@@ -1,0 +1,158 @@
+import { ITaskRepository } from '../repositories/interfaces/ITaskRepository';
+import { Task, CreateTaskRequest, UpdateTaskRequest, TaskQuery } from '../models/Task';
+import logger from '../utils/logger';
+
+export class TaskService {
+  constructor(private taskRepository: ITaskRepository) {}
+
+  async createTask(taskData: CreateTaskRequest, assignedBy: string, currentUserRole: string): Promise<Task> {
+    try {
+      // Only admins can assign tasks
+      if (currentUserRole !== 'admin') {
+        throw new Error('Only administrators can assign tasks');
+      }
+
+      logger.info('TaskService: Creating task', { title: taskData.title, assignedBy });
+
+      // Validate required fields
+      if (!taskData.title || !taskData.assigneeId || !taskData.dueDate) {
+        throw new Error('Title, assignee ID, and due date are required');
+      }
+
+      const task = await this.taskRepository.create(taskData, assignedBy);
+
+      logger.info('TaskService: Task created successfully', { taskId: task.id });
+      return task;
+    } catch (error) {
+      logger.error('TaskService: Create task failed', { error: (error as Error).message });
+      throw error;
+    }
+  }
+
+  async getAllTasks(query?: TaskQuery, currentUserRole?: string, currentUserId?: string): Promise<{ tasks: Task[]; total: number; page: number; limit: number }> {
+    try {
+      logger.info('TaskService: Getting all tasks', { role: currentUserRole });
+
+      // Non-admin users can only see tasks assigned to them
+      if (currentUserRole !== 'admin') {
+        query = { ...query, assigneeId: currentUserId };
+      }
+
+      return await this.taskRepository.findAll(query);
+    } catch (error) {
+      logger.error('TaskService: Get all tasks failed', { error: (error as Error).message });
+      throw error;
+    }
+  }
+
+  async getTaskById(id: string, currentUserRole: string, currentUserId?: string): Promise<Task | null> {
+    try {
+      const task = await this.taskRepository.findById(id);
+
+      if (!task) {
+        return null;
+      }
+
+      // Check permissions
+      if (currentUserRole !== 'admin' && task.assigneeId !== currentUserId) {
+        throw new Error('Access denied');
+      }
+
+      return task;
+    } catch (error) {
+      logger.error('TaskService: Get task by ID failed', { error: (error as Error).message });
+      throw error;
+    }
+  }
+
+  async getMyTasks(userId: string): Promise<Task[]> {
+    try {
+      return await this.taskRepository.findByAssignee(userId);
+    } catch (error) {
+      logger.error('TaskService: Get my tasks failed', { error: (error as Error).message });
+      throw error;
+    }
+  }
+
+  async updateTask(id: string, taskData: UpdateTaskRequest, currentUserRole: string, currentUserId?: string): Promise<Task> {
+    try {
+      // Check if task exists
+      const existingTask = await this.taskRepository.findById(id);
+      if (!existingTask) {
+        throw new Error('Task not found');
+      }
+
+      // Check permissions
+      if (currentUserRole !== 'admin' && existingTask.assigneeId !== currentUserId) {
+        throw new Error('Access denied');
+      }
+
+      // Non-admin users can only update status
+      if (currentUserRole !== 'admin') {
+        const allowedFields = ['status'];
+        const filteredData: UpdateTaskRequest = {};
+
+        allowedFields.forEach(field => {
+          if (taskData[field as keyof UpdateTaskRequest] !== undefined) {
+            (filteredData as any)[field] = taskData[field as keyof UpdateTaskRequest];
+          }
+        });
+
+        taskData = filteredData;
+      }
+
+      const updatedTask = await this.taskRepository.update(id, taskData);
+
+      logger.info('TaskService: Task updated successfully', { taskId: id });
+      return updatedTask;
+    } catch (error) {
+      logger.error('TaskService: Update task failed', { error: (error as Error).message });
+      throw error;
+    }
+  }
+
+  async updateTaskStatus(id: string, status: 'pending' | 'in_progress' | 'completed' | 'cancelled', currentUserRole: string, currentUserId?: string): Promise<Task> {
+    try {
+      // Check if task exists
+      const existingTask = await this.taskRepository.findById(id);
+      if (!existingTask) {
+        throw new Error('Task not found');
+      }
+
+      // Check permissions
+      if (currentUserRole !== 'admin' && existingTask.assigneeId !== currentUserId) {
+        throw new Error('Access denied');
+      }
+
+      const updatedTask = await this.taskRepository.updateStatus(id, status);
+
+      logger.info('TaskService: Task status updated successfully', { taskId: id, status });
+      return updatedTask;
+    } catch (error) {
+      logger.error('TaskService: Update task status failed', { error: (error as Error).message });
+      throw error;
+    }
+  }
+
+  async deleteTask(id: string, currentUserRole: string, currentUserId?: string): Promise<void> {
+    try {
+      // Check if task exists
+      const existingTask = await this.taskRepository.findById(id);
+      if (!existingTask) {
+        throw new Error('Task not found');
+      }
+
+      // Only admins can delete tasks
+      if (currentUserRole !== 'admin') {
+        throw new Error('Only administrators can delete tasks');
+      }
+
+      await this.taskRepository.delete(id);
+
+      logger.info('TaskService: Task deleted successfully', { taskId: id });
+    } catch (error) {
+      logger.error('TaskService: Delete task failed', { error: (error as Error).message });
+      throw error;
+    }
+  }
+}
