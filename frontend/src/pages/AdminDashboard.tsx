@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabaseClient';
 import { notificationService } from '../services/notificationService';
 import Logo from '../components/ui/Logo';
 import { authService } from '../services/authService';
+import { BottomNavbar } from '../components/layout/BottomNavbar';
 
 export default function AdminDashboard() {
   const [darkMode, setDarkMode] = useState(false);
@@ -211,6 +212,9 @@ export default function AdminDashboard() {
         position="top-right"
         maxToasts={5}
       />
+
+      {/* Bottom Navigation */}
+      <BottomNavbar darkMode={darkMode} />
     </div>
   );
 }

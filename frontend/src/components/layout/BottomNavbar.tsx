@@ -1,0 +1,130 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import {
+  LayoutDashboard,
+  Users,
+  CheckSquare,
+  Clock,
+  Calendar,
+  BarChart3,
+  Settings,
+  LogOut,
+  User
+} from 'lucide-react';
+import { Button } from '../ui/Button';
+
+interface BottomNavbarProps {
+  darkMode?: boolean;
+}
+
+export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+        setIsProfileOpen(false);
+      }
+    }
+
+    if (isProfileOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isProfileOpen]);
+
+  const navItems = [
+    { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard', active: location.pathname === '/dashboard' },
+    { icon: Users, label: 'Employees', path: '/employees', active: location.pathname === '/employees' },
+    { icon: CheckSquare, label: 'Tasks', path: '/tasks', active: location.pathname === '/tasks' },
+    { icon: Clock, label: 'Attendance', path: '/attendance', active: location.pathname === '/attendance' },
+    { icon: Calendar, label: 'Leave', path: '/leave', active: location.pathname === '/leave' },
+    { icon: BarChart3, label: 'Reports', path: '/reports', active: location.pathname === '/reports' },
+  ];
+
+  const handleNavigation = (path: string) => {
+    navigate(path);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    navigate('/auth');
+  };
+
+  return (
+    <>
+      {/* Bottom Navigation Bar */}
+      <nav className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-t fixed bottom-0 left-0 right-0 z-40`}>
+        <div className="flex justify-around items-center py-2 px-4">
+          {navItems.map((item) => (
+            <button
+              key={item.path}
+              onClick={() => handleNavigation(item.path)}
+              className={`flex flex-col items-center justify-center p-2 rounded-lg transition-colors ${
+                item.active
+                  ? (darkMode ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-600')
+                  : (darkMode ? 'text-gray-400 hover:text-white hover:bg-gray-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50')
+              }`}
+            >
+              <item.icon className="h-5 w-5 mb-1" />
+              <span className="text-xs font-medium">{item.label}</span>
+            </button>
+          ))}
+
+          {/* Profile Button */}
+          <div className="relative" ref={profileRef}>
+            <button
+              onClick={() => setIsProfileOpen(!isProfileOpen)}
+              className={`flex flex-col items-center justify-center p-2 rounded-lg transition-colors ${
+                darkMode ? 'text-gray-400 hover:text-white hover:bg-gray-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              <User className="h-5 w-5 mb-1" />
+              <span className="text-xs font-medium">Profile</span>
+            </button>
+
+            {/* Profile Dropdown */}
+            {isProfileOpen && (
+              <div className={`absolute bottom-full right-0 mb-2 w-48 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border rounded-lg shadow-lg z-50`}>
+                <div className="p-2">
+                  <button
+                    onClick={() => {
+                      setIsProfileOpen(false);
+                      // Handle settings - for now just close dropdown
+                    }}
+                    className={`w-full text-left px-3 py-2 rounded ${darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'} flex items-center`}
+                  >
+                    <Settings className="h-4 w-4 mr-2" />
+                    Settings
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsProfileOpen(false);
+                      handleLogout();
+                    }}
+                    className={`w-full text-left px-3 py-2 rounded ${darkMode ? 'text-red-400 hover:bg-gray-700' : 'text-red-600 hover:bg-gray-100'} flex items-center`}
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Logout
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </nav>
+
+      {/* Spacer for fixed navbar */}
+      <div className="h-16"></div>
+    </>
+  );
+}
