@@ -10,9 +10,21 @@ export class AuthController {
     try {
       const userData: CreateUserRequest = req.body;
 
-      logger.info('AuthController: Signup request', { email: userData.email });
+      logger.info('🔍 [AuthController] Signup request received', {
+        email: userData.email,
+        fullName: userData.fullName,
+        role: userData.role || 'employee',
+        hasPassword: !!userData.password,
+        body: JSON.stringify(req.body, null, 2)
+      });
 
       const result = await this.authService.signUp(userData);
+
+      logger.info('✅ [AuthController] Signup successful', {
+        userId: result.user.id,
+        email: userData.email,
+        role: result.user.role
+      });
 
       res.status(201).json({
         status: 'success',
@@ -24,10 +36,27 @@ export class AuthController {
         }
       });
     } catch (error) {
-      logger.error('AuthController: Signup error', { error: (error as Error).message });
+      logger.error('❌ [AuthController] Signup error', {
+        error: (error as Error).message,
+        stack: (error as Error).stack,
+        email: req.body.email,
+        body: JSON.stringify(req.body, null, 2)
+      });
+
+      // Provide more specific error messages
+      let errorMessage = (error as Error).message;
+      if (errorMessage.includes('Email already registered')) {
+        errorMessage = 'This email is already registered. Please try signing in instead.';
+      } else if (errorMessage.includes('Database error')) {
+        errorMessage = 'There was an issue creating your account. Please contact support.';
+      } else if (errorMessage.includes('Check your inbox')) {
+        errorMessage = 'Please check your email for a confirmation link.';
+      }
+
       res.status(400).json({
         status: 'error',
-        message: (error as Error).message
+        message: errorMessage,
+        originalError: (error as Error).message
       });
     }
   }

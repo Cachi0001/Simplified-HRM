@@ -43,9 +43,22 @@ const SignupCard: React.FC<SignupCardProps> = ({ onSwitchToLogin }) => {
 
     } catch (err) {
       if (err instanceof Error) {
-        setError(err.message);
+        let errorMessage = err.message;
+
+        // Provide more specific guidance based on error type
+        if (errorMessage.includes('Email already registered')) {
+          errorMessage = 'This email is already registered. Please try signing in instead, or contact support if you need help.';
+        } else if (errorMessage.includes('Database error')) {
+          errorMessage = 'There was an issue creating your account. Please try again in a few minutes or contact support.';
+        } else if (errorMessage.includes('Check your inbox')) {
+          errorMessage = 'Please check your email for a confirmation link. The link will expire in 24 hours.';
+        } else if (errorMessage.includes('Password')) {
+          errorMessage = 'Password must be at least 6 characters long and contain letters and numbers.';
+        }
+
+        setError(errorMessage);
       } else {
-        setError('An unexpected error occurred.');
+        setError('An unexpected error occurred. Please try again or contact support.');
       }
     } finally {
       setIsLoading(false);

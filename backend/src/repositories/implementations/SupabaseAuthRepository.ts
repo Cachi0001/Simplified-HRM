@@ -33,19 +33,37 @@ export class SupabaseAuthRepository implements IAuthRepository {
   // ———————————————————— SIGN UP ————————————————————
   async signUp(userData: CreateUserRequest): Promise<AuthResponse> {
     try {
-      logger.info('Signing up user', { email: userData.email });
+      logger.info('🔍 [SupabaseAuthRepository] Starting signup process', {
+        email: userData.email,
+        fullName: userData.fullName,
+        role: userData.role || 'employee'
+      });
 
-      // 1. Admin list – see if email already exists
-      const { data: { users } } = await this.supabaseAdmin.auth.admin.listUsers();
+      // 1. Check if email already exists
+      logger.info('🔍 [SupabaseAuthRepository] Checking for existing users...');
+      const { data: { users }, error: listError } = await this.supabaseAdmin.auth.admin.listUsers();
+
+      if (listError) {
+        logger.error('❌ [SupabaseAuthRepository] Failed to list users', { error: listError });
+        throw new Error('Failed to check existing users');
+      }
+
       const existing = users.find(u => u.email === userData.email);
+      logger.info('🔍 [SupabaseAuthRepository] Existing user check', {
+        email: userData.email,
+        userExists: !!existing,
+        confirmed: existing?.email_confirmed_at ? true : false
+      });
 
       if (existing) {
         // 2. Already confirmed → block duplicate
         if (existing.email_confirmed_at) {
+          logger.warn('❌ [SupabaseAuthRepository] Email already registered and confirmed', { email: userData.email });
           throw new Error('Email already registered');
         }
 
         // 3. Not confirmed → resend confirmation email
+        logger.info('🔄 [SupabaseAuthRepository] Resending confirmation email', { email: userData.email });
         const { error } = await this.supabase.auth.resend({
           type: 'signup',
           email: userData.email,
@@ -54,13 +72,17 @@ export class SupabaseAuthRepository implements IAuthRepository {
           },
         });
 
-        if (error) throw error;
+        if (error) {
+          logger.error('❌ [SupabaseAuthRepository] Failed to resend confirmation', { error: error.message });
+          throw error;
+        }
 
-        // Return a helpful message (no token – user must click link)
+        logger.info('✅ [SupabaseAuthRepository] Confirmation email resent successfully');
         throw new Error('Check your inbox – we sent you a new confirmation email');
       }
 
-      // 4. New user – normal signup
+      // 4. New user – create Supabase auth user
+      logger.info('🆕 [SupabaseAuthRepository] Creating new Supabase auth user...');
       const { data, error } = await this.supabase.auth.signUp({
         email: userData.email,
         password: userData.password,
@@ -73,8 +95,20 @@ export class SupabaseAuthRepository implements IAuthRepository {
         },
       });
 
-      if (error) throw error;
-      if (!data.user) throw new Error('Signup failed');
+      if (error) {
+        logger.error('❌ [SupabaseAuthRepository] Supabase auth signup failed', { error: error.message });
+        throw error;
+      }
+
+      if (!data.user) {
+        logger.error('❌ [SupabaseAuthRepository] No user returned from Supabase signup');
+        throw new Error('Signup failed - no user created');
+      }
+
+      logger.info('✅ [SupabaseAuthRepository] Supabase auth user created successfully', {
+        userId: data.user.id,
+        email: data.user.email
+      });
 
       const user: User = {
         id: data.user.id,
@@ -86,9 +120,93 @@ export class SupabaseAuthRepository implements IAuthRepository {
         updatedAt: new Date(data.user.updated_at || data.user.created_at!),
       };
 
+      // 5. Create employee record in database if role is employee
+      if (userData.role === 'employee' || !userData.role) {
+        logger.info('👤 [SupabaseAuthRepository] Creating employee record in database...');
+        try {
+          logger.info('🔍 [SupabaseAuthRepository] Checking employees table structure...');
+
+          // First check if employees table exists and its structure
+          const { data: tableInfo, error: tableError } = await this.supabaseAdmin
+            .from('employees')
+            .select('*')
+            .limit(1);
+
+          if (tableError) {
+            logger.error('❌ [SupabaseAuthRepository] Employees table error', {
+              error: tableError.message,
+              details: tableError.details,
+              hint: tableError.hint,
+              code: tableError.code
+            });
+            throw new Error(`Database schema error: ${tableError.message}`);
+          }
+
+          logger.info('✅ [SupabaseAuthRepository] Employees table exists, inserting record...');
+
+          const { error: empError } = await this.supabaseAdmin
+            .from('employees')
+            .insert({
+              user_id: data.user.id,
+              full_name: userData.fullName,
+              email: userData.email,
+              role: userData.role || 'employee',
+              status: 'pending', // Pending admin approval
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+
+          if (empError) {
+            logger.error('❌ [SupabaseAuthRepository] Failed to create employee record', {
+              error: empError.message,
+              details: empError.details,
+              hint: empError.hint,
+              code: empError.code
+            });
+            throw new Error(`Database error saving employee record: ${empError.message}`);
+          }
+
+          logger.info('✅ [SupabaseAuthRepository] Employee record created successfully', {
+            userId: data.user.id,
+            employeeData: {
+              user_id: data.user.id,
+              full_name: userData.fullName,
+              email: userData.email,
+              role: 'employee',
+              status: 'pending'
+            }
+          });
+
+          // 6. Send admin notification email
+          logger.info('📧 [SupabaseAuthRepository] Sending admin notification email...');
+          try {
+            const emailService = new EmailService();
+            await emailService.sendApprovalNotification(userData.email, userData.fullName);
+            logger.info('✅ [SupabaseAuthRepository] Admin approval notification sent', { email: userData.email });
+          } catch (emailError) {
+            logger.warn('⚠️ [SupabaseAuthRepository] Admin notification email failed (non-critical)', { error: (emailError as Error).message });
+          }
+        } catch (empCreateError) {
+          logger.error('❌ [SupabaseAuthRepository] Employee creation process failed', {
+            error: (empCreateError as Error).message,
+            stack: (empCreateError as Error).stack
+          });
+          throw new Error(`Employee record creation failed: ${(empCreateError as Error).message}`);
+        }
+      }
+
+      logger.info('🎉 [SupabaseAuthRepository] Signup process completed successfully', {
+        userId: data.user.id,
+        email: userData.email
+      });
+
       return { user, accessToken: '', refreshToken: '' };
     } catch (error) {
-      logger.error('Signup failed', { error: (error as Error).message });
+      logger.error('❌ [SupabaseAuthRepository] Signup process failed', {
+        error: (error as Error).message,
+        stack: (error as Error).stack,
+        email: userData.email
+      });
       throw error;
     }
   }

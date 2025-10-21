@@ -7,18 +7,37 @@ export class AuthService {
 
   async signUp(userData: CreateUserRequest): Promise<AuthResponse> {
     try {
-      logger.info('AuthService: Signing up user', { email: userData.email });
+      logger.info('🔍 [AuthService] Starting user signup process', {
+        email: userData.email,
+        fullName: userData.fullName,
+        role: userData.role || 'employee'
+      });
 
       if (!userData.email || !userData.password || !userData.fullName) {
+        logger.error('❌ [AuthService] Missing required fields', {
+          hasEmail: !!userData.email,
+          hasPassword: !!userData.password,
+          hasFullName: !!userData.fullName
+        });
         throw new Error('Email, password, and full name are required');
       }
 
+      logger.info('🔄 [AuthService] Calling repository signup...');
       const result = await this.authRepository.signUp(userData);
 
-      logger.info('AuthService: User signed up successfully', { userId: result.user.id });
+      logger.info('✅ [AuthService] User signed up successfully', {
+        userId: result.user.id,
+        email: userData.email,
+        role: result.user.role
+      });
+
       return result;
     } catch (error) {
-      logger.error('AuthService: Signup failed', { error: (error as Error).message });
+      logger.error('❌ [AuthService] Signup failed', {
+        error: (error as Error).message,
+        stack: (error as Error).stack,
+        email: userData.email
+      });
       throw error;
     }
   }

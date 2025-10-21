@@ -76,7 +76,16 @@ CREATE POLICY "Users can insert their own push subscriptions" ON public.push_sub
 CREATE POLICY "Users can update their own push subscriptions" ON public.push_subscriptions
     FOR UPDATE USING (auth.uid() = user_id);
 
--- Create RLS policies for employees (admin only for now)
+
+CREATE POLICY "Users can create their own employee record" ON public.employees
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can-- Create RLS policies for employees view their own employee record" ON public.employees
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own employee record" ON public.employees
+    FOR UPDATE USING (auth.uid() = user_id);
+
 CREATE POLICY "Admins can view all employees" ON public.employees
     FOR SELECT USING (
         EXISTS (
