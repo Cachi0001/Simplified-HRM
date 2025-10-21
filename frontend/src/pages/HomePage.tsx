@@ -102,8 +102,8 @@ const HomePage: React.FC = () => {
                 </svg>
               </div>
               <h3 className="text-xl font-semibold text-light mb-2">Email</h3>
-              <a href="mailto:contact@gonet.com" className="text-highlight hover:underline">
-                contact@gonet.com
+              <a href="mailto:info@go3net.com" className="text-highlight hover:underline">
+                info@go3net.com
               </a>
             </div>
           </div>
