@@ -8,7 +8,6 @@ import ConfirmEmail from './src/pages/ConfirmEmail';
 import Header from './src/components/layout/Header';
 import Footer from './src/components/layout/Footer';
 
-// Create a client
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
