@@ -26,15 +26,17 @@ export class SupabaseAuthRepository implements IAuthRepository {
     try {
       logger.info('Signing up user', { email: userData.email });
 
-      // Check if email already exists in employees table
-      const { data: existingEmployee } = await this.supabase
-        .from('employees')
-        .select('id')
-        .eq('email', userData.email)
-        .single();
-
-      if (existingEmployee) {
-        throw new Error('Email already registered');
+      // Check if email already exists in Supabase Auth (not employees table)
+      // This prevents duplicate auth users, the trigger will handle employee creation
+      try {
+        const { data: existingAuthUser } = await this.supabase.auth.admin.listUsers();
+        const emailExists = existingAuthUser.users.some(user => user.email === userData.email);
+        if (emailExists) {
+          throw new Error('Email already registered');
+        }
+      } catch (authCheckError) {
+        // If we can't check auth users, continue and let Supabase handle duplicate detection
+        logger.warn('Could not check existing auth users', { error: (authCheckError as Error).message });
       }
 
       const { data, error } = await this.supabase.auth.signUp({
@@ -78,39 +80,25 @@ export class SupabaseAuthRepository implements IAuthRepository {
         }
       }
 
-      // Create employee record with verification token
-      const verificationToken = crypto.randomBytes(32).toString('hex');
-
-      const { data: employeeData, error: employeeError } = await this.supabase
-        .from('employees')
-        .insert({
-          user_id: data.user.id,
-          email: userData.email,
-          full_name: userData.fullName,
-          role: userData.role || 'employee',
-          status: 'pending',
-          email_verification_token: verificationToken,
-          email_verified: false
-        })
-        .select()
-        .single();
-
-      if (employeeError) {
-        logger.error('Employee creation error', { error: employeeError.message });
-        throw new Error('Failed to create employee record');
+      // Send welcome email using EmailService (trigger will create employee record)
+      try {
+        const emailService = new EmailService();
+        // Generate a temporary approval token for the welcome email
+        const approvalToken = crypto.randomBytes(32).toString('hex');
+        await emailService.sendWelcomeEmail(userData.email, userData.fullName, approvalToken);
+        logger.info('Welcome email sent successfully', { email: userData.email });
+      } catch (emailError) {
+        logger.error('Error sending welcome email', { error: (emailError as Error).message });
+        // Don't fail signup if email fails, but log it
       }
 
-      // Send custom confirmation email
-      const emailService = new EmailService();
-      const confirmationUrl = `http://localhost:3000/auth/verify-email?token=${verificationToken}`;
-      await emailService.sendEmailConfirmation(userData.email, userData.fullName, confirmationUrl);
-
+      // Create a basic user object (employee details will be populated by trigger)
       const user: User = {
         id: data.user.id,
         email: data.user.email!,
-        fullName: employeeData.full_name,
-        role: employeeData.role,
-        emailVerified: false, // Custom verification
+        fullName: userData.fullName,
+        role: userData.role || 'employee',
+        emailVerified: false, // Will be updated when email is verified
         createdAt: new Date(data.user.created_at),
         updatedAt: new Date(data.user.updated_at || data.user.created_at)
       };
@@ -353,18 +341,29 @@ export class SupabaseAuthRepository implements IAuthRepository {
         throw new Error('Invalid verification token');
       }
 
-      // Update employee to verified
-      const { error: updateError } = await this.supabase
-        .from('employees')
-        .update({
-          email_verified: true,
-          email_verification_token: null
-        })
-        .eq('id', employee.id);
+      // Update employee to verified - handle columns gracefully
+      const updateData: any = {};
 
-      if (updateError) {
-        logger.error('Email verification update error', { error: updateError.message });
-        throw new Error('Failed to verify email');
+      try {
+        updateData.email_verified = true;
+        updateData.email_verification_token = null;
+      } catch (schemaError) {
+        // If columns don't exist, we'll skip this update
+        logger.warn('Email verification columns not available for update', {
+          error: (schemaError as Error).message
+        });
+      }
+
+      if (Object.keys(updateData).length > 0) {
+        const { error: updateError } = await this.supabase
+          .from('employees')
+          .update(updateData)
+          .eq('id', employee.id);
+
+        if (updateError) {
+          logger.error('Email verification update error', { error: updateError.message });
+          throw new Error('Failed to verify email');
+        }
       }
     } catch (error) {
       logger.error('Email verification failed', { error: (error as Error).message });

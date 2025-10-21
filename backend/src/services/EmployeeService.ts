@@ -7,14 +7,12 @@ export class EmployeeService {
 
   async createEmployee(employeeData: CreateEmployeeRequest, userId: string, currentUserRole: string): Promise<Employee> {
     try {
-      // Only admins can create employees
       if (currentUserRole !== 'admin') {
         throw new Error('Only administrators can create employees');
       }
 
       logger.info('EmployeeService: Creating employee', { email: employeeData.email, createdBy: userId });
 
-      // Validate required fields
       if (!employeeData.email || !employeeData.fullName || !employeeData.role) {
         throw new Error('Email, full name, and role are required');
       }
