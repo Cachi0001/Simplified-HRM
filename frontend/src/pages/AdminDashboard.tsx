@@ -1,14 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { OverviewCards } from '../components/dashboard/OverviewCards';
 import { PendingApprovals } from '../components/dashboard/PendingApprovals';
 import { NotificationBell } from '../components/dashboard/NotificationBell';
 import { DarkModeToggle } from '../components/ui/DarkModeToggle';
+import { NotificationManager, triggerNotification, NotificationUtils } from '../components/notifications/NotificationManager';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabaseClient';
+import { notificationService } from '../services/notificationService';
 import Logo from '../components/ui/Logo';
 
 export default function AdminDashboard() {
   const [darkMode, setDarkMode] = useState(false);
+
+  // Get current user for notifications
+  const { data: user } = useQuery({
+    queryKey: ['current-user'],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      return user;
+    },
+  });
 
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['employee-stats'],
@@ -20,6 +31,34 @@ export default function AdminDashboard() {
       return { total, active, pending };
     },
   });
+
+  // Initialize push notifications on mount
+  useEffect(() => {
+    notificationService.initializePushNotifications();
+  }, []);
+
+  // Listen for employee signup events (simulate real-time updates)
+  useEffect(() => {
+    if (!user) return;
+
+    // Simulate receiving notifications for demo purposes
+    const demoNotifications = [
+      NotificationUtils.employeeSignup('John Doe', '123'),
+      NotificationUtils.approvalRequired('Jane Smith', '456'),
+      NotificationUtils.profileUpdated('Mike Johnson', '789')
+    ];
+
+    // Show demo notifications after a delay
+    const timer = setTimeout(() => {
+      demoNotifications.forEach((notification, index) => {
+        setTimeout(() => {
+          triggerNotification(notification);
+        }, index * 3000); // Stagger notifications
+      });
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [user]);
 
   return (
     <div className={`min-h-screen transition-colors duration-300 ${darkMode ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}>
@@ -66,6 +105,14 @@ export default function AdminDashboard() {
           <PendingApprovals darkMode={darkMode} />
         </section>
       </div>
+
+      {/* Notification Manager - handles toast notifications */}
+      <NotificationManager
+        userId={user?.id}
+        darkMode={darkMode}
+        position="top-right"
+        maxToasts={5}
+      />
     </div>
   );
 }

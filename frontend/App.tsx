@@ -8,6 +8,7 @@ import ConfirmEmail from './src/pages/ConfirmEmail';
 import AdminDashboard from './src/pages/AdminDashboard';
 import Header from './src/components/layout/Header';
 import Footer from './src/components/layout/Footer';
+import { NotificationManager } from './src/components/notifications/NotificationManager';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,6 +34,9 @@ function App() {
             </Routes>
           </main>
           <Footer />
+
+          {/* Global Notification Manager */}
+          <NotificationManager position="top-right" maxToasts={5} />
         </div>
       </HashRouter>
     </QueryClientProvider>
