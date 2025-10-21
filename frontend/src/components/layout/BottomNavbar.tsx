@@ -20,9 +20,19 @@ interface BottomNavbarProps {
 export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [localDarkMode, setLocalDarkMode] = useState(() => {
+    // Load dark mode preference from localStorage
+    const saved = localStorage.getItem('darkMode');
+    return saved ? JSON.parse(saved) : false;
+  });
   const profileRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Update local dark mode when prop changes
+  useEffect(() => {
+    setLocalDarkMode(darkMode);
+  }, [darkMode]);
 
   // Get current user on mount
   useEffect(() => {
@@ -73,7 +83,7 @@ export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
   return (
     <>
       {/* Bottom Navigation Bar */}
-      <nav className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-t fixed bottom-0 left-0 right-0 z-40`}>
+      <nav className={`${localDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-t fixed bottom-0 left-0 right-0 z-40`}>
         <div className="flex justify-around items-center py-2 px-4">
           {navItems.map((item) => (
             <button
@@ -81,8 +91,8 @@ export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
               onClick={() => handleNavigation(item.path)}
               className={`flex flex-col items-center justify-center p-2 rounded-lg transition-colors ${
                 item.active
-                  ? (darkMode ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-600')
-                  : (darkMode ? 'text-gray-400 hover:text-white hover:bg-gray-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50')
+                  ? (localDarkMode ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-600')
+                  : (localDarkMode ? 'text-gray-400 hover:text-white hover:bg-gray-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50')
               }`}
             >
               <item.icon className="h-5 w-5 mb-1" />
@@ -95,7 +105,7 @@ export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
             <button
               onClick={() => setIsProfileOpen(!isProfileOpen)}
               className={`flex flex-col items-center justify-center p-2 rounded-lg transition-colors ${
-                darkMode ? 'text-gray-400 hover:text-white hover:bg-gray-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                localDarkMode ? 'text-gray-400 hover:text-white hover:bg-gray-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
               }`}
             >
               <User className="h-5 w-5 mb-1" />
@@ -104,14 +114,14 @@ export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
 
             {/* Profile Dropdown */}
             {isProfileOpen && (
-              <div className={`absolute bottom-full right-0 mb-2 w-48 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border rounded-lg shadow-lg z-50`}>
+              <div className={`absolute bottom-full right-0 mb-2 w-48 ${localDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border rounded-lg shadow-lg z-50`}>
                 <div className="p-2">
                   <button
                     onClick={() => {
                       setIsProfileOpen(false);
                       // Handle settings - for now just close dropdown
                     }}
-                    className={`w-full text-left px-3 py-2 rounded ${darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'} flex items-center`}
+                    className={`w-full text-left px-3 py-2 rounded ${localDarkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'} flex items-center`}
                   >
                     <Settings className="h-4 w-4 mr-2" />
                     Settings
@@ -121,7 +131,7 @@ export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
                       setIsProfileOpen(false);
                       handleLogout();
                     }}
-                    className={`w-full text-left px-3 py-2 rounded ${darkMode ? 'text-red-400 hover:bg-gray-700' : 'text-red-600 hover:bg-gray-100'} flex items-center`}
+                    className={`w-full text-left px-3 py-2 rounded ${localDarkMode ? 'text-red-400 hover:bg-gray-700' : 'text-red-600 hover:bg-gray-100'} flex items-center`}
                   >
                     <LogOut className="h-4 w-4 mr-2" />
                     Logout

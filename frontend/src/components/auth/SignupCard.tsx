@@ -104,7 +104,7 @@ const SignupCard: React.FC<SignupCardProps> = ({ onSwitchToLogin }) => {
             type="button"
             onClick={() => setShowPassword(!showPassword)}
             className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-all duration-200 flex items-center justify-center w-8 h-8 rounded-md hover:bg-gray-100"
-            style={{ top: '50%', transform: 'translateY(-50%)', marginTop: '1px' }}
+            style={{ top: '50%', transform: 'translateY(-50%)' }}
           >
             {showPassword ? (
               <EyeOff className="h-4 w-4" />

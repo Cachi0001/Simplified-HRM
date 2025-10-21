@@ -16,7 +16,7 @@ export const Input: React.FC<InputProps> = ({ label, id, className = "", ...prop
         <input
           id={id}
           {...props}
-          className={`appearance-none block w-full px-3 py-3 border border-accent bg-primary rounded-md shadow-sm placeholder-gray-500 focus:outline-none focus:ring-highlight focus:border-highlight sm:text-sm text-light h-11 ${className}`.replace(/\s+/g, ' ').trim()}
+          className={`appearance-none block w-full px-3 py-2.5 border border-accent bg-primary rounded-md shadow-sm placeholder-gray-500 focus:outline-none focus:ring-highlight focus:border-highlight sm:text-sm text-light h-10 ${className}`.replace(/\s+/g, ' ').trim()}
         />
       </div>
     </div>
