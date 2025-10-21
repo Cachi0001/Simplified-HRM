@@ -177,8 +177,8 @@ class NotificationService {
 
     const options: NotificationOptions = {
       body: notification.message,
-      icon: import.meta.env.VITE_PUSH_NOTIFICATION_ICON || '/logo.png',
-      badge: import.meta.env.VITE_PUSH_NOTIFICATION_BADGE || '/badge.png',
+      icon: (import.meta as any).env?.VITE_PUSH_NOTIFICATION_ICON || '/logo.png',
+      badge: (import.meta as any).env?.VITE_PUSH_NOTIFICATION_BADGE || '/badge.png',
       tag: `go3net-${notification.id}`,
       data: {
         notificationId: notification.id,
