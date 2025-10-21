@@ -1,0 +1,41 @@
+
+import React from 'react';
+import { HashRouter, Routes, Route } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import HomePage from './src/pages/HomePage';
+import AuthPage from './src/pages/AuthPage';
+import ConfirmEmail from './src/pages/ConfirmEmail';
+import Header from './src/components/layout/Header';
+import Footer from './src/components/layout/Footer';
+
+// Create a client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <HashRouter>
+        <div className="flex flex-col min-h-screen bg-primary">
+          <Header />
+          <main className="flex-grow">
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/auth" element={<AuthPage />} />
+              <Route path="/confirm" element={<ConfirmEmail />} />
+            </Routes>
+          </main>
+          <Footer />
+        </div>
+      </HashRouter>
+    </QueryClientProvider>
+  );
+}
+
+export default App;

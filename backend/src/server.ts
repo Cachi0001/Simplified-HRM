@@ -36,14 +36,35 @@ const corsOptions = {
     // Allow requests with no origin (mobile apps, serverless, etc.)
     if (!origin) return callback(null, true);
 
-    const allowedOrigins = process.env.NODE_ENV === 'production'
-      ? [process.env.FRONTEND_URL, process.env.VERCEL_URL].filter(Boolean)
-      : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:4173'];
+    // Always allow localhost origins for development/testing
+    const localhostOrigins = [
+      'http://localhost:3000',
+      'http://localhost:5173',
+      'http://localhost:4173',
+      'http://127.0.0.1:5173',
+      'http://127.0.0.1:3000'
+    ];
+
+    // Production frontend URLs
+    const productionOrigins = [
+      process.env.FRONTEND_URL,
+      process.env.VERCEL_URL,
+      'https://go3nethrm.vercel.app', // Deployed frontend URL
+      'https://go3nethrm.com' // Alternative domain
+    ].filter(Boolean);
+
+    // Combine all allowed origins
+    const allowedOrigins = [...localhostOrigins, ...productionOrigins];
 
     if (allowedOrigins.some(allowed => origin.startsWith(allowed))) {
       callback(null, true);
     } else {
-      callback(null, true); // Allow all in development
+      // For security, only allow specific origins in production
+      if (process.env.NODE_ENV === 'production') {
+        callback(new Error('Not allowed by CORS'), false);
+      } else {
+        callback(null, true); // Allow all in development
+      }
     }
   },
   credentials: true,

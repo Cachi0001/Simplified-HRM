@@ -1,0 +1,28 @@
+import React from 'react';
+import { Link, NavLink } from 'react-router-dom';
+import Logo from '../ui/Logo';
+
+const Header: React.FC = () => {
+  return (
+    <header className="bg-secondary/50 backdrop-blur-sm sticky top-0 z-50">
+      <nav className="container mx-auto px-6 py-4 flex justify-between items-center">
+        <Link to="/" className="text-xl font-bold text-white">
+          <Logo className="h-10 w-auto" />
+        </Link>
+        <div className="hidden md:flex items-center space-x-8">
+          <NavLink to="/" className={({ isActive }) => `hover:text-highlight transition-colors ${isActive ? 'text-highlight' : 'text-light'}`}>Home</NavLink>
+          <a href="#features" className="hover:text-highlight transition-colors text-light">Features</a>
+          <a href="#contact" className="hover:text-highlight transition-colors text-light">Contact</a>
+        </div>
+        <div className="flex items-center space-x-4">
+          <Link to="/auth" className="text-light hover:text-highlight transition-colors">Login</Link>
+          <Link to="/auth" state={{ initialView: 'signup' }} className="bg-highlight text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors">
+            Sign Up
+          </Link>
+        </div>
+      </nav>
+    </header>
+  );
+};
+
+export default Header;
