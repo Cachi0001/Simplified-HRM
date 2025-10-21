@@ -37,7 +37,7 @@ const HomePage: React.FC = () => {
           Modern HR Management,<br /> <span className="text-highlight">Simplified</span>
         </h1>
         <p className="mt-6 text-lg text-gray-300 max-w-2xl mx-auto">
-          GoNet provides a comprehensive suite of tools to manage your workforce efficiently, from onboarding to analytics.
+          Go3net provides a comprehensive suite of tools to manage your workforce efficiently, from onboarding to analytics.
         </p>
         <div className="mt-8">
           <Link to="/auth" state={{ initialView: 'signup' }} className="bg-highlight text-white text-lg font-semibold px-8 py-3 rounded-md hover:bg-blue-600 transition-colors transform hover:scale-105">
@@ -48,7 +48,7 @@ const HomePage: React.FC = () => {
 
       {/* Features Section */}
       <section id="features" className="py-20">
-        <h2 className="text-4xl font-bold text-center mb-12 text-light">Why Choose GoNet?</h2>
+        <h2 className="text-4xl font-bold text-center mb-12 text-light">Why Choose Go3net?</h2>
         <div className="grid md:grid-cols-3 gap-8">
           {features.map((feature, index) => (
             <FeatureCard key={index} {...feature} />

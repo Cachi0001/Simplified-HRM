@@ -53,7 +53,7 @@ const SignupCard: React.FC<SignupCardProps> = ({ onSwitchToLogin }) => {
   return (
     <AuthCard
       title="Create an Account"
-      subtitle="Join GoNet to streamline your HR processes"
+      subtitle="Join Go3net to streamline your HR processes"
     >
       <form onSubmit={handleSubmit} className="space-y-6">
         <Input

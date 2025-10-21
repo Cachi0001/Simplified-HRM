@@ -9,7 +9,7 @@ const Footer: React.FC = () => {
         <div className="flex flex-col items-center text-center">
           <Logo className="h-12" />
           <p className="max-w-md mx-auto mt-4 text-gray-400">
-            GoNet HR Management: Streamlining your HR processes with cutting-edge technology.
+            Go3net HR Management: Streamlining your HR processes with cutting-edge technology.
           </p>
           <div className="flex justify-center mt-6">
             <a href="#" className="mx-3 text-light hover:text-highlight" aria-label="Facebook">
@@ -20,7 +20,7 @@ const Footer: React.FC = () => {
         </div>
         <hr className="my-6 border-accent/20" />
         <div className="text-center">
-          <p className="text-sm text-gray-400">© {new Date().getFullYear()} GoNet. All rights reserved.</p>
+          <p className="text-sm text-gray-400">© {new Date().getFullYear()} Go3net. All rights reserved.</p>
         </div>
       </div>
     </footer>

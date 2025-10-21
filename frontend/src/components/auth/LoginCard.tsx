@@ -51,7 +51,7 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
   return (
     <AuthCard
       title="Welcome Back!"
-      subtitle="Sign in to continue to GoNet"
+      subtitle="Sign in to continue to Go3net"
     >
       <form onSubmit={handleSubmit} className="space-y-6">
         <Input
