@@ -87,6 +87,24 @@ export class EmployeeController {
     }
   }
 
+    async getPendingApprovals(req: Request, res: Response): Promise<void> {
+    try {
+      const pendingEmployees = await this.employeeService.getPendingApprovals();
+
+      res.status(200).json({
+        status: 'success',
+        message: 'Pending approvals retrieved',
+        data: { pendingEmployees }
+      });
+    } catch (error) {
+      logger.error('EmployeeController: Get pending approvals error', { error: (error as Error).message });
+      res.status(400).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
+  
   async getMyProfile(req: Request, res: Response): Promise<void> {
     try {
       const userId = req.user?.id;
@@ -178,16 +196,28 @@ export class EmployeeController {
     }
   }
 
-  async getPendingApprovals(req: Request, res: Response): Promise<void> {
+  async searchEmployees(req: Request, res: Response): Promise<void> {
     try {
-      const pendingApprovals = await this.employeeService.getPendingApprovals();
+      const { q } = req.query;
+
+      if (!q || typeof q !== 'string') {
+        res.status(400).json({
+          status: 'error',
+          message: 'Search query is required'
+        });
+        return;
+      }
+
+      const userRole = req.user?.role;
+
+      const employees = await this.employeeService.searchEmployees(q, userRole);
 
       res.status(200).json({
         status: 'success',
-        data: { pendingApprovals }
+        data: { employees }
       });
     } catch (error) {
-      logger.error('EmployeeController: Get pending approvals error', { error: (error as Error).message });
+      logger.error('EmployeeController: Search employees error', { error: (error as Error).message });
       res.status(400).json({
         status: 'error',
         message: (error as Error).message
@@ -233,3 +263,4 @@ export class EmployeeController {
       });
     }
   }
+}

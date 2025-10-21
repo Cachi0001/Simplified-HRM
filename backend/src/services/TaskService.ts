@@ -7,14 +7,12 @@ export class TaskService {
 
   async createTask(taskData: CreateTaskRequest, assignedBy: string, currentUserRole: string): Promise<Task> {
     try {
-      // Only admins can assign tasks
       if (currentUserRole !== 'admin') {
         throw new Error('Only administrators can assign tasks');
       }
 
       logger.info('TaskService: Creating task', { title: taskData.title, assignedBy });
 
-      // Validate required fields
       if (!taskData.title || !taskData.assigneeId || !taskData.dueDate) {
         throw new Error('Title, assignee ID, and due date are required');
       }
@@ -33,7 +31,6 @@ export class TaskService {
     try {
       logger.info('TaskService: Getting all tasks', { role: currentUserRole });
 
-      // Non-admin users can only see tasks assigned to them
       if (currentUserRole !== 'admin') {
         query = { ...query, assigneeId: currentUserId };
       }
@@ -53,7 +50,6 @@ export class TaskService {
         return null;
       }
 
-      // Check permissions
       if (currentUserRole !== 'admin' && task.assigneeId !== currentUserId) {
         throw new Error('Access denied');
       }
@@ -76,18 +72,14 @@ export class TaskService {
 
   async updateTask(id: string, taskData: UpdateTaskRequest, currentUserRole: string, currentUserId?: string): Promise<Task> {
     try {
-      // Check if task exists
       const existingTask = await this.taskRepository.findById(id);
       if (!existingTask) {
         throw new Error('Task not found');
       }
-
-      // Check permissions
       if (currentUserRole !== 'admin' && existingTask.assigneeId !== currentUserId) {
         throw new Error('Access denied');
       }
 
-      // Non-admin users can only update status
       if (currentUserRole !== 'admin') {
         const allowedFields = ['status'];
         const filteredData: UpdateTaskRequest = {};
@@ -113,13 +105,11 @@ export class TaskService {
 
   async updateTaskStatus(id: string, status: 'pending' | 'in_progress' | 'completed' | 'cancelled', currentUserRole: string, currentUserId?: string): Promise<Task> {
     try {
-      // Check if task exists
       const existingTask = await this.taskRepository.findById(id);
       if (!existingTask) {
         throw new Error('Task not found');
       }
 
-      // Check permissions
       if (currentUserRole !== 'admin' && existingTask.assigneeId !== currentUserId) {
         throw new Error('Access denied');
       }
@@ -136,13 +126,11 @@ export class TaskService {
 
   async deleteTask(id: string, currentUserRole: string, currentUserId?: string): Promise<void> {
     try {
-      // Check if task exists
       const existingTask = await this.taskRepository.findById(id);
       if (!existingTask) {
         throw new Error('Task not found');
       }
 
-      // Only admins can delete tasks
       if (currentUserRole !== 'admin') {
         throw new Error('Only administrators can delete tasks');
       }
@@ -152,6 +140,25 @@ export class TaskService {
       logger.info('TaskService: Task deleted successfully', { taskId: id });
     } catch (error) {
       logger.error('TaskService: Delete task failed', { error: (error as Error).message });
+      throw error;
+    }
+  }
+
+  async searchTasks(query: string, currentUserRole?: string, currentUserId?: string): Promise<Task[]> {
+    try {
+      logger.info('TaskService: Searching tasks', { query, role: currentUserRole });
+
+      if (currentUserRole !== 'admin') {
+        const myTasks = await this.taskRepository.findByAssignee(currentUserId!);
+        return myTasks.filter(task =>
+          task.title.toLowerCase().includes(query.toLowerCase()) ||
+          (task.description && task.description.toLowerCase().includes(query.toLowerCase()))
+        );
+      }
+
+      return await this.taskRepository.search(query);
+    } catch (error) {
+      logger.error('TaskService: Search tasks failed', { error: (error as Error).message });
       throw error;
     }
   }

@@ -210,6 +210,7 @@ export class SupabaseEmployeeRepository implements IEmployeeRepository {
       role: data.role,
       department: data.department,
       position: data.position,
+      emailVerified: data.email_verified,
       phone: data.phone,
       address: data.address,
       dateOfBirth: data.date_of_birth ? new Date(data.date_of_birth) : undefined,

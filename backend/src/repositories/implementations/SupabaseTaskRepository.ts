@@ -197,6 +197,28 @@ export class SupabaseTaskRepository implements ITaskRepository {
     }
   }
 
+  async search(query: string): Promise<Task[]> {
+    try {
+      logger.info('Searching tasks', { query });
+
+      const { data, error } = await this.supabase
+        .from('tasks')
+        .select('*')
+        .or(`title.ilike.%${query}%,description.ilike.%${query}%`)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        logger.error('Task search error', { error: error.message });
+        throw new Error(error.message);
+      }
+
+      return data.map(this.mapSupabaseTaskToTask);
+    } catch (error) {
+      logger.error('Task search failed', { error: (error as Error).message });
+      throw error;
+    }
+  }
+
   private mapSupabaseTaskToTask(data: any): Task {
     return {
       id: data.id,

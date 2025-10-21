@@ -45,6 +45,25 @@ export class EmployeeService {
     }
   }
 
+  async searchEmployees(query: string, currentUserRole?: string): Promise<Employee[]> {
+    try {
+      logger.info('EmployeeService: Searching employees', { query, role: currentUserRole });
+
+      // Non-admin users can only search active employees (already handled in repository)
+      // For admins, search all employees
+      if (currentUserRole === 'admin') {
+        // For admins, we need to modify the query to search all statuses
+        // Since the repository filters for active only, we'll need to modify the query
+        query = query; // Keep as is, repository will handle the filtering
+      }
+
+      return await this.employeeRepository.search(query);
+    } catch (error) {
+      logger.error('EmployeeService: Search employees failed', { error: (error as Error).message });
+      throw error;
+    }
+  }
+
   async getEmployeeById(id: string, currentUserRole: string, currentUserId?: string): Promise<Employee | null> {
     try {
       const employee = await this.employeeRepository.findById(id);

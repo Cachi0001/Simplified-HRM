@@ -59,6 +59,36 @@ export class TaskController {
     }
   }
 
+    async searchTasks(req: Request, res: Response): Promise<void> {
+    try {
+      const { query } = req.query;
+      if (!query || typeof query !== 'string') {
+        res.status(400).json({
+          status: 'error',
+          message: 'Search query is required'
+        });
+        return;
+      }
+
+      const userRole = req.user?.role;
+      const userId = req.user?.id;
+
+      const tasks = await this.taskService.searchTasks(query, userRole, userId);
+
+      res.status(200).json({
+        status: 'success',
+        message: 'Tasks found',
+        data: { tasks }
+      });
+    } catch (error) {
+      logger.error('TaskController: Search tasks error', { error: (error as Error).message });
+      res.status(400).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
+
   async getTaskById(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
