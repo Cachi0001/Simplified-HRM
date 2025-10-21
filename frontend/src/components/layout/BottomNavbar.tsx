@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
-  Users,
   CheckSquare,
   Clock,
   Calendar,
@@ -54,7 +53,6 @@ export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
 
   const navItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: currentUser?.role === 'employee' ? '/employee-dashboard' : '/dashboard', active: location.pathname === (currentUser?.role === 'employee' ? '/employee-dashboard' : '/dashboard') },
-    { icon: Users, label: 'Profile', path: '/profile', active: location.pathname === '/profile' },
     { icon: CheckSquare, label: 'Tasks', path: '/tasks', active: location.pathname === '/tasks' },
     { icon: Clock, label: 'Attendance', path: '/attendance', active: location.pathname === '/attendance' },
     { icon: Calendar, label: 'Leave', path: '/leave', active: location.pathname === '/leave' },
