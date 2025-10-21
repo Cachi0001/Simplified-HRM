@@ -169,33 +169,6 @@ export class AuthController {
     }
   }
 
-  async verifyEmail(req: Request, res: Response): Promise<void> {
-    try {
-      const { token } = req.query;
-
-      if (!token || typeof token !== 'string') {
-        res.status(400).json({
-          status: 'error',
-          message: 'Verification token is required'
-        });
-        return;
-      }
-
-      await this.authService.verifyEmail(token);
-
-      res.status(200).json({
-        status: 'success',
-        message: 'Email verified successfully. You can now log in.'
-      });
-    } catch (error) {
-      logger.error('AuthController: Email verification error', { error: (error as Error).message });
-      res.status(400).json({
-        status: 'error',
-        message: (error as Error).message
-      });
-    }
-  }
-
   async resetPassword(req: Request, res: Response): Promise<void> {
     try {
       const { email } = req.body;

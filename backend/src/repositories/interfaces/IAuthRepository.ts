@@ -7,7 +7,6 @@ export interface IAuthRepository {
   refreshToken(refreshToken: string): Promise<AuthResponse>;
   getCurrentUser(accessToken: string): Promise<User>;
   signOut(accessToken: string): Promise<void>;
-  verifyEmail(token: string): Promise<void>;
   resetPassword(email: string): Promise<void>;
   updatePassword(accessToken: string, newPassword: string): Promise<void>;
 }

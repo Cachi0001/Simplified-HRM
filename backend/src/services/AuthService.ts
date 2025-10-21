@@ -101,19 +101,7 @@ export class AuthService {
     }
   }
 
-  async verifyEmail(token: string): Promise<void> {
-    try {
-      if (!token) {
-        throw new Error('Verification token is required');
-      }
-
-      await this.authRepository.verifyEmail(token);
-      logger.info('AuthService: Email verified');
-    } catch (error) {
-      logger.error('AuthService: Email verification failed', { error: (error as Error).message });
-      throw error;
-    }
-  }
+  
 
   async resetPassword(email: string): Promise<void> {
     try {
