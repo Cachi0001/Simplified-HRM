@@ -22,7 +22,7 @@ const Header: React.FC = () => {
           <button onClick={() => scrollToSection('contact')} className="hover:text-highlight transition-colors text-light">Contact</button>
         </div>
         <div className="flex items-center space-x-4">
-          <Link to="/auth" className="text-light hover:text-highlight transition-colors">Login</Link>
+          <Link to="/auth" state={{ initialView: 'login' }} className="text-light hover:text-highlight transition-colors">Login</Link>
           <Link to="/auth" state={{ initialView: 'signup' }} className="bg-highlight text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors">
             Sign Up
           </Link>

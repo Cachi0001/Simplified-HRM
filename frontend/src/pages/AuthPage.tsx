@@ -12,8 +12,11 @@ const AuthPage: React.FC = () => {
   const [view, setView] = useState<AuthView>('login');
 
   useEffect(() => {
-    if (location.state?.initialView === 'signup') {
+    const initialView = location.state?.initialView;
+    if (initialView === 'signup') {
       setView('signup');
+    } else if (initialView === 'login') {
+      setView('login');
     }
   }, [location.state]);
 
