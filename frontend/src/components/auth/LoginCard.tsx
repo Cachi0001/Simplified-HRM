@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AuthCard } from '../ui/Card';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
+import { authService } from '../../services/authService';
 
 interface LoginCardProps {
   onSwitchToSignup: () => void;
   onSwitchToForgotPassword: () => void;
 }
-
-const API_BASE_URL = 'https://go3nethrm-backend.vercel.app/api';
 
 const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgotPassword }) => {
   const [email, setEmail] = useState('');
@@ -16,6 +16,7 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,24 +25,17 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
     setSuccess(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
+      const response = await authService.login({ email, password });
 
-      const data = await response.json();
+      setSuccess('Login successful! Redirecting...');
 
-      if (!response.ok) {
-        throw new Error(data.message || 'An unknown error occurred.');
-      }
+      // Store user data for UI state
+      localStorage.setItem('user', JSON.stringify(response.user));
 
-      setSuccess(data.message || 'Login successful! Redirecting...');
-      // In a real app, you'd store the tokens and redirect the user here.
-      // For example: localStorage.setItem('accessToken', data.data.accessToken);
-      // window.location.href = '/dashboard';
+      // Redirect to dashboard or home
+      setTimeout(() => {
+        navigate('/');
+      }, 1500);
 
     } catch (err) {
       if (err instanceof Error) {
@@ -89,7 +83,7 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
             </button>
           </div>
         </div>
-        
+
         {error && <p className="text-red-500 text-sm text-center">{error}</p>}
         {success && <p className="text-green-500 text-sm text-center">{success}</p>}
 

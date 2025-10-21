@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AuthCard } from '../ui/Card';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
+import { authService } from '../../services/authService';
 
 interface SignupCardProps {
   onSwitchToLogin: () => void;
 }
-
-const API_BASE_URL = 'https://go3nethrm-backend.vercel.app/api';
 
 const SignupCard: React.FC<SignupCardProps> = ({ onSwitchToLogin }) => {
   const [fullName, setFullName] = useState('');
@@ -16,6 +16,7 @@ const SignupCard: React.FC<SignupCardProps> = ({ onSwitchToLogin }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,31 +24,23 @@ const SignupCard: React.FC<SignupCardProps> = ({ onSwitchToLogin }) => {
     setError(null);
     setSuccess(null);
 
-    const payload = { fullName, email, password, role: 'employee' };
-    
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/signup`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
+      await authService.signup({
+        fullName,
+        email,
+        password,
+        role: 'employee'
       });
 
-      const data = await response.json();
+      setSuccess("Check your inbox – we sent you a confirmation email. Please verify your account to continue.");
 
-      if (!response.ok) {
-        throw new Error(data.message || 'An unknown error occurred during signup.');
-      }
-      
-      if (data.message.includes('confirmation email')) {
-        setSuccess("Check your inbox – we sent you a new confirmation email.");
-      } else {
-        setSuccess(data.message || 'Registration successful! Please check your email to verify your account.');
-      }
+      // Clear form
+      setFullName('');
+      setEmail('');
+      setPassword('');
 
     } catch (err) {
-       if (err instanceof Error) {
+      if (err instanceof Error) {
         setError(err.message);
       } else {
         setError('An unexpected error occurred.');
@@ -56,7 +49,6 @@ const SignupCard: React.FC<SignupCardProps> = ({ onSwitchToLogin }) => {
       setIsLoading(false);
     }
   };
-
 
   return (
     <AuthCard
