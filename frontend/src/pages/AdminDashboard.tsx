@@ -96,26 +96,12 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (!currentUser) return;
 
-    console.log('Setting up demo notifications for user:', currentUser.id);
+    console.log('Dashboard ready for real notifications from Supabase');
 
-    // Simulate receiving notifications for demo purposes
-    const demoNotifications = [
-      NotificationUtils.employeeSignup('John Doe', '123'),
-      NotificationUtils.approvalRequired('Jane Smith', '456'),
-      NotificationUtils.profileUpdated('Mike Johnson', '789')
-    ];
+    // In real app, notifications would come from Supabase realtime subscriptions
+    // For now, no demo notifications as requested
 
-    // Show demo notifications after a delay
-    const timer = setTimeout(() => {
-      demoNotifications.forEach((notification, index) => {
-        setTimeout(() => {
-          console.log('Triggering notification:', notification);
-          triggerNotification(notification);
-        }, index * 3000); // Stagger notifications
-      });
-    }, 2000);
-
-    return () => clearTimeout(timer);
+    return () => {};
   }, [currentUser]);
 
   // If there's an error, show error message

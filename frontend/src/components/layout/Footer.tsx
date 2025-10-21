@@ -1,8 +1,16 @@
 
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import Logo from '../ui/Logo';
 
 const Footer: React.FC = () => {
+  const location = useLocation();
+
+  // Hide footer on dashboard page
+  if (location.pathname === '/dashboard') {
+    return null;
+  }
+
   return (
     <footer id="contact" className="bg-secondary border-t border-accent/20">
       <div className="container mx-auto px-6 py-8">

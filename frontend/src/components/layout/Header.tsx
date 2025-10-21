@@ -19,6 +19,11 @@ const Header: React.FC = () => {
     }
   };
 
+  // Hide header on dashboard page
+  if (location.pathname === '/dashboard') {
+    return null;
+  }
+
   return (
     <header className="bg-secondary/50 backdrop-blur-sm sticky top-0 z-50">
       <nav className="container mx-auto px-6 py-4 flex justify-between items-center">

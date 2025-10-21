@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Bell } from 'lucide-react';
 import { Button } from '../ui/Button';
 
@@ -7,16 +7,17 @@ interface NotificationBellProps {
 }
 
 export function NotificationBell({ darkMode = false }: NotificationBellProps) {
-  // Mock notifications - in real app, this would come from Supabase realtime
+  const [isOpen, setIsOpen] = useState(false);
+
+  // In real app, notifications would come from Supabase realtime or API
   const notifications = [
-    { id: 1, message: 'New employee signup: john.doe@company.com', time: '2 min ago', type: 'signup' },
-    { id: 2, message: 'Profile updated by admin', time: '1 hour ago', type: 'update' },
-    { id: 3, message: 'New leave request submitted', time: '3 hours ago', type: 'leave' },
+    { id: 1, message: 'New employee signup: john.doe@company.com', time: '2 min ago', type: 'signup' }
   ];
 
   return (
     <div className="relative">
       <Button
+        onClick={() => setIsOpen(!isOpen)}
         className={`relative ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
       >
         <Bell className={`h-5 w-5 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`} />
@@ -27,18 +28,30 @@ export function NotificationBell({ darkMode = false }: NotificationBellProps) {
         )}
       </Button>
 
-      {/* Simple dropdown - in real app would use popover */}
-      {notifications.length > 0 && (
+      {/* Interactive dropdown - in real app would use popover component */}
+      {isOpen && notifications.length > 0 && (
         <div className={`absolute right-0 mt-2 w-80 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border rounded-lg shadow-lg z-50`}>
           <div className="p-4">
-            <h4 className={`font-semibold mb-3 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-              Notifications
-            </h4>
-            <div className="space-y-3">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                Notifications
+              </h4>
+              <button
+                onClick={() => setIsOpen(false)}
+                className={`text-sm ${darkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                ×
+              </button>
+            </div>
+            <div className="space-y-3 max-h-96 overflow-y-auto">
               {notifications.map((notification) => (
                 <div
                   key={notification.id}
-                  className={`p-3 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}
+                  className={`p-3 rounded cursor-pointer hover:opacity-80 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}
+                  onClick={() => {
+                    // Handle notification click
+                    setIsOpen(false);
+                  }}
                 >
                   <p className={`text-sm ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>
                     {notification.message}
