@@ -6,6 +6,7 @@ import HomePage from './src/pages/HomePage';
 import AuthPage from './src/pages/AuthPage';
 import ConfirmEmail from './src/pages/ConfirmEmail';
 import AdminDashboard from './src/pages/AdminDashboard';
+import EmployeeDashboard from './src/pages/EmployeeDashboard';
 import Header from './src/components/layout/Header';
 import Footer from './src/components/layout/Footer';
 import { NotificationManager } from './src/components/notifications/NotificationManager';
@@ -34,6 +35,11 @@ function App() {
               <Route path="/dashboard" element={
                 <ProtectedRoute>
                   <AdminDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/employee-dashboard" element={
+                <ProtectedRoute>
+                  <EmployeeDashboard />
                 </ProtectedRoute>
               } />
             </Routes>

@@ -9,8 +9,17 @@ interface ProtectedRouteProps {
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const user = authService.getCurrentUserFromStorage();
 
-  if (!user || user.role !== 'admin') {
+  if (!user) {
     return <Navigate to="/auth" replace />;
+  }
+
+  // Redirect based on user role
+  if (user.role === 'employee' && window.location.pathname === '/dashboard') {
+    return <Navigate to="/employee-dashboard" replace />;
+  }
+
+  if (user.role === 'admin' && window.location.pathname === '/employee-dashboard') {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return children;

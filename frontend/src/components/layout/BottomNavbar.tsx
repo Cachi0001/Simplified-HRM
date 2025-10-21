@@ -12,6 +12,7 @@ import {
   User
 } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { authService } from '../../services/authService';
 
 interface BottomNavbarProps {
   darkMode?: boolean;
@@ -19,9 +20,20 @@ interface BottomNavbarProps {
 
 export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const profileRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Get current user on mount
+  useEffect(() => {
+    try {
+      const user = authService.getCurrentUserFromStorage();
+      setCurrentUser(user);
+    } catch (err) {
+      console.error('Error getting current user in BottomNavbar:', err);
+    }
+  }, []);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -41,8 +53,8 @@ export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
   }, [isProfileOpen]);
 
   const navItems = [
-    { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard', active: location.pathname === '/dashboard' },
-    { icon: Users, label: 'Employees', path: '/employees', active: location.pathname === '/employees' },
+    { icon: LayoutDashboard, label: 'Dashboard', path: currentUser?.role === 'employee' ? '/employee-dashboard' : '/dashboard', active: location.pathname === (currentUser?.role === 'employee' ? '/employee-dashboard' : '/dashboard') },
+    { icon: Users, label: 'Profile', path: '/profile', active: location.pathname === '/profile' },
     { icon: CheckSquare, label: 'Tasks', path: '/tasks', active: location.pathname === '/tasks' },
     { icon: Clock, label: 'Attendance', path: '/attendance', active: location.pathname === '/attendance' },
     { icon: Calendar, label: 'Leave', path: '/leave', active: location.pathname === '/leave' },

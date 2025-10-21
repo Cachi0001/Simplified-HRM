@@ -1,4 +1,4 @@
-export type NotificationType = 'info' | 'success' | 'warning' | 'error' | 'signup' | 'approval' | 'update';
+export type NotificationType = 'info' | 'success' | 'warning' | 'error' | 'signup' | 'approval' | 'update' | 'task';
 
 export type NotificationPriority = 'low' | 'normal' | 'high' | 'urgent';
 
@@ -21,7 +21,7 @@ export interface Go3netNotification {
   actions?: NotificationAction[];
   metadata?: Record<string, any>;
   source: 'system' | 'admin' | 'employee';
-  category: 'dashboard' | 'employee' | 'system' | 'approval';
+  category: 'dashboard' | 'employee' | 'system' | 'approval' | 'task';
 }
 
 export interface PushNotificationPayload {

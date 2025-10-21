@@ -50,6 +50,10 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
         setTimeout(() => {
           navigate('/dashboard');
         }, 500);
+      } else if (user.role === 'employee') {
+        setTimeout(() => {
+          navigate('/employee-dashboard');
+        }, 500);
       } else {
         setTimeout(() => {
           navigate('/');

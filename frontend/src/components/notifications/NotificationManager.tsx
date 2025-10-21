@@ -144,18 +144,20 @@ export const NotificationUtils = {
     category: 'employee'
   }),
 
-  systemAlert: (title: string, message: string): Go3netNotification => ({
-    id: `system-${Date.now()}`,
-    type: 'info',
+  taskAssigned: (taskTitle: string, employeeId: string): Go3netNotification => ({
+    id: `task-${employeeId}-${Date.now()}`,
+    type: 'task',
     priority: 'normal',
-    title,
-    message,
+    title: 'New Task Assigned',
+    message: `You have been assigned: ${taskTitle}`,
     timestamp: new Date(),
     read: false,
+    targetUserId: employeeId,
     actions: [
-      { label: 'View Dashboard', action: 'view', url: '/dashboard' }
+      { label: 'View Task', action: 'view', url: '/employee-dashboard#tasks' },
+      { label: 'Mark Complete', action: 'complete', url: '/employee-dashboard#tasks' }
     ],
-    source: 'system',
-    category: 'system'
-  })
+    source: 'admin',
+    category: 'task'
+  }),
 };
