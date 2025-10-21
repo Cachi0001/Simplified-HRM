@@ -37,7 +37,7 @@ export class EmployeeController {
         limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
         search: req.query.search as string,
         department: req.query.department as string,
-        status: req.query.status as 'active' | 'inactive',
+        status: req.query.status as 'active' | 'rejected' | 'pending',
         role: req.query.role as 'admin' | 'employee'
       };
 

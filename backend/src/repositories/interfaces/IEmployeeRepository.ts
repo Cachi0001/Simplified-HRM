@@ -9,4 +9,5 @@ export interface IEmployeeRepository {
   delete(id: string): Promise<void>;
   search(query: string): Promise<Employee[]>;
   getPendingApprovals(): Promise<Employee[]>;
+  approve(id: string): Promise<Employee>;
 }

@@ -14,7 +14,7 @@ export interface Employee {
   hireDate?: Date;
   profilePicture?: string;
 
-  status: 'active' | 'inactive' | 'pending';
+  status: 'active' | 'rejected' | 'pending';
   emailVerificationToken?: string;
   emailVerified: boolean;
   createdAt: Date;
@@ -45,7 +45,7 @@ export interface UpdateEmployeeRequest {
   dateOfBirth?: Date;
   hireDate?: Date;
   profilePicture?: string;
-  status?: 'active' | 'inactive';
+  status?: 'active' | 'rejected' | 'pending';
 }
 
 export interface EmployeeQuery {
@@ -53,6 +53,6 @@ export interface EmployeeQuery {
   limit?: number;
   search?: string;
   department?: string;
-  status?: 'active' | 'inactive';
+  status?: 'active' | 'rejected' | 'pending';
   role?: 'admin' | 'employee';
 }

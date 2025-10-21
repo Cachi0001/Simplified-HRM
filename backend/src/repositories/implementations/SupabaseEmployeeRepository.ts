@@ -1,15 +1,27 @@
 import { IEmployeeRepository } from '../interfaces/IEmployeeRepository';
 import { Employee, CreateEmployeeRequest, UpdateEmployeeRequest, EmployeeQuery } from '../../models/Employee';
 import logger from '../../utils/logger';
+import { createClient } from '@supabase/supabase-js';
 
 export class SupabaseEmployeeRepository implements IEmployeeRepository {
-  constructor(private supabase: any) {}
+private supabaseAdmin: any;
+
+  constructor() {
+    const url = process.env.SUPABASE_URL!;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+    if (!url || !serviceKey) {
+      throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY required');
+    }
+
+    this.supabaseAdmin = createClient(url, serviceKey);
+  }
 
   async create(employeeData: CreateEmployeeRequest, userId: string): Promise<Employee> {
     try {
       logger.info('Creating employee', { email: employeeData.email, userId });
 
-      const { data, error } = await this.supabase
+      const { data, error } = await this.supabaseAdmin
         .from('employees')
         .insert({
           user_id: userId,
@@ -46,7 +58,7 @@ export class SupabaseEmployeeRepository implements IEmployeeRepository {
       const limit = query?.limit || 10;
       const offset = (page - 1) * limit;
 
-      let supabaseQuery = this.supabase.from('employees').select('*', { count: 'exact' });
+      let supabaseQuery = this.supabaseAdmin.from('employees').select('*', { count: 'exact' });
 
       // Apply filters
       if (query?.search) {
@@ -85,7 +97,7 @@ export class SupabaseEmployeeRepository implements IEmployeeRepository {
 
   async findById(id: string): Promise<Employee | null> {
     try {
-      const { data, error } = await this.supabase
+      const { data, error } = await this.supabaseAdmin
         .from('employees')
         .select('*')
         .eq('id', id)
@@ -108,7 +120,7 @@ export class SupabaseEmployeeRepository implements IEmployeeRepository {
 
   async findByUserId(userId: string): Promise<Employee | null> {
     try {
-      const { data, error } = await this.supabase
+      const { data, error } = await this.supabaseAdmin
         .from('employees')
         .select('*')
         .eq('user_id', userId)
@@ -144,7 +156,7 @@ export class SupabaseEmployeeRepository implements IEmployeeRepository {
       if (employeeData.profilePicture !== undefined) updateData.profile_picture = employeeData.profilePicture;
       if (employeeData.status !== undefined) updateData.status = employeeData.status;
 
-      const { data, error } = await this.supabase
+      const { data, error } = await this.supabaseAdmin
         .from('employees')
         .update(updateData)
         .eq('id', id)
@@ -165,7 +177,7 @@ export class SupabaseEmployeeRepository implements IEmployeeRepository {
 
   async delete(id: string): Promise<void> {
     try {
-      const { error } = await this.supabase
+      const { error } = await this.supabaseAdmin
         .from('employees')
         .delete()
         .eq('id', id);
@@ -182,7 +194,7 @@ export class SupabaseEmployeeRepository implements IEmployeeRepository {
 
   async search(query: string): Promise<Employee[]> {
     try {
-      const { data, error } = await this.supabase
+      const { data, error } = await this.supabaseAdmin
         .from('employees')
         .select('*')
         .or(`full_name.ilike.%${query}%,email.ilike.%${query}%,department.ilike.%${query}%`)
@@ -224,7 +236,7 @@ export class SupabaseEmployeeRepository implements IEmployeeRepository {
 
   async getPendingApprovals(): Promise<Employee[]> {
     try {
-      const { data, error } = await this.supabase
+      const { data, error } = await this.supabaseAdmin 
         .from('employees')
         .select('*')
         .eq('status', 'pending')
@@ -241,4 +253,27 @@ export class SupabaseEmployeeRepository implements IEmployeeRepository {
       throw error;
     }
   }
+
+  async approve(id: string): Promise<Employee> {
+    const { data, error } = await this.supabaseAdmin
+      .from('employees')
+      .update({ status: 'active' })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+    return data as Employee;
+  }
+
+  async getPending(): Promise<Employee[]> {
+    const { data, error } = await this.supabaseAdmin
+      .from('employees')
+      .select('*')
+      .eq('status', 'pending');
+
+    if (error) throw new Error(error.message);
+    return data as Employee[];
+  }
+
 }

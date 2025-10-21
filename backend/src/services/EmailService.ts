@@ -148,9 +148,9 @@ export class EmailService {
   async sendApprovalConfirmation(email: string, fullName: string): Promise<void> {
     try {
       const mailOptions = {
-        from: `"HR Management System" <${process.env.FROM_EMAIL}>`,
+        from: `"Go3net HR Management System" <${process.env.FROM_EMAIL}>`,
         to: email,
-        subject: 'Account Approved - Welcome to HR Management System',
+        subject: 'Account Approved - Welcome to Go3net HR Management System',
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f4f4f4; padding: 20px;">
             <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1);">

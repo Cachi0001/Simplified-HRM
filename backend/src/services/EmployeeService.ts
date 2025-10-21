@@ -1,5 +1,6 @@
 import { IEmployeeRepository } from '../repositories/interfaces/IEmployeeRepository';
 import { Employee, CreateEmployeeRequest, UpdateEmployeeRequest, EmployeeQuery } from '../models/Employee';
+import { EmailService } from './EmailService';
 import logger from '../utils/logger';
 
 export class EmployeeService {
@@ -175,20 +176,23 @@ export class EmployeeService {
 
   async approveEmployee(id: string): Promise<Employee> {
     try {
-      // Update employee status to active
-      const updatedEmployee = await this.employeeRepository.update(id, { status: 'active' });
+      const updatedEmployee = await this.employeeRepository.approve(id); // Use repo.approve
+    
+      // Send email
+      try {
+        const emailService = new (await import('../services/EmailService')).EmailService();
+        await emailService.sendApprovalConfirmation(updatedEmployee.email, updatedEmployee.fullName);
+        logger.info('Approval email sent', { email: updatedEmployee.email });
+      } catch (emailError) {
+        logger.warn('Approval email failed (non-critical)', { error: (emailError as Error).message });
+      }
 
-      // Send approval confirmation email
-      const emailService = new (await import('../services/EmailService')).EmailService();
-      await emailService.sendApprovalConfirmation(updatedEmployee.email, updatedEmployee.fullName);
-
-      logger.info('Employee approved successfully', { employeeId: id });
       return updatedEmployee;
     } catch (error) {
       logger.error('Approve employee failed', { error: (error as Error).message });
       throw error;
     }
-  }
+}
 
   async rejectEmployee(id: string): Promise<void> {
     try {
