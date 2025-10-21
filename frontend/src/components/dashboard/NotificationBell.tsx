@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Bell } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { notificationService } from '../../services/notificationService';
 
 interface NotificationBellProps {
   darkMode?: boolean;
@@ -11,8 +12,32 @@ export function NotificationBell({ darkMode = false }: NotificationBellProps) {
 
   // In real app, notifications would come from Supabase realtime or API
   const notifications = [
-    { id: 1, message: 'New employee signup: john.doe@company.com', time: '2 min ago', type: 'signup' }
+    {
+      id: 1,
+      message: 'New employee signup: john.doe@company.com requires approval',
+      time: '2 min ago',
+      type: 'signup',
+      url: '/dashboard#pending-approvals',
+      read: false
+    }
   ];
+
+  const handleNotificationClick = async (notification: any) => {
+    // Mark as read using the service
+    await notificationService.markNotificationAsRead(notification.id);
+
+    // Update local state
+    notification.read = true;
+
+    // Navigate to the appropriate page based on notification type
+    if (notification.url) {
+      window.location.href = notification.url;
+    }
+
+    setIsOpen(false);
+  };
+
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
     <div className="relative">
@@ -21,9 +46,9 @@ export function NotificationBell({ darkMode = false }: NotificationBellProps) {
         className={`relative ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
       >
         <Bell className={`h-5 w-5 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`} />
-        {notifications.length > 0 && (
+        {unreadCount > 0 && (
           <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-            {notifications.length > 9 ? '9+' : notifications.length}
+            {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
       </Button>
@@ -49,18 +74,31 @@ export function NotificationBell({ darkMode = false }: NotificationBellProps) {
                 {notifications.map((notification) => (
                   <div
                     key={notification.id}
-                    className={`p-3 rounded cursor-pointer hover:opacity-80 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}
-                    onClick={() => {
-                      // Handle notification click
-                      setIsOpen(false);
-                    }}
+                    className={`p-3 rounded cursor-pointer transition-colors ${
+                      notification.read
+                        ? (darkMode ? 'bg-gray-700/50' : 'bg-gray-50')
+                        : (darkMode ? 'bg-blue-900/30' : 'bg-blue-50')
+                    } ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+                    onClick={() => handleNotificationClick(notification)}
                   >
-                    <p className={`text-sm ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>
-                      {notification.message}
-                    </p>
-                    <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                      {notification.time}
-                    </p>
+                    <div className="flex items-start gap-2">
+                      <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
+                        notification.read ? 'bg-gray-400' : 'bg-blue-500'
+                      }`} />
+                      <div className="flex-1">
+                        <p className={`text-sm ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>
+                          {notification.message}
+                        </p>
+                        <div className="flex items-center justify-between mt-2">
+                          <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                            {notification.time}
+                          </p>
+                          {!notification.read && (
+                            <span className="text-xs text-blue-600 font-medium">New</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>

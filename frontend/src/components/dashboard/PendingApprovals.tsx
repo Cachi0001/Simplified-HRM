@@ -4,6 +4,8 @@ import { supabase } from '@/lib/supabaseClient';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Check, X } from 'lucide-react';
+import { triggerNotification, NotificationUtils } from '../notifications/NotificationManager';
+import { notificationService } from '../../services/notificationService';
 
 interface PendingApprovalsProps {
   darkMode?: boolean;
@@ -41,15 +43,59 @@ export function PendingApprovals({ darkMode = false }: PendingApprovalsProps) {
 
   const approveMutation = useMutation({
     mutationFn: async (id: string) => {
+      // First get employee details
+      const { data: employee, error: fetchError } = await supabase
+        .from('employees')
+        .select('id, full_name, email')
+        .eq('id', id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Update status to active
       const { error } = await supabase
         .from('employees')
         .update({ status: 'active' })
         .eq('id', id);
       if (error) throw error;
+
+      return employee;
     },
-    onSuccess: () => {
+    onSuccess: (employee) => {
       queryClient.invalidateQueries({ queryKey: ['pending-employees'] });
       queryClient.invalidateQueries({ queryKey: ['employee-stats'] });
+
+      // Send approval notification to employee
+      if (employee) {
+        triggerNotification({
+          id: `approval-${employee.id}-${Date.now()}`,
+          type: 'info' as any,
+          priority: 'normal',
+          title: 'Account Approved!',
+          message: `Your account has been approved by admin. Welcome to Go3net!`,
+          timestamp: new Date(),
+          read: false,
+          targetUserId: employee.id,
+          actions: [{ label: 'Login', action: 'login', url: '/auth' }],
+          source: 'admin',
+          category: 'employee' as any
+        });
+
+        // Also send push notification if service is available
+        notificationService.sendPushNotification(employee.id, {
+          id: `approval-${employee.id}-${Date.now()}`,
+          type: 'info' as any,
+          priority: 'normal',
+          title: 'Account Approved!',
+          message: `Your account has been approved. Welcome to Go3net!`,
+          timestamp: new Date(),
+          read: false,
+          targetUserId: employee.id,
+          actions: [{ label: 'Login', action: 'login', url: '/auth' }],
+          source: 'admin',
+          category: 'employee' as any
+        });
+      }
     },
   });
 
