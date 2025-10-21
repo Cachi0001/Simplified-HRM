@@ -12,10 +12,19 @@ import { authService } from '../services/authService';
 import { BottomNavbar } from '../components/layout/BottomNavbar';
 
 export default function AdminDashboard() {
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => {
+    // Load dark mode preference from localStorage
+    const saved = localStorage.getItem('darkMode');
+    return saved ? JSON.parse(saved) : false;
+  });
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [supabaseConfigured, setSupabaseConfigured] = useState(false);
+
+  // Save dark mode preference whenever it changes
+  useEffect(() => {
+    localStorage.setItem('darkMode', JSON.stringify(darkMode));
+  }, [darkMode]);
 
   // Get current user from localStorage since we're using custom auth
   useEffect(() => {

@@ -6,8 +6,8 @@ import Logo from '../ui/Logo';
 const Footer: React.FC = () => {
   const location = useLocation();
 
-  // Hide footer on dashboard page
-  if (location.pathname === '/dashboard') {
+  // Hide footer on dashboard pages
+  if (location.pathname === '/dashboard' || location.pathname === '/employee-dashboard') {
     return null;
   }
 
