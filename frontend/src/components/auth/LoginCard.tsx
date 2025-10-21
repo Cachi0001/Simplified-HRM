@@ -4,6 +4,7 @@ import { AuthCard } from '../ui/Card';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { authService } from '../../services/authService';
+import { Eye, EyeOff } from 'lucide-react';
 
 interface LoginCardProps {
   onSwitchToSignup: () => void;
@@ -13,6 +14,7 @@ interface LoginCardProps {
 const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgotPassword }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -27,17 +29,35 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
     try {
       const response = await authService.login({ email, password });
 
+      // Check if response has the expected structure
+      if (!response || !response.data || !response.data.user) {
+        console.error('Invalid response structure:', response);
+        throw new Error('Invalid response from server');
+      }
+
+      const user = response.data.user;
+      const { accessToken, refreshToken } = response.data;
+
       setSuccess('Login successful! Redirecting...');
 
       // Store user data for UI state
-      localStorage.setItem('user', JSON.stringify(response.user));
+      localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('accessToken', accessToken);
+      localStorage.setItem('refreshToken', refreshToken);
 
-      // Redirect to dashboard or home
-      setTimeout(() => {
-        navigate('/');
-      }, 1500);
+      // Redirect based on user role with immediate navigation
+      if (user.role === 'admin') {
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 500);
+      } else {
+        setTimeout(() => {
+          navigate('/');
+        }, 500);
+      }
 
     } catch (err) {
+      console.error('Login error:', err);
       if (err instanceof Error) {
         setError(err.message);
       } else {
@@ -63,15 +83,29 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
           required
           autoComplete="email"
         />
-        <Input
-          id="password"
-          type="password"
-          label="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          autoComplete="current-password"
-        />
+        <div className="relative">
+          <Input
+            id="password"
+            type={showPassword ? "text" : "password"}
+            label="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            autoComplete="current-password"
+            className="pr-12"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-all duration-200 flex items-center justify-center w-6 h-6"
+          >
+            {showPassword ? (
+              <EyeOff className="h-4 w-4" />
+            ) : (
+              <Eye className="h-4 w-4" />
+            )}
+          </button>
+        </div>
         <div className="flex items-center justify-between">
           <div className="text-sm">
             <button

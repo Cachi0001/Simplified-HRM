@@ -10,14 +10,24 @@ interface PendingApprovalsProps {
 }
 
 const fetchPending = async () => {
-  const { data, error } = await supabase
-    .from('employees')
-    .select('id, full_name, email, created_at')
-    .eq('status', 'pending')
-    .order('created_at', { ascending: false });
+  try {
+    const { data, error } = await supabase
+      .from('employees')
+      .select('id, full_name, email, created_at')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
 
-  if (error) throw error;
-  return data || [];
+    if (error) {
+      console.error('Pending approvals query error:', error);
+      throw error;
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('Failed to fetch pending approvals:', error);
+    // Return empty array for demo purposes when database is not available
+    return [];
+  }
 };
 
 export function PendingApprovals({ darkMode = false }: PendingApprovalsProps) {

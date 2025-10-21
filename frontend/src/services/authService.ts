@@ -14,12 +14,6 @@ export class AuthService {
   async login(credentials: LoginRequest): Promise<AuthResponse> {
     try {
       const response = await api.post<AuthResponse>('/auth/login', credentials);
-
-      // Store tokens and user data
-      localStorage.setItem('accessToken', response.data.accessToken);
-      localStorage.setItem('refreshToken', response.data.refreshToken);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
-
       return response.data;
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Login failed');
@@ -57,12 +51,6 @@ export class AuthService {
       const response = await api.post<AuthResponse>('/auth/refresh', {
         refreshToken
       });
-
-      // Update stored tokens
-      localStorage.setItem('accessToken', response.data.accessToken);
-      localStorage.setItem('refreshToken', response.data.refreshToken);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
-
       return response.data;
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Token refresh failed');
