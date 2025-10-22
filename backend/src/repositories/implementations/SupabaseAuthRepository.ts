@@ -56,128 +56,96 @@ export class SupabaseAuthRepository implements IAuthRepository {
       });
 
       if (existing) {
-        // 2. Already confirmed → block duplicate
+        logger.warn('❌ [SupabaseAuthRepository] Email already registered', { email: userData.email });
+
         if (existing.email_confirmed_at) {
-          logger.warn('❌ [SupabaseAuthRepository] Email already registered and confirmed', { email: userData.email });
-          throw new Error('Email already registered');
+          throw new Error('Email already registered and active. Please try signing in instead.');
+        } else {
+          throw new Error('Email already registered but not confirmed. Please check your email for the confirmation link.');
         }
-
-        // 3. Not confirmed → resend confirmation email
-        logger.info('🔄 [SupabaseAuthRepository] Resending confirmation email', { email: userData.email });
-        const { error } = await this.supabase.auth.resend({
-          type: 'signup',
-          email: userData.email,
-          options: {
-            emailRedirectTo: 'http://localhost:3000/confirm',
-          },
-        });
-
-        if (error) {
-          logger.error('❌ [SupabaseAuthRepository] Failed to resend confirmation', { error: error.message });
-          throw error;
-        }
-
-        logger.info('✅ [SupabaseAuthRepository] Confirmation email resent successfully');
-        throw new Error('Check your inbox – we sent you a new confirmation email');
       }
 
-      // 4. New user – create Supabase auth user
+      // 2. Create Supabase auth user (no metadata yet)
       logger.info('🆕 [SupabaseAuthRepository] Creating new Supabase auth user...');
-      const { data, error } = await this.supabase.auth.signUp({
+      const { data: authData, error: authError } = await this.supabase.auth.signUp({
         email: userData.email,
         password: userData.password,
         options: {
-          emailRedirectTo: 'http://localhost:3000/confirm',
-          data: {
-            full_name: userData.fullName,
-            role: userData.role || 'employee',
-          },
-        },
+          emailRedirectTo: `${process.env.FRONTEND_URL}/confirm`,
+          // Do NOT send metadata yet
+        }
       });
 
-      if (error) {
-        logger.error('❌ [SupabaseAuthRepository] Supabase auth signup failed', { error: error.message });
-        throw error;
+      if (authError) {
+        logger.error('❌ [SupabaseAuthRepository] Supabase auth signup failed', { error: authError.message });
+        throw authError;
       }
 
-      if (!data.user) {
+      if (!authData.user) {
         logger.error('❌ [SupabaseAuthRepository] No user returned from Supabase signup');
         throw new Error('Signup failed - no user created');
       }
 
       logger.info('✅ [SupabaseAuthRepository] Supabase auth user created successfully', {
-        userId: data.user.id,
-        email: data.user.email
+        userId: authData.user.id,
+        email: authData.user.email
       });
 
+      // Check if user needs email confirmation
+      const emailConfirmed = authData.session && authData.session.access_token;
+      logger.info('📧 [SupabaseAuthRepository] Email confirmation status', {
+        hasSession: !!authData.session,
+        emailConfirmed: !!emailConfirmed,
+        userId: authData.user.id
+      });
+
+      // 3. Create user object for response
       const user: User = {
-        id: data.user.id,
-        email: data.user.email!,
+        id: authData.user.id,
+        email: authData.user.email!,
         fullName: userData.fullName,
         role: userData.role || 'employee',
-        emailVerified: false,
-        createdAt: new Date(data.user.created_at!),
-        updatedAt: new Date(data.user.updated_at || data.user.created_at!),
+        emailVerified: !!emailConfirmed,
+        createdAt: new Date(authData.user.created_at!),
+        updatedAt: new Date(authData.user.updated_at || authData.user.created_at!),
       };
 
-      // 5. Create employee record in database if role is employee
+      // 4. Create employee record using service role (bypasses RLS)
       if (userData.role === 'employee' || !userData.role) {
-        logger.info('👤 [SupabaseAuthRepository] Creating employee record in database...');
-        try {
-          logger.info('🔍 [SupabaseAuthRepository] Checking employees table structure...');
+        logger.info('👤 [SupabaseAuthRepository] Creating employee record with service role...');
 
-          // First check if employees table exists and its structure
-          const { data: tableInfo, error: tableError } = await this.supabaseAdmin
-            .from('employees')
-            .select('*')
-            .limit(1);
+        const { data: employee, error: empError } = await this.supabaseAdmin
+          .from('employees')
+          .insert({
+            user_id: authData.user.id,
+            email: userData.email,
+            full_name: userData.fullName,
+            role: userData.role || 'employee',
+            status: 'pending'
+          })
+          .select()
+          .single();
 
-          if (tableError) {
-            logger.error('❌ [SupabaseAuthRepository] Employees table error', {
-              error: tableError.message,
-              details: tableError.details,
-              hint: tableError.hint,
-              code: tableError.code
-            });
-            throw new Error(`Database schema error: ${tableError.message}`);
-          }
-
-          logger.info('✅ [SupabaseAuthRepository] Employees table exists, inserting record...');
-
-          const { error: empError } = await this.supabaseAdmin
-            .from('employees')
-            .insert({
-              user_id: data.user.id,
-              full_name: userData.fullName,
-              email: userData.email,
-              role: userData.role || 'employee',
-              status: 'pending', // Pending admin approval
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            });
-
-          if (empError) {
-            logger.error('❌ [SupabaseAuthRepository] Failed to create employee record', {
-              error: empError.message,
-              details: empError.details,
-              hint: empError.hint,
-              code: empError.code
-            });
-            throw new Error(`Database error saving employee record: ${empError.message}`);
-          }
-
-          logger.info('✅ [SupabaseAuthRepository] Employee record created successfully', {
-            userId: data.user.id,
-            employeeData: {
-              user_id: data.user.id,
-              full_name: userData.fullName,
-              email: userData.email,
-              role: 'employee',
-              status: 'pending'
-            }
+        if (empError) {
+          logger.error('❌ [SupabaseAuthRepository] Failed to create employee record', {
+            error: empError.message,
+            details: empError.details,
+            hint: empError.hint,
+            code: empError.code
           });
 
-          // 6. Send admin notification email
+          // Log but don't fail signup - user is created in auth
+          logger.warn('⚠️ [SupabaseAuthRepository] Employee record creation failed, but auth user created', {
+            userId: authData.user.id,
+            email: userData.email
+          });
+        } else {
+          logger.info('✅ [SupabaseAuthRepository] Employee record created successfully', {
+            employeeId: employee?.id,
+            userId: authData.user.id
+          });
+
+          // 5. Send admin notification email
           logger.info('📧 [SupabaseAuthRepository] Sending admin notification email...');
           try {
             const emailService = new EmailService();
@@ -186,21 +154,54 @@ export class SupabaseAuthRepository implements IAuthRepository {
           } catch (emailError) {
             logger.warn('⚠️ [SupabaseAuthRepository] Admin notification email failed (non-critical)', { error: (emailError as Error).message });
           }
-        } catch (empCreateError) {
-          logger.error('❌ [SupabaseAuthRepository] Employee creation process failed', {
-            error: (empCreateError as Error).message,
-            stack: (empCreateError as Error).stack
-          });
-          throw new Error(`Employee record creation failed: ${(empCreateError as Error).message}`);
         }
       }
 
-      logger.info('🎉 [SupabaseAuthRepository] Signup process completed successfully', {
-        userId: data.user.id,
+      // 6. Update auth user metadata (optional cleanup)
+      try {
+        await this.supabase.auth.updateUser({
+          data: {
+            full_name: userData.fullName,
+            role: userData.role || 'employee'
+          }
+        });
+        logger.info('✅ [SupabaseAuthRepository] Auth user metadata updated');
+      } catch (metadataError) {
+        logger.warn('⚠️ [SupabaseAuthRepository] Failed to update auth metadata (non-critical)', {
+          error: (metadataError as Error).message
+        });
+      }
+
+      // 7. Return appropriate response based on confirmation status
+      if (!emailConfirmed) {
+        // User needs to confirm email - this is normal, not an error
+        logger.info('📧 [SupabaseAuthRepository] User needs email confirmation - returning success with message', {
+          userId: authData.user.id,
+          email: userData.email
+        });
+
+        return {
+          user,
+          accessToken: '', // No session yet until email confirmed
+          refreshToken: '',
+          requiresConfirmation: true,
+          message: 'Check your inbox – we sent you a new confirmation email'
+        };
+      }
+
+      // User is confirmed and can sign in immediately
+      logger.info('🎉 [SupabaseAuthRepository] User confirmed - returning full auth response', {
+        userId: authData.user.id,
         email: userData.email
       });
 
-      return { user, accessToken: '', refreshToken: '' };
+      return {
+        user,
+        accessToken: authData.session?.access_token || '',
+        refreshToken: authData.session?.refresh_token || '',
+        requiresConfirmation: false,
+        message: 'Account created successfully'
+      };
     } catch (error) {
       logger.error('❌ [SupabaseAuthRepository] Signup process failed', {
         error: (error as Error).message,

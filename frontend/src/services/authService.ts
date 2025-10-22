@@ -21,10 +21,30 @@ export class AuthService {
   }
 
   // Signup user
-  async signup(userData: SignupRequest): Promise<void> {
+  async signup(userData: SignupRequest): Promise<{ requiresConfirmation: boolean; message: string; user?: User }> {
     try {
-      await api.post('/auth/signup', userData);
-      // Note: Signup doesn't return tokens until email is confirmed
+      const response = await api.post<AuthResponse>('/auth/signup', userData);
+
+      if (response.data.data.requiresConfirmation) {
+        // Email confirmation required
+        return {
+          requiresConfirmation: true,
+          message: response.data.message,
+          user: response.data.data.user
+        };
+      }
+
+      // User is confirmed and logged in
+      // Store tokens and user data
+      localStorage.setItem('accessToken', response.data.data.accessToken);
+      localStorage.setItem('refreshToken', response.data.data.refreshToken);
+      localStorage.setItem('user', JSON.stringify(response.data.data.user));
+
+      return {
+        requiresConfirmation: false,
+        message: response.data.message,
+        user: response.data.data.user
+      };
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Signup failed');
     }

@@ -27,14 +27,25 @@ const SignupCard: React.FC<SignupCardProps> = ({ onSwitchToLogin }) => {
     setSuccess(null);
 
     try {
-      await authService.signup({
+      const result = await authService.signup({
         fullName,
         email,
         password,
         role: 'employee'
       });
 
-      setSuccess("Check your inbox – we sent you a confirmation email. Please verify your account to continue.");
+      if (result.requiresConfirmation) {
+        // Email confirmation required
+        setSuccess(result.message || "Check your inbox – we sent you a confirmation email. Please verify your account to continue.");
+      } else {
+        // User is logged in immediately
+        setSuccess(result.message || "Account created successfully!");
+
+        // Redirect to dashboard or appropriate page
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 1500);
+      }
 
       // Clear form
       setFullName('');
@@ -50,8 +61,6 @@ const SignupCard: React.FC<SignupCardProps> = ({ onSwitchToLogin }) => {
           errorMessage = 'This email is already registered. Please try signing in instead, or contact support if you need help.';
         } else if (errorMessage.includes('Database error')) {
           errorMessage = 'There was an issue creating your account. Please try again in a few minutes or contact support.';
-        } else if (errorMessage.includes('Check your inbox')) {
-          errorMessage = 'Please check your email for a confirmation link. The link will expire in 24 hours.';
         } else if (errorMessage.includes('Password')) {
           errorMessage = 'Password must be at least 6 characters long and contain letters and numbers.';
         }

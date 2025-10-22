@@ -20,6 +20,24 @@ export class AuthController {
 
       const result = await this.authService.signUp(userData);
 
+      // Check if email confirmation is required
+      if (result.requiresConfirmation) {
+        logger.info('📧 [AuthController] Email confirmation required - returning confirmation response', {
+          userId: result.user.id,
+          email: userData.email
+        });
+
+        res.status(200).json({
+          status: 'success',
+          message: result.message || 'Check your email to confirm your account',
+          data: {
+            user: result.user,
+            requiresConfirmation: true
+          }
+        });
+        return;
+      }
+
       logger.info('✅ [AuthController] Signup successful', {
         userId: result.user.id,
         email: userData.email,
@@ -28,7 +46,7 @@ export class AuthController {
 
       res.status(201).json({
         status: 'success',
-        message: 'User registered successfully',
+        message: result.message || 'User registered successfully',
         data: {
           user: result.user,
           accessToken: result.accessToken,
@@ -49,8 +67,8 @@ export class AuthController {
         errorMessage = 'This email is already registered. Please try signing in instead.';
       } else if (errorMessage.includes('Database error')) {
         errorMessage = 'There was an issue creating your account. Please contact support.';
-      } else if (errorMessage.includes('Check your inbox')) {
-        errorMessage = 'Please check your email for a confirmation link.';
+      } else if (errorMessage.includes('Email, password, and full name are required')) {
+        errorMessage = 'Email, password, and full name are required.';
       }
 
       res.status(400).json({

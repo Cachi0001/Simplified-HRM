@@ -25,6 +25,22 @@ export class AuthService {
       logger.info('🔄 [AuthService] Calling repository signup...');
       const result = await this.authRepository.signUp(userData);
 
+      // Check if email confirmation is required
+      if (result.requiresConfirmation) {
+        logger.info('📧 [AuthService] Email confirmation required - returning confirmation response', {
+          userId: result.user.id,
+          email: userData.email
+        });
+
+        return {
+          user: result.user,
+          accessToken: '',
+          refreshToken: '',
+          requiresConfirmation: true,
+          message: result.message || 'Check your email to confirm your account'
+        };
+      }
+
       logger.info('✅ [AuthService] User signed up successfully', {
         userId: result.user.id,
         email: userData.email,
