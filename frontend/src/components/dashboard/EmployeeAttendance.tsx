@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../../lib/supabaseClient';
+import { attendanceService } from '../../services/attendanceService';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { MapPin, Clock, Calendar, Play, Square } from 'lucide-react';
@@ -12,19 +12,13 @@ interface EmployeeAttendanceProps {
 
 const fetchEmployeeAttendance = async (employeeId: string) => {
   try {
-    const { data, error } = await supabase
-      .from('attendance')
-      .select('*')
-      .eq('employee_id', employeeId)
-      .order('created_at', { ascending: false })
-      .limit(10);
-
-    if (error) {
-      console.error('Employee attendance query error:', error);
-      throw error;
-    }
-
-    return data || [];
+    const history = await attendanceService.getAttendanceHistory(
+      new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
+      new Date(),
+      1,
+      10
+    );
+    return history.attendances;
   } catch (error) {
     console.error('Failed to fetch employee attendance:', error);
     return [];
@@ -69,15 +63,13 @@ export function EmployeeAttendance({ employeeId, darkMode = false }: EmployeeAtt
         throw new Error('Location not available');
       }
 
-      const { error } = await supabase
-        .from('attendance')
-        .insert({
-          employee_id: employeeId,
-          check_in: new Date().toISOString(),
-          location_lat: currentLocation.lat,
-          location_lng: currentLocation.lng,
-        });
-      if (error) throw error;
+      return await attendanceService.checkIn({
+        location: {
+          latitude: currentLocation.lat,
+          longitude: currentLocation.lng,
+          accuracy: 10 // meters
+        }
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employee-attendance', employeeId] });
@@ -85,12 +77,14 @@ export function EmployeeAttendance({ employeeId, darkMode = false }: EmployeeAtt
   });
 
   const checkOutMutation = useMutation({
-    mutationFn: async (attendanceId: string) => {
-      const { error } = await supabase
-        .from('attendance')
-        .update({ check_out: new Date().toISOString() })
-        .eq('id', attendanceId);
-      if (error) throw error;
+    mutationFn: async () => {
+      return await attendanceService.checkOut({
+        location: currentLocation ? {
+          latitude: currentLocation.lat,
+          longitude: currentLocation.lng,
+          accuracy: 10
+        } : undefined
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employee-attendance', employeeId] });
@@ -155,16 +149,8 @@ export function EmployeeAttendance({ employeeId, darkMode = false }: EmployeeAtt
               Check In
             </Button>
             <Button
-              onClick={() => {
-                const today = new Date().toISOString().split('T')[0];
-                const todayAttendance = attendance.find(a =>
-                  a.created_at.startsWith(today) && !a.check_out
-                );
-                if (todayAttendance) {
-                  checkOutMutation.mutate(todayAttendance.id);
-                }
-              }}
-              disabled={checkOutMutation.isPending || !attendance.some(a => !a.check_out)}
+              onClick={() => checkOutMutation.mutate()}
+              disabled={checkOutMutation.isPending || !attendance.some(a => a.status === 'checked_in')}
               className="bg-red-600 hover:bg-red-700 text-white flex-1"
             >
               <Square className="h-4 w-4 mr-2" />
@@ -209,20 +195,20 @@ export function EmployeeAttendance({ employeeId, darkMode = false }: EmployeeAtt
                       <Calendar className={`h-5 w-5 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
                       <div>
                         <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                          {formatDate(record.created_at)}
+                          {formatDate(record.date)}
                         </p>
                         <div className={`flex items-center gap-4 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                          <span>Check-in: {formatTime(record.check_in)}</span>
-                          {record.check_out && (
-                            <span>Check-out: {formatTime(record.check_out)}</span>
+                          <span>Check-in: {formatTime(record.checkInTime)}</span>
+                          {record.checkOutTime && (
+                            <span>Check-out: {formatTime(record.checkOutTime)}</span>
                           )}
                         </div>
                       </div>
                     </div>
                     <div className="text-right">
-                      {record.check_out ? (
+                      {record.checkOutTime ? (
                         <div className={`text-sm font-medium ${darkMode ? 'text-green-400' : 'text-green-600'}`}>
-                          {calculateHours(record.check_in, record.check_out)}h
+                          {calculateHours(record.checkInTime, record.checkOutTime)}h
                         </div>
                       ) : (
                         <div className={`text-sm ${darkMode ? 'text-orange-400' : 'text-orange-600'}`}>

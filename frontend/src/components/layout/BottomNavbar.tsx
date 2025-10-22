@@ -70,7 +70,23 @@ export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
   ];
 
   const handleNavigation = (path: string) => {
-    navigate(path);
+    // Handle placeholder functionality for unimplemented features
+    switch (path) {
+      case '/tasks':
+        alert('Tasks page is coming soon! Check the dashboard for task management.');
+        return;
+      case '/attendance':
+        alert('Attendance page is coming soon! Use the check-in/out feature in the dashboard.');
+        return;
+      case '/leave':
+        alert('Leave management is coming soon! Contact your HR department for leave requests.');
+        return;
+      case '/reports':
+        alert('Reports feature is coming soon! Check the admin dashboard for attendance reports.');
+        return;
+      default:
+        navigate(path);
+    }
   };
 
   const handleLogout = () => {

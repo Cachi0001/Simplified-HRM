@@ -19,6 +19,20 @@ export class TaskService {
 
       const task = await this.taskRepository.create(taskData, assignedBy);
 
+      // Send notification email to assignee
+      try {
+        const emailService = new (await import('../services/EmailService')).EmailService();
+        await emailService.sendTaskNotification(
+          taskData.assigneeId,
+          task.title,
+          task.description || '',
+          new Date(task.dueDate).toLocaleDateString()
+        );
+        logger.info('Task notification email sent', { assigneeId: taskData.assigneeId, taskId: task.id });
+      } catch (emailError) {
+        logger.warn('Task notification email failed (non-critical)', { error: (emailError as Error).message });
+      }
+
       logger.info('TaskService: Task created successfully', { taskId: task.id });
       return task;
     } catch (error) {
@@ -115,6 +129,21 @@ export class TaskService {
       }
 
       const updatedTask = await this.taskRepository.updateStatus(id, status);
+
+      // Send notification if task is completed
+      if (status === 'completed') {
+        try {
+          const emailService = new (await import('../services/EmailService')).EmailService();
+          await emailService.sendTaskCompletionNotification(
+            existingTask.assigneeId,
+            updatedTask.title,
+            'Task completed successfully!'
+          );
+          logger.info('Task completion notification sent', { assigneeId: existingTask.assigneeId, taskId: id });
+        } catch (emailError) {
+          logger.warn('Task completion notification failed (non-critical)', { error: (emailError as Error).message });
+        }
+      }
 
       logger.info('TaskService: Task status updated successfully', { taskId: id, status });
       return updatedTask;

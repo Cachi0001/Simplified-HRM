@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { OverviewCards } from '../components/dashboard/OverviewCards';
-import { PendingApprovals } from '../components/dashboard/PendingApprovals';
-import { NotificationBell } from '../components/dashboard/NotificationBell';
-import { DarkModeToggle } from '../components/ui/DarkModeToggle';
+import { AdminAttendance } from '../components/dashboard/AdminAttendance';
+import { AdminTasks } from '../components/dashboard/AdminTasks';
+import { AdminDepartments } from '../components/dashboard/AdminDepartments';
 import { NotificationManager, triggerNotification, NotificationUtils } from '../components/notifications/NotificationManager';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabaseClient';
@@ -17,9 +16,7 @@ export default function AdminDashboard() {
     const saved = localStorage.getItem('darkMode');
     return saved ? JSON.parse(saved) : false;
   });
-  const [currentUser, setCurrentUser] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [supabaseConfigured, setSupabaseConfigured] = useState(false);
+  const { addToast } = useToast();
 
   // Save dark mode preference whenever it changes
   useEffect(() => {
@@ -206,11 +203,26 @@ export default function AdminDashboard() {
         </section>
 
         {/* Pending Approvals */}
-        <section>
+        <section className="mb-8">
           <h2 className={`text-2xl font-semibold mb-6 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
             Pending Approvals
           </h2>
           <PendingApprovals darkMode={darkMode} />
+        </section>
+
+        {/* Attendance Management */}
+        <section className="mb-8">
+          <AdminAttendance darkMode={darkMode} />
+        </section>
+
+        {/* Task Management */}
+        <section className="mb-8">
+          <AdminTasks darkMode={darkMode} />
+        </section>
+
+        {/* Department Management */}
+        <section>
+          <AdminDepartments darkMode={darkMode} />
         </section>
       </div>
 

@@ -28,5 +28,6 @@ router.put('/:id', (req, res) => employeeController.updateEmployee(req, res));
 router.delete('/:id', requireRole(['admin']), (req, res) => employeeController.deleteEmployee(req, res));
 router.post('/:id/approve', requireRole(['admin']), (req, res) => employeeController.approveEmployee(req, res));
 router.post('/:id/reject', requireRole(['admin']), (req, res) => employeeController.rejectEmployee(req, res));
+router.post('/:id/department', requireRole(['admin']), (req, res) => employeeController.assignDepartment(req, res));
 
 export default router;

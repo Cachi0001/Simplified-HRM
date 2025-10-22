@@ -18,6 +18,24 @@ export class AttendanceService {
         if (accuracy && typeof accuracy !== 'number') {
           throw new Error('Invalid location accuracy');
         }
+
+        // Verify office location if required
+        if (process.env.REQUIRE_OFFICE_LOCATION === 'true') {
+          const isValidLocation = this.verifyOfficeLocation(latitude, longitude);
+          if (!isValidLocation) {
+            const distance = this.calculateDistanceFromOffice(latitude, longitude);
+            const allowFallback = process.env.ALLOW_LOCATION_FALLBACK === 'true';
+
+            if (!allowFallback) {
+              throw new Error(`You are ${Math.round(distance)}m from the office. Please move closer to check in.`);
+            } else {
+              logger.warn('AttendanceService: Check-in from outside office radius, but fallback allowed', {
+                userId,
+                distance: Math.round(distance)
+              });
+            }
+          }
+        }
       }
 
       // Get employee ID from user ID
@@ -141,6 +159,38 @@ export class AttendanceService {
       logger.error('AttendanceService: Get attendance report failed', { error: (error as Error).message });
       throw error;
     }
+  }
+
+  private verifyOfficeLocation(latitude: number, longitude: number): boolean {
+    const officeLatitude = parseFloat(process.env.OFFICE_LATITUDE || '0');
+    const officeLongitude = parseFloat(process.env.OFFICE_LONGITUDE || '0');
+    const officeRadius = parseFloat(process.env.OFFICE_RADIUS || '100');
+
+    if (officeLatitude === 0 || officeLongitude === 0) {
+      // If office location not configured, allow all locations
+      return true;
+    }
+
+    const distance = this.calculateDistanceFromOffice(latitude, longitude);
+    return distance <= officeRadius;
+  }
+
+  private calculateDistanceFromOffice(latitude: number, longitude: number): number {
+    const officeLatitude = parseFloat(process.env.OFFICE_LATITUDE || '0');
+    const officeLongitude = parseFloat(process.env.OFFICE_LONGITUDE || '0');
+
+    const R = 6371e3; // Earth's radius in meters
+    const φ1 = latitude * Math.PI / 180;
+    const φ2 = officeLatitude * Math.PI / 180;
+    const Δφ = (officeLatitude - latitude) * Math.PI / 180;
+    const Δλ = (officeLongitude - longitude) * Math.PI / 180;
+
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c; // Distance in meters
   }
 
   private async getEmployeeIdFromUserId(userId: string): Promise<string> {

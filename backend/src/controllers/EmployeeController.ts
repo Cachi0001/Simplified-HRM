@@ -245,6 +245,35 @@ export class EmployeeController {
     }
   }
 
+  async assignDepartment(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { department } = req.body;
+
+      if (!department) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Department is required'
+        });
+        return;
+      }
+
+      const employee = await this.employeeService.assignDepartment(id, department);
+
+      res.status(200).json({
+        status: 'success',
+        message: 'Department assigned successfully',
+        data: { employee }
+      });
+    } catch (error) {
+      logger.error('EmployeeController: Assign department error', { error: (error as Error).message });
+      res.status(400).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
+
   async rejectEmployee(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;

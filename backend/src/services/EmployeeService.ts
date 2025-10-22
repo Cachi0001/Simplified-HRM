@@ -177,7 +177,7 @@ export class EmployeeService {
   async approveEmployee(id: string): Promise<Employee> {
     try {
       const updatedEmployee = await this.employeeRepository.approve(id); // Use repo.approve
-    
+
       // Send email
       try {
         const emailService = new (await import('../services/EmailService')).EmailService();
@@ -192,7 +192,7 @@ export class EmployeeService {
       logger.error('Approve employee failed', { error: (error as Error).message });
       throw error;
     }
-}
+  }
 
   async rejectEmployee(id: string): Promise<void> {
     try {
@@ -202,6 +202,20 @@ export class EmployeeService {
       logger.info('Employee rejected successfully', { employeeId: id });
     } catch (error) {
       logger.error('Reject employee failed', { error: (error as Error).message });
+      throw error;
+    }
+  }
+
+  async assignDepartment(id: string, department: string): Promise<Employee> {
+    try {
+      logger.info('EmployeeService: Assigning department', { employeeId: id, department });
+
+      const updatedEmployee = await this.employeeRepository.update(id, { department });
+
+      logger.info('EmployeeService: Department assigned successfully', { employeeId: id, department });
+      return updatedEmployee;
+    } catch (error) {
+      logger.error('EmployeeService: Assign department failed', { error: (error as Error).message });
       throw error;
     }
   }

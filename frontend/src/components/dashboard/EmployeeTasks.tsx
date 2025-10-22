@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../../lib/supabaseClient';
+import { taskService } from '../../services/taskService';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Check, Clock, AlertCircle, CheckSquare } from 'lucide-react';
@@ -12,18 +12,7 @@ interface EmployeeTasksProps {
 
 const fetchEmployeeTasks = async (employeeId: string) => {
   try {
-    const { data, error } = await supabase
-      .from('tasks')
-      .select('id, title, description, status, priority, due_date, created_at, assigned_to')
-      .eq('assigned_to', employeeId)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Employee tasks query error:', error);
-      throw error;
-    }
-
-    return data || [];
+    return await taskService.getMyTasks();
   } catch (error) {
     console.error('Failed to fetch employee tasks:', error);
     return [];
@@ -41,11 +30,7 @@ export function EmployeeTasks({ employeeId, darkMode = false }: EmployeeTasksPro
 
   const updateTaskStatus = useMutation({
     mutationFn: async ({ taskId, status }: { taskId: string; status: string }) => {
-      const { error } = await supabase
-        .from('tasks')
-        .update({ status })
-        .eq('id', taskId);
-      if (error) throw error;
+      return await taskService.updateTaskStatus(taskId, status);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employee-tasks', employeeId] });
@@ -132,9 +117,9 @@ export function EmployeeTasks({ employeeId, darkMode = false }: EmployeeTasksPro
                         Priority: {task.priority}
                       </span>
                     )}
-                    {task.due_date && (
+                    {task.dueDate && (
                       <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                        Due: {new Date(task.due_date).toLocaleDateString()}
+                        Due: {new Date(task.dueDate).toLocaleDateString()}
                       </span>
                     )}
                   </div>

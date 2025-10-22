@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { EmployeeOverviewCards } from '../components/dashboard/EmployeeOverviewCards';
 import { EmployeeTasks } from '../components/dashboard/EmployeeTasks';
-import { EmployeeAttendance } from '../components/dashboard/EmployeeAttendance';
+import { DraggableLogo } from '../components/dashboard/DraggableLogo';
 import { NotificationBell } from '../components/dashboard/NotificationBell';
 import { DarkModeToggle } from '../components/ui/DarkModeToggle';
 import { NotificationManager, triggerNotification, NotificationUtils } from '../components/notifications/NotificationManager';
@@ -271,12 +271,19 @@ export default function EmployeeDashboard() {
           <EmployeeTasks employeeId={currentUser.id} darkMode={darkMode} />
         </section>
 
-        {/* Employee Attendance */}
+        {/* Check-in/Check-out with Draggable Logo */}
         <section>
           <h2 className={`text-2xl font-semibold mb-6 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-            Attendance History
+            Daily Check-in/Out
           </h2>
-          <EmployeeAttendance employeeId={currentUser.id} darkMode={darkMode} />
+          <DraggableLogo
+            employeeId={currentUser.id}
+            darkMode={darkMode}
+            onStatusChange={(status) => {
+              // Handle status change if needed
+              console.log('Check-in status changed:', status);
+            }}
+          />
         </section>
       </div>
 
