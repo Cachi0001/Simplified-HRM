@@ -55,6 +55,7 @@ const ConfirmEmail: React.FC = () => {
             // Check user metadata to determine if it's signup or login
             const isSignup = user.user_metadata?.signup === true;
             const isLogin = user.user_metadata?.login === true;
+            const isResend = user.user_metadata?.resend === true;
 
             if (isSignup) {
               // Handle signup confirmation
@@ -106,8 +107,8 @@ const ConfirmEmail: React.FC = () => {
               setTimeout(() => {
                 navigate('/auth');
               }, 5000);
-            } else if (isLogin) {
-              // Handle login confirmation
+            } else if (isLogin || isResend) {
+              // Handle login confirmation or resend confirmation
               // Check if user is approved
               const { data: employee } = await supabase
                 .from('employees')
@@ -152,7 +153,7 @@ const ConfirmEmail: React.FC = () => {
                 }, 3000);
               }
             } else {
-              // Fallback: assume login for existing users
+              // Fallback: assume login for existing users or resend
               const { data: employee } = await supabase
                 .from('employees')
                 .select('role, status, full_name')

@@ -249,7 +249,6 @@ export class SupabaseAuthRepository implements IAuthRepository {
     }
   }
 
-  // ———————————————————— REFRESH TOKEN ————————————————————
   async refreshToken(refreshToken: string): Promise<AuthResponse> {
     try {
       const { data, error } = await this.supabase.auth.refreshSession({ refresh_token: refreshToken });
@@ -341,22 +340,26 @@ export class SupabaseAuthRepository implements IAuthRepository {
 
   async resendConfirmationEmail(email: string): Promise<{ message: string }> {
     try {
-      const { error } = await this.supabase.auth.resend({
-        type: 'signup',
+      logger.info('📧 [SupabaseAuthRepository] Resending magic link confirmation', { email });
+
+      const { error } = await this.supabase.auth.signInWithOtp({
         email: email,
         options: {
           emailRedirectTo: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/confirm`,
-        },
+          data: {
+            resend: true // Mark as resend flow
+          }
+        }
       });
 
       if (error) throw new Error(error.message);
-      logger.info('Confirmation email resent', { email });
+      logger.info('✅ [SupabaseAuthRepository] Magic link resent successfully', { email });
 
       return {
         message: 'Check your inbox – we sent you a new confirmation email. Please verify your account to continue.'
       };
     } catch (error) {
-      logger.error('Resend confirmation failed', { error: (error as Error).message });
+      logger.error('❌ [SupabaseAuthRepository] Resend confirmation failed', { error: (error as Error).message });
       throw error;
     }
   }
