@@ -388,7 +388,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
   async resetPassword(email: string): Promise<void> {
     try {
       const { error } = await this.supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: 'http://localhost:3000/auth/reset-password',
+        redirectTo: `${process.env.FRONTEND_URL}/auth/reset-password`,
       });
       if (error) throw new Error(error.message);
     } catch (error) {

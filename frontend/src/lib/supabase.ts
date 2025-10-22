@@ -63,7 +63,7 @@ export class SupabaseAuth {
         password,
         options: {
           data: metadata,
-          emailRedirectTo: `${window.location.origin}/confirm`,
+          emailRedirectTo: `${(import.meta as any).env.VITE_FRONTEND_URL || window.location.origin}/confirm`,
         },
       });
 

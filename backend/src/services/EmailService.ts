@@ -66,7 +66,7 @@ export class EmailService {
                       </div>
                       <p style="font-size: 16px; color: #555;">Please review this registration and approve or decline as appropriate.</p>
                       <div style="text-align: center; margin: 30px 0;">
-                          <a href="http://localhost:3000/dashboard#pending-approvals" class="review-button">Review Registration</a>
+                          <a href="${process.env.FRONTEND_URL}/dashboard#pending-approvals" class="review-button">Review Registration</a>
                       </div>
                   </div>
                   <div class="footer">
@@ -89,7 +89,7 @@ export class EmailService {
 
   async sendWelcomeEmail(email: string, fullName: string, approvalToken: string): Promise<void> {
     try {
-      const approvalUrl = `http://localhost:3000/auth/verify-approval?token=${approvalToken}`;
+      const approvalUrl = `${process.env.FRONTEND_URL}/auth/verify-approval?token=${approvalToken}`;
 
       const mailOptions = {
         from: `"Go3net HR Management System" <${process.env.FROM_EMAIL}>`,
