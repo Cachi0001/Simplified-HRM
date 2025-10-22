@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { notificationService } from '@/services/notificationService';
 import { Go3netNotification, NotificationType } from '@/types/notification';
-import { supabase } from '@/lib/supabaseClient';
+import { supabase } from '../lib/supabase';
 
 interface UseNotificationsReturn {
   notifications: Go3netNotification[];

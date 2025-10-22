@@ -4,11 +4,16 @@ import { AdminTasks } from '../components/dashboard/AdminTasks';
 import { AdminDepartments } from '../components/dashboard/AdminDepartments';
 import { NotificationManager, triggerNotification, NotificationUtils } from '../components/notifications/NotificationManager';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from '../lib/supabase';
 import { notificationService } from '../services/notificationService';
 import Logo from '../components/ui/Logo';
 import { authService } from '../services/authService';
 import { BottomNavbar } from '../components/layout/BottomNavbar';
+import { useToast } from '../components/ui/Toast';
+import { DarkModeToggle } from '../components/ui/DarkModeToggle';
+import { NotificationBell } from '../components/dashboard/NotificationBell';
+import { OverviewCards } from '../components/dashboard/OverviewCards';
+import { PendingApprovals } from '../components/dashboard/PendingApprovals';
 
 export default function AdminDashboard() {
   const [darkMode, setDarkMode] = useState(() => {
@@ -16,6 +21,11 @@ export default function AdminDashboard() {
     const saved = localStorage.getItem('darkMode');
     return saved ? JSON.parse(saved) : false;
   });
+
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [supabaseConfigured, setSupabaseConfigured] = useState(false);
+
   const { addToast } = useToast();
 
   // Save dark mode preference whenever it changes

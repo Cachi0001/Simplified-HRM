@@ -321,6 +321,144 @@ export class AuthController {
     }
   }
 
+  async confirmEmail(req: Request, res: Response): Promise<void> {
+    try {
+      const { accessToken, refreshToken } = req.body;
+
+      if (!accessToken || !refreshToken) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Access token and refresh token are required'
+        });
+        return;
+      }
+
+      logger.info('🔗 [AuthController] Email confirmation request', {
+        hasAccessToken: !!accessToken,
+        hasRefreshToken: !!refreshToken
+      });
+
+      // Set the session using the tokens
+      const result = await this.authService.confirmEmail(accessToken, refreshToken);
+
+      if (!result.user) {
+        throw new Error('Failed to confirm email - invalid tokens');
+      }
+
+      const user = result.user;
+      logger.info('✅ [AuthController] Session confirmed successfully', {
+        userId: user.id,
+        email: user.email,
+        role: user.role
+      });
+
+      // Check if user exists in employees table and get their status
+      const { data: employee, error: empError } = await this.authService.getEmployeeByUserId(user.id);
+
+      if (empError || !employee) {
+        logger.warn('⚠️ [AuthController] Employee record not found, creating one...', {
+          userId: user.id,
+          email: user.email
+        });
+
+        // Create employee record for new signup
+        const newEmployee = await this.authService.createEmployeeRecord({
+          user_id: user.id,
+          email: user.email!,
+          full_name: user.fullName,
+          role: user.role || 'employee',
+          status: 'pending'
+        });
+
+        logger.info('✅ [AuthController] Employee record created', {
+          employeeId: newEmployee.id,
+          userId: user.id
+        });
+
+        res.status(200).json({
+          status: 'success',
+          message: 'Email confirmed successfully! Your account is pending admin approval.',
+          data: {
+            user: {
+              ...user,
+              status: 'pending'
+            },
+            redirectTo: '/auth',
+            requiresApproval: true
+          }
+        });
+        return;
+      }
+
+      // User exists - check their status
+      if (employee.status === 'active') {
+        // Approved user - redirect to dashboard
+        logger.info('✅ [AuthController] User is approved, redirecting to dashboard', {
+          employeeId: employee.id,
+          role: employee.role
+        });
+
+        res.status(200).json({
+          status: 'success',
+          message: 'Welcome back! Redirecting to dashboard...',
+          data: {
+            user: {
+              ...user,
+              status: 'active',
+              role: employee.role
+            },
+            redirectTo: '/dashboard',
+            requiresApproval: false
+          }
+        });
+      } else if (employee.status === 'pending') {
+        // Still pending approval
+        logger.info('⏳ [AuthController] User is still pending approval', {
+          employeeId: employee.id,
+          email: user.email
+        });
+
+        res.status(200).json({
+          status: 'success',
+          message: 'Email confirmed! Your account is still pending admin approval.',
+          data: {
+            user: {
+              ...user,
+              status: 'pending'
+            },
+            redirectTo: '/auth',
+            requiresApproval: true
+          }
+        });
+      } else {
+        // Rejected or other status
+        logger.warn('❌ [AuthController] User account is not active', {
+          employeeId: employee.id,
+          status: employee.status
+        });
+
+        res.status(403).json({
+          status: 'error',
+          message: 'Your account is not active. Please contact your administrator.',
+          data: {
+            redirectTo: '/auth'
+          }
+        });
+      }
+    } catch (error) {
+      logger.error('❌ [AuthController] Email confirmation failed', {
+        error: (error as Error).message,
+        stack: (error as Error).stack
+      });
+
+      res.status(400).json({
+        status: 'error',
+        message: 'Email confirmation failed. Please try again or contact support.',
+        originalError: (error as Error).message
+      });
+    }
+  }
+
   async updatePassword(req: Request, res: Response): Promise<void> {
     try {
       const accessToken = req.headers.authorization?.split(' ')[1];
@@ -335,6 +473,8 @@ export class AuthController {
       }
 
       await this.authService.updatePassword(accessToken, newPassword);
+
+      logger.info('AuthController: Password updated successfully');
 
       res.status(200).json({
         status: 'success',

@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from '../lib/supabase';
 import { Go3netNotification, NotificationType, PushNotificationPayload } from '../types/notification';
 
 class NotificationService {

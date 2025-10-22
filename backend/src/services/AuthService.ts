@@ -135,8 +135,6 @@ export class AuthService {
     }
   }
 
-  
-
   async resetPassword(email: string): Promise<void> {
     try {
       if (!email) {
@@ -163,6 +161,64 @@ export class AuthService {
       return result; // Return the repository response directly
     } catch (error) {
       logger.error('AuthService: Resend confirmation failed', { error: (error as Error).message });
+      throw error;
+    }
+  }
+
+  async confirmEmail(accessToken: string, refreshToken: string): Promise<AuthResponse> {
+    try {
+      logger.info('🔗 [AuthService] Confirming email with tokens');
+
+      // Set the session using the tokens from the magic link
+      const { data, error } = await this.authRepository.setSession(accessToken, refreshToken);
+
+      if (error) {
+        logger.error('❌ [AuthService] Session confirmation failed', { error: error.message });
+        throw new Error(error.message);
+      }
+
+      if (!data.user || !data.session) {
+        throw new Error('Invalid tokens provided');
+      }
+
+      logger.info('✅ [AuthService] Email confirmed successfully', {
+        userId: data.user.id,
+        email: data.user.email
+      });
+
+      return {
+        user: {
+          id: data.user.id,
+          email: data.user.email!,
+          fullName: data.user.user_metadata?.full_name || data.user.email!,
+          role: data.user.user_metadata?.role || 'employee',
+          emailVerified: !!data.user.email_confirmed_at,
+          createdAt: new Date(data.user.created_at!),
+          updatedAt: new Date(data.user.updated_at || data.user.created_at!),
+        },
+        accessToken: data.session.access_token,
+        refreshToken: data.session.refresh_token,
+      };
+    } catch (error) {
+      logger.error('❌ [AuthService] Confirm email failed', { error: (error as Error).message });
+      throw error;
+    }
+  }
+
+  async getEmployeeByUserId(userId: string): Promise<any> {
+    try {
+      return await this.authRepository.getEmployeeByUserId(userId);
+    } catch (error) {
+      logger.error('AuthService: Get employee by user ID failed', { error: (error as Error).message });
+      throw error;
+    }
+  }
+
+  async createEmployeeRecord(employeeData: any): Promise<any> {
+    try {
+      return await this.authRepository.createEmployeeRecord(employeeData);
+    } catch (error) {
+      logger.error('AuthService: Create employee record failed', { error: (error as Error).message });
       throw error;
     }
   }

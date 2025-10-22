@@ -6,7 +6,7 @@ import { NotificationBell } from '../components/dashboard/NotificationBell';
 import { DarkModeToggle } from '../components/ui/DarkModeToggle';
 import { NotificationManager, triggerNotification, NotificationUtils } from '../components/notifications/NotificationManager';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from '../lib/supabase';
 import { notificationService } from '../services/notificationService';
 import Logo from '../components/ui/Logo';
 import { authService } from '../services/authService';

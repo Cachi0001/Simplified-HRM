@@ -236,6 +236,10 @@ export class EmailService {
       await this.transporter.sendMail(mailOptions);
       logger.info('Employee approval confirmation email sent', { to: email });
     } catch (error) {
+      logger.error('Failed to send approval confirmation email', { error: (error as Error).message });
+      throw error;
+    }
+  }
   async sendTaskNotification(employeeId: string, taskTitle: string, taskDescription: string, dueDate: string): Promise<void> {
     try {
       // Get employee email from database

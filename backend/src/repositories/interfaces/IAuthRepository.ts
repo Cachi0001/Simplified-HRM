@@ -10,4 +10,7 @@ export interface IAuthRepository {
   resetPassword(email: string): Promise<void>;
   updatePassword(accessToken: string, newPassword: string): Promise<void>;
   resendConfirmationEmail(email: string): Promise<{ message: string }>;
+  setSession(accessToken: string, refreshToken: string): Promise<any>;
+  getEmployeeByUserId(userId: string): Promise<any>;
+  createEmployeeRecord(employeeData: any): Promise<any>;
 }
