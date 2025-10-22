@@ -8,19 +8,36 @@ export class EmailService {
     this.transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
       port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: false, 
+      secure: false, // Gmail SMTP uses TLS (not SSL) on port 587
+      requireTLS: true, // Require TLS encryption
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
       },
-      connectionTimeout: 10000,
-      greetingTimeout: 10000,
-      socketTimeout: 10000,
+      tls: {
+        rejectUnauthorized: false // Allow self-signed certificates
+      },
+      connectionTimeout: 30000,
+      greetingTimeout: 30000,
+      socketTimeout: 30000,
+    });
+
+    // Verify connection configuration
+    this.transporter.verify((error, success) => {
+      if (error) {
+        logger.error('Email transporter verification failed', { error: error.message });
+      } else {
+        logger.info('Email transporter verified successfully');
+      }
     });
   }
 
   async sendApprovalNotification(email: string, fullName: string, adminEmail?: string): Promise<void> {
     try {
+      if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+        throw new Error('SMTP credentials not configured');
+      }
+
       const adminEmailAddress = adminEmail || process.env.FROM_EMAIL || 'admin@go3net.com.ng';
 
       const mailOptions = {
@@ -79,10 +96,23 @@ export class EmailService {
         `
       };
 
-      await this.transporter.sendMail(mailOptions);
-      logger.info('Admin approval notification email sent', { to: adminEmailAddress, forEmployee: email });
+      logger.info('📧 Sending admin approval notification email', {
+        to: adminEmailAddress,
+        from: process.env.FROM_EMAIL,
+        forEmployee: email
+      });
+
+      const result = await this.transporter.sendMail(mailOptions);
+      logger.info('✅ Admin approval notification email sent successfully', {
+        messageId: result.messageId,
+        to: adminEmailAddress
+      });
     } catch (error) {
-      logger.error('Failed to send admin approval notification email', { error: (error as Error).message });
+      logger.error('❌ Failed to send admin approval notification email', {
+        error: (error as Error).message,
+        stack: (error as Error).stack,
+        to: adminEmail || process.env.FROM_EMAIL
+      });
       throw error;
     }
   }
@@ -411,6 +441,79 @@ export class EmailService {
       logger.info('Task completion notification email sent', { to: employee.email, taskTitle });
     } catch (error) {
       logger.error('Failed to send task completion notification email', { error: (error as Error).message });
+      throw error;
+    }
+  }
+
+  async sendConfirmationEmail(email: string, fullName: string, confirmationUrl: string): Promise<void> {
+    try {
+      if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+        throw new Error('SMTP credentials not configured');
+      }
+
+      const mailOptions = {
+        from: `"Go3net HR Management System" <${process.env.FROM_EMAIL}>`,
+        to: email,
+        subject: 'Confirm Your Go3net Account',
+        html: `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="UTF-8">
+            <title>Confirm Your Go3net Account</title>
+            <style>
+              body {font-family: Arial, Helvetica, sans-serif; background:#f4f4f4; padding:20px;}
+              .container {max-width:600px; margin:auto; background:#fff; padding:30px; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,.1);}
+              .button {display:inline-block; background:#007bff; color:#fff; padding:14px 28px; text-decoration:none; border-radius:6px; font-weight:bold; font-size:15px;}
+              .fallback {margin-top:20px; font-size:13px; color:#555; word-break:break-all;}
+              .footer {margin-top:30px; font-size:12px; color:#777;}
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <h2>Welcome to Go3net!</h2>
+              <p>Click below to confirm your account and log in instantly:</p>
+
+              <p style="text-align:center;">
+                <a href="${confirmationUrl}" class="button">
+                  Confirm & Log In
+                </a>
+              </p>
+
+              <p><strong>No password needed.</strong> This link expires in 1 hour.</p>
+
+              <div class="fallback">
+                <p>If the button doesn't work, copy & paste this URL into your browser:</p>
+                <p><a href="${confirmationUrl}">${confirmationUrl}</a></p>
+              </div>
+
+              <div class="footer">
+                <p>© Go3net. All rights reserved.</p>
+              </div>
+            </div>
+          </body>
+          </html>
+        `
+      };
+
+      logger.info('📧 Sending confirmation email', {
+        to: email,
+        from: process.env.FROM_EMAIL,
+        confirmationUrl: confirmationUrl.substring(0, 100) + '...' // Log partial URL for security
+      });
+
+      const result = await this.transporter.sendMail(mailOptions);
+      logger.info('✅ Confirmation email sent successfully', {
+        messageId: result.messageId,
+        to: email
+      });
+    } catch (error) {
+      logger.error('❌ Failed to send confirmation email', {
+        error: (error as Error).message,
+        stack: (error as Error).stack,
+        to: email,
+        from: process.env.FROM_EMAIL
+      });
       throw error;
     }
   }

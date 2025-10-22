@@ -5,6 +5,7 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 import { Router } from 'express';
 import { AuthController } from '../controllers/AuthController';
 import { AuthService } from '../services/AuthService';
+import { EmailService } from '../services/EmailService';
 import { SupabaseAuthRepository } from '../repositories/implementations/SupabaseAuthRepository';
 import { authenticateToken } from '../middleware/auth.middleware';
 
@@ -24,6 +25,22 @@ router.post('/signout', (req, res) => authController.signOut(req, res));
 router.post('/forgot-password', (req, res) => authController.resetPassword(req, res));
 router.post('/google', (req, res) => authController.signInWithGoogle(req, res));
 router.post('/logout', authenticateToken, (req, res) => authController.signOut(req, res));
-router.post('/update-password', authenticateToken, (req, res) => authController.updatePassword(req, res));
+router.get('/test-email', async (req, res) => {
+  try {
+    const emailService = new EmailService();
+    await emailService.sendConfirmationEmail(
+      'test@example.com',
+      'Test User',
+      'http://localhost:5173/confirm?token=test'
+    );
+    res.status(200).json({ status: 'success', message: 'Test email sent successfully' });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Email test failed',
+      error: (error as Error).message
+    });
+  }
+});
 
 export default router;

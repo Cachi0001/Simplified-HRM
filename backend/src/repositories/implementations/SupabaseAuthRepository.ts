@@ -2,6 +2,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { IAuthRepository } from '../interfaces/IAuthRepository';
 import { User, CreateUserRequest, LoginRequest, AuthResponse } from '../../models/User';
 import logger from '../../utils/logger';
+import crypto from 'crypto';
 
 export class SupabaseAuthRepository implements IAuthRepository {
   private _supabase: SupabaseClient;
@@ -52,34 +53,40 @@ export class SupabaseAuthRepository implements IAuthRepository {
         throw new Error('Email and full name are required');
       }
 
-      // Send magic link
-      const { error: authError } = await this.supabase.auth.signInWithOtp({
+      // Use Supabase's built-in auth with magic link
+      const { data, error } = await this.supabase.auth.signUp({
         email: userData.email,
+        password: crypto.randomBytes(32).toString('hex'), // dummy password for magic link auth
         options: {
           emailRedirectTo: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/confirm`,
           data: {
             full_name: userData.fullName,
             role: userData.role || 'employee',
             signup: true
-          }
+          },
+          captchaToken: undefined // Enable PKCE flow
         }
       });
 
-      if (authError) {
-        logger.error('❌ [SupabaseAuthRepository] Magic link send failed', { error: authError.message });
-        throw authError;
+      if (error) {
+        logger.error('❌ [SupabaseAuthRepository] Signup failed', { error: error.message });
+        throw new Error(error.message);
+      }
+
+      if (!data.user) {
+        throw new Error('Failed to create user account');
       }
 
       logger.info('✅ [SupabaseAuthRepository] Magic link sent successfully', { email: userData.email });
 
       const user: User = {
-        id: '',
+        id: data.user.id,
         email: userData.email,
         fullName: userData.fullName,
         role: userData.role || 'employee',
         emailVerified: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt: new Date(data.user.created_at!),
+        updatedAt: new Date(data.user.updated_at || data.user.created_at!),
       };
 
       return {
@@ -106,30 +113,38 @@ export class SupabaseAuthRepository implements IAuthRepository {
         throw new Error('Email is required');
       }
 
-      // Send magic link for login
-      const { error: sendError } = await this.supabase.auth.signInWithOtp({
+      // Use signUp for magic link (same flow as signup)
+      const { data, error } = await this.supabase.auth.signUp({
         email: credentials.email,
+        password: crypto.randomBytes(32).toString('hex'), // dummy password for magic link auth
         options: {
           emailRedirectTo: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/confirm`,
           data: {
-            login: true
-          }
+            login: true,
+            full_name: 'Login User',
+            role: 'employee'
+          },
+          captchaToken: undefined // Enable PKCE flow
         }
       });
 
-      if (sendError) {
-        logger.error('❌ [SupabaseAuthRepository] Magic link send failed', { error: sendError.message });
-        throw new Error(`Please confirm your email address before signing in: ${sendError.message}`);
+      if (error) {
+        logger.error('❌ [SupabaseAuthRepository] Magic link send failed', { error: error.message });
+        throw new Error(`Please confirm your email address before signing in: ${error.message}`);
+      }
+
+      if (!data.user) {
+        throw new Error('Failed to send magic link');
       }
 
       const user: User = {
-        id: '',
+        id: data.user.id,
         email: credentials.email,
-        fullName: '',
+        fullName: 'Login User',
         role: 'employee',
         emailVerified: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt: new Date(data.user.created_at!),
+        updatedAt: new Date(data.user.updated_at || data.user.created_at!),
       };
 
       logger.info('✅ [SupabaseAuthRepository] Magic link sent successfully', { email: credentials.email });
@@ -361,13 +376,17 @@ export class SupabaseAuthRepository implements IAuthRepository {
     try {
       logger.info('📧 [SupabaseAuthRepository] Resending magic link confirmation', { email });
 
-      const { error } = await this.supabase.auth.signInWithOtp({
+      const { data, error } = await this.supabase.auth.signUp({
         email: email,
+        password: crypto.randomBytes(32).toString('hex'), // dummy password for magic link auth
         options: {
           emailRedirectTo: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/confirm`,
           data: {
-            resend: true
-          }
+            resend: true,
+            full_name: 'Resend User',
+            role: 'employee'
+          },
+          captchaToken: undefined // Enable PKCE flow
         }
       });
 

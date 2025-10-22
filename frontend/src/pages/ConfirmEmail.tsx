@@ -1,127 +1,94 @@
-import React, { useEffect, useState } from 'react';
+// 🚨🚨🚨 FORCE LOG - OUTSIDE COMPONENT - SHOULD ALWAYS SHOW
+console.log('%c🟢🟢🟢 CONFIRM PAGE FILE LOADED', 'color: green; font-size: 24px; font-weight: bold; background: yellow; padding: 10px');
+console.log('Timestamp:', new Date().toISOString());
+console.log('Location:', window.location.href);
+
+import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import Logo from '../components/ui/Logo';
 import { useToast } from '../components/ui/Toast';
 
 const ConfirmEmail: React.FC = () => {
-  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { addToast } = useToast();
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const handleConfirmation = async () => {
-      try {
-        // Supabase automatically handles the session from the URL hash
-        // Just wait for the auth state to be ready
-        const { data: { session }, error } = await supabase.auth.getSession();
+  const handleAuthSuccess = useCallback(async (session: any, isSignup: boolean) => {
+    try {
+      const user = session.user;
 
-        if (error) {
-          throw new Error(error.message);
-        }
-
-        if (!session || !session.user) {
-          addToast('error', 'Invalid confirmation link. Please try again.');
-          setLoading(false);
-          setTimeout(() => navigate('/auth'), 3000);
-          return;
-        }
-
-        const user = session.user;
-        console.log('✅ Email confirmed successfully', {
-          userId: user.id,
-          email: user.email
+      if (isSignup) {
+        await supabase.from('employees').insert({
+          user_id: user.id,
+          email: user.email!,
+          full_name: user.user_metadata.full_name,
+          role: 'employee',
+          status: 'pending'
         });
-
-        // Check if user exists in employees table
-        const { data: employee, error: empError } = await supabase
-          .from('employees')
-          .select('*')
-          .eq('user_id', user.id)
-          .single();
-
-        if (empError && empError.code !== 'PGRST116') {
-          console.error('Employee lookup failed', { error: empError.message });
-          throw new Error('Failed to verify user account');
-        }
-
-        if (!employee) {
-          // Create employee record for new signup
-          console.log('Creating new employee record');
-          const { data: newEmployee, error: createError } = await supabase
-            .from('employees')
-            .insert({
-              user_id: user.id,
-              email: user.email!,
-              full_name: user.user_metadata?.full_name || user.email!,
-              role: user.user_metadata?.role || 'employee',
-              status: 'pending'
-            })
-            .select()
-            .single();
-
-          if (createError) {
-            console.error('Failed to create employee record', { error: createError.message });
-            throw new Error('Failed to create account. Please contact support.');
-          }
-
-          // Send admin notification
-          try {
-            await fetch(`${(import.meta as any).env.VITE_API_URL}/auth/notify-admin`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                email: user.email,
-                fullName: user.user_metadata?.full_name || user.email!
-              })
-            });
-          } catch (emailError) {
-            console.warn('Admin notification failed', { error: emailError });
-          }
-
-          addToast('success', '🎉 Email confirmed successfully! Your account is pending admin approval.');
-          setLoading(false);
-          setTimeout(() => navigate('/auth'), 5000);
-          return;
-        }
-
-        // User exists - check status
-        if (employee.status === 'active') {
-          // Approved user - go to dashboard
-          console.log('User approved, redirecting to dashboard');
-          addToast('success', `Welcome back! Redirecting to dashboard...`);
-
-          localStorage.setItem('user', JSON.stringify({
-            id: user.id,
-            email: user.email,
-            fullName: employee.full_name,
-            role: employee.role,
-            emailVerified: true,
-            createdAt: user.created_at,
-            updatedAt: user.updated_at || user.created_at
-          }));
-          localStorage.setItem('accessToken', session.access_token);
-          localStorage.setItem('refreshToken', session.refresh_token);
-
-          setLoading(false);
-          setTimeout(() => navigate('/dashboard'), 1500);
-        } else {
-          // Still pending approval
-          console.log('User pending approval');
-          addToast('warning', 'Your account is still pending admin approval.');
-          setLoading(false);
-          setTimeout(() => navigate('/auth'), 3000);
-        }
-      } catch (err: any) {
-        console.error('Confirmation failed', { error: err.message });
-        addToast('error', err.message || 'Confirmation failed. Please try again or contact support.');
+        addToast('success', 'Confirmed! Pending approval.');
         setLoading(false);
         setTimeout(() => navigate('/auth'), 3000);
+      } else {
+        const { data: emp } = await supabase.from('employees').select('status').eq('email', user.email!).single();
+        if (emp?.status === 'active') {
+          localStorage.setItem('accessToken', session.access_token);
+          setLoading(false);
+          navigate('/dashboard');
+        } else {
+          addToast('warning', 'Pending approval.');
+          setLoading(false);
+          navigate('/auth');
+        }
+      }
+    } catch (err: any) {
+      console.error('Auth success handling failed:', err);
+      addToast('error', 'Authentication failed. Please contact support.');
+      setLoading(false);
+      navigate('/auth');
+    }
+  }, [navigate, addToast]);
+
+  useEffect(() => {
+    const confirm = async () => {
+      console.clear();
+      console.log('%c🔍 CONFIRM START', 'color: red; font-size: 18px; font-weight: bold');
+
+      const params = new URLSearchParams(window.location.search);
+      const error = params.get('error');
+
+      if (error) {
+        console.error('❌ SUPABASE ERROR:', error, params.get('error_description'));
+        addToast('error', 'Confirmation failed.');
+        navigate('/auth', { replace: true });
+        return;
+      }
+
+      const token_hash = params.get('token_hash');
+      const type = params.get('type');
+
+      console.log('TOKEN_HASH:', token_hash);
+      console.log('TYPE:', type);
+
+      if (token_hash && type === 'signup') {
+        console.log('🔑 VERIFYING OTP:', token_hash);
+        const { data, error } = await supabase.auth.verifyOtp({
+          token_hash,
+          type: 'email'
+        });
+
+        if (error) throw error;
+        console.log('✅ CONFIRMED:', data.session?.user?.id);
+        await handleAuthSuccess(data.session, true);
+      } else {
+        console.log('❌ INVALID LINK');
+        addToast('error', 'Invalid confirmation link.');
+        navigate('/auth', { replace: true });
       }
     };
 
-    handleConfirmation();
-  }, [navigate, addToast]);
+    confirm();
+  }, [navigate, addToast]); // ← FIXED DEPENDENCY ARRAY
 
   if (loading) {
     return (
