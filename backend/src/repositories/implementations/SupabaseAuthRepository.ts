@@ -18,8 +18,24 @@ export class SupabaseAuthRepository implements IAuthRepository {
       throw new Error('SUPABASE_URL, SUPABASE_ANON_KEY, and SUPABASE_SERVICE_ROLE_KEY must be set');
     }
 
-    this._supabase = createClient(url, anonKey);
-    this._supabaseAdmin = createClient(url, serviceKey);
+    // Configuration for extended token lifetime (7 days)
+    const authConfig = {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true,
+      flowType: 'pkce' as const
+    };
+
+    this._supabase = createClient(url, anonKey, {
+      auth: authConfig
+    });
+    this._supabaseAdmin = createClient(url, serviceKey, {
+      auth: {
+        ...authConfig,
+        // Admin client doesn't need persistence
+        persistSession: false
+      }
+    });
   }
 
   private get supabase(): SupabaseClient {
@@ -33,177 +49,98 @@ export class SupabaseAuthRepository implements IAuthRepository {
   // ———————————————————— SIGN UP ————————————————————
   async signUp(userData: CreateUserRequest): Promise<AuthResponse> {
     try {
-      logger.info('🔍 [SupabaseAuthRepository] Starting signup process', {
+      logger.info('🔍 [SupabaseAuthRepository] Starting passwordless signup process', {
         email: userData.email,
         fullName: userData.fullName,
         role: userData.role || 'employee'
       });
 
-      // 1. Check if email already exists
-      logger.info('🔍 [SupabaseAuthRepository] Checking for existing users...');
-      const { data: { users }, error: listError } = await this.supabaseAdmin.auth.admin.listUsers();
-
-      if (listError) {
-        logger.error('❌ [SupabaseAuthRepository] Failed to list users', { error: listError });
-        throw new Error('Failed to check existing users');
+      if (!userData.email || !userData.fullName) {
+        logger.error('❌ [SupabaseAuthRepository] Missing required fields', {
+          hasEmail: !!userData.email,
+          hasFullName: !!userData.fullName
+        });
+        throw new Error('Email and full name are required');
       }
 
-      const existing = users.find(u => u.email === userData.email);
-      logger.info('🔍 [SupabaseAuthRepository] Existing user check', {
-        email: userData.email,
-        userExists: !!existing,
-        confirmed: existing?.email_confirmed_at ? true : false
-      });
+      // 1. Check if user already exists (using anon client, not service role)
+      logger.info('🔍 [SupabaseAuthRepository] Checking if user already exists...');
+      const { data: existing, error: existingError } = await this.supabase
+        .from('employees')
+        .select('user_id, status')
+        .eq('email', userData.email)
+        .single();
+
+      if (existingError && existingError.code !== 'PGRST116') {
+        logger.error('❌ [SupabaseAuthRepository] Error checking existing user', {
+          error: existingError.message,
+          code: existingError.code
+        });
+        throw existingError;
+      }
 
       if (existing) {
         logger.warn('❌ [SupabaseAuthRepository] Email already registered', { email: userData.email });
 
-        if (existing.email_confirmed_at) {
-          throw new Error('Email already registered and active. Please try signing in instead.');
-        } else {
-          throw new Error('Email already registered but not confirmed. Please check your email for the confirmation link.');
+        // Check if there's a corresponding auth user
+        const { data: authUser } = await this.supabase.auth.admin.getUserById(existing.user_id);
+        if (authUser.user) {
+          if (authUser.user.email_confirmed_at) {
+            throw new Error('Email already registered and active. Please try signing in instead.');
+          } else {
+            throw new Error('Email already registered but not confirmed. Please check your email for the confirmation link.');
+          }
         }
       }
 
-      // 2. Create Supabase auth user (no metadata yet)
-      logger.info('🆕 [SupabaseAuthRepository] Creating new Supabase auth user...');
-      const { data: authData, error: authError } = await this.supabase.auth.signUp({
+      // 2. Send magic link using signInWithOtp (TRUE MAGIC LINK!)
+      logger.info('🆕 [SupabaseAuthRepository] Sending magic link for signup...');
+      const { data: authData, error: authError } = await this.supabase.auth.signInWithOtp({
         email: userData.email,
-        password: userData.password,
         options: {
-          emailRedirectTo: `${process.env.FRONTEND_URL}/confirm`,
-          // Do NOT send metadata yet
+          emailRedirectTo: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/confirm`,
+          data: {
+            full_name: userData.fullName,
+            role: userData.role || 'employee',
+            signup: true // Mark as signup flow
+          }
         }
       });
 
       if (authError) {
-        logger.error('❌ [SupabaseAuthRepository] Supabase auth signup failed', { error: authError.message });
+        logger.error('❌ [SupabaseAuthRepository] Magic link send failed', { error: authError.message });
         throw authError;
       }
 
-      if (!authData.user) {
-        logger.error('❌ [SupabaseAuthRepository] No user returned from Supabase signup');
-        throw new Error('Signup failed - no user created');
-      }
-
-      logger.info('✅ [SupabaseAuthRepository] Supabase auth user created successfully', {
-        userId: authData.user.id,
-        email: authData.user.email
+      logger.info('✅ [SupabaseAuthRepository] Magic link sent successfully', {
+        email: userData.email
       });
 
-      // Check if user needs email confirmation
-      const emailConfirmed = authData.session && authData.session.access_token;
-      logger.info('📧 [SupabaseAuthRepository] Email confirmation status', {
-        hasSession: !!authData.session,
-        emailConfirmed: !!emailConfirmed,
-        userId: authData.user.id
-      });
-
-      // 3. Create user object for response
+      // 3. Create temporary user object for response
       const user: User = {
-        id: authData.user.id,
-        email: authData.user.email!,
+        id: '', // Will be set via magic link
+        email: userData.email,
         fullName: userData.fullName,
         role: userData.role || 'employee',
-        emailVerified: !!emailConfirmed,
-        createdAt: new Date(authData.user.created_at!),
-        updatedAt: new Date(authData.user.updated_at || authData.user.created_at!),
+        emailVerified: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
       };
 
-      // 4. Create employee record using service role (bypasses RLS)
-      if (userData.role === 'employee' || !userData.role) {
-        logger.info('👤 [SupabaseAuthRepository] Creating employee record with service role...');
-
-        const { data: employee, error: empError } = await this.supabaseAdmin
-          .from('employees')
-          .insert({
-            user_id: authData.user.id,
-            email: userData.email,
-            full_name: userData.fullName,
-            role: userData.role || 'employee',
-            status: 'pending'
-          })
-          .select()
-          .single();
-
-        if (empError) {
-          logger.error('❌ [SupabaseAuthRepository] Failed to create employee record', {
-            error: empError.message,
-            details: empError.details,
-            hint: empError.hint,
-            code: empError.code
-          });
-
-          // Log but don't fail signup - user is created in auth
-          logger.warn('⚠️ [SupabaseAuthRepository] Employee record creation failed, but auth user created', {
-            userId: authData.user.id,
-            email: userData.email
-          });
-        } else {
-          logger.info('✅ [SupabaseAuthRepository] Employee record created successfully', {
-            employeeId: employee?.id,
-            userId: authData.user.id
-          });
-
-          // 5. Send admin notification email
-          logger.info('📧 [SupabaseAuthRepository] Sending admin notification email...');
-          try {
-            const emailService = new EmailService();
-            await emailService.sendApprovalNotification(userData.email, userData.fullName);
-            logger.info('✅ [SupabaseAuthRepository] Admin approval notification sent', { email: userData.email });
-          } catch (emailError) {
-            logger.warn('⚠️ [SupabaseAuthRepository] Admin notification email failed (non-critical)', { error: (emailError as Error).message });
-          }
-        }
-      }
-
-      // 6. Update auth user metadata (optional cleanup)
-      try {
-        await this.supabase.auth.updateUser({
-          data: {
-            full_name: userData.fullName,
-            role: userData.role || 'employee'
-          }
-        });
-        logger.info('✅ [SupabaseAuthRepository] Auth user metadata updated');
-      } catch (metadataError) {
-        logger.warn('⚠️ [SupabaseAuthRepository] Failed to update auth metadata (non-critical)', {
-          error: (metadataError as Error).message
-        });
-      }
-
-      // 7. Return appropriate response based on confirmation status
-      if (!emailConfirmed) {
-        // User needs to confirm email - this is normal, not an error
-        logger.info('📧 [SupabaseAuthRepository] User needs email confirmation - returning success with message', {
-          userId: authData.user.id,
-          email: userData.email
-        });
-
-        return {
-          user,
-          accessToken: '', // No session yet until email confirmed
-          refreshToken: '',
-          requiresConfirmation: true,
-          message: 'Check your inbox – we sent you a new confirmation email'
-        };
-      }
-
-      // User is confirmed and can sign in immediately
-      logger.info('🎉 [SupabaseAuthRepository] User confirmed - returning full auth response', {
-        userId: authData.user.id,
+      // 4. Return response - employee record will be created after email confirmation
+      logger.info('📧 [SupabaseAuthRepository] Passwordless signup successful - magic link sent', {
         email: userData.email
       });
 
       return {
         user,
-        accessToken: authData.session?.access_token || '',
-        refreshToken: authData.session?.refresh_token || '',
-        requiresConfirmation: false,
-        message: 'Account created successfully'
+        accessToken: '',
+        refreshToken: '',
+        requiresConfirmation: true,
+        message: 'Check your inbox – we sent you a confirmation email'
       };
     } catch (error) {
-      logger.error('❌ [SupabaseAuthRepository] Signup process failed', {
+      logger.error('❌ [SupabaseAuthRepository] Passwordless signup process failed', {
         error: (error as Error).message,
         stack: (error as Error).stack,
         email: userData.email
@@ -215,52 +152,56 @@ export class SupabaseAuthRepository implements IAuthRepository {
   // ———————————————————— SIGN IN ————————————————————
   async signIn(credentials: LoginRequest): Promise<AuthResponse> {
     try {
-      logger.info('Signing in user', { email: credentials.email });
+      logger.info('🔐 [SupabaseAuthRepository] Passwordless signin request', { email: credentials.email });
 
-      const { data, error } = await this.supabase.auth.signInWithPassword({
-        email: credentials.email,
-        password: credentials.password,
-      });
-
-      if (error) {
-        // Handle specific Supabase errors with better messages
-        if (error.message.includes('Email not confirmed')) {
-          throw new Error('Please confirm your email address before signing in. Check your inbox for the confirmation link.');
-        }
-        if (error.message.includes('Invalid login credentials')) {
-          throw new Error('Invalid email or password');
-        }
-        throw new Error(error.message);
+      if (!credentials.email) {
+        throw new Error('Email is required');
       }
 
-      if (!data.user || !data.session) throw new Error('Authentication failed');
+      // Send magic link for passwordless login
+      logger.info('📧 [SupabaseAuthRepository] Sending magic link for login', { email: credentials.email });
+      const { error: sendError } = await this.supabase.auth.signInWithOtp({
+        email: credentials.email,
+        options: {
+          emailRedirectTo: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/confirm`,
+          data: {
+            login: true // Mark as login flow
+          }
+        }
+      });
 
-      const { data: employee, error: empError } = await this.supabaseAdmin
-        .from('employees')
-        .select('id, full_name, role, status')
-        .eq('user_id', data.user.id)
-        .single();
+      if (sendError) {
+        logger.error('❌ [SupabaseAuthRepository] Magic link send failed', { error: sendError.message });
+        throw new Error('EMAIL_NOT_CONFIRMED:Please confirm your email address before signing in. Check your inbox for the confirmation link.');
+      }
 
-      if (empError || !employee) throw new Error('Employee record not found');
-      if (employee.status !== 'active') throw new Error('Account pending admin approval');
-
+      // Return user info without tokens (tokens come via magic link)
       const user: User = {
-        id: data.user.id,
-        email: data.user.email!,
-        fullName: employee.full_name,
-        role: employee.role,
-        emailVerified: !!data.user.email_confirmed_at,
-        createdAt: new Date(data.user.created_at!),
-        updatedAt: new Date(data.user.updated_at || data.user.created_at!),
+        id: '', // Will be set via magic link
+        email: credentials.email,
+        fullName: '',
+        role: 'employee',
+        emailVerified: false, // Will be verified via magic link
+        createdAt: new Date(),
+        updatedAt: new Date(),
       };
+
+      logger.info('✅ [SupabaseAuthRepository] Magic link sent successfully', {
+        email: credentials.email
+      });
 
       return {
         user,
-        accessToken: data.session.access_token,
-        refreshToken: data.session.refresh_token,
+        accessToken: '',
+        refreshToken: '',
+        requiresConfirmation: true,
+        message: 'Check your inbox – we sent you a magic link to sign in'
       };
     } catch (error) {
-      logger.error('Signin failed', { error: (error as Error).message });
+      logger.error('❌ [SupabaseAuthRepository] Passwordless signin failed', {
+        error: (error as Error).message,
+        email: credentials.email
+      });
       throw error;
     }
   }
@@ -394,6 +335,28 @@ export class SupabaseAuthRepository implements IAuthRepository {
       if (error) throw new Error(error.message);
     } catch (error) {
       logger.error('Password reset failed', { error: (error as Error).message });
+      throw error;
+    }
+  }
+
+  async resendConfirmationEmail(email: string): Promise<{ message: string }> {
+    try {
+      const { error } = await this.supabase.auth.resend({
+        type: 'signup',
+        email: email,
+        options: {
+          emailRedirectTo: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/confirm`,
+        },
+      });
+
+      if (error) throw new Error(error.message);
+      logger.info('Confirmation email resent', { email });
+
+      return {
+        message: 'Check your inbox – we sent you a new confirmation email. Please verify your account to continue.'
+      };
+    } catch (error) {
+      logger.error('Resend confirmation failed', { error: (error as Error).message });
       throw error;
     }
   }

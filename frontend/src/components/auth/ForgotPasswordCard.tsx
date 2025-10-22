@@ -2,47 +2,30 @@ import React, { useState } from 'react';
 import { AuthCard } from '../ui/Card';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
+import { authService } from '../../services/authService';
+import { useToast } from '../ui/Toast';
 
 interface ForgotPasswordCardProps {
   onSwitchToLogin: () => void;
 }
 
-const API_BASE_URL = 'https://go3nethrm-backend.vercel.app/api';
-
 const ForgotPasswordCard: React.FC<ForgotPasswordCardProps> = ({ onSwitchToLogin }) => {
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const { addToast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setError(null);
-    setSuccess(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'An unknown error occurred.');
-      }
-      
-      setSuccess(data.message || 'If an account exists, a reset link has been sent.');
-
+      await authService.resetPassword(email);
+      addToast('success', 'If an account exists, a reset link has been sent to your email.');
     } catch (err) {
       if (err instanceof Error) {
-        setError(err.message);
+        addToast('error', err.message);
       } else {
-        setError('An unexpected error occurred.');
+        addToast('error', 'An unexpected error occurred.');
       }
     } finally {
       setIsLoading(false);
@@ -65,9 +48,6 @@ const ForgotPasswordCard: React.FC<ForgotPasswordCardProps> = ({ onSwitchToLogin
           autoComplete="email"
         />
         
-        {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-        {success && <p className="text-green-500 text-sm text-center">{success}</p>}
-
         <Button type="submit" className="w-full" isLoading={isLoading}>
           Send Reset Link
         </Button>

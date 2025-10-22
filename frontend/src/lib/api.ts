@@ -25,8 +25,8 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401) {
-      // Token expired or invalid, clear storage and redirect to login
+    if (error.response?.status === 401 && error.response?.data?.errorType !== 'email_not_confirmed') {
+      // Only redirect on 401 AND not email confirmation errors
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
@@ -57,17 +57,18 @@ export interface AuthResponse {
     accessToken: string;
     refreshToken: string;
     requiresConfirmation?: boolean;
+    message?: string;
   };
 }
 
 export interface LoginRequest {
   email: string;
-  password: string;
+  password?: string; // Optional for passwordless magic link login
 }
 
 export interface SignupRequest {
   email: string;
-  password: string;
+  password?: string; // Optional for passwordless magic link signup
   fullName: string;
   role?: 'admin' | 'employee';
 }

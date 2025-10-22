@@ -12,7 +12,8 @@ export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKe
   auth: {
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: true
+    detectSessionInUrl: true,
+    flowType: 'pkce'
   }
 });
 
@@ -40,12 +41,17 @@ export class SupabaseAuth {
     }
   }
 
-  // Sign in with email and password
-  async signIn(email: string, password: string): Promise<any> {
+  // Sign in with magic link (passwordless)
+  async signIn(email: string): Promise<any> {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithOtp({
         email,
-        password,
+        options: {
+          data: {
+            login: true
+          },
+          emailRedirectTo: `${(import.meta as any).env.VITE_FRONTEND_URL || window.location.origin}/confirm`,
+        },
       });
 
       if (error) throw error;
@@ -55,14 +61,17 @@ export class SupabaseAuth {
     }
   }
 
-  // Sign up with email and password
-  async signUp(email: string, password: string, metadata: any = {}): Promise<any> {
+  // Sign up with email only (passwordless)
+  async signUp(email: string, fullName: string, role: string = 'employee'): Promise<any> {
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signInWithOtp({
         email,
-        password,
         options: {
-          data: metadata,
+          data: {
+            full_name: fullName,
+            role: role,
+            signup: true
+          },
           emailRedirectTo: `${(import.meta as any).env.VITE_FRONTEND_URL || window.location.origin}/confirm`,
         },
       });

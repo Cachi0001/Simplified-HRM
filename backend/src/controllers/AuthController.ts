@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { AuthService } from '../services/AuthService';
 import { CreateUserRequest, LoginRequest } from '../models/User';
+import { EmailService } from '../services/EmailService';
 import logger from '../utils/logger';
 
 export class AuthController {
@@ -22,14 +23,14 @@ export class AuthController {
 
       // Check if email confirmation is required
       if (result.requiresConfirmation) {
-        logger.info('📧 [AuthController] Email confirmation required - returning confirmation response', {
+        logger.info('📧 [AuthController] Magic link sent - returning confirmation response', {
           userId: result.user.id,
           email: userData.email
         });
 
         res.status(200).json({
           status: 'success',
-          message: result.message || 'Check your email to confirm your account',
+          message: result.message || 'Check your inbox – we sent you a magic link to confirm your account',
           data: {
             user: result.user,
             requiresConfirmation: true
@@ -67,8 +68,8 @@ export class AuthController {
         errorMessage = 'This email is already registered. Please try signing in instead.';
       } else if (errorMessage.includes('Database error')) {
         errorMessage = 'There was an issue creating your account. Please contact support.';
-      } else if (errorMessage.includes('Email, password, and full name are required')) {
-        errorMessage = 'Email, password, and full name are required.';
+      } else if (errorMessage.includes('Email and full name are required')) {
+        errorMessage = 'Email and full name are required.';
       }
 
       res.status(400).json({
@@ -83,24 +84,44 @@ export class AuthController {
     try {
       const credentials: LoginRequest = req.body;
 
-      logger.info('AuthController: Signin request', { email: credentials.email });
+      logger.info('🔐 [AuthController] Magic link signin request', { email: credentials.email });
 
       const result = await this.authService.signIn(credentials);
 
+      // Magic link always sent for passwordless login
       res.status(200).json({
         status: 'success',
-        message: 'User signed in successfully',
+        message: result.message || 'Check your inbox – we sent you a magic link to sign in',
         data: {
           user: result.user,
-          accessToken: result.accessToken,
-          refreshToken: result.refreshToken
+          requiresConfirmation: true
         }
       });
     } catch (error) {
-      logger.error('AuthController: Signin error', { error: (error as Error).message });
-      res.status(401).json({
+      logger.error('❌ [AuthController] Signin error', { error: (error as Error).message });
+
+      // Handle email confirmation as a special case (not a 401 error)
+      let errorMessage = (error as Error).message;
+      let statusCode = 401; // Default for auth errors
+
+      if (errorMessage.includes('EMAIL_NOT_CONFIRMED:')) {
+        statusCode = 400; // Client error, not auth error
+        errorMessage = errorMessage.replace('EMAIL_NOT_CONFIRMED:', '');
+      } else if (errorMessage.includes('Invalid login credentials')) {
+        statusCode = 401;
+        errorMessage = 'Invalid email or password';
+      } else if (errorMessage.includes('Employee record not found')) {
+        statusCode = 404;
+        errorMessage = 'Account not found. Please contact support.';
+      } else if (errorMessage.includes('Account pending admin approval')) {
+        statusCode = 403;
+        errorMessage = 'Your account is pending admin approval. Please wait for approval or contact support.';
+      }
+
+      res.status(statusCode).json({
         status: 'error',
-        message: (error as Error).message
+        message: errorMessage,
+        errorType: errorMessage.includes('EMAIL_NOT_CONFIRMED:') ? 'email_not_confirmed' : 'authentication_error'
       });
     }
   }
@@ -236,6 +257,63 @@ export class AuthController {
       });
     } catch (error) {
       logger.error('AuthController: Password reset error', { error: (error as Error).message });
+      res.status(400).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
+
+  async resendConfirmationEmail(req: Request, res: Response): Promise<void> {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Email is required'
+        });
+        return;
+      }
+
+      // Use service to resend confirmation email
+      const result = await this.authService.resendConfirmationEmail(email);
+
+      res.status(200).json({
+        status: 'success',
+        message: result.message
+      });
+    } catch (error) {
+      logger.error('AuthController: Resend confirmation error', { error: (error as Error).message });
+      res.status(400).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
+
+  async notifyAdmin(req: Request, res: Response): Promise<void> {
+    try {
+      const { email, fullName } = req.body;
+
+      if (!email || !fullName) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Email and full name are required'
+        });
+        return;
+      }
+
+      // Send admin notification email
+      const emailService = new EmailService();
+      await emailService.sendApprovalNotification(email, fullName);
+
+      res.status(200).json({
+        status: 'success',
+        message: 'Admin notification sent successfully'
+      });
+    } catch (error) {
+      logger.error('AuthController: Admin notification error', { error: (error as Error).message });
       res.status(400).json({
         status: 'error',
         message: (error as Error).message

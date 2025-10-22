@@ -7,19 +7,18 @@ export class AuthService {
 
   async signUp(userData: CreateUserRequest): Promise<AuthResponse> {
     try {
-      logger.info('🔍 [AuthService] Starting user signup process', {
+      logger.info('🔍 [AuthService] Starting passwordless signup process', {
         email: userData.email,
         fullName: userData.fullName,
         role: userData.role || 'employee'
       });
 
-      if (!userData.email || !userData.password || !userData.fullName) {
+      if (!userData.email || !userData.fullName) {
         logger.error('❌ [AuthService] Missing required fields', {
           hasEmail: !!userData.email,
-          hasPassword: !!userData.password,
           hasFullName: !!userData.fullName
         });
-        throw new Error('Email, password, and full name are required');
+        throw new Error('Email and full name are required');
       }
 
       logger.info('🔄 [AuthService] Calling repository signup...');
@@ -60,18 +59,18 @@ export class AuthService {
 
   async signIn(credentials: LoginRequest): Promise<AuthResponse> {
     try {
-      logger.info('AuthService: Signing in user', { email: credentials.email });
+      logger.info('🔐 [AuthService] Passwordless signin request', { email: credentials.email });
 
-      if (!credentials.email || !credentials.password) {
-        throw new Error('Email and password are required');
+      if (!credentials.email) {
+        throw new Error('Email is required');
       }
 
       const result = await this.authRepository.signIn(credentials);
 
-      logger.info('AuthService: User signed in successfully', { userId: result.user.id });
+      logger.info('✅ [AuthService] Magic link sent successfully', { email: credentials.email });
       return result;
     } catch (error) {
-      logger.error('AuthService: Signin failed', { error: (error as Error).message });
+      logger.error('❌ [AuthService] Signin failed', { error: (error as Error).message });
       throw error;
     }
   }
@@ -148,6 +147,22 @@ export class AuthService {
       logger.info('AuthService: Password reset email sent', { email });
     } catch (error) {
       logger.error('AuthService: Password reset failed', { error: (error as Error).message });
+      throw error;
+    }
+  }
+
+  async resendConfirmationEmail(email: string): Promise<{ message: string }> {
+    try {
+      if (!email) {
+        throw new Error('Email is required');
+      }
+
+      const result = await this.authRepository.resendConfirmationEmail(email);
+      logger.info('AuthService: Confirmation email resent', { email });
+
+      return result; // Return the repository response directly
+    } catch (error) {
+      logger.error('AuthService: Resend confirmation failed', { error: (error as Error).message });
       throw error;
     }
   }

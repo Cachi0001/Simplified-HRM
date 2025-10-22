@@ -10,7 +10,7 @@ export interface User {
 
 export interface CreateUserRequest {
   email: string;
-  password: string;
+  password?: string; // Optional for passwordless magic link signup
   fullName: string;
   role?: 'admin' | 'employee';
 }

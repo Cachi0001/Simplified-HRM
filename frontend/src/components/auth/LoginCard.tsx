@@ -4,7 +4,7 @@ import { AuthCard } from '../ui/Card';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { authService } from '../../services/authService';
-import { Eye, EyeOff } from 'lucide-react';
+import { useToast } from '../ui/Toast';
 
 interface LoginCardProps {
   onSwitchToSignup: () => void;
@@ -13,21 +13,16 @@ interface LoginCardProps {
 
 const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgotPassword }) => {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const navigate = useNavigate();
+  const { addToast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setError(null);
-    setSuccess(null);
 
     try {
-      const response = await authService.login({ email, password });
+      const response = await authService.login({ email, password: '' }); // Password not needed for magic links
 
       // Check if response has the expected structure
       if (!response || !response.data || !response.data.user) {
@@ -38,7 +33,13 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
       const user = response.data.user;
       const { accessToken, refreshToken } = response.data;
 
-      setSuccess('Login successful! Redirecting...');
+      if (response.data.requiresConfirmation) {
+        // Magic link sent - show success message
+        addToast('success', response.data.message || 'Check your inbox – we sent you a magic link to sign in');
+        return;
+      }
+
+      addToast('success', 'Login successful! Redirecting...');
 
       // Store user data for UI state
       localStorage.setItem('user', JSON.stringify(user));
@@ -60,22 +61,54 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
         }, 500);
       }
 
-    } catch (err) {
+    } catch (err: any) {
       console.error('Login error:', err);
+
+      if (err.response?.data?.errorType === 'email_not_confirmed') {
+        addToast('info', err.response.data.message);
+        return; // Don't set error state for confirmation messages
+      }
+
       if (err instanceof Error) {
-        setError(err.message);
+        let errorMessage = err.message;
+
+        // Provide more specific guidance based on error type
+        if (errorMessage.includes('Invalid email or password')) {
+          errorMessage = 'Invalid email or password. Please check your credentials and try again.';
+        } else if (errorMessage.includes('Account pending admin approval')) {
+          // Use warning toast for pending status since it's expected behavior
+          addToast('warning', 'Your account is pending admin approval. You will receive an email notification once your account is activated. Please wait for approval before signing in.');
+          return; // Don't continue with error flow
+        } else if (errorMessage.includes('Account not found')) {
+          errorMessage = 'Account not found. Please check your email or contact support.';
+        }
+
+        addToast('error', errorMessage);
       } else {
-        setError('An unexpected error occurred.');
+        addToast('error', 'An unexpected error occurred.');
       }
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleResendConfirmation = async () => {
+    try {
+      addToast('info', 'Sending confirmation email...');
+      const result = await authService.resendConfirmationEmail(email);
+      addToast('success', result.message);
+    } catch (error: any) {
+      addToast('error', 'Failed to resend confirmation email. Please try again.');
+      setTimeout(() => {
+        addToast('info', 'Please confirm your email address before signing in. Check your inbox for the confirmation link.');
+      }, 3000);
+    }
+  };
+
   return (
     <AuthCard
       title="Welcome Back!"
-      subtitle="Sign in to continue to Go3net"
+      subtitle="Sign in with a magic link"
     >
       <form onSubmit={handleSubmit} className="space-y-6">
         <Input
@@ -87,54 +120,18 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
           required
           autoComplete="email"
         />
-        <div className="relative">
-          <Input
-            id="password"
-            type={showPassword ? "text" : "password"}
-            label="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            autoComplete="current-password"
-            className="pr-12"
-          />
-          <button
-            type="button"
-            onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 text-gray-400 hover:text-gray-600 transition-all duration-200 flex items-center justify-center w-8 h-8 rounded-md hover:bg-gray-100"
-            style={{ top: '50%', transform: 'translateY(-20%)' }}
-          >
-            {showPassword ? (
-              <EyeOff className="h-4 w-4" />
-            ) : (
-              <Eye className="h-4 w-4" />
-            )}
-          </button>
-        </div>
-        <div className="flex items-center justify-between">
-          <div className="text-sm">
-            <button
-              type="button"
-              onClick={onSwitchToForgotPassword}
-              className="font-medium text-highlight hover:text-blue-500"
-            >
-              Forgot your password?
-            </button>
-          </div>
-        </div>
-
-        {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-        {success && <p className="text-green-500 text-sm text-center">{success}</p>}
 
         <Button type="submit" className="w-full" isLoading={isLoading}>
-          Sign In
+          Send Magic Link
         </Button>
-        <p className="text-center text-sm text-gray-400">
-          Don't have an account?{' '}
+
+        <div className="text-center text-sm text-gray-500">
+          <p className="mb-2">No password required! We'll send you a magic link to sign in.</p>
+          <p>Don't have an account?{' '}
           <button type="button" onClick={onSwitchToSignup} className="font-medium text-highlight hover:text-blue-500">
             Sign up
-          </button>
-        </p>
+          </button></p>
+        </div>
       </form>
     </AuthCard>
   );

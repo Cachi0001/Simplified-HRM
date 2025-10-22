@@ -1,129 +1,205 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import Logo from '../components/ui/Logo';
-import { Button } from '../components/ui/Button';
+import { useToast } from '../components/ui/Toast';
 
 const ConfirmEmail: React.FC = () => {
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState('');
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [errorType, setErrorType] = useState<string | null>(null);
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const { addToast } = useToast();
 
   useEffect(() => {
-    const handleEmailConfirmation = async () => {
+    const handleConfirmation = async () => {
       try {
-        // Check for URL query parameters (Supabase error redirects)
-        const error = searchParams.get('error');
-        const errorCode = searchParams.get('error_code');
-        const errorDescription = searchParams.get('error_description');
+        // Check for URL query parameters (Supabase verification endpoint redirects)
+        const urlParams = new URLSearchParams(window.location.search);
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
 
+        const token = urlParams.get('token') || hashParams.get('access_token');
+        const type = urlParams.get('type') || hashParams.get('type');
+        const refreshToken = hashParams.get('refresh_token');
+        const error = urlParams.get('error');
+        const errorDescription = urlParams.get('error_description');
+
+        // Handle Supabase verification endpoint errors
         if (error) {
-          // Handle Supabase error redirects
           let errorMessage = 'Email confirmation failed. Please try again.';
 
-          if (errorCode === 'otp_expired' || errorDescription?.includes('expired')) {
+          if (errorDescription?.includes('expired')) {
             errorMessage = 'Your confirmation link has expired. Please request a new confirmation email.';
-            setErrorType('expired');
-          } else if (errorCode === 'access_denied' || errorDescription?.includes('invalid')) {
-            errorMessage = 'This confirmation link is invalid or has already been used. Please request a new confirmation email.';
-            setErrorType('invalid');
-          } else {
-            errorMessage = decodeURIComponent(errorDescription || 'Email confirmation failed. Please try again.');
-            setErrorType('general');
+          } else if (errorDescription?.includes('invalid')) {
+            errorMessage = 'This confirmation link is invalid. Please request a new confirmation email.';
           }
 
-          setMessage(errorMessage);
-          setIsSuccess(false);
+          addToast('error', errorMessage);
           setLoading(false);
+          setTimeout(() => navigate('/auth'), 3000);
           return;
         }
 
-        // Handle the confirmation from URL hash (normal flow)
-        const hash = window.location.hash.substring(1);
-        const params = new URLSearchParams(hash);
-        const token = params.get('access_token');
-        const type = params.get('type');
-
-        if (token && type === 'signup') {
-          // Set the session with the token
-          const { data, error } = await supabase.auth.setSession({
+        // Handle magic link confirmation (hash-based)
+        if (token && refreshToken) {
+          // Set session first
+          const { error: sessionError } = await supabase.auth.setSession({
             access_token: token,
-            refresh_token: params.get('refresh_token') || '',
+            refresh_token: refreshToken,
           });
 
-          if (error) {
-            let errorMessage = 'Email confirmation failed. The link may be expired or invalid. Please try registering again or contact support.';
+          if (sessionError) throw sessionError;
 
-            if (error.message.includes('expired')) {
-              errorMessage = 'Your confirmation link has expired. Please request a new confirmation email.';
-              setErrorType('expired');
-            } else if (error.message.includes('invalid')) {
-              errorMessage = 'This confirmation link is invalid. Please request a new confirmation email.';
-              setErrorType('invalid');
+          // Get user info
+          const { data: { user } } = await supabase.auth.getUser();
+
+          if (user) {
+            // Check user metadata to determine if it's signup or login
+            const isSignup = user.user_metadata?.signup === true;
+            const isLogin = user.user_metadata?.login === true;
+
+            if (isSignup) {
+              // Handle signup confirmation
+              try {
+                // Create employee record using service role
+                const { data: employee, error: empError } = await supabase
+                  .from('employees')
+                  .insert({
+                    user_id: user.id,
+                    email: user.email!,
+                    full_name: user.user_metadata.full_name || user.email!,
+                    role: user.user_metadata.role || 'employee',
+                    status: 'pending'
+                  })
+                  .select()
+                  .single();
+
+                if (empError) {
+                  console.warn('Failed to create employee record:', empError);
+                } else {
+                  // Send admin notification email
+                  try {
+                    const response = await fetch(`${(import.meta as any).env.VITE_API_URL}/auth/notify-admin`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({
+                        email: user.email,
+                        fullName: user.user_metadata.full_name || user.email!
+                      })
+                    });
+
+                    if (response.ok) {
+                      console.log('Admin notification sent');
+                    }
+                  } catch (emailError) {
+                    console.warn('Failed to send admin notification:', emailError);
+                  }
+                }
+              } catch (recordError) {
+                console.warn('Failed to create employee record after confirmation:', recordError);
+              }
+
+              addToast('success', '🎉 Email confirmed successfully! Your account is now pending admin approval.');
+              setLoading(false);
+
+              // Redirect to login after 5 seconds
+              setTimeout(() => {
+                navigate('/auth');
+              }, 5000);
+            } else if (isLogin) {
+              // Handle login confirmation
+              // Check if user is approved
+              const { data: employee } = await supabase
+                .from('employees')
+                .select('role, status, full_name')
+                .eq('email', user.email!)
+                .single();
+
+              if (employee?.status === 'active') {
+                // User is approved - redirect to dashboard
+                addToast('success', `Welcome back! Redirecting to dashboard...`);
+
+                // Store user data
+                localStorage.setItem('user', JSON.stringify({
+                  id: user.id,
+                  email: user.email,
+                  fullName: employee.full_name || user.email,
+                  role: employee.role,
+                  emailVerified: true,
+                  createdAt: user.created_at,
+                  updatedAt: user.updated_at || user.created_at
+                }));
+                localStorage.setItem('accessToken', token);
+                localStorage.setItem('refreshToken', refreshToken);
+
+                setLoading(false);
+                setTimeout(() => {
+                  navigate('/dashboard');
+                }, 1500);
+              } else if (employee?.status === 'pending') {
+                // User is still pending approval
+                addToast('warning', 'Your account is still pending admin approval. Please wait for approval.');
+                setLoading(false);
+                setTimeout(() => {
+                  navigate('/auth');
+                }, 3000);
+              } else {
+                // User not found in employee records
+                addToast('error', 'Account not found. Please contact support.');
+                setLoading(false);
+                setTimeout(() => {
+                  navigate('/auth');
+                }, 3000);
+              }
+            } else {
+              // Fallback: assume login for existing users
+              const { data: employee } = await supabase
+                .from('employees')
+                .select('role, status, full_name')
+                .eq('email', user.email!)
+                .single();
+
+              if (employee?.status === 'active') {
+                addToast('success', `Welcome back! Redirecting to dashboard...`);
+                localStorage.setItem('user', JSON.stringify({
+                  id: user.id,
+                  email: user.email,
+                  fullName: employee.full_name || user.email,
+                  role: employee.role,
+                  emailVerified: true,
+                  createdAt: user.created_at,
+                  updatedAt: user.updated_at || user.created_at
+                }));
+                localStorage.setItem('accessToken', token);
+                localStorage.setItem('refreshToken', refreshToken);
+                setLoading(false);
+                setTimeout(() => {
+                  navigate('/dashboard');
+                }, 1500);
+              } else {
+                addToast('info', 'Please confirm your email address first.');
+                setLoading(false);
+                setTimeout(() => {
+                  navigate('/auth');
+                }, 3000);
+              }
             }
-
-            setMessage(errorMessage);
-            setIsSuccess(false);
-          } else if (data.session) {
-            setMessage('🎉 Email confirmed successfully! Your account is now pending admin approval. You will receive a notification once your account is activated.');
-            setIsSuccess(true);
-
-            // Redirect to login after 5 seconds
-            setTimeout(() => {
-              navigate('/auth');
-            }, 5000);
           }
         } else {
-          setMessage('Invalid confirmation link. Please check your email for the correct confirmation link or try registering again.');
-          setIsSuccess(false);
-          setErrorType('invalid');
+          throw new Error('Invalid confirmation link - missing tokens');
         }
-      } catch (error) {
-        setMessage('An unexpected error occurred during email confirmation. Please try again or contact support.');
-        setIsSuccess(false);
-        setErrorType('general');
-      } finally {
+      } catch (err: any) {
+        console.error('Confirmation failed:', err);
+        addToast('error', 'Confirmation failed. Please try again or contact support.');
         setLoading(false);
+        setTimeout(() => {
+          navigate('/auth');
+        }, 3000);
       }
     };
 
-    handleEmailConfirmation();
-  }, [navigate, searchParams]);
-
-  const handleResendConfirmation = async () => {
-    setLoading(true);
-    try {
-      // Extract email from URL or redirect to auth page
-      const email = searchParams.get('email');
-      if (email) {
-        const { error } = await supabase.auth.resend({
-          type: 'signup',
-          email: decodeURIComponent(email),
-          options: {
-            emailRedirectTo: `${(import.meta as any).env.VITE_FRONTEND_URL || window.location.origin}/confirm`,
-          },
-        });
-
-        if (error) throw error;
-
-        setMessage('A new confirmation email has been sent. Please check your inbox and click the link to confirm your account.');
-        setIsSuccess(true);
-        setErrorType(null);
-      } else {
-        // No email in URL, redirect to auth
-        navigate('/auth');
-      }
-    } catch (error: any) {
-      setMessage('Failed to resend confirmation email. Please try registering again.');
-      setIsSuccess(false);
-      setErrorType('general');
-    } finally {
-      setLoading(false);
-    }
-  };
+    handleConfirmation();
+  }, [navigate, addToast]);
 
   if (loading) {
     return (
@@ -158,79 +234,40 @@ const ConfirmEmail: React.FC = () => {
           </div>
 
           <div className="mb-6">
-            {isSuccess ? (
-              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-            ) : (
-              <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                {errorType === 'expired' ? (
-                  <svg className="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                ) : errorType === 'invalid' ? (
-                  <svg className="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                  </svg>
-                ) : (
-                  <svg className="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                  </svg>
-                )}
-              </div>
-            )}
+            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
           </div>
 
           <h2 className="text-2xl font-bold text-gray-800 mb-3">
-            {isSuccess
-              ? 'Email Confirmed Successfully!'
-              : errorType === 'expired'
-                ? 'Link Expired'
-                : errorType === 'invalid'
-                  ? 'Invalid Link'
-                  : 'Confirmation Failed'
-            }
+            Email Confirmed Successfully!
           </h2>
 
-          <div className={`p-4 rounded-lg mb-6 ${isSuccess ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
-            <p className={`text-sm ${isSuccess ? 'text-green-800' : 'text-red-800'}`}>
-              {message}
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+            <p className="text-sm text-green-800">
+              🎉 Your email has been confirmed successfully! Your account is now pending admin approval.
             </p>
           </div>
 
-          {isSuccess && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-              <h3 className="font-semibold text-blue-800 mb-2">📋 Next Steps:</h3>
-              <ul className="text-sm text-blue-700 text-left space-y-1">
-                <li>• Your account is now submitted for admin review</li>
-                <li>• You'll receive an email notification once approved</li>
-                <li>• Check your notifications in the app for updates</li>
-                <li>• Redirecting to login page in a few seconds...</li>
-              </ul>
-            </div>
-          )}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <h3 className="font-semibold text-blue-800 mb-2">📋 Next Steps:</h3>
+            <ul className="text-sm text-blue-700 text-left space-y-1">
+              <li>• Your account is now submitted for admin review</li>
+              <li>• You'll receive an email notification once approved</li>
+              <li>• Check your notifications in the app for updates</li>
+              <li>• Redirecting to login page in a few seconds...</li>
+            </ul>
+          </div>
 
           <div className="space-y-3">
-            {!isSuccess && (
-              <>
-                <Button
-                  onClick={handleResendConfirmation}
-                  className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors font-semibold"
-                  isLoading={loading}
-                >
-                  {loading ? 'Sending...' : 'Resend Confirmation Email'}
-                </Button>
-
-                <button
-                  onClick={() => navigate('/auth')}
-                  className="w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-200 transition-colors font-semibold"
-                >
-                  Go to Registration
-                </button>
-              </>
-            )}
+            <button
+              onClick={() => navigate('/auth')}
+              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+            >
+              Go to Login
+            </button>
 
             <button
               onClick={() => navigate('/')}

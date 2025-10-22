@@ -16,6 +16,8 @@ const authController = new AuthController(authService);
 
 router.post('/signup', (req, res) => authController.signUp(req, res));
 router.post('/login', (req, res) => authController.signIn(req, res));
+router.post('/resend-confirmation', (req, res) => authController.resendConfirmationEmail(req, res));
+router.post('/notify-admin', (req, res) => authController.notifyAdmin(req, res));
 router.get('/me', authenticateToken, (req, res) => authController.getCurrentUser(req, res));
 router.post('/refresh', authenticateToken, (req, res) => authController.refreshToken(req, res));
 router.post('/signout', (req, res) => authController.signOut(req, res));

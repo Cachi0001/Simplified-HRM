@@ -10,10 +10,24 @@ export class AuthService {
     return AuthService.instance;
   }
 
-  // Login user
+  // Login user (passwordless with magic links)
   async login(credentials: LoginRequest): Promise<AuthResponse> {
     try {
       const response = await api.post<AuthResponse>('/auth/login', credentials);
+
+      if (response.data.data.requiresConfirmation) {
+        // Magic link sent - return the response as is
+        return response.data;
+      }
+
+      // User is logged in immediately (fallback for direct login)
+      if (response.data.data.accessToken && response.data.data.refreshToken) {
+        // Store tokens and user data
+        localStorage.setItem('accessToken', response.data.data.accessToken);
+        localStorage.setItem('refreshToken', response.data.data.refreshToken);
+        localStorage.setItem('user', JSON.stringify(response.data.data.user));
+      }
+
       return response.data;
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Login failed');
@@ -34,11 +48,13 @@ export class AuthService {
         };
       }
 
-      // User is confirmed and logged in
-      // Store tokens and user data
-      localStorage.setItem('accessToken', response.data.data.accessToken);
-      localStorage.setItem('refreshToken', response.data.data.refreshToken);
-      localStorage.setItem('user', JSON.stringify(response.data.data.user));
+      // User is confirmed and logged in (fallback)
+      if (response.data.data.accessToken && response.data.data.refreshToken) {
+        // Store tokens and user data
+        localStorage.setItem('accessToken', response.data.data.accessToken);
+        localStorage.setItem('refreshToken', response.data.data.refreshToken);
+        localStorage.setItem('user', JSON.stringify(response.data.data.user));
+      }
 
       return {
         requiresConfirmation: false,
@@ -101,12 +117,16 @@ export class AuthService {
     }
   }
 
-  // Update password
-  async updatePassword(newPassword: string): Promise<void> {
+  // Resend confirmation email
+  async resendConfirmationEmail(email: string): Promise<{ success: boolean; message: string }> {
     try {
-      await api.post('/auth/update-password', { newPassword });
+      const response = await api.post('/auth/resend-confirmation', { email });
+      return {
+        success: true,
+        message: response.data.message || 'Confirmation email resent successfully'
+      };
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Password update failed');
+      throw new Error(error.response?.data?.message || 'Failed to resend confirmation email');
     }
   }
 
