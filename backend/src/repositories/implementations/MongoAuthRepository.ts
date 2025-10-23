@@ -32,11 +32,7 @@ export class MongoAuthRepository implements IAuthRepository {
       const existingUser = await User.findOne({ email: userData.email });
       if (existingUser) {
         logger.warn('❌ [MongoAuthRepository] User already exists', { email: userData.email });
-        return {
-          user: existingUser.toObject(),
-          accessToken: '',
-          message: 'User already exists with this email',
-        };
+        throw new Error('This email is already registered. Please try signing in instead.');
       }
 
       // Create user
@@ -648,12 +644,7 @@ export class MongoAuthRepository implements IAuthRepository {
 
       for (const admin of adminUsers) {
         try {
-          await emailService.sendApprovalNotification(admin.email, admin.fullName, {
-            employeeName: user.fullName,
-            employeeEmail: user.email,
-            signupDate: new Date().toLocaleDateString(),
-            approvalUrl: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard`
-          });
+          await emailService.sendApprovalNotification(user.email, user.fullName, admin.email);
         } catch (emailError) {
           logger.warn('⚠️ [MongoAuthRepository] Failed to send notification email to admin:', {
             adminEmail: admin.email,

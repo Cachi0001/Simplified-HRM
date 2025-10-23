@@ -39,8 +39,13 @@ export class AuthService {
     try {
       const response = await api.post<AuthResponse>('/auth/signup', userData);
 
-      if (response.data.data.requiresConfirmation) {
-        // Email confirmation required
+      // Check if response indicates an error (user already exists)
+      if (response.data.status === 'error') {
+        throw new Error(response.data.message || 'Signup failed');
+      }
+
+      // Check if email confirmation is required
+      if (response.data.data.requiresConfirmation || response.data.data.requiresEmailVerification) {
         return {
           requiresConfirmation: true,
           message: response.data.message,

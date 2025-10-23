@@ -21,7 +21,9 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
     queryKey: ['employees'],
     queryFn: async () => {
       const response = await employeeService.getAllEmployees();
-      return response.employees;
+      // Filter out admin users for display purposes
+      const nonAdminEmployees = response.employees.filter((emp: any) => emp.role !== 'admin');
+      return nonAdminEmployees;
     },
   });
 
@@ -59,16 +61,16 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
     // Simple CSV export
     if (!report || report.length === 0) return;
 
-    const headers = ['Employee', 'Date', 'Check In', 'Check Out', 'Hours', 'Location'];
+    const headers = ['Employee', 'Date', 'Check In', 'Check Out', 'Hours', 'Status'];
     const csvContent = [
       headers.join(','),
       ...report.map(record => [
-        record.employees?.full_name || 'Unknown',
-        formatDate(record.date),
-        formatTime(record.check_in_time),
-        record.check_out_time ? formatTime(record.check_out_time) : 'Active',
-        record.check_out_time ? calculateHours(record.check_in_time, record.check_out_time) : 0,
-        record.location ? `${record.location.lat.toFixed(4)}, ${record.location.lng.toFixed(4)}` : 'N/A'
+        record._id.employeeName || 'Unknown',
+        formatDate(record._id.date),
+        formatTime(record.checkInTime),
+        record.checkOutTime ? formatTime(record.checkOutTime) : 'Active',
+        record.totalHours ? record.totalHours.toFixed(1) : '0',
+        record.status || 'Unknown'
       ].join(','))
     ].join('\n');
 
@@ -166,8 +168,8 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
             </div>
           ) : report && report.length > 0 ? (
             <div className="space-y-3">
-              {report.map((record) => (
-                <div key={record.id} className={`p-4 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
+              {report.map((record, index) => (
+                <div key={`${record._id.employeeId}-${record._id.date}-${index}`} className={`p-4 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center ${darkMode ? 'bg-gray-600' : 'bg-gray-200'}`}>
@@ -175,26 +177,26 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
                       </div>
                       <div>
                         <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                          {record.employees?.full_name || 'Unknown Employee'}
+                          {record._id.employeeName || 'Unknown Employee'}
                         </p>
                         <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                          {record.employees?.department || 'No Department'}
+                          {formatDate(record._id.date)}
                         </p>
                       </div>
                     </div>
                     <div className="text-right">
                       <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                        {formatDate(record.date)}
+                        {record.status === 'checked_out' ? 'Completed' : 'Active'}
                       </p>
                       <div className={`flex items-center gap-2 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                         <Clock className="h-4 w-4" />
-                        <span>{formatTime(record.check_in_time)}</span>
-                        {record.check_out_time ? (
+                        <span>{formatTime(record.checkInTime)}</span>
+                        {record.checkOutTime ? (
                           <>
                             <span>-</span>
-                            <span>{formatTime(record.check_out_time)}</span>
+                            <span>{formatTime(record.checkOutTime)}</span>
                             <span className={`ml-2 px-2 py-1 rounded text-xs ${darkMode ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-800'}`}>
-                              {calculateHours(record.check_in_time, record.check_out_time)}h
+                              {record.totalHours ? `${record.totalHours.toFixed(1)}h` : '0h'}
                             </span>
                           </>
                         ) : (
@@ -205,15 +207,6 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
                       </div>
                     </div>
                   </div>
-
-                  {record.location && (
-                    <div className={`mt-2 flex items-center gap-2 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                      <MapPin className="h-4 w-4" />
-                      <span>
-                        {record.location.lat.toFixed(4)}, {record.location.lng.toFixed(4)}
-                      </span>
-                    </div>
-                  )}
                 </div>
               ))}
             </div>

@@ -169,26 +169,6 @@ export class MongoEmployeeRepository implements IEmployeeRepository {
       throw error;
     }
   }
-  
-    async getEmployeeStats(): Promise<{ total: number; active: number; pending: number; rejected: number }> {
-    try {
-      logger.info('Getting employee stats');
-
-      const [total, active, pending, rejected] = await Promise.all([
-        Employee.countDocuments(),
-        Employee.countDocuments({ status: 'active' }),
-        Employee.countDocuments({ status: 'pending' }),
-        Employee.countDocuments({ status: 'rejected' })
-      ]);
-
-      logger.info('Employee stats fetched', { total, active, pending, rejected });
-
-      return { total, active, pending, rejected };
-    } catch (error) {
-      logger.error('Failed to get employee stats:', error);
-      throw error;
-    }
-  }
   async delete(id: string): Promise<void> {
     try {
       logger.info('🔍 [MongoEmployeeRepository] Deleting employee', { id });
@@ -310,6 +290,27 @@ export class MongoEmployeeRepository implements IEmployeeRepository {
 
     } catch (error) {
       logger.error('❌ [MongoEmployeeRepository] Assign department failed:', error);
+      throw error;
+    }
+  }
+
+  async getEmployeeStats(): Promise<{ total: number; active: number; pending: number; rejected: number }> {
+    try {
+      logger.info('📊 [MongoEmployeeRepository] Getting employee statistics');
+
+      // Count employees by status
+      const total = await Employee.countDocuments({ role: 'employee' });
+      const active = await Employee.countDocuments({ role: 'employee', status: 'active' });
+      const pending = await Employee.countDocuments({ role: 'employee', status: 'pending' });
+      const rejected = await Employee.countDocuments({ role: 'employee', status: 'rejected' });
+
+      const stats = { total, active, pending, rejected };
+
+      logger.info('✅ [MongoEmployeeRepository] Employee statistics calculated', stats);
+
+      return stats;
+    } catch (error) {
+      logger.error('❌ [MongoEmployeeRepository] Get employee stats failed:', error);
       throw error;
     }
   }

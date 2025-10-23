@@ -55,7 +55,9 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
     queryKey: ['employees'],
     queryFn: async () => {
       const response = await employeeService.getAllEmployees();
-      return response.employees;
+      // Filter out admin users for display purposes
+      const nonAdminEmployees = response.employees.filter((emp: any) => emp.role !== 'admin');
+      return nonAdminEmployees;
     },
   });
 

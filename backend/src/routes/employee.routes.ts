@@ -22,12 +22,12 @@ router.get('/search', (req, res) => employeeController.searchEmployees(req, res)
 router.get('/me', (req, res) => employeeController.getMyProfile(req, res));
 router.put('/me', (req, res) => employeeController.updateMyProfile(req, res));
 router.get('/pending', requireRole(['admin']), (req, res) => employeeController.getPendingApprovals(req, res));
+router.get('/stats', requireRole(['admin']), (req, res) => employeeController.getEmployeeStats(req, res));
 router.get('/:id', (req, res) => employeeController.getEmployeeById(req, res));
 router.put('/:id', (req, res) => employeeController.updateEmployee(req, res));
 router.delete('/:id', requireRole(['admin']), (req, res) => employeeController.deleteEmployee(req, res));
 router.post('/:id/approve', requireRole(['admin']), (req, res) => employeeController.approveEmployee(req, res));
 router.post('/:id/reject', requireRole(['admin']), (req, res) => employeeController.rejectEmployee(req, res));
 router.post('/:id/department', requireRole(['admin']), (req, res) => employeeController.assignDepartment(req, res));
-router.get('/stats', requireRole(['admin']), (req, res) => employeeController.getEmployeeStats(req, res));
 
 export default router;
