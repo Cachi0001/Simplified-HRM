@@ -362,6 +362,17 @@ export class MongoAuthRepository implements IAuthRepository {
           token: u.emailVerificationToken?.substring(0, 10) + '...',
           expires: u.emailVerificationExpires
         })));
+
+        // Check if any user with this email is already verified
+        const emailFromToken = this.extractEmailFromToken(token);
+        if (emailFromToken) {
+          const verifiedUser = await User.findOne({ email: emailFromToken, emailVerified: true });
+          if (verifiedUser) {
+            logger.info('✅ [MongoAuthRepository] Email already verified', { email: emailFromToken });
+            throw new Error('Email has already been verified. Please log in to continue.');
+          }
+        }
+
         throw new Error('Invalid or expired verification token');
       }
 
@@ -373,6 +384,12 @@ export class MongoAuthRepository implements IAuthRepository {
           now: new Date()
         });
         throw new Error('Verification token has expired. Please request a new confirmation email.');
+      }
+
+      // Check if email is already verified
+      if (user.emailVerified) {
+        logger.info('✅ [MongoAuthRepository] Email already verified', { email: user.email });
+        throw new Error('Email has already been verified. Please log in to continue.');
       }
 
       // Find employee record
@@ -516,16 +533,18 @@ export class MongoAuthRepository implements IAuthRepository {
     }
   }
 
-  private generateAccessToken(user: any): string {
-    return jwt.sign(
-      {
-        sub: user._id,
-        email: user.email,
-        role: user.role,
-      },
-      this.jwtSecret,
-      { expiresIn: '15m' }
-    );
+  private extractEmailFromToken(token: string): string | null {
+    try {
+      // Basic JWT decode (without verification) to extract email
+      const parts = token.split('.');
+      if (parts.length !== 3) return null;
+
+      const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+      return payload.email || null;
+    } catch (error) {
+      logger.error('❌ [MongoAuthRepository] Failed to extract email from token:', error);
+      return null;
+    }
   }
 
   private generateRefreshToken(user: any): string {
@@ -536,6 +555,18 @@ export class MongoAuthRepository implements IAuthRepository {
       },
       this.jwtRefreshSecret,
       { expiresIn: '7d' }
+    );
+  }
+
+  private generateAccessToken(user: any): string {
+    return jwt.sign(
+      {
+        sub: user._id,
+        email: user.email,
+        role: user.role,
+      },
+      this.jwtSecret,
+      { expiresIn: '15m' }
     );
   }
 }

@@ -20,6 +20,14 @@ const ConfirmEmail: React.FC<ConfirmEmailProps> = () => {
   const [isResending, setIsResending] = useState(false);
 
   useEffect(() => {
+    // Guard against double confirmation
+    const isConfirmed = localStorage.getItem('emailConfirmed');
+    if (isConfirmed) {
+      console.log('🔒 Email already confirmed, redirecting to auth');
+      navigate('/auth', { replace: true });
+      return;
+    }
+
     const confirmEmail = async () => {
       console.log('%c🔍 CONFIRM START', 'color: red; font-size: 18px; font-weight: bold');
 
@@ -49,6 +57,10 @@ const ConfirmEmail: React.FC<ConfirmEmailProps> = () => {
           if (response.ok) {
             console.log('✅ EMAIL CONFIRMED:', result.data?.user?.id);
             setLoading(false);
+
+            // Set guard to prevent double confirmation
+            localStorage.setItem('emailConfirmed', 'true');
+
             addToast('success', result.message || 'Email confirmed successfully!');
 
             // If user is logged in (has tokens), redirect to dashboard
