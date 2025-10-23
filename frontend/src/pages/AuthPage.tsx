@@ -8,6 +8,7 @@ import ForgotPasswordCard from '../components/auth/ForgotPasswordCard';
 type AuthView = 'login' | 'signup' | 'forgot-password';
 
 const AuthPage: React.FC = () => {
+  
   const location = useLocation();
   const [view, setView] = useState<AuthView>('login');
 

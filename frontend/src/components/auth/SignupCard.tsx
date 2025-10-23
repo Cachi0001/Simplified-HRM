@@ -24,8 +24,13 @@ const SignupCard: React.FC<SignupCardProps> = ({ onSwitchToLogin }) => {
     e.preventDefault();
     e.stopPropagation();
 
-    // Double prevention - ensure no form submission
+    // Triple prevention - ensure no form submission
     if (e.target !== e.currentTarget) {
+      return;
+    }
+
+    // Prevent multiple submissions
+    if (isLoading) {
       return;
     }
 
@@ -40,6 +45,9 @@ const SignupCard: React.FC<SignupCardProps> = ({ onSwitchToLogin }) => {
       });
 
       if (result.requiresConfirmation) {
+        // Store email for potential resend functionality
+        localStorage.setItem('pendingConfirmationEmail', email);
+
         // Email confirmation required - show appropriate message
         if (isFirstSignup) {
           addToast('success', result.message || 'Account created! Please check your email to verify your account before logging in.');
@@ -107,7 +115,7 @@ const SignupCard: React.FC<SignupCardProps> = ({ onSwitchToLogin }) => {
           value={email}
           onChange={(e) => {
             setEmail(e.target.value);
-            setIsFirstSignup(true); // Reset to first signup when email changes
+            setIsFirstSignup(true);
           }}
           required
           autoComplete="email"

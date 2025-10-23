@@ -119,7 +119,7 @@ export class EmployeeService {
   async getPendingApprovals(): Promise<Employee[]> {
     try {
       const response = await api.get('/employees/pending');
-      return response.data.data.pendingEmployees;
+      return response.data.employees || [];
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Failed to fetch pending approvals');
     }

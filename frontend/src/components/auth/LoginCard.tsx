@@ -16,6 +16,7 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showResendButton, setShowResendButton] = useState(false);
   const navigate = useNavigate();
   const { addToast } = useToast();
 
@@ -44,6 +45,7 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
 
       // Check if email verification is required
       if (response.data.requiresEmailVerification) {
+        setShowResendButton(true);
         addToast('info', response.data.message || 'Please verify your email before logging in');
         return;
       }
@@ -81,10 +83,15 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
         }, 1000);
       }
 
+      // Clear any pending confirmation data since user is now logged in
+      localStorage.removeItem('pendingConfirmationEmail');
+      setShowResendButton(false);
+
     } catch (err: any) {
       console.error('Login error:', err);
 
       if (err.response?.data?.errorType === 'email_not_confirmed') {
+        setShowResendButton(true);
         addToast('info', err.response.data.message);
         return; // Don't set error state for confirmation messages
       }
@@ -102,6 +109,7 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
         } else if (errorMessage.includes('Account not found')) {
           errorMessage = 'Account not found. Please check your email or contact support.';
         } else if (errorMessage.includes('Please verify your email')) {
+          setShowResendButton(true);
           addToast('info', 'Please verify your email address before logging in. Check your inbox for the confirmation link.');
           return;
         }
@@ -120,6 +128,7 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
       addToast('info', 'Sending confirmation email...');
       const result = await authService.resendConfirmationEmail(email);
       addToast('success', result.message);
+      setShowResendButton(false); // Hide button after successful resend
     } catch (error: any) {
       addToast('error', 'Failed to resend confirmation email. Please try again.');
       setTimeout(() => {
@@ -139,7 +148,10 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
           type="email"
           label="Email Address"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            setShowResendButton(false); // Hide resend button when email changes
+          }}
           required
           autoComplete="email"
         />
@@ -161,6 +173,16 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
           >
             Forgot password?
           </button>
+
+          {showResendButton && (
+            <button
+              type="button"
+              onClick={handleResendConfirmation}
+              className="text-sm text-blue-600 hover:text-blue-500"
+            >
+              Resend confirmation email
+            </button>
+          )}
         </div>
 
         <Button type="submit" className="w-full" isLoading={isLoading}>

@@ -134,6 +134,16 @@ export class AuthService {
     }
   }
 
+  // Resend confirmation email
+  async resendConfirmationEmail(email: string): Promise<{ message: string }> {
+    try {
+      const response = await api.post('/auth/resend-confirmation', { email });
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to resend confirmation email');
+    }
+  }
+
   // Check if user is authenticated
   isAuthenticated(): boolean {
     return !!localStorage.getItem('accessToken');
@@ -148,6 +158,17 @@ export class AuthService {
   // Get stored token
   getToken(): string | null {
     return localStorage.getItem('accessToken');
+  }
+
+  // Logout - clear all auth data and guards
+  logout(): void {
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('user');
+    localStorage.removeItem('emailConfirmed');
+    localStorage.removeItem('pendingConfirmationEmail'); // Clear pending email
+    sessionStorage.removeItem('confirmExecuted');
+    console.log('🔓 User logged out - all guards cleared');
   }
 }
 

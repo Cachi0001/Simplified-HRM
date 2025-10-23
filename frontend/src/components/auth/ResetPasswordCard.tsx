@@ -60,11 +60,16 @@ const ResetPasswordCard: React.FC<ResetPasswordCardProps> = () => {
 
       if (response.ok) {
         addToast('success', 'Password reset successfully! You can now sign in with your new password.');
+
         // Clear any existing tokens to ensure clean login
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
-        navigate('/auth', { replace: true });
+
+        // Add delay before redirect to ensure backend processing is complete
+        setTimeout(() => {
+          navigate('/auth', { replace: true });
+        }, 2000); // 2 second delay to ensure backend processes the reset
       } else {
         addToast('error', result.message || 'Failed to reset password. Please try again.');
       }

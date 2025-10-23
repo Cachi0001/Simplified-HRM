@@ -395,8 +395,9 @@ export class MongoAuthRepository implements IAuthRepository {
         throw new Error('Reset token has expired. Please request a new password reset.');
       }
 
-      // Update password
+      // Update password (set plain text, pre-save hook will hash it)
       user.password = newPassword;
+      user.markModified('password'); // Ensure the pre-save hook runs
       user.passwordResetToken = undefined;
       user.passwordResetExpires = undefined;
 
@@ -440,6 +441,8 @@ export class MongoAuthRepository implements IAuthRepository {
 
         // Check if any user with this email is already verified
         const emailFromToken = this.extractEmailFromToken(token);
+        logger.info('🔍 [MongoAuthRepository] Extracted email from token:', emailFromToken);
+
         if (emailFromToken) {
           const verifiedUser = await User.findOne({ email: emailFromToken, emailVerified: true });
           if (verifiedUser) {
@@ -481,10 +484,22 @@ export class MongoAuthRepository implements IAuthRepository {
       });
 
       // Mark email as verified
+      logger.info('🔄 [MongoAuthRepository] Marking email as verified', {
+        userId: user._id,
+        email: user.email,
+        currentEmailVerified: user.emailVerified
+      });
+
       user.emailVerified = true;
       user.emailVerificationToken = undefined;
       user.emailVerificationExpires = undefined;
       await user.save();
+
+      logger.info('✅ [MongoAuthRepository] Email verified in database', {
+        userId: user._id,
+        email: user.email,
+        emailVerified: user.emailVerified
+      });
 
       // Update employee record
       employee.emailVerified = true;

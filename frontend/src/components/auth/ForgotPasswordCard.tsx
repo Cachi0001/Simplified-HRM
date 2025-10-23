@@ -19,8 +19,13 @@ const ForgotPasswordCard: React.FC<ForgotPasswordCardProps> = ({ onSwitchToLogin
     e.preventDefault();
     e.stopPropagation();
 
-    // Double prevention - ensure no form submission
+    // Triple prevention - ensure no form submission
     if (e.target !== e.currentTarget) {
+      return;
+    }
+
+    // Prevent multiple submissions
+    if (isLoading) {
       return;
     }
 

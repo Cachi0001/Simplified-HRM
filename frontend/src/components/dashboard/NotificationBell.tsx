@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Bell } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { notificationService } from '../../services/notificationService';
+import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 
 interface NotificationBellProps {
   darkMode?: boolean;
@@ -14,23 +16,21 @@ export function NotificationBell({ darkMode = false }: NotificationBellProps) {
     const saved = localStorage.getItem('darkMode');
     return saved ? JSON.parse(saved) : false;
   });
+  const navigate = useNavigate();
 
   // Update local dark mode when prop changes
   useEffect(() => {
     setLocalDarkMode(darkMode);
   }, [darkMode]);
 
-  // In real app, notifications would come from Supabase realtime or API
-  const notifications = [
-    {
-      id: 1,
-      message: 'New employee signup: john.doe@company.com requires approval',
-      time: '2 min ago',
-      type: 'signup',
-      url: '/dashboard#pending-approvals',
-      read: false
-    }
-  ];
+  // Fetch real notifications from the service
+  const { data: notifications = [], refetch } = useQuery({
+    queryKey: ['notifications'],
+    queryFn: async () => {
+      return await notificationService.getNotifications();
+    },
+    refetchInterval: 30000, // Refetch every 30 seconds
+  });
 
   const handleNotificationClick = async (notification: any) => {
     // Mark as read using the service
@@ -38,10 +38,14 @@ export function NotificationBell({ darkMode = false }: NotificationBellProps) {
 
     // Update local state
     notification.read = true;
+    refetch();
 
     // Navigate to the appropriate page based on notification type
-    if (notification.url) {
-      window.location.href = notification.url;
+    if (notification.actions && notification.actions.length > 0) {
+      const action = notification.actions[0];
+      if (action.url) {
+        navigate(action.url);
+      }
     }
 
     setIsOpen(false);
@@ -101,7 +105,7 @@ export function NotificationBell({ darkMode = false }: NotificationBellProps) {
                         </p>
                         <div className="flex items-center justify-between mt-2">
                           <p className={`text-xs ${localDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                            {notification.time}
+                            {new Date(notification.timestamp).toLocaleDateString()} at {new Date(notification.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </p>
                           {!notification.read && (
                             <span className="text-xs text-blue-600 font-medium">New</span>

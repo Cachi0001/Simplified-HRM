@@ -50,6 +50,20 @@ export default function AdminDashboard() {
     }
   }, []);
 
+  // Fetch all employees for filtering
+  const { data: employees = [], isLoading: employeesLoading } = useQuery({
+    queryKey: ['employees'],
+    queryFn: async () => {
+      const response = await api.get('/employees');
+      const allEmployees = response.data.data.employees || [];
+
+      // Filter out admin users for display purposes
+      const nonAdminEmployees = allEmployees.filter((emp: any) => emp.role !== 'admin');
+
+      return nonAdminEmployees;
+    },
+  });
+
   const { data: stats, isLoading: statsLoading, error: statsError } = useQuery({
     queryKey: ['employee-stats'],
     queryFn: async () => {

@@ -122,9 +122,51 @@ class NotificationService {
   }
 
   async getNotifications(userId?: string): Promise<Go3netNotification[]> {
-    // For MongoDB implementation, this would call the API
-    console.log('Getting notifications for user:', userId);
-    return [];
+    try {
+      // For now, return mock notifications until API is implemented
+      // In a real implementation, this would fetch from the backend API
+      const mockNotifications: Go3netNotification[] = [];
+
+      // Check if there are pending approvals (for admin users)
+      const currentUser = localStorage.getItem('user');
+      if (currentUser) {
+        const user = JSON.parse(currentUser);
+        if (user.role === 'admin') {
+          try {
+            // Fetch pending employees
+            const response = await fetch(`${(import.meta as any).env?.VITE_API_URL || 'http://localhost:3000'}/api/employees/pending`);
+            if (response.ok) {
+              const data = await response.json();
+              const pendingEmployees = data.employees || [];
+
+              // Create notifications for each pending approval
+              pendingEmployees.forEach((emp: any, index: number) => {
+                mockNotifications.push({
+                  id: `pending-${emp.id || emp._id}-${Date.now()}-${index}`,
+                  type: 'info' as NotificationType,
+                  priority: 'normal',
+                  title: 'New Employee Signup',
+                  message: `${emp.fullName} (${emp.email}) requires approval`,
+                  timestamp: new Date(emp.createdAt || Date.now()),
+                  read: false,
+                  targetUserId: emp.id || emp._id,
+                  actions: [{ label: 'Review', action: 'review', url: '/dashboard#pending-approvals' }],
+                  source: 'system',
+                  category: 'approval' as any
+                });
+              });
+            }
+          } catch (error) {
+            console.warn('Failed to fetch pending approvals for notifications:', error);
+          }
+        }
+      }
+
+      return mockNotifications;
+    } catch (error) {
+      console.error('Failed to get notifications:', error);
+      return [];
+    }
   }
 }
 
