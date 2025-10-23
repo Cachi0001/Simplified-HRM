@@ -4,7 +4,6 @@ import { AdminTasks } from '../components/dashboard/AdminTasks';
 import { AdminDepartments } from '../components/dashboard/AdminDepartments';
 import { NotificationManager, triggerNotification, NotificationUtils } from '../components/notifications/NotificationManager';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '../lib/supabase';
 import { notificationService } from '../services/notificationService';
 import Logo from '../components/ui/Logo';
 import { authService } from '../services/authService';
@@ -14,6 +13,7 @@ import { DarkModeToggle } from '../components/ui/DarkModeToggle';
 import { NotificationBell } from '../components/dashboard/NotificationBell';
 import { OverviewCards } from '../components/dashboard/OverviewCards';
 import { PendingApprovals } from '../components/dashboard/PendingApprovals';
+import api from '../lib/api';
 
 export default function AdminDashboard() {
   const [darkMode, setDarkMode] = useState(() => {
@@ -24,7 +24,6 @@ export default function AdminDashboard() {
 
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
-  const [supabaseConfigured, setSupabaseConfigured] = useState(false);
 
   const { addToast } = useToast();
 
@@ -51,44 +50,20 @@ export default function AdminDashboard() {
     }
   }, []);
 
-  // Check if Supabase is properly configured
-  useEffect(() => {
-    const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || '';
-    const supabaseKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
-
-    const isConfigured = supabaseUrl &&
-                        supabaseKey &&
-                        !supabaseUrl.includes('your-project') &&
-                        !supabaseKey.includes('your_supabase');
-
-    console.log('Supabase configured:', isConfigured, {
-      url: supabaseUrl ? 'configured' : 'missing',
-      key: supabaseKey ? 'configured' : 'missing'
-    });
-
-    setSupabaseConfigured(isConfigured);
-  }, []);
-
   const { data: stats, isLoading: statsLoading, error: statsError } = useQuery({
     queryKey: ['employee-stats'],
     queryFn: async () => {
-      if (!supabaseConfigured) {
-        console.log('Supabase not configured, using fallback data');
-        return { total: 0, active: 0, pending: 0 };
-      }
-
       try {
         console.log('Fetching employee stats...');
-        const { data, error } = await supabase.from('employees').select('status');
-        if (error) {
-          console.error('Supabase error:', error);
-          throw error;
-        }
-        console.log('Employee stats data:', data);
-        const total = data?.length || 0;
-        const active = data?.filter(e => e.status === 'active').length || 0;
-        const pending = data?.filter(e => e.status === 'pending').length || 0;
-        return { total, active, pending };
+        const response = await api.get('/employees/stats');
+        console.log('Employee stats data:', response.data);
+
+        const data = response.data;
+        return {
+          total: data.total || 0,
+          active: data.active || 0,
+          pending: data.pending || 0
+        };
       } catch (error) {
         console.error('Failed to fetch employee stats:', error);
         // Return fallback data for demo purposes
@@ -107,18 +82,6 @@ export default function AdminDashboard() {
         console.error('Failed to initialize push notifications:', err);
       });
     }
-  }, [currentUser]);
-
-  // Listen for employee signup events (simulate real-time updates)
-  useEffect(() => {
-    if (!currentUser) return;
-
-    console.log('Dashboard ready for real notifications from Supabase');
-
-    // In real app, notifications would come from Supabase realtime subscriptions
-    // For now, no demo notifications as requested
-
-    return () => {};
   }, [currentUser]);
 
   // If there's an error, show error message
@@ -179,21 +142,6 @@ export default function AdminDashboard() {
       </header>
 
       <div className="container mx-auto px-4 py-6">
-        {/* Supabase Configuration Notice */}
-        {!supabaseConfigured && (
-          <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <div className="flex items-center">
-              <div className="text-yellow-600 text-2xl mr-3">⚠️</div>
-              <div className="flex-1">
-                <h3 className="text-yellow-800 font-semibold">Supabase Not Configured</h3>
-                <p className="text-yellow-700 text-sm">
-                  Database features are disabled. Please configure your Supabase credentials in the .env file to enable full functionality.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Overview Cards */}
         <section className="mb-8">
           {statsLoading ? (

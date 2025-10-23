@@ -13,6 +13,7 @@ interface LoginCardProps {
 
 const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgotPassword }) => {
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { addToast } = useToast();
@@ -22,7 +23,7 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
     setIsLoading(true);
 
     try {
-      const response = await authService.login({ email, password: '' }); // Password not needed for magic links
+      const response = await authService.login({ email, password });
 
       // Check if response has the expected structure
       if (!response || !response.data || !response.data.user) {
@@ -33,9 +34,9 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
       const user = response.data.user;
       const { accessToken, refreshToken } = response.data;
 
-      if (response.data.requiresConfirmation) {
-        // Magic link sent - show success message
-        addToast('success', response.data.message || 'Check your inbox – we sent you a magic link to sign in');
+      // Check if email verification is required
+      if (response.data.requiresEmailVerification) {
+        addToast('info', response.data.message || 'Please verify your email before logging in');
         return;
       }
 
@@ -81,6 +82,9 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
           return; // Don't continue with error flow
         } else if (errorMessage.includes('Account not found')) {
           errorMessage = 'Account not found. Please check your email or contact support.';
+        } else if (errorMessage.includes('Please verify your email')) {
+          addToast('info', 'Please verify your email address before logging in. Check your inbox for the confirmation link.');
+          return;
         }
 
         addToast('error', errorMessage);
@@ -108,7 +112,7 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
   return (
     <AuthCard
       title="Welcome Back!"
-      subtitle="Sign in with a magic link"
+      subtitle="Sign in with your email and password"
     >
       <form onSubmit={handleSubmit} className="space-y-6">
         <Input
@@ -120,13 +124,32 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
           required
           autoComplete="email"
         />
+        <Input
+          id="password"
+          type="password"
+          label="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          autoComplete="current-password"
+        />
+
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={onSwitchToForgotPassword}
+            className="text-sm text-blue-600 hover:text-blue-500"
+          >
+            Forgot password?
+          </button>
+        </div>
 
         <Button type="submit" className="w-full" isLoading={isLoading}>
-          Send Magic Link
+          Sign In
         </Button>
 
         <div className="text-center text-sm text-gray-500">
-          <p className="mb-2">No password required! We'll send you a magic link to sign in.</p>
+          <p className="mb-2">Sign in with your email and password</p>
           <p>Don't have an account?{' '}
           <button type="button" onClick={onSwitchToSignup} className="font-medium text-highlight hover:text-blue-500">
             Sign up

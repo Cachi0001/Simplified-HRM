@@ -6,18 +6,19 @@ import { Router } from 'express';
 import { AuthController } from '../controllers/AuthController';
 import { AuthService } from '../services/AuthService';
 import { EmailService } from '../services/EmailService';
-import { SupabaseAuthRepository } from '../repositories/implementations/SupabaseAuthRepository';
+import { MongoAuthRepository } from '../repositories/implementations/MongoAuthRepository';
 import { authenticateToken } from '../middleware/auth.middleware';
 
 const router = Router();
 
-const authRepository = new SupabaseAuthRepository();
+const authRepository = new MongoAuthRepository();
 const authService = new AuthService(authRepository);
 const authController = new AuthController(authService);
 
 router.post('/signup', (req, res) => authController.signUp(req, res));
 router.post('/login', (req, res) => authController.signIn(req, res));
 router.post('/resend-confirmation', (req, res) => authController.resendConfirmationEmail(req, res));
+router.get('/confirm/:token', (req, res) => authController.confirmEmailByToken(req, res));
 router.post('/confirm', (req, res) => authController.confirmEmail(req, res));
 router.get('/me', authenticateToken, (req, res) => authController.getCurrentUser(req, res));
 router.post('/refresh', authenticateToken, (req, res) => authController.refreshToken(req, res));

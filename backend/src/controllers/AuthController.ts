@@ -488,4 +488,117 @@ export class AuthController {
       });
     }
   }
+
+  async confirmEmailByToken(req: Request, res: Response): Promise<void> {
+    try {
+      const { token } = req.params;
+
+      if (!token) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Verification token is required'
+        });
+        return;
+      }
+
+      logger.info('🔗 [AuthController] Email confirmation by token request', { token });
+
+      const result = await this.authService.confirmEmailByToken(token);
+
+      logger.info('✅ [AuthController] Email confirmed successfully', {
+        userId: result.user.id,
+        email: result.user.email
+      });
+
+      // Check employee status and return appropriate response
+      const employee = await this.authService.getEmployeeByUserId(result.user.id);
+
+      if (employee && employee.status === 'active') {
+        // User is approved - return tokens for auto-login
+        const accessToken = this.generateAccessToken(result.user);
+        const refreshToken = this.generateRefreshToken(result.user);
+
+        // Add refresh token to user
+        result.user.addRefreshToken(refreshToken);
+        await result.user.save();
+
+        res.status(200).json({
+          status: 'success',
+          message: 'Email verified successfully! Welcome back!',
+          data: {
+            user: {
+              ...result.user.toObject(),
+              role: employee.role,
+              status: employee.status
+            },
+            accessToken,
+            refreshToken,
+            requiresEmailVerification: false
+          }
+        });
+      } else if (employee && employee.status === 'pending') {
+        // User is pending approval
+        res.status(200).json({
+          status: 'success',
+          message: 'Email verified successfully! Your account is pending admin approval.',
+          data: {
+            user: {
+              ...result.user.toObject(),
+              role: employee.role,
+              status: employee.status
+            },
+            requiresEmailVerification: false,
+            requiresApproval: true
+          }
+        });
+      } else {
+        // Employee record not found or other status
+        res.status(200).json({
+          status: 'success',
+          message: 'Email verified successfully! Please contact support to activate your account.',
+          data: {
+            user: result.user.toObject(),
+            requiresEmailVerification: false
+          }
+        });
+      }
+
+    } catch (error) {
+      logger.error('❌ [AuthController] Email confirmation failed', { error: (error as Error).message });
+
+      res.status(400).json({
+        status: 'error',
+        message: (error as Error).message || 'Email confirmation failed. Please try again or contact support.'
+      });
+    }
+  }
+
+  private generateAccessToken(user: any): string {
+    const jwt = require('jsonwebtoken');
+    const jwtSecret = process.env.JWT_SECRET || 'fallback-secret-key';
+
+    return jwt.sign(
+      {
+        userId: user._id,
+        email: user.email,
+        role: user.role,
+      },
+      jwtSecret,
+      { expiresIn: '15m' }
+    );
+  }
+
+  private generateRefreshToken(user: any): string {
+    const jwt = require('jsonwebtoken');
+    const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET || 'fallback-refresh-secret-key';
+
+    return jwt.sign(
+      {
+        userId: user._id,
+        email: user.email,
+      },
+      jwtRefreshSecret,
+      { expiresIn: '7d' }
+    );
+  }
 }

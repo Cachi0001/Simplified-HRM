@@ -13,9 +13,21 @@ import authRoutes from './routes/auth.routes';
 import employeeRoutes from './routes/employee.routes';
 import attendanceRoutes from './routes/attendance.routes';
 import taskRoutes from './routes/task.routes';
+import databaseConfig from './config/database';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Initialize database connection
+async function initializeDatabase() {
+  try {
+    await databaseConfig.connect();
+    logger.info('✅ Database connected successfully');
+  } catch (error) {
+    logger.error('❌ Database connection failed:', error);
+    process.exit(1);
+  }
+}
 
 // Security middleware (optimized for serverless)
 app.use(helmet({
@@ -141,10 +153,12 @@ export default app;
 
 // For local development
 if (require.main === module) {
-  app.listen(PORT, () => {
-    logger.info(`Server is running on port ${PORT}`);
-    logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
-    logger.info(`Deployment: ${process.env.VERCEL ? 'Vercel' : 'Local'}`);
-    logger.info(`Health check available at http://localhost:${PORT}/api/health`);
+  initializeDatabase().then(() => {
+    app.listen(PORT, () => {
+      logger.info(`Server is running on port ${PORT}`);
+      logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+      logger.info(`Deployment: ${process.env.VERCEL ? 'Vercel' : 'Local'}`);
+      logger.info(`Health check available at http://localhost:${PORT}/api/health`);
+    });
   });
 }

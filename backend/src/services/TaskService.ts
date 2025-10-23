@@ -1,11 +1,11 @@
 import { ITaskRepository } from '../repositories/interfaces/ITaskRepository';
-import { Task, CreateTaskRequest, UpdateTaskRequest, TaskQuery } from '../models/Task';
+import { Task as TaskModel, ITask, CreateTaskRequest, UpdateTaskRequest, TaskQuery } from '../models/Task';
 import logger from '../utils/logger';
 
 export class TaskService {
   constructor(private taskRepository: ITaskRepository) {}
 
-  async createTask(taskData: CreateTaskRequest, assignedBy: string, currentUserRole: string): Promise<Task> {
+  async createTask(taskData: CreateTaskRequest, assignedBy: string, currentUserRole: string): Promise<ITask> {
     try {
       if (currentUserRole !== 'admin') {
         throw new Error('Only administrators can assign tasks');
@@ -41,7 +41,7 @@ export class TaskService {
     }
   }
 
-  async getAllTasks(query?: TaskQuery, currentUserRole?: string, currentUserId?: string): Promise<{ tasks: Task[]; total: number; page: number; limit: number }> {
+  async getAllTasks(query?: TaskQuery, currentUserRole?: string, currentUserId?: string): Promise<{ tasks: ITask[]; total: number; page: number; limit: number }> {
     try {
       logger.info('TaskService: Getting all tasks', { role: currentUserRole });
 
@@ -56,7 +56,7 @@ export class TaskService {
     }
   }
 
-  async getTaskById(id: string, currentUserRole: string, currentUserId?: string): Promise<Task | null> {
+  async getTaskById(id: string, currentUserRole: string, currentUserId?: string): Promise<ITask | null> {
     try {
       const task = await this.taskRepository.findById(id);
 
@@ -75,7 +75,7 @@ export class TaskService {
     }
   }
 
-  async getMyTasks(userId: string): Promise<Task[]> {
+  async getMyTasks(userId: string): Promise<ITask[]> {
     try {
       return await this.taskRepository.findByAssignee(userId);
     } catch (error) {
@@ -84,7 +84,7 @@ export class TaskService {
     }
   }
 
-  async updateTask(id: string, taskData: UpdateTaskRequest, currentUserRole: string, currentUserId?: string): Promise<Task> {
+  async updateTask(id: string, taskData: UpdateTaskRequest, currentUserRole: string, currentUserId?: string): Promise<ITask> {
     try {
       const existingTask = await this.taskRepository.findById(id);
       if (!existingTask) {
@@ -117,7 +117,7 @@ export class TaskService {
     }
   }
 
-  async updateTaskStatus(id: string, status: 'pending' | 'in_progress' | 'completed' | 'cancelled', currentUserRole: string, currentUserId?: string): Promise<Task> {
+  async updateTaskStatus(id: string, status: 'pending' | 'in_progress' | 'completed' | 'cancelled', currentUserRole: string, currentUserId?: string): Promise<ITask> {
     try {
       const existingTask = await this.taskRepository.findById(id);
       if (!existingTask) {
@@ -173,7 +173,7 @@ export class TaskService {
     }
   }
 
-  async searchTasks(query: string, currentUserRole?: string, currentUserId?: string): Promise<Task[]> {
+  async searchTasks(query: string, currentUserRole?: string, currentUserId?: string): Promise<ITask[]> {
     try {
       logger.info('TaskService: Searching tasks', { query, role: currentUserRole });
 

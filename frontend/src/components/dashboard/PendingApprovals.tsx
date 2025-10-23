@@ -1,11 +1,11 @@
 import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../../lib/supabase';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Check, X } from 'lucide-react';
 import { triggerNotification, NotificationUtils } from '../notifications/NotificationManager';
 import { notificationService } from '../../services/notificationService';
+import api from '../../lib/api';
 
 interface PendingApprovalsProps {
   darkMode?: boolean;
@@ -13,18 +13,8 @@ interface PendingApprovalsProps {
 
 const fetchPending = async () => {
   try {
-    const { data, error } = await supabase
-      .from('employees')
-      .select('id, full_name, email, created_at')
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Pending approvals query error:', error);
-      throw error;
-    }
-
-    return data || [];
+    const response = await api.get('/employees/pending');
+    return response.data.employees || [];
   } catch (error) {
     console.error('Failed to fetch pending approvals:', error);
     // Return empty array for demo purposes when database is not available
@@ -43,23 +33,8 @@ export function PendingApprovals({ darkMode = false }: PendingApprovalsProps) {
 
   const approveMutation = useMutation({
     mutationFn: async (id: string) => {
-      // First get employee details
-      const { data: employee, error: fetchError } = await supabase
-        .from('employees')
-        .select('id, full_name, email')
-        .eq('id', id)
-        .single();
-
-      if (fetchError) throw fetchError;
-
-      // Update status to active
-      const { error } = await supabase
-        .from('employees')
-        .update({ status: 'active' })
-        .eq('id', id);
-      if (error) throw error;
-
-      return employee;
+      const response = await api.put(`/employees/${id}/approve`);
+      return response.data;
     },
     onSuccess: (employee) => {
       queryClient.invalidateQueries({ queryKey: ['pending-employees'] });
@@ -101,11 +76,7 @@ export function PendingApprovals({ darkMode = false }: PendingApprovalsProps) {
 
   const rejectMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('employees')
-        .delete()
-        .eq('id', id);
-      if (error) throw error;
+      await api.delete(`/employees/${id}/reject`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pending-employees'] });

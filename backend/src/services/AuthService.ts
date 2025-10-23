@@ -1,5 +1,5 @@
 import { IAuthRepository } from '../repositories/interfaces/IAuthRepository';
-import { User, CreateUserRequest, LoginRequest, AuthResponse } from '../models/User';
+import { IUser, CreateUserRequest, LoginRequest, AuthResponse } from '../models/User';
 import logger from '../utils/logger';
 
 export class AuthService {
@@ -7,26 +7,28 @@ export class AuthService {
 
   async signUp(userData: CreateUserRequest): Promise<AuthResponse> {
     try {
-      logger.info('🔍 [AuthService] Starting passwordless signup process', {
+      logger.info('🔍 [AuthService] Starting signup process', {
         email: userData.email,
         fullName: userData.fullName,
-        role: userData.role || 'employee'
+        role: userData.role || 'employee',
+        hasPassword: !!userData.password
       });
 
-      if (!userData.email || !userData.fullName) {
+      if (!userData.email || !userData.fullName || !userData.password) {
         logger.error('❌ [AuthService] Missing required fields', {
           hasEmail: !!userData.email,
-          hasFullName: !!userData.fullName
+          hasFullName: !!userData.fullName,
+          hasPassword: !!userData.password
         });
-        throw new Error('Email and full name are required');
+        throw new Error('Email, full name, and password are required');
       }
 
       logger.info('🔄 [AuthService] Calling repository signup...');
       const result = await this.authRepository.signUp(userData);
 
       // Check if email confirmation is required
-      if (result.requiresConfirmation) {
-        logger.info('📧 [AuthService] Email confirmation required - returning confirmation response', {
+      if (result.requiresEmailVerification) {
+        logger.info('📧 [AuthService] Email verification required - returning confirmation response', {
           userId: result.user.id,
           email: userData.email
         });
@@ -35,8 +37,8 @@ export class AuthService {
           user: result.user,
           accessToken: '',
           refreshToken: '',
-          requiresConfirmation: true,
-          message: result.message || 'Check your email to confirm your account'
+          requiresEmailVerification: true,
+          message: result.message || 'Account created! Please check your email to verify your account before logging in.'
         };
       }
 
@@ -59,15 +61,15 @@ export class AuthService {
 
   async signIn(credentials: LoginRequest): Promise<AuthResponse> {
     try {
-      logger.info('🔐 [AuthService] Passwordless signin request', { email: credentials.email });
+      logger.info('🔐 [AuthService] Password signin request', { email: credentials.email });
 
-      if (!credentials.email) {
-        throw new Error('Email is required');
+      if (!credentials.email || !credentials.password) {
+        throw new Error('Email and password are required');
       }
 
       const result = await this.authRepository.signIn(credentials);
 
-      logger.info('✅ [AuthService] Magic link sent successfully', { email: credentials.email });
+      logger.info('✅ [AuthService] User signed in successfully', { email: credentials.email });
       return result;
     } catch (error) {
       logger.error('❌ [AuthService] Signin failed', { error: (error as Error).message });
@@ -102,7 +104,7 @@ export class AuthService {
     }
   }
 
-  async getCurrentUser(accessToken: string): Promise<User> {
+  async getCurrentUser(accessToken: string): Promise<IUser> {
     try {
       if (!accessToken) {
         throw new Error('Access token is required');
@@ -169,35 +171,30 @@ export class AuthService {
     try {
       logger.info('🔗 [AuthService] Confirming email with tokens');
 
-      // Set the session using the tokens from the magic link
-      const { data, error } = await this.authRepository.setSession(accessToken, refreshToken);
-
-      if (error) {
-        logger.error('❌ [AuthService] Session confirmation failed', { error: error.message });
-        throw new Error(error.message);
+      // For MongoDB, email verification is handled via refresh token
+      // This method can be used for email verification token confirmation
+      if (!accessToken || !refreshToken) {
+        throw new Error('Both access token and refresh token are required');
       }
 
-      if (!data.user || !data.session) {
-        throw new Error('Invalid tokens provided');
+      // Use the repository's refresh token method to verify and get new tokens
+      const result = await this.authRepository.refreshToken(refreshToken);
+
+      // Mark email as verified
+      if (result.user) {
+        result.user.emailVerified = true;
+        result.user.emailVerificationToken = undefined;
+        await result.user.save();
       }
 
       logger.info('✅ [AuthService] Email confirmed successfully', {
-        userId: data.user.id,
-        email: data.user.email
+        userId: result.user._id,
+        email: result.user.email
       });
 
       return {
-        user: {
-          id: data.user.id,
-          email: data.user.email!,
-          fullName: data.user.user_metadata?.full_name || data.user.email!,
-          role: data.user.user_metadata?.role || 'employee',
-          emailVerified: !!data.user.email_confirmed_at,
-          createdAt: new Date(data.user.created_at!),
-          updatedAt: new Date(data.user.updated_at || data.user.created_at!),
-        },
-        accessToken: data.session.access_token,
-        refreshToken: data.session.refresh_token,
+        ...result,
+        message: 'Email verified successfully',
       };
     } catch (error) {
       logger.error('❌ [AuthService] Confirm email failed', { error: (error as Error).message });
@@ -219,6 +216,24 @@ export class AuthService {
       return await this.authRepository.createEmployeeRecord(employeeData);
     } catch (error) {
       logger.error('AuthService: Create employee record failed', { error: (error as Error).message });
+      throw error;
+    }
+  }
+
+  async confirmEmailByToken(token: string): Promise<AuthResponse> {
+    try {
+      logger.info('🔗 [AuthService] Confirming email by token', { token });
+
+      const result = await this.authRepository.confirmEmailByToken(token);
+
+      logger.info('✅ [AuthService] Email confirmed by token successfully', {
+        userId: result.user._id,
+        email: result.user.email
+      });
+
+      return result;
+    } catch (error) {
+      logger.error('❌ [AuthService] Confirm email by token failed', { error: (error as Error).message });
       throw error;
     }
   }

@@ -6,11 +6,11 @@ import { NotificationBell } from '../components/dashboard/NotificationBell';
 import { DarkModeToggle } from '../components/ui/DarkModeToggle';
 import { NotificationManager, triggerNotification, NotificationUtils } from '../components/notifications/NotificationManager';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '../lib/supabase';
 import { notificationService } from '../services/notificationService';
 import Logo from '../components/ui/Logo';
 import { authService } from '../services/authService';
 import { BottomNavbar } from '../components/layout/BottomNavbar';
+import api from '../lib/api';
 
 export default function EmployeeDashboard() {
   const [darkMode, setDarkMode] = useState(() => {
@@ -20,7 +20,6 @@ export default function EmployeeDashboard() {
   });
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
-  const [supabaseConfigured, setSupabaseConfigured] = useState(false);
 
   // Save dark mode preference whenever it changes
   useEffect(() => {
@@ -48,29 +47,11 @@ export default function EmployeeDashboard() {
     }
   }, []);
 
-  // Check if Supabase is properly configured
-  useEffect(() => {
-    const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || '';
-    const supabaseKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
-
-    const isConfigured = supabaseUrl &&
-                        supabaseKey &&
-                        !supabaseUrl.includes('your-project') &&
-                        !supabaseKey.includes('your_supabase');
-
-    console.log('Supabase configured:', isConfigured, {
-      url: supabaseUrl ? 'configured' : 'missing',
-      key: supabaseKey ? 'configured' : 'missing'
-    });
-
-    setSupabaseConfigured(isConfigured);
-  }, []);
-
   const { data: employeeStats, isLoading: statsLoading } = useQuery({
     queryKey: ['employee-stats', currentUser?.id],
     queryFn: async () => {
-      if (!supabaseConfigured || !currentUser?.id) {
-        console.log('Supabase not configured or no user, using fallback data');
+      if (!currentUser?.id) {
+        console.log('No user, using fallback data');
         return {
           totalTasks: 0,
           completedTasks: 0,
@@ -84,41 +65,28 @@ export default function EmployeeDashboard() {
         console.log('Fetching employee stats for user:', currentUser.id);
 
         // Get tasks assigned to this employee
-        const { data: tasks, error: tasksError } = await supabase
-          .from('tasks')
-          .select('status, created_at')
-          .eq('assigned_to', currentUser.id);
+        const [tasksResponse, attendanceResponse] = await Promise.all([
+          api.get(`/tasks?assigneeId=${currentUser.id}`),
+          api.get(`/attendance/employee/${currentUser.id}`)
+        ]);
 
-        if (tasksError) {
-          console.error('Tasks query error:', tasksError);
-        }
+        const tasks = tasksResponse.data.tasks || [];
+        const attendance = attendanceResponse.data.attendances || [];
 
-        // Get attendance records for this employee
-        const { data: attendance, error: attendanceError } = await supabase
-          .from('attendance')
-          .select('check_in, check_out, created_at')
-          .eq('employee_id', currentUser.id)
-          .order('created_at', { ascending: false })
-          .limit(30);
+        const totalTasks = tasks.length;
+        const completedTasks = tasks.filter((t: any) => t.status === 'completed').length;
+        const pendingTasks = tasks.filter((t: any) => t.status === 'pending').length;
 
-        if (attendanceError) {
-          console.error('Attendance query error:', attendanceError);
-        }
-
-        const totalTasks = tasks?.length || 0;
-        const completedTasks = tasks?.filter(t => t.status === 'completed').length || 0;
-        const pendingTasks = tasks?.filter(t => t.status === 'pending').length || 0;
-
-        const attendanceDays = attendance?.length || 0;
-        const totalHours = attendance?.reduce((acc: number, record: any) => {
-          if (record.check_in && record.check_out) {
-            const checkIn = new Date(record.check_in);
-            const checkOut = new Date(record.check_out);
+        const attendanceDays = attendance.length;
+        const totalHours = attendance.reduce((acc: number, record: any) => {
+          if (record.checkInTime && record.checkOutTime) {
+            const checkIn = new Date(record.checkInTime);
+            const checkOut = new Date(record.checkOutTime);
             const hours = (checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60);
             return acc + hours;
           }
           return acc;
-        }, 0) || 0;
+        }, 0);
 
         return {
           totalTasks,
@@ -228,21 +196,6 @@ export default function EmployeeDashboard() {
       </header>
 
       <div className="container mx-auto px-4 py-6">
-        {/* Supabase Configuration Notice */}
-        {!supabaseConfigured && (
-          <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <div className="flex items-center">
-              <div className="text-yellow-600 text-2xl mr-3">⚠️</div>
-              <div className="flex-1">
-                <h3 className="text-yellow-800 font-semibold">Database Not Configured</h3>
-                <p className="text-yellow-700 text-sm">
-                  Some features may not work properly. Please configure your Supabase credentials.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Employee Overview Cards */}
         <section className="mb-8">
           {statsLoading ? (

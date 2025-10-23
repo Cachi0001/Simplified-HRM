@@ -272,85 +272,28 @@ export class EmailService {
   }
   async sendTaskNotification(employeeId: string, taskTitle: string, taskDescription: string, dueDate: string): Promise<void> {
     try {
-      // Get employee email from database
-      const { data: employee } = await this.getSupabaseAdmin()
-        .from('employees')
-        .select('email, full_name')
-        .eq('id', employeeId)
-        .single();
+      // For MongoDB, we'll need to get employee email from the database
+      // This would need to be implemented based on your MongoDB employee model
+      logger.info('📧 Task notification requested', {
+        employeeId,
+        taskTitle,
+        taskDescription,
+        dueDate
+      });
 
-      if (!employee) {
-        logger.warn('Employee not found for task notification', { employeeId });
-        return;
-      }
+      // TODO: Implement MongoDB employee lookup
+      // const employee = await Employee.findById(employeeId);
+      // if (!employee) {
+      //   logger.warn('Employee not found for task notification', { employeeId });
+      //   return;
+      // }
 
-      const mailOptions = {
-        from: `"Go3net HR Management System" <${process.env.FROM_EMAIL}>`,
-        to: employee.email,
-        subject: 'New Task Assigned - Go3net HR Management System',
-        html: `
-          <!DOCTYPE html>
-          <html lang="en">
-          <head>
-              <meta charset="UTF-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <title>New Task Assigned - Go3net HR Management System</title>
-              <style>
-                  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333333; margin: 0; padding: 0; background-color: #f4f4f4; }
-                  .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); overflow: hidden; }
-                  .header { background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); padding: 40px 30px; text-align: center; color: white; }
-                  .header h1 { margin: 0; font-size: 28px; font-weight: 600; letter-spacing: 0.5px; }
-                  .content { padding: 40px 30px; }
-                  .task-card { background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border-radius: 8px; padding: 25px; margin: 25px 0; border-left: 4px solid #007bff; }
-                  .task-card h3 { margin: 0 0 15px 0; color: #007bff; font-size: 20px; }
-                  .task-details { background-color: #f8f9fa; border-radius: 6px; padding: 20px; margin: 15px 0; }
-                  .task-details p { margin: 8px 0; color: #495057; }
-                  .dashboard-button { display: inline-block; background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); color: #ffffff; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-weight: 600; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3); transition: all 0.3s ease; }
-                  .dashboard-button:hover { background: linear-gradient(135deg, #0056b3 0%, #004085 100%); box-shadow: 0 6px 20px rgba(0, 123, 255, 0.4); transform: translateY(-2px); }
-                  .footer { background-color: #f8f9fa; padding: 30px; text-align: center; border-top: 1px solid #e9ecef; }
-                  @media only screen and (max-width: 600px) { .email-container { margin: 0; border-radius: 0; } .header { padding: 30px 20px; } .content { padding: 30px 20px; } .dashboard-button { display: block; width: 100%; box-sizing: border-box; } }
-              </style>
-          </head>
-          <body>
-              <div class="email-container">
-                  <div class="header">
-                      <h1>📋 New Task Assigned</h1>
-                      <p>You have been assigned a new task</p>
-                  </div>
-                  <div class="content">
-                      <p style="font-size: 16px; color: #555;">Hello ${employee.full_name},</p>
-                      <p style="font-size: 16px; color: #555;">A new task has been assigned to you by your administrator.</p>
+      logger.info('📧 Task notification email would be sent', {
+        employeeId,
+        taskTitle,
+        dueDate
+      });
 
-                      <div class="task-card">
-                          <h3>📋 Task Details</h3>
-                          <div class="task-details">
-                              <p><strong>📝 Task Title:</strong> ${taskTitle}</p>
-                              ${taskDescription ? `<p><strong>📄 Description:</strong> ${taskDescription}</p>` : ''}
-                              <p><strong>📅 Due Date:</strong> ${dueDate}</p>
-                              <p><strong>⏰ Assigned:</strong> ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</p>
-                          </div>
-                      </div>
-
-                      <p style="font-size: 16px; color: #555;">Please review the task details and take appropriate action. You can mark tasks as complete or update their status through your dashboard.</p>
-
-                      <div style="text-align: center; margin: 40px 0;">
-                          <a href="${process.env.FRONTEND_URL}/dashboard" class="dashboard-button">View in Dashboard</a>
-                      </div>
-
-                      <p style="font-size: 16px; color: #555;">If you have any questions about this task, please contact your supervisor or administrator.</p>
-                  </div>
-                  <div class="footer">
-                      <p>This is an automated message from Go3net HR Management System.</p>
-                      <p style="margin-top: 15px;">© Go3net HR Management System. All rights reserved.</p>
-                  </div>
-              </div>
-          </body>
-          </html>
-        `
-      };
-
-      await this.transporter.sendMail(mailOptions);
-      logger.info('Task notification email sent', { to: employee.email, taskTitle });
     } catch (error) {
       logger.error('Failed to send task notification email', { error: (error as Error).message });
       throw error;
@@ -359,86 +302,26 @@ export class EmailService {
 
   async sendTaskCompletionNotification(employeeId: string, taskTitle: string, completionMessage: string): Promise<void> {
     try {
-      // Get employee email from database
-      const { data: employee } = await this.getSupabaseAdmin()
-        .from('employees')
-        .select('email, full_name')
-        .eq('id', employeeId)
-        .single();
+      // For MongoDB, we'll need to get employee email from the database
+      // This would need to be implemented based on your MongoDB employee model
+      logger.info('📧 Task completion notification requested', {
+        employeeId,
+        taskTitle,
+        completionMessage
+      });
 
-      if (!employee) {
-        logger.warn('Employee not found for task completion notification', { employeeId });
-        return;
-      }
+      // TODO: Implement MongoDB employee lookup
+      // const employee = await Employee.findById(employeeId);
+      // if (!employee) {
+      //   logger.warn('Employee not found for task completion notification', { employeeId });
+      //   return;
+      // }
 
-      const mailOptions = {
-        from: `"Go3net HR Management System" <${process.env.FROM_EMAIL}>`,
-        to: employee.email,
-        subject: 'Task Completed - Go3net HR Management System',
-        html: `
-          <!DOCTYPE html>
-          <html lang="en">
-          <head>
-              <meta charset="UTF-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <title>Task Completed - Go3net HR Management System</title>
-              <style>
-                  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333333; margin: 0; padding: 0; background-color: #f4f4f4; }
-                  .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); overflow: hidden; }
-                  .header { background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%); padding: 40px 30px; text-align: center; color: white; }
-                  .header h1 { margin: 0; font-size: 28px; font-weight: 600; letter-spacing: 0.5px; }
-                  .content { padding: 40px 30px; }
-                  .completion-card { background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%); border-radius: 8px; padding: 25px; margin: 25px 0; text-align: center; border: 2px solid #28a745; }
-                  .completion-card h3 { margin: 0 0 15px 0; color: #155724; font-size: 22px; }
-                  .completion-card p { margin: 0; color: #155724; font-size: 16px; font-weight: 500; }
-                  .task-details { background-color: #f8f9fa; border-radius: 6px; padding: 20px; margin: 20px 0; }
-                  .task-details p { margin: 8px 0; color: #495057; }
-                  .dashboard-button { display: inline-block; background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%); color: #ffffff; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-weight: 600; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3); transition: all 0.3s ease; }
-                  .dashboard-button:hover { background: linear-gradient(135deg, #1e7e34 0%, #155724 100%); box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4); transform: translateY(-2px); }
-                  .footer { background-color: #f8f9fa; padding: 30px; text-align: center; border-top: 1px solid #e9ecef; }
-                  @media only screen and (max-width: 600px) { .email-container { margin: 0; border-radius: 0; } .header { padding: 30px 20px; } .content { padding: 30px 20px; } .dashboard-button { display: block; width: 100%; box-sizing: border-box; } }
-              </style>
-          </head>
-          <body>
-              <div class="email-container">
-                  <div class="header">
-                      <h1>✅ Task Completed!</h1>
-                      <p>Great work on completing your task</p>
-                  </div>
-                  <div class="content">
-                      <p style="font-size: 16px; color: #555;">Hello ${employee.full_name},</p>
-                      <p style="font-size: 16px; color: #555;">Congratulations! Your task has been marked as completed.</p>
+      logger.info('📧 Task completion notification email would be sent', {
+        employeeId,
+        taskTitle
+      });
 
-                      <div class="completion-card">
-                          <h3>🎉 Task Completed Successfully!</h3>
-                          <p>${completionMessage}</p>
-                      </div>
-
-                      <div class="task-details">
-                          <p><strong>📝 Task Title:</strong> ${taskTitle}</p>
-                          <p><strong>✅ Completed:</strong> ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</p>
-                      </div>
-
-                      <p style="font-size: 16px; color: #555;">Thank you for your hard work! Your completed tasks help us track progress and maintain productivity.</p>
-
-                      <div style="text-align: center; margin: 40px 0;">
-                          <a href="${process.env.FRONTEND_URL}/dashboard" class="dashboard-button">View Dashboard</a>
-                      </div>
-
-                      <p style="font-size: 16px; color: #555;">Keep up the excellent work! If you have any questions or need assistance, please contact your supervisor.</p>
-                  </div>
-                  <div class="footer">
-                      <p>This is an automated message from Go3net HR Management System.</p>
-                      <p style="margin-top: 15px;">© Go3net HR Management System. All rights reserved.</p>
-                  </div>
-              </div>
-          </body>
-          </html>
-        `
-      };
-
-      await this.transporter.sendMail(mailOptions);
-      logger.info('Task completion notification email sent', { to: employee.email, taskTitle });
     } catch (error) {
       logger.error('Failed to send task completion notification email', { error: (error as Error).message });
       throw error;

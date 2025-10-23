@@ -1,11 +1,11 @@
 import { IAttendanceRepository } from '../repositories/interfaces/IAttendanceRepository';
-import { Attendance, CreateAttendanceRequest } from '../models/Attendance';
+import { IAttendance, CreateAttendanceRequest } from '../models/Attendance';
 import logger from '../utils/logger';
 
 export class AttendanceService {
   constructor(private attendanceRepository: IAttendanceRepository) {}
 
-  async checkIn(userId: string, attendanceData: CreateAttendanceRequest): Promise<Attendance> {
+  async checkIn(userId: string, attendanceData: CreateAttendanceRequest): Promise<IAttendance> {
     try {
       logger.info('AttendanceService: Check-in request', { userId });
 
@@ -51,7 +51,7 @@ export class AttendanceService {
     }
   }
 
-  async checkOut(userId: string, attendanceData: CreateAttendanceRequest): Promise<Attendance> {
+  async checkOut(userId: string, attendanceData: CreateAttendanceRequest): Promise<IAttendance> {
     try {
       logger.info('AttendanceService: Check-out request', { userId });
 
@@ -79,7 +79,7 @@ export class AttendanceService {
     }
   }
 
-  async getCurrentStatus(userId: string): Promise<Attendance | null> {
+  async getCurrentStatus(userId: string): Promise<IAttendance | null> {
     try {
       const employeeId = await this.getEmployeeIdFromUserId(userId);
       return await this.attendanceRepository.getCurrentStatus(employeeId);
@@ -89,7 +89,7 @@ export class AttendanceService {
     }
   }
 
-  async getAttendanceHistory(employeeId: string, startDate?: Date, endDate?: Date, page?: number, limit?: number): Promise<{ attendances: Attendance[]; total: number; page: number; limit: number }> {
+  async getAttendanceHistory(employeeId: string, startDate?: Date, endDate?: Date, page?: number, limit?: number): Promise<{ attendances: IAttendance[]; total: number; page: number; limit: number }> {
     try {
       const query = {
         employeeId,
@@ -106,7 +106,7 @@ export class AttendanceService {
     }
   }
 
-  async getMyAttendanceHistory(userId: string, startDate?: Date, endDate?: Date, page?: number, limit?: number): Promise<{ attendances: Attendance[]; total: number; page: number; limit: number }> {
+  async getMyAttendanceHistory(userId: string, startDate?: Date, endDate?: Date, page?: number, limit?: number): Promise<{ attendances: IAttendance[]; total: number; page: number; limit: number }> {
     try {
       const employeeId = await this.getEmployeeIdFromUserId(userId);
       return await this.getAttendanceHistory(employeeId, startDate, endDate, page, limit);
@@ -116,7 +116,7 @@ export class AttendanceService {
     }
   }
 
-  async getEmployeeAttendance(employeeId: string, startDate?: Date, endDate?: Date): Promise<Attendance[]> {
+  async getEmployeeAttendance(employeeId: string, startDate?: Date, endDate?: Date): Promise<IAttendance[]> {
     try {
       return await this.attendanceRepository.getEmployeeAttendance(employeeId, startDate, endDate);
     } catch (error) {
@@ -125,7 +125,7 @@ export class AttendanceService {
     }
   }
 
-  async getAttendanceById(id: string): Promise<Attendance | null> {
+  async getAttendanceById(id: string): Promise<IAttendance | null> {
     try {
       return await this.attendanceRepository.getAttendanceById(id);
     } catch (error) {
@@ -134,7 +134,7 @@ export class AttendanceService {
     }
   }
 
-  async updateAttendance(id: string, attendanceData: Partial<Attendance>): Promise<Attendance> {
+  async updateAttendance(id: string, attendanceData: Partial<IAttendance>): Promise<IAttendance> {
     try {
       return await this.attendanceRepository.updateAttendance(id, attendanceData);
     } catch (error) {

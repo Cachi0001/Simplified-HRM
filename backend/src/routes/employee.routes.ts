@@ -3,15 +3,14 @@ import path from 'path';
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 import { Router } from 'express';
-import { createClient } from '@supabase/supabase-js';
-import { SupabaseEmployeeRepository } from '../repositories/implementations/SupabaseEmployeeRepository';
+import { MongoEmployeeRepository } from '../repositories/implementations/MongoEmployeeRepository';
 import { EmployeeService } from '../services/EmployeeService';
 import { EmployeeController } from '../controllers/EmployeeController';
 import { authenticateToken, requireRole } from '../middleware/auth.middleware';
 
 const router = Router();
 
-const employeeRepository = new SupabaseEmployeeRepository();
+const employeeRepository = new MongoEmployeeRepository();
 const employeeService = new EmployeeService(employeeRepository);
 const employeeController = new EmployeeController(employeeService);
 

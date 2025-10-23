@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { notificationService } from '@/services/notificationService';
 import { Go3netNotification, NotificationType } from '@/types/notification';
-import { supabase } from '../lib/supabase';
 
 interface UseNotificationsReturn {
   notifications: Go3netNotification[];
@@ -79,38 +78,6 @@ export function useNotifications(userId?: string): UseNotificationsReturn {
     window.addEventListener('navigate', handleNavigate as EventListener);
     return () => window.removeEventListener('navigate', handleNavigate as EventListener);
   }, [navigate, markAsRead]);
-
-  // Set up realtime subscription for notifications
-  useEffect(() => {
-    if (!userId) return;
-
-    const channel = supabase
-      .channel('notifications')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${userId}`
-        },
-        (payload) => {
-          const newNotification: Go3netNotification = {
-            ...payload.new as any,
-            timestamp: new Date(payload.new.created_at),
-            metadata: payload.new.metadata || {}
-          };
-
-          setNotifications(prev => [newNotification, ...prev]);
-          showToast(newNotification);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [userId, showToast]);
 
   // Initial fetch
   useEffect(() => {

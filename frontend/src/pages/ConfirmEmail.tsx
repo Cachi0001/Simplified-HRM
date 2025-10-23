@@ -3,55 +3,18 @@ console.log('%c🟢🟢🟢 CONFIRM PAGE FILE LOADED', 'color: green; font-size:
 console.log('Timestamp:', new Date().toISOString());
 console.log('Location:', window.location.href);
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
-import Logo from '../components/ui/Logo';
 import { useToast } from '../components/ui/Toast';
+import Logo from '../components/ui/Logo';
 
 const ConfirmEmail: React.FC = () => {
   const navigate = useNavigate();
   const { addToast } = useToast();
   const [loading, setLoading] = useState(true);
 
-  const handleAuthSuccess = useCallback(async (session: any, isSignup: boolean) => {
-    try {
-      const user = session.user;
-
-      if (isSignup) {
-        await supabase.from('employees').insert({
-          user_id: user.id,
-          email: user.email!,
-          full_name: user.user_metadata.full_name,
-          role: 'employee',
-          status: 'pending'
-        });
-        addToast('success', 'Confirmed! Pending approval.');
-        setLoading(false);
-        setTimeout(() => navigate('/auth'), 3000);
-      } else {
-        const { data: emp } = await supabase.from('employees').select('status').eq('email', user.email!).single();
-        if (emp?.status === 'active') {
-          localStorage.setItem('accessToken', session.access_token);
-          setLoading(false);
-          navigate('/dashboard');
-        } else {
-          addToast('warning', 'Pending approval.');
-          setLoading(false);
-          navigate('/auth');
-        }
-      }
-    } catch (err: any) {
-      console.error('Auth success handling failed:', err);
-      addToast('error', 'Authentication failed. Please contact support.');
-      setLoading(false);
-      navigate('/auth');
-    }
-  }, [navigate, addToast]);
-
   useEffect(() => {
     const confirm = async () => {
-      console.clear();
       console.log('%c🔍 CONFIRM START', 'color: red; font-size: 18px; font-weight: bold');
 
       const params = new URLSearchParams(window.location.search);
@@ -64,22 +27,48 @@ const ConfirmEmail: React.FC = () => {
         return;
       }
 
-      const token_hash = params.get('token_hash');
-      const type = params.get('type');
+      const token = params.get('token');
 
-      console.log('TOKEN_HASH:', token_hash);
-      console.log('TYPE:', type);
+      console.log('TOKEN:', token);
 
-      if (token_hash && type === 'signup') {
-        console.log('🔑 VERIFYING OTP:', token_hash);
-        const { data, error } = await supabase.auth.verifyOtp({
-          token_hash,
-          type: 'email'
-        });
+      if (token) {
+        console.log('🔑 VERIFYING TOKEN:', token);
+        try {
+          // Make API call to backend to verify token
+          const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000/api'}/auth/confirm/${token}`);
+          const result = await response.json();
 
-        if (error) throw error;
-        console.log('✅ CONFIRMED:', data.session?.user?.id);
-        await handleAuthSuccess(data.session, true);
+          if (response.ok) {
+            console.log('✅ EMAIL CONFIRMED:', result.data?.user?.id);
+            addToast('success', result.message || 'Email confirmed successfully!');
+
+            // If user is logged in (has tokens), redirect to dashboard
+            if (result.data?.accessToken) {
+              localStorage.setItem('accessToken', result.data.accessToken);
+              localStorage.setItem('refreshToken', result.data.refreshToken);
+              localStorage.setItem('user', JSON.stringify(result.data.user));
+
+              setTimeout(() => {
+                if (result.data.user.role === 'admin') {
+                  navigate('/dashboard');
+                } else {
+                  navigate('/employee-dashboard');
+                }
+              }, 2000);
+            } else {
+              // Email confirmed but user needs to login
+              setTimeout(() => {
+                navigate('/auth');
+              }, 3000);
+            }
+          } else {
+            throw new Error(result.message || 'Confirmation failed');
+          }
+        } catch (err: any) {
+          console.error('❌ TOKEN VERIFICATION FAILED:', err.message);
+          addToast('error', err.message || 'Invalid or expired confirmation link.');
+          navigate('/auth', { replace: true });
+        }
       } else {
         console.log('❌ INVALID LINK');
         addToast('error', 'Invalid confirmation link.');
@@ -143,6 +132,7 @@ const ConfirmEmail: React.FC = () => {
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
             <h3 className="font-semibold text-blue-800 mb-2">📋 Next Steps:</h3>
             <ul className="text-sm text-blue-700 text-left space-y-1">
+              <li>• Your email has been verified successfully</li>
               <li>• If you're an admin, you'll be redirected to dashboard</li>
               <li>• If you're an employee, your account is pending admin approval</li>
               <li>• You'll receive an email notification once approved</li>

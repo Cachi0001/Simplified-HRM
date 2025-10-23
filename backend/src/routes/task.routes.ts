@@ -5,14 +5,12 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 import { Router } from 'express';
 import { TaskController } from '../controllers/TaskController';
 import { TaskService } from '../services/TaskService';
-import { SupabaseTaskRepository } from '../repositories/implementations/SupabaseTaskRepository';
+import { MongoTaskRepository } from '../repositories/implementations/MongoTaskRepository';
 import { authenticateToken, requireRole } from '../middleware/auth.middleware';
-import { createClient } from '@supabase/supabase-js';
 
 const router = Router();
 
-const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
-const taskRepository = new SupabaseTaskRepository(supabase);
+const taskRepository = new MongoTaskRepository();
 const taskService = new TaskService(taskRepository);
 const taskController = new TaskController(taskService);
 router.use(authenticateToken);

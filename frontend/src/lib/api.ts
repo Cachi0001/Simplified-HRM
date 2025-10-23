@@ -57,6 +57,7 @@ export interface AuthResponse {
     accessToken: string;
     refreshToken: string;
     requiresConfirmation?: boolean;
+    requiresEmailVerification?: boolean;
     message?: string;
   };
 }

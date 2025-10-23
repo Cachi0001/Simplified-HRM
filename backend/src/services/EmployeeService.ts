@@ -1,12 +1,12 @@
 import { IEmployeeRepository } from '../repositories/interfaces/IEmployeeRepository';
-import { Employee, CreateEmployeeRequest, UpdateEmployeeRequest, EmployeeQuery } from '../models/Employee';
+import { Employee as EmployeeModel, IEmployee, CreateEmployeeRequest, UpdateEmployeeRequest, EmployeeQuery } from '../models/Employee';
 import { EmailService } from './EmailService';
 import logger from '../utils/logger';
 
 export class EmployeeService {
   constructor(private employeeRepository: IEmployeeRepository) {}
 
-  async createEmployee(employeeData: CreateEmployeeRequest, userId: string, currentUserRole: string): Promise<Employee> {
+  async createEmployee(employeeData: CreateEmployeeRequest, userId: string, currentUserRole: string): Promise<IEmployee> {
     try {
       if (currentUserRole !== 'admin') {
         throw new Error('Only administrators can create employees');
@@ -28,7 +28,7 @@ export class EmployeeService {
     }
   }
 
-  async getAllEmployees(query?: EmployeeQuery, currentUserRole?: string): Promise<{ employees: Employee[]; total: number; page: number; limit: number }> {
+  async getAllEmployees(query?: EmployeeQuery, currentUserRole?: string): Promise<{ employees: IEmployee[]; total: number; page: number; limit: number }> {
     try {
       logger.info('EmployeeService: Getting all employees', { role: currentUserRole });
 
@@ -44,7 +44,7 @@ export class EmployeeService {
     }
   }
 
-  async searchEmployees(query: string, currentUserRole?: string): Promise<Employee[]> {
+  async searchEmployees(query: string, currentUserRole?: string): Promise<IEmployee[]> {
     try {
       logger.info('EmployeeService: Searching employees', { query, role: currentUserRole });
 
@@ -63,7 +63,7 @@ export class EmployeeService {
     }
   }
 
-  async getEmployeeById(id: string, currentUserRole: string, currentUserId?: string): Promise<Employee | null> {
+  async getEmployeeById(id: string, currentUserRole: string, currentUserId?: string): Promise<IEmployee | null> {
     try {
       const employee = await this.employeeRepository.findById(id);
 
@@ -83,7 +83,7 @@ export class EmployeeService {
     }
   }
 
-  async getMyProfile(userId: string): Promise<Employee | null> {
+  async getMyProfile(userId: string): Promise<IEmployee | null> {
     try {
       return await this.employeeRepository.findByUserId(userId);
     } catch (error) {
@@ -92,7 +92,7 @@ export class EmployeeService {
     }
   }
 
-  async updateEmployee(id: string, employeeData: UpdateEmployeeRequest, currentUserRole: string, currentUserId?: string): Promise<Employee> {
+  async updateEmployee(id: string, employeeData: UpdateEmployeeRequest, currentUserRole: string, currentUserId?: string): Promise<IEmployee> {
     try {
       // Check if employee exists
       const existingEmployee = await this.employeeRepository.findById(id);
@@ -129,7 +129,7 @@ export class EmployeeService {
     }
   }
 
-  async updateMyProfile(employeeData: UpdateEmployeeRequest, userId: string): Promise<Employee> {
+  async updateMyProfile(employeeData: UpdateEmployeeRequest, userId: string): Promise<IEmployee> {
     try {
       const employee = await this.employeeRepository.findByUserId(userId);
       if (!employee) {
@@ -165,7 +165,7 @@ export class EmployeeService {
     }
   }
 
-  async getPendingApprovals(): Promise<Employee[]> {
+  async getPendingApprovals(): Promise<IEmployee[]> {
     try {
       return await this.employeeRepository.getPendingApprovals();
     } catch (error) {
@@ -174,7 +174,7 @@ export class EmployeeService {
     }
   }
 
-  async approveEmployee(id: string): Promise<Employee> {
+  async approveEmployee(id: string): Promise<IEmployee> {
     try {
       const updatedEmployee = await this.employeeRepository.approve(id); // Use repo.approve
 
@@ -206,7 +206,7 @@ export class EmployeeService {
     }
   }
 
-  async assignDepartment(id: string, department: string): Promise<Employee> {
+  async assignDepartment(id: string, department: string): Promise<IEmployee> {
     try {
       logger.info('EmployeeService: Assigning department', { employeeId: id, department });
 

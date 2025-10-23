@@ -13,6 +13,7 @@ interface SignupCardProps {
 const SignupCard: React.FC<SignupCardProps> = ({ onSwitchToLogin }) => {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isFirstSignup, setIsFirstSignup] = useState(true);
   const navigate = useNavigate();
@@ -26,14 +27,14 @@ const SignupCard: React.FC<SignupCardProps> = ({ onSwitchToLogin }) => {
       const result = await authService.signup({
         fullName,
         email,
-        // No password for magic link flow
+        password,
         role: 'employee'
       });
 
       if (result.requiresConfirmation) {
         // Email confirmation required - show appropriate message
         if (isFirstSignup) {
-          addToast('success', result.message || 'Check your inbox – we sent you a confirmation email. Please verify your account to continue.');
+          addToast('success', result.message || 'Account created! Please check your email to verify your account before logging in.');
           setIsFirstSignup(false); // Mark as not first signup for future attempts
         } else {
           addToast('success', 'Check your inbox – we sent you a new confirmation email. Please verify your account to continue.');
@@ -51,6 +52,7 @@ const SignupCard: React.FC<SignupCardProps> = ({ onSwitchToLogin }) => {
       // Clear form
       setFullName('');
       setEmail('');
+      setPassword('');
 
     } catch (err) {
       if (err instanceof Error) {
@@ -78,7 +80,7 @@ const SignupCard: React.FC<SignupCardProps> = ({ onSwitchToLogin }) => {
   return (
     <AuthCard
       title="Join Go3net"
-      subtitle="Create your account with a magic link"
+      subtitle="Create your account with email and password"
     >
       <form onSubmit={handleSubmit} className="space-y-6">
         <Input
@@ -102,12 +104,22 @@ const SignupCard: React.FC<SignupCardProps> = ({ onSwitchToLogin }) => {
           required
           autoComplete="email"
         />
+        <Input
+          id="password"
+          type="password"
+          label="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          autoComplete="new-password"
+          minLength={6}
+        />
 
         <Button type="submit" className="w-full" isLoading={isLoading}>
-          Send Magic Link
+          Create Account
         </Button>
         <div className="text-center text-sm text-gray-500">
-          <p className="mb-2">No password required! We'll send you a magic link to confirm your account.</p>
+          <p className="mb-2">Create an account with your email and password. You'll need to verify your email before logging in.</p>
           <p>Already have an account?{' '}
           <button type="button" onClick={onSwitchToLogin} className="font-medium text-highlight hover:text-blue-500">
             Sign in
