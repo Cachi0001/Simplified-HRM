@@ -50,11 +50,11 @@ export class MongoAuthRepository implements IAuthRepository {
 
       await user.save();
 
-      // Generate verification token
+      // Generate verification token BEFORE creating employee record
       const verificationToken = user.generateEmailVerificationToken();
-      await user.save();
+      await user.save(); // Save user with token first
 
-      // Create employee record with pending status (unless admin)
+      // Create employee record with the same token
       const employeeStatus = userData.role === 'admin' ? 'active' : 'pending';
       const employee = new Employee({
         userId: user._id,
@@ -303,21 +303,39 @@ export class MongoAuthRepository implements IAuthRepository {
       // Find user by verification token
       const user = await User.findOne({ emailVerificationToken: token });
       if (!user) {
-        logger.warn('❌ [MongoAuthRepository] Invalid verification token', { token });
+        logger.warn('❌ [MongoAuthRepository] User not found with token', { token });
+        logger.info('🔍 [MongoAuthRepository] Checking all users with verification tokens...');
+        const usersWithTokens = await User.find({ emailVerificationToken: { $exists: true } }).select('email emailVerificationToken emailVerificationExpires');
+        logger.info('📋 [MongoAuthRepository] Users with tokens:', usersWithTokens.map(u => ({
+          email: u.email,
+          token: u.emailVerificationToken?.substring(0, 10) + '...',
+          expires: u.emailVerificationExpires
+        })));
         throw new Error('Invalid or expired verification token');
       }
 
       // Check if token is still valid (not expired)
       if (!user.isValidEmailVerificationToken(token)) {
-        logger.warn('❌ [MongoAuthRepository] Expired verification token', { token });
+        logger.warn('❌ [MongoAuthRepository] Token expired', {
+          token,
+          expires: user.emailVerificationExpires,
+          now: new Date()
+        });
         throw new Error('Verification token has expired. Please request a new confirmation email.');
       }
 
       // Find employee record
       const employee = await Employee.findOne({ userId: user._id });
       if (!employee) {
+        logger.error('❌ [MongoAuthRepository] Employee record not found', { userId: user._id });
         throw new Error('Employee record not found');
       }
+
+      logger.info('✅ [MongoAuthRepository] Token validation successful', {
+        userId: user._id,
+        email: user.email,
+        employeeStatus: employee.status
+      });
 
       // Mark email as verified
       user.emailVerified = true;

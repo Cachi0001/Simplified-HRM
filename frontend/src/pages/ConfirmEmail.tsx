@@ -38,6 +38,8 @@ const ConfirmEmail: React.FC = () => {
           const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000/api'}/auth/confirm/${token}`);
           const result = await response.json();
 
+          console.log('📧 CONFIRMATION RESPONSE:', { status: response.status, result });
+
           if (response.ok) {
             console.log('✅ EMAIL CONFIRMED:', result.data?.user?.id);
             addToast('success', result.message || 'Email confirmed successfully!');
@@ -62,11 +64,16 @@ const ConfirmEmail: React.FC = () => {
               }, 3000);
             }
           } else {
-            throw new Error(result.message || 'Confirmation failed');
+            // Handle error response
+            const errorMessage = result?.message || result?.error || 'Confirmation failed';
+            console.error('❌ CONFIRMATION ERROR:', errorMessage);
+            addToast('error', errorMessage);
+            navigate('/auth', { replace: true });
           }
         } catch (err: any) {
-          console.error('❌ TOKEN VERIFICATION FAILED:', err.message);
-          addToast('error', err.message || 'Invalid or expired confirmation link.');
+          console.error('❌ NETWORK ERROR:', err);
+          const errorMessage = err?.message || 'Network error occurred. Please try again.';
+          addToast('error', errorMessage);
           navigate('/auth', { replace: true });
         }
       } else {
