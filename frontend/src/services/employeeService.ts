@@ -135,12 +135,13 @@ export class EmployeeService {
     }
   }
 
-  // Reject employee (admin only)
-  async rejectEmployee(id: string): Promise<void> {
+  // Assign department (admin only)
+  async assignDepartment(id: string, department: string): Promise<Employee> {
     try {
-      await api.post(`/employees/${id}/reject`);
+      const response = await api.post(`/employees/${id}/department`, { department });
+      return response.data.data.employee;
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to reject employee');
+      throw new Error(error.response?.data?.message || 'Failed to assign department');
     }
   }
 }

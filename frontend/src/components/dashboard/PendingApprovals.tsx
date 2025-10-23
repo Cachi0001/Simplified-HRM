@@ -64,7 +64,7 @@ export function PendingApprovals({ darkMode = false }: PendingApprovalsProps) {
       if (!employeeId) {
         throw new Error('Employee ID not found');
       }
-      const response = await api.put(`/employees/${employeeId}/approve`);
+      const response = await api.post(`/employees/${employeeId}/approve`);
       return { ...response.data, employee };
     },
     onSuccess: (result) => {
@@ -98,7 +98,7 @@ export function PendingApprovals({ darkMode = false }: PendingApprovalsProps) {
       if (!employeeId) {
         throw new Error('Employee ID not found');
       }
-      await api.delete(`/employees/${employeeId}/reject`);
+      await api.post(`/employees/${employeeId}/reject`);
       return employee;
     },
     onSuccess: () => {

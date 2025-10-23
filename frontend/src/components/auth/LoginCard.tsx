@@ -102,19 +102,21 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
         // Provide more specific guidance based on error type
         if (errorMessage.includes('Invalid email or password')) {
           errorMessage = 'Invalid email or password. Please check your credentials and try again.';
-        } else if (errorMessage.includes('Account pending admin approval')) {
-          // Use warning toast for pending status since it's expected behavior
-          addToast('warning', 'Your account is pending admin approval. You will receive an email notification once your account is activated. Please wait for approval before signing in.');
-          return; // Don't continue with error flow
+          addToast('error', errorMessage);
+        } else if (errorMessage.includes('pending approval') || errorMessage.includes('pending admin approval')) {
+          // Use warning toast for pending status since it's expected behavior - DON'T refresh page
+          addToast('warning', 'Your account is pending admin approval. Please wait for admin approval before logging in.');
+          return; // Exit early - don't continue with error flow
         } else if (errorMessage.includes('Account not found')) {
           errorMessage = 'Account not found. Please check your email or contact support.';
-        } else if (errorMessage.includes('Please verify your email')) {
+          addToast('error', errorMessage);
+        } else if (errorMessage.includes('Please verify your email') || errorMessage.includes('verify your email')) {
           setShowResendButton(true);
           addToast('info', 'Please verify your email address before logging in. Check your inbox for the confirmation link.');
           return;
+        } else {
+          addToast('error', errorMessage);
         }
-
-        addToast('error', errorMessage);
       } else {
         addToast('error', 'An unexpected error occurred.');
       }

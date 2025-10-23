@@ -1,6 +1,8 @@
 import React from 'react';
 import { Card } from '../ui/Card';
 import { Users, UserCheck, Clock, Bell } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { notificationService } from '../../services/notificationService';
 
 interface OverviewCardsProps {
   total: number;
@@ -10,6 +12,17 @@ interface OverviewCardsProps {
 }
 
 export function OverviewCards({ total, active, pending, darkMode = false }: OverviewCardsProps) {
+  // Fetch real notification count
+  const { data: notifications = [] } = useQuery({
+    queryKey: ['notifications'],
+    queryFn: async () => {
+      return await notificationService.getNotifications();
+    },
+    refetchInterval: 30000, // Refetch every 30 seconds
+  });
+
+  const unreadNotificationCount = notifications.filter(n => !n.read).length;
+
   const cards = [
     {
       title: 'Total Employees',
@@ -31,7 +44,7 @@ export function OverviewCards({ total, active, pending, darkMode = false }: Over
     },
     {
       title: 'Notifications',
-      value: 3,
+      value: unreadNotificationCount,
       icon: Bell,
       color: 'text-purple-600',
     },

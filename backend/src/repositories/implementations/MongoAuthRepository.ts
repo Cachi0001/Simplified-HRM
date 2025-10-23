@@ -166,7 +166,11 @@ export class MongoAuthRepository implements IAuthRepository {
           email: credentials.email,
           status: employee.status
         });
-        throw new Error('Your account is pending approval. Please wait for admin approval before logging in.');
+        // Return a special response for pending approval instead of throwing
+        const error: any = new Error('Your account is pending approval. Please wait for admin approval before logging in.');
+        error.code = 'PENDING_APPROVAL';
+        error.status = employee.status;
+        throw error;
       }
 
       // Generate JWT tokens

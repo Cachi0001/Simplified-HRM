@@ -44,20 +44,7 @@ export function AdminDepartments({ darkMode = false }: AdminDepartmentsProps) {
   // Assign department mutation
   const assignDepartmentMutation = useMutation({
     mutationFn: async ({ employeeId, department }: { employeeId: string; department: string }) => {
-      const response = await fetch(`${(import.meta as any).env.VITE_API_URL}/employees/${employeeId}/department`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-        },
-        body: JSON.stringify({ department })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to assign department');
-      }
-
-      return response.json();
+      return await employeeService.assignDepartment(employeeId, department);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
@@ -166,12 +153,14 @@ export function AdminDepartments({ darkMode = false }: AdminDepartmentsProps) {
               </label>
               <div className="flex gap-2">
                 <Input
+                  id="customDepartment"
+                  label="Custom Department"
                   value={customDepartment}
                   onChange={(e) => setCustomDepartment(e.target.value)}
                   placeholder="Enter custom department name"
                   className="flex-1"
                 />
-                <Button onClick={addCustomDepartment} variant="outline">
+                <Button onClick={addCustomDepartment}>
                   Add
                 </Button>
               </div>
@@ -183,7 +172,6 @@ export function AdminDepartments({ darkMode = false }: AdminDepartmentsProps) {
                 Assign Department
               </Button>
               <Button
-                variant="outline"
                 onClick={() => {
                   setShowAssignForm(false);
                   setSelectedEmployee('');
@@ -191,6 +179,7 @@ export function AdminDepartments({ darkMode = false }: AdminDepartmentsProps) {
                   setCustomDepartment('');
                 }}
                 disabled={assignDepartmentMutation.isPending}
+                className="border border-gray-300 text-gray-700 hover:bg-gray-50"
               >
                 <X className="h-4 w-4 mr-2" />
                 Cancel
@@ -211,8 +200,6 @@ export function AdminDepartments({ darkMode = false }: AdminDepartmentsProps) {
             {COMMON_DEPARTMENTS.map(dept => (
               <Button
                 key={dept}
-                variant="outline"
-                size="sm"
                 onClick={() => {
                   const employee = employeesWithoutDepartment[0];
                   if (employee) {
