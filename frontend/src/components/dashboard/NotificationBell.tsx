@@ -40,14 +40,28 @@ export function NotificationBell({ darkMode = false }: NotificationBellProps) {
     notification.read = true;
     refetch();
 
-    // Navigate to the appropriate page based on notification type
-    if (notification.actions && notification.actions.length > 0) {
-      const action = notification.actions[0];
-      if (action.url) {
-        navigate(action.url);
+    // Navigate based on notification category and type
+    let navigateUrl = '/dashboard'; // Default
+
+    if (notification.category === 'employee') {
+      // For employee approval notifications, navigate to login
+      if (notification.type === 'approval_success' || notification.message.includes('approved') || notification.message.includes('Welcome')) {
+        navigateUrl = '/auth';
+      } else {
+        navigateUrl = `/employee/${notification.targetUserId}`;
       }
+    } else if (notification.category === 'approval') {
+      navigateUrl = '/dashboard#pending-approvals';
+    } else if (notification.category === 'task') {
+      navigateUrl = '/employee-dashboard#tasks';
+    } else if (notification.actions && notification.actions.length > 0) {
+      // Use the action URL if available
+      const action = notification.actions[0];
+      navigateUrl = action.url || '/dashboard';
     }
 
+    // Navigate to the determined URL
+    navigate(navigateUrl);
     setIsOpen(false);
   };
 

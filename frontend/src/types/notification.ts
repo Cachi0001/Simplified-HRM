@@ -1,4 +1,4 @@
-export type NotificationType = 'info' | 'success' | 'warning' | 'error' | 'signup' | 'approval' | 'update' | 'task';
+export type NotificationType = 'info' | 'success' | 'warning' | 'error' | 'signup' | 'approval' | 'update' | 'task' | 'approval_success';
 
 export type NotificationPriority = 'low' | 'normal' | 'high' | 'urgent';
 
@@ -17,7 +17,7 @@ export interface Go3netNotification {
   timestamp: Date;
   read: boolean;
   userId?: string;
-  targetUserId?: string; // For admin notifications about specific users
+  targetUserId?: string;
   actions?: NotificationAction[];
   metadata?: Record<string, any>;
   source: 'system' | 'admin' | 'employee';

@@ -76,17 +76,17 @@ export function PendingApprovals({ darkMode = false }: PendingApprovalsProps) {
       // Send approval notification to employee
       if (result.employee) {
         triggerNotification({
-          id: `approval-${result.employee.id}-${Date.now()}`,
-          type: 'info' as any,
+          id: `approval-success-${result.employee.id}-${Date.now()}`,
+          type: 'approval_success' as any,
           priority: 'normal',
           title: 'Account Approved!',
-          message: `Your account has been approved by admin. Welcome to Go3net!`,
+          message: `Your account has been approved by admin. Welcome to Go3net! Please log in to continue.`,
           timestamp: new Date(),
           read: false,
           targetUserId: result.employee.id,
           actions: [{ label: 'Login', action: 'login', url: '/auth' }],
           source: 'admin',
-          category: 'employee' as any
+          category: 'employee'
         });
       }
     },

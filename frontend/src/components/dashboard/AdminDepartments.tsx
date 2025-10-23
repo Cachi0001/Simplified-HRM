@@ -292,7 +292,7 @@ export function AdminDepartments({ darkMode = false }: AdminDepartmentsProps) {
                   if (count === 0) return null;
 
                   return (
-                    <div key={dept} className={`flex items-center justify-between p-2 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                    <div key={`common-${dept}`} className={`flex items-center justify-between p-2 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
                       <span className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                         {dept}
                       </span>
@@ -310,7 +310,7 @@ export function AdminDepartments({ darkMode = false }: AdminDepartmentsProps) {
                 )).map(dept => {
                   const count = employeesWithDepartment.filter(emp => emp.department === dept).length;
                   return (
-                    <div key={dept} className={`flex items-center justify-between p-2 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                    <div key={`custom-${dept}`} className={`flex items-center justify-between p-2 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
                       <span className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                         {dept}
                       </span>

@@ -1,4 +1,5 @@
 import { Go3netNotification, NotificationType, PushNotificationPayload } from '../types/notification';
+import api from '../lib/api';
 
 class NotificationService {
   private static instance: NotificationService;
@@ -57,6 +58,24 @@ class NotificationService {
       return;
     }
 
+    // Only show notification if current user is the target or if it's a system notification for admins
+    const currentUser = localStorage.getItem('user');
+    if (currentUser) {
+      const user = JSON.parse(currentUser);
+
+      // For employee-specific notifications, only show if current user is the target
+      if (notification.category === 'employee' && notification.targetUserId) {
+        if (user.id !== notification.targetUserId && user.role !== 'admin') {
+          return; // Don't show notification to non-target users
+        }
+      }
+
+      // For admin notifications (like pending approvals), only show to admins
+      if (notification.category === 'approval' && user.role !== 'admin') {
+        return; // Don't show admin notifications to non-admins
+      }
+    }
+
     const options: NotificationOptions = {
       body: notification.message,
       icon: (import.meta as any).env?.VITE_PUSH_NOTIFICATION_ICON || '/logo.png',
@@ -89,11 +108,17 @@ class NotificationService {
       case 'dashboard':
         return '/dashboard';
       case 'employee':
+        // For employee notifications, navigate to login if it's an approval success
+        if (notification.type === 'approval_success' || notification.message.includes('approved') || notification.message.includes('Welcome')) {
+          return '/auth';
+        }
         return `/employee/${notification.targetUserId}`;
       case 'approval':
-        return `/dashboard#pending-approvals`;
+        return '/dashboard#pending-approvals';
       case 'system':
         return '/dashboard';
+      case 'task':
+        return '/employee-dashboard#tasks';
       default:
         return '/dashboard';
     }
@@ -133,29 +158,27 @@ class NotificationService {
         const user = JSON.parse(currentUser);
         if (user.role === 'admin') {
           try {
-            // Fetch pending employees
-            const response = await fetch(`${(import.meta as any).env?.VITE_API_URL || 'http://localhost:3000'}/api/employees/pending`);
-            if (response.ok) {
-              const data = await response.json();
-              const pendingEmployees = data.employees || [];
+            // Fetch pending employees using the API utility
+            const response = await api.get('/employees/pending');
+            const data = response.data;
+            const pendingEmployees = data.employees || [];
 
-              // Create notifications for each pending approval
-              pendingEmployees.forEach((emp: any, index: number) => {
-                mockNotifications.push({
-                  id: `pending-${emp.id || emp._id}-${Date.now()}-${index}`,
-                  type: 'info' as NotificationType,
-                  priority: 'normal',
-                  title: 'New Employee Signup',
-                  message: `${emp.fullName} (${emp.email}) requires approval`,
-                  timestamp: new Date(emp.createdAt || Date.now()),
-                  read: false,
-                  targetUserId: emp.id || emp._id,
-                  actions: [{ label: 'Review', action: 'review', url: '/dashboard#pending-approvals' }],
-                  source: 'system',
-                  category: 'approval' as any
-                });
+            // Create notifications for each pending approval
+            pendingEmployees.forEach((emp: any, index: number) => {
+              mockNotifications.push({
+                id: `pending-${emp.id || emp._id}-${Date.now()}-${index}`,
+                type: 'info' as NotificationType,
+                priority: 'normal',
+                title: 'New Employee Signup',
+                message: `${emp.fullName} (${emp.email}) requires approval`,
+                timestamp: new Date(emp.createdAt || Date.now()),
+                read: false,
+                targetUserId: emp.id || emp._id,
+                actions: [{ label: 'Review', action: 'review', url: '/dashboard#pending-approvals' }],
+                source: 'system',
+                category: 'approval' as any
               });
-            }
+            });
           } catch (error) {
             console.warn('Failed to fetch pending approvals for notifications:', error);
           }
