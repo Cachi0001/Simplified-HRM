@@ -312,7 +312,16 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
       ) : filteredTasks.length > 0 ? (
         <div className="space-y-3">
           {filteredTasks.map((task, index) => {
-            const assignedEmployee = employees.find(e => e.id === task.assigneeId);
+            // Handle both cases: assigneeId as object (populated) or string
+            const assigneeId = typeof task.assigneeId === 'object' 
+              ? (task.assigneeId?._id || task.assigneeId?.id)
+              : task.assigneeId;
+            
+            // Match employee using _id field (MongoDB native field)
+            const assignedEmployee = employees.find(e => 
+              e._id === assigneeId || e.id === assigneeId
+            );
+            
             return (
               <Card key={task.id || `task-${index}`} className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
                 <div className="p-4">

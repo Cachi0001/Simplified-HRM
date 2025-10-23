@@ -148,44 +148,75 @@ class NotificationService {
 
   async getNotifications(userId?: string): Promise<Go3netNotification[]> {
     try {
-      // For now, return mock notifications until API is implemented
-      // In a real implementation, this would fetch from the backend API
-      const mockNotifications: Go3netNotification[] = [];
+      const allNotifications: Go3netNotification[] = [];
 
-      // Check if there are pending approvals (for admin users)
+      // Get current user from localStorage
       const currentUser = localStorage.getItem('user');
-      if (currentUser) {
-        const user = JSON.parse(currentUser);
-        if (user.role === 'admin') {
-          try {
-            // Fetch pending employees using the API utility
-            const response = await api.get('/employees/pending');
-            const data = response.data;
-            const pendingEmployees = data.employees || [];
+      if (!currentUser) {
+        return [];
+      }
 
-            // Create notifications for each pending approval
-            pendingEmployees.forEach((emp: any, index: number) => {
-              mockNotifications.push({
-                id: `pending-${emp.id || emp._id}-${Date.now()}-${index}`,
+      const user = JSON.parse(currentUser);
+      const effectiveUserId = userId || user?.id || user?._id;
+
+      if (user.role === 'admin') {
+        // ADMIN: Fetch pending approvals
+        try {
+          const response = await api.get('/employees/pending');
+          const data = response.data;
+          const pendingEmployees = data.employees || [];
+
+          // Create notifications for each pending approval
+          pendingEmployees.forEach((emp: any, index: number) => {
+            allNotifications.push({
+              id: `pending-${emp.id || emp._id}-${Date.now()}-${index}`,
+              type: 'info' as NotificationType,
+              priority: 'normal',
+              title: 'New Employee Signup',
+              message: `${emp.fullName} (${emp.email}) requires approval`,
+              timestamp: new Date(emp.createdAt || Date.now()),
+              read: false,
+              targetUserId: emp.id || emp._id,
+              actions: [{ label: 'Review', action: 'review', url: '/dashboard#pending-approvals' }],
+              source: 'system',
+              category: 'approval' as any
+            });
+          });
+        } catch (error) {
+          console.warn('Failed to fetch pending approvals for notifications:', error);
+        }
+      } else if (user.role === 'employee') {
+        // EMPLOYEE: Fetch real task assignments
+        try {
+          // Fetch tasks assigned to this employee
+          const tasksResponse = await api.get(`/tasks?assigneeId=${effectiveUserId}`);
+          const tasks = tasksResponse.data.data?.tasks || tasksResponse.data.tasks || [];
+
+          // Create notifications for tasks that haven't been viewed yet
+          // Filter for pending and in_progress tasks (real assignments)
+          tasks
+            .filter((task: any) => ['pending', 'in_progress'].includes(task.status))
+            .forEach((task: any, index: number) => {
+              allNotifications.push({
+                id: `task-${task.id || task._id}-${index}`,
                 type: 'info' as NotificationType,
-                priority: 'normal',
-                title: 'New Employee Signup',
-                message: `${emp.fullName} (${emp.email}) requires approval`,
-                timestamp: new Date(emp.createdAt || Date.now()),
+                priority: task.priority === 'high' ? 'high' : 'normal',
+                title: 'New Task Assigned',
+                message: `You have been assigned: ${task.title}`,
+                timestamp: new Date(task.createdAt || Date.now()),
                 read: false,
-                targetUserId: emp.id || emp._id,
-                actions: [{ label: 'Review', action: 'review', url: '/dashboard#pending-approvals' }],
-                source: 'system',
-                category: 'approval' as any
+                targetUserId: effectiveUserId,
+                actions: [{ label: 'View Task', action: 'view', url: '/employee-dashboard#tasks' }],
+                source: 'task',
+                category: 'task' as any
               });
             });
-          } catch (error) {
-            console.warn('Failed to fetch pending approvals for notifications:', error);
-          }
+        } catch (error) {
+          console.warn('Failed to fetch task notifications for employee:', error);
         }
       }
 
-      return mockNotifications;
+      return allNotifications;
     } catch (error) {
       console.error('Failed to get notifications:', error);
       return [];

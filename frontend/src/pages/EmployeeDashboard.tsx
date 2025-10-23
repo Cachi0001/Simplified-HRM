@@ -110,10 +110,11 @@ export default function EmployeeDashboard() {
   }, []);
 
   const { data: employeeStats, isLoading: statsLoading } = useQuery({
-    queryKey: ['employee-stats', currentUser?.id],
+    queryKey: ['employee-stats', currentUser?._id || currentUser?.id],
     queryFn: async () => {
-      if (!currentUser?.id) {
-        console.log('No user, using fallback data');
+      const userId = currentUser?._id || currentUser?.id;
+      if (!userId) {
+        console.log('No user ID available, using fallback data');
         return {
           totalTasks: 0,
           completedTasks: 0,
@@ -124,12 +125,12 @@ export default function EmployeeDashboard() {
       }
 
       try {
-        console.log('Fetching employee stats for user:', currentUser.id);
+        console.log('Fetching employee stats for user:', userId);
 
         // Get tasks assigned to this employee
         const [tasksResponse, attendanceResponse] = await Promise.all([
-          api.get(`/tasks?assigneeId=${currentUser.id}`),
-          api.get(`/attendance/employee/${currentUser.id}`)
+          api.get(`/tasks?assigneeId=${userId}`),
+          api.get(`/attendance/employee/${userId}`)
         ]);
 
         const tasks = tasksResponse.data.tasks || [];
@@ -168,36 +169,19 @@ export default function EmployeeDashboard() {
         };
       }
     },
-    enabled: !!currentUser && !!currentUser.id,
+    enabled: !!currentUser && !!(currentUser._id || currentUser.id),
     retry: 1,
   });
 
   // Initialize push notifications on mount
   useEffect(() => {
     if (currentUser) {
-      console.log('Initializing push notifications for employee:', currentUser.id);
+      const userId = currentUser._id || currentUser.id;
+      console.log('Initializing push notifications for employee:', userId);
       notificationService.initializePushNotifications().catch(err => {
         console.error('Failed to initialize push notifications:', err);
       });
     }
-  }, [currentUser]);
-
-  // Listen for task assignments (simulate real-time updates)
-  useEffect(() => {
-    if (!currentUser) return;
-
-    console.log('Setting up task notifications for employee:', currentUser.id);
-
-    // Simulate receiving task assignment notification
-    const taskNotification = NotificationUtils.taskAssigned('Complete monthly report', currentUser.id);
-
-    // Show task notification after a delay
-    const timer = setTimeout(() => {
-      console.log('Triggering task notification:', taskNotification);
-      triggerNotification(taskNotification);
-    }, 3000);
-
-    return () => clearTimeout(timer);
   }, [currentUser]);
 
   // If there's an error, show error message
@@ -283,7 +267,7 @@ export default function EmployeeDashboard() {
           <h2 className={`text-2xl font-semibold mb-6 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
             My Tasks
           </h2>
-          <EmployeeTasks employeeId={currentUser.id} darkMode={darkMode} />
+          <EmployeeTasks employeeId={currentUser._id || currentUser.id} darkMode={darkMode} />
         </section>
 
         {/* Check-in/Check-out with Draggable Logo */}
@@ -292,7 +276,7 @@ export default function EmployeeDashboard() {
             Daily Check-in/Out
           </h2>
           <DraggableLogo
-            employeeId={currentUser.id}
+            employeeId={currentUser._id || currentUser.id}
             darkMode={darkMode}
             onStatusChange={(status) => {
               // Handle status change if needed
@@ -304,7 +288,7 @@ export default function EmployeeDashboard() {
 
       {/* Notification Manager - handles toast notifications */}
       <NotificationManager
-        userId={currentUser?.id}
+        userId={currentUser?._id || currentUser?.id}
         darkMode={darkMode}
         position="top-right"
         maxToasts={5}
