@@ -3,18 +3,24 @@ console.log('%c🟢🟢🟢 CONFIRM PAGE FILE LOADED', 'color: green; font-size:
 console.log('Timestamp:', new Date().toISOString());
 console.log('Location:', window.location.href);
 
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useToast } from '../components/ui/Toast';
 import Logo from '../components/ui/Logo';
 
-const ConfirmEmail: React.FC = () => {
+interface ConfirmEmailProps {}
+
+const ConfirmEmail: React.FC<ConfirmEmailProps> = () => {
   const navigate = useNavigate();
   const { addToast } = useToast();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showResendForm, setShowResendForm] = useState(false);
+  const [resendEmail, setResendEmail] = useState('');
+  const [isResending, setIsResending] = useState(false);
 
   useEffect(() => {
-    const confirm = async () => {
+    const confirmEmail = async () => {
       console.log('%c🔍 CONFIRM START', 'color: red; font-size: 18px; font-weight: bold');
 
       const params = new URLSearchParams(window.location.search);
@@ -42,6 +48,7 @@ const ConfirmEmail: React.FC = () => {
 
           if (response.ok) {
             console.log('✅ EMAIL CONFIRMED:', result.data?.user?.id);
+            setLoading(false);
             addToast('success', result.message || 'Email confirmed successfully!');
 
             // If user is logged in (has tokens), redirect to dashboard
@@ -67,24 +74,54 @@ const ConfirmEmail: React.FC = () => {
             // Handle error response
             const errorMessage = result?.message || result?.error || 'Confirmation failed';
             console.error('❌ CONFIRMATION ERROR:', errorMessage);
-            addToast('error', errorMessage);
-            navigate('/auth', { replace: true });
+            setError(errorMessage);
+            setLoading(false);
+            setShowResendForm(true);
           }
         } catch (err: any) {
           console.error('❌ NETWORK ERROR:', err);
           const errorMessage = err?.message || 'Network error occurred. Please try again.';
-          addToast('error', errorMessage);
-          navigate('/auth', { replace: true });
+          setError(errorMessage);
+          setLoading(false);
+          setShowResendForm(true);
         }
       } else {
         console.log('❌ INVALID LINK');
-        addToast('error', 'Invalid confirmation link.');
-        navigate('/auth', { replace: true });
+        setError('Invalid confirmation link.');
+        setLoading(false);
+        setShowResendForm(true);
       }
     };
 
-    confirm();
-  }, [navigate, addToast]); // ← FIXED DEPENDENCY ARRAY
+    confirmEmail();
+  }, [navigate, addToast]);
+
+  const handleResendConfirmation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resendEmail.trim()) {
+      addToast('error', 'Please enter your email address');
+      return;
+    }
+
+    setIsResending(true);
+    try {
+      await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000/api'}/auth/resend-confirmation`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: resendEmail }),
+      });
+
+      addToast('success', 'Confirmation email resent successfully! Please check your inbox.');
+      setShowResendForm(false);
+      setError(null);
+    } catch (err: any) {
+      addToast('error', err.message || 'Failed to resend confirmation email');
+    } finally {
+      setIsResending(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -97,12 +134,64 @@ const ConfirmEmail: React.FC = () => {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
             <h2 className="text-xl font-semibold text-gray-800 mb-2">Confirming Your Email</h2>
             <p className="text-gray-600">Please wait while we verify your email address...</p>
-            <div className="mt-4">
-              <div className="flex items-center justify-center space-x-1">
-                <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && showResendForm) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full mx-4">
+          <div className="text-center">
+            <div className="flex justify-center mb-4">
+              <Logo className="h-12 w-auto" />
+            </div>
+
+            <div className="mb-6">
+              <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
               </div>
+              <h2 className="text-2xl font-bold text-gray-800 mb-3">Email Confirmation Failed</h2>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                <p className="text-sm text-red-800">{error}</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleResendConfirmation} className="mb-6">
+              <div className="mb-4">
+                <label htmlFor="resendEmail" className="block text-sm font-medium text-gray-700 mb-2">
+                  Enter your email address to resend confirmation:
+                </label>
+                <input
+                  type="email"
+                  id="resendEmail"
+                  value={resendEmail}
+                  onChange={(e) => setResendEmail(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-black placeholder-gray-500"
+                  placeholder="your.email@example.com"
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isResending}
+                className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors font-semibold disabled:opacity-50"
+              >
+                {isResending ? 'Sending...' : 'Resend Confirmation Email'}
+              </button>
+            </form>
+
+            <div className="space-y-3">
+              <button
+                onClick={() => navigate('/auth')}
+                className="w-full bg-gray-600 text-white py-3 px-4 rounded-lg hover:bg-gray-700 transition-colors font-semibold"
+              >
+                Back to Login
+              </button>
             </div>
           </div>
         </div>

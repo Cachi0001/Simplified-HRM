@@ -347,23 +347,23 @@ export class EmailService {
             <style>
               body {font-family: Arial, Helvetica, sans-serif; background:#f4f4f4; padding:20px;}
               .container {max-width:600px; margin:auto; background:#fff; padding:30px; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,.1);}
-              .button {display:inline-block; background:#007bff; color:#fff; padding:14px 28px; text-decoration:none; border-radius:6px; font-weight:bold; font-size:15px;}
+              .button {display:inline-block; background:#007bff; color:#000000; padding:14px 28px; text-decoration:none; border-radius:6px; font-weight:bold; font-size:15px; border: 2px solid #007bff;}
               .fallback {margin-top:20px; font-size:13px; color:#555; word-break:break-all;}
               .footer {margin-top:30px; font-size:12px; color:#777;}
             </style>
           </head>
           <body>
             <div class="container">
-              <h2>Welcome to Go3net!</h2>
-              <p>Click below to confirm your account and log in instantly:</p>
+              <h2>Welcome to Go3net HR Management System!</h2>
+              <p>Click below to confirm your account and complete your registration:</p>
 
               <p style="text-align:center;">
                 <a href="${confirmationUrl}" class="button">
-                  Confirm & Log In
+                  Confirm Account
                 </a>
               </p>
 
-              <p><strong>No password needed.</strong> This link expires in 1 hour.</p>
+              <p><strong>This link expires in 1 hour.</strong></p>
 
               <div class="fallback">
                 <p>If the button doesn't work, copy & paste this URL into your browser:</p>
@@ -371,7 +371,7 @@ export class EmailService {
               </div>
 
               <div class="footer">
-                <p>© Go3net. All rights reserved.</p>
+                <p>© Go3net HR Management System. All rights reserved.</p>
               </div>
             </div>
           </body>

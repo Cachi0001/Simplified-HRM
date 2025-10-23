@@ -108,12 +108,16 @@ export class AuthService {
     }
   }
 
-  // Reset password
-  async resetPassword(email: string): Promise<void> {
+  // Update password
+  async updatePassword(email: string, newPassword: string): Promise<{ success: boolean; message: string }> {
     try {
-      await api.post('/auth/forgot-password', { email });
+      const response = await api.put('/auth/update-password', { email, newPassword });
+      return {
+        success: true,
+        message: response.data.message || 'Password updated successfully'
+      };
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Password reset failed');
+      throw new Error(error.response?.data?.message || 'Password update failed');
     }
   }
 

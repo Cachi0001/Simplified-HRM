@@ -87,14 +87,14 @@ export class EmployeeController {
     }
   }
 
-    async getPendingApprovals(req: Request, res: Response): Promise<void> {
+  async getPendingApprovals(req: Request, res: Response): Promise<void> {
     try {
       const pendingEmployees = await this.employeeService.getPendingApprovals();
 
       res.status(200).json({
         status: 'success',
-        message: 'Pending approvals retrieved',
-        data: { pendingEmployees }
+        employees: pendingEmployees,
+        total: pendingEmployees.length
       });
     } catch (error) {
       logger.error('EmployeeController: Get pending approvals error', { error: (error as Error).message });
@@ -274,7 +274,23 @@ export class EmployeeController {
     }
   }
 
-  async rejectEmployee(req: Request, res: Response): Promise<void> {
+  async getEmployeeStats(req: Request, res: Response): Promise<void> {
+    try {
+      const stats = await this.employeeService.getEmployeeStats();
+
+      res.status(200).json({
+        status: 'success',
+        ...stats
+      });
+    } catch (error) {
+      logger.error('EmployeeController: Get employee stats error', { error: (error as Error).message });
+      res.status(400).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
+   async rejectEmployee(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
 

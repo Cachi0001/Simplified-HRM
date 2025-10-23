@@ -1,13 +1,15 @@
-import { Employee, CreateEmployeeRequest, UpdateEmployeeRequest, EmployeeQuery } from '../../models/Employee';
+import { CreateEmployeeRequest, UpdateEmployeeRequest, EmployeeQuery, IEmployee } from '../../models/Employee';
 
 export interface IEmployeeRepository {
-  create(employeeData: CreateEmployeeRequest, userId: string): Promise<Employee>;
-  findAll(query?: EmployeeQuery): Promise<{ employees: Employee[]; total: number; page: number; limit: number }>;
-  findById(id: string): Promise<Employee | null>;
-  findByUserId(userId: string): Promise<Employee | null>;
-  update(id: string, employeeData: UpdateEmployeeRequest): Promise<Employee>;
+  create(employeeData: CreateEmployeeRequest, userId: string): Promise<IEmployee>;
+  findAll(query?: EmployeeQuery): Promise<{ employees: IEmployee[]; total: number; page: number; limit: number }>;
+  findById(id: string): Promise<IEmployee | null>;
+  findByUserId(userId: string): Promise<IEmployee | null>;
+  update(id: string, employeeData: UpdateEmployeeRequest): Promise<IEmployee>;
   delete(id: string): Promise<void>;
-  search(query: string): Promise<Employee[]>;
-  getPendingApprovals(): Promise<Employee[]>;
-  approve(id: string): Promise<Employee>;
+  search(query: string): Promise<IEmployee[]>;
+  getPendingApprovals(): Promise<IEmployee[]>;
+  approve(id: string): Promise<IEmployee>;
+  getEmployeeStats(): Promise<{ total: number; active: number; pending: number; rejected: number }>;
+  assignDepartment(id: string, department: string): Promise<IEmployee>;
 }

@@ -238,16 +238,16 @@ export class AuthService {
     }
   }
 
-  async updatePassword(accessToken: string, newPassword: string): Promise<void> {
+  async updatePasswordByEmail(email: string, newPassword: string): Promise<void> {
     try {
-      if (!accessToken || !newPassword) {
-        throw new Error('Access token and new password are required');
+      if (!email || !newPassword) {
+        throw new Error('Email and new password are required');
       }
 
-      await this.authRepository.updatePassword(accessToken, newPassword);
-      logger.info('AuthService: Password updated');
+      await this.authRepository.updatePasswordByEmail(email, newPassword);
+      logger.info('AuthService: Password updated by email');
     } catch (error) {
-      logger.error('AuthService: Password update failed', { error: (error as Error).message });
+      logger.error('AuthService: Password update by email failed', { error: (error as Error).message });
       throw error;
     }
   }

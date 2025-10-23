@@ -8,6 +8,8 @@ import { AuthService } from '../services/AuthService';
 import { EmailService } from '../services/EmailService';
 import { MongoAuthRepository } from '../repositories/implementations/MongoAuthRepository';
 import { authenticateToken } from '../middleware/auth.middleware';
+import { User } from '../models/User';
+import { Employee } from '../models/Employee';
 
 const router = Router();
 
@@ -25,20 +27,26 @@ router.post('/refresh', authenticateToken, (req, res) => authController.refreshT
 router.post('/signout', (req, res) => authController.signOut(req, res));
 router.post('/forgot-password', (req, res) => authController.resetPassword(req, res));
 router.post('/google', (req, res) => authController.signInWithGoogle(req, res));
-router.post('/logout', authenticateToken, (req, res) => authController.signOut(req, res));
-router.get('/test-email', async (req, res) => {
+router.put('/update-password', (req, res) => authController.updatePassword(req, res));
+router.get('/debug/tokens', async (req, res) => {
   try {
-    const emailService = new EmailService();
-    await emailService.sendConfirmationEmail(
-      'test@example.com',
-      'Test User',
-      'http://localhost:5173/confirm?token=test'
-    );
-    res.status(200).json({ status: 'success', message: 'Test email sent successfully' });
+    const usersWithTokens = await User.find({ emailVerificationToken: { $exists: true } })
+      .select('email emailVerificationToken emailVerificationExpires emailVerified createdAt');
+    const employeesWithTokens = await Employee.find({ emailVerificationToken: { $exists: true } })
+      .select('email emailVerificationToken emailVerificationExpires emailVerified status');
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        users: usersWithTokens,
+        employees: employeesWithTokens,
+        timestamp: new Date().toISOString()
+      }
+    });
   } catch (error) {
     res.status(500).json({
       status: 'error',
-      message: 'Email test failed',
+      message: 'Debug query failed',
       error: (error as Error).message
     });
   }

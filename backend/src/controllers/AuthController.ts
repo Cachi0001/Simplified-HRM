@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { AuthService } from '../services/AuthService';
 import { CreateUserRequest, LoginRequest } from '../models/User';
 import { EmailService } from '../services/EmailService';
+import { User } from '../models/User';
 import logger from '../utils/logger';
 
 export class AuthController {
@@ -32,7 +33,7 @@ export class AuthController {
           status: 'success',
           message: result.message || 'Check your inbox – we sent you a magic link to confirm your account',
           data: {
-            user: result.user,
+            user: result.user.toObject ? result.user.toObject() : result.user, // Handle both Mongoose model and plain object
             requiresConfirmation: true
           }
         });
@@ -49,7 +50,7 @@ export class AuthController {
         status: 'success',
         message: result.message || 'User registered successfully',
         data: {
-          user: result.user,
+          user: result.user.toObject ? result.user.toObject() : result.user, // Handle both Mongoose model and plain object
           accessToken: result.accessToken,
           refreshToken: result.refreshToken
         }
@@ -88,12 +89,11 @@ export class AuthController {
 
       const result = await this.authService.signIn(credentials);
 
-      // Magic link always sent for passwordless login
       res.status(200).json({
         status: 'success',
         message: result.message || 'Check your inbox – we sent you a magic link to sign in',
         data: {
-          user: result.user,
+          user: result.user.toObject ? result.user.toObject() : result.user, // Handle both Mongoose model and plain object
           requiresConfirmation: true
         }
       });
@@ -461,27 +461,24 @@ export class AuthController {
 
   async updatePassword(req: Request, res: Response): Promise<void> {
     try {
-      const accessToken = req.headers.authorization?.split(' ')[1];
-      const { newPassword } = req.body;
+      const { email, newPassword } = req.body;
 
-      if (!accessToken || !newPassword) {
+      if (!email || !newPassword) {
         res.status(400).json({
           status: 'error',
-          message: 'Access token and new password are required'
+          message: 'Email and new password are required'
         });
         return;
       }
 
-      await this.authService.updatePassword(accessToken, newPassword);
-
-      logger.info('AuthController: Password updated successfully');
+      await this.authService.updatePasswordByEmail(email, newPassword);
 
       res.status(200).json({
         status: 'success',
         message: 'Password updated successfully'
       });
     } catch (error) {
-      logger.error('AuthController: Password update error', { error: (error as Error).message });
+      logger.error('AuthController: Update password error', { error: (error as Error).message });
       res.status(400).json({
         status: 'error',
         message: (error as Error).message
@@ -518,16 +515,19 @@ export class AuthController {
         const accessToken = this.generateAccessToken(result.user);
         const refreshToken = this.generateRefreshToken(result.user);
 
-        // Add refresh token to user
-        result.user.addRefreshToken(refreshToken);
-        await result.user.save();
+        // Add refresh token to user (get the Mongoose model from database)
+        const userModel = await User.findById(result.user.id);
+        if (userModel) {
+          userModel.addRefreshToken(refreshToken);
+          await userModel.save();
+        }
 
         res.status(200).json({
           status: 'success',
           message: 'Email verified successfully! Welcome back!',
           data: {
             user: {
-              ...result.user.toObject(),
+              ...result.user, // result.user is already a plain object
               role: employee.role,
               status: employee.status
             },
@@ -543,7 +543,7 @@ export class AuthController {
           message: 'Email verified successfully! Your account is pending admin approval.',
           data: {
             user: {
-              ...result.user.toObject(),
+              ...result.user, // result.user is already a plain object
               role: employee.role,
               status: employee.status
             },
@@ -557,7 +557,7 @@ export class AuthController {
           status: 'success',
           message: 'Email verified successfully! Please contact support to activate your account.',
           data: {
-            user: result.user.toObject(),
+            user: result.user, // result.user is already a plain object
             requiresEmailVerification: false
           }
         });
@@ -579,7 +579,7 @@ export class AuthController {
 
     return jwt.sign(
       {
-        userId: user._id,
+        sub: user._id,
         email: user.email,
         role: user.role,
       },
@@ -594,7 +594,7 @@ export class AuthController {
 
     return jwt.sign(
       {
-        userId: user._id,
+        sub: user._id,
         email: user.email,
       },
       jwtRefreshSecret,

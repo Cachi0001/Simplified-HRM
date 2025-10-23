@@ -52,7 +52,20 @@ export class MongoAuthRepository implements IAuthRepository {
 
       // Generate verification token BEFORE creating employee record
       const verificationToken = user.generateEmailVerificationToken();
+      logger.info('🔑 [MongoAuthRepository] Generated verification token', {
+        userId: user._id,
+        email: user.email,
+        token: verificationToken.substring(0, 10) + '...',
+        expires: user.emailVerificationExpires
+      });
+
       await user.save(); // Save user with token first
+      logger.info('💾 [MongoAuthRepository] User saved with token', {
+        userId: user._id,
+        email: user.email,
+        token: user.emailVerificationToken?.substring(0, 10) + '...',
+        expires: user.emailVerificationExpires
+      });
 
       // Create employee record with the same token
       const employeeStatus = userData.role === 'admin' ? 'active' : 'pending';
@@ -68,9 +81,22 @@ export class MongoAuthRepository implements IAuthRepository {
       });
 
       await employee.save();
+      logger.info('💾 [MongoAuthRepository] Employee saved with token', {
+        employeeId: employee._id,
+        userId: employee.userId,
+        email: employee.email,
+        token: employee.emailVerificationToken?.substring(0, 10) + '...',
+        expires: employee.emailVerificationExpires
+      });
 
       // Send confirmation email with verification token
       const confirmationUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/confirm?token=${verificationToken}`;
+      logger.info('📧 [MongoAuthRepository] Sending confirmation email', {
+        email: user.email,
+        confirmationUrl: confirmationUrl.substring(0, 100) + '...',
+        token: verificationToken.substring(0, 10) + '...'
+      });
+
       const emailService = new (require('../../services/EmailService').EmailService)();
       await emailService.sendConfirmationEmail(user.email, user.fullName, confirmationUrl);
 
@@ -174,7 +200,7 @@ export class MongoAuthRepository implements IAuthRepository {
       const decoded = jwt.verify(refreshToken, this.jwtRefreshSecret) as any;
 
       // Find user
-      const user = await User.findById(decoded.userId);
+      const user = await User.findById(decoded.sub);
       if (!user) {
         throw new Error('User not found');
       }
@@ -211,12 +237,12 @@ export class MongoAuthRepository implements IAuthRepository {
       const decoded = jwt.verify(accessToken, this.jwtSecret) as any;
 
       // Find user
-      const user = await User.findById(decoded.userId);
+      const user = await User.findById(decoded.sub);
       if (!user) {
         throw new Error('User not found');
       }
 
-      return user;
+      return user.toObject();
 
     } catch (error) {
       logger.error('❌ [MongoAuthRepository] Get current user failed:', error);
@@ -230,7 +256,7 @@ export class MongoAuthRepository implements IAuthRepository {
       const decoded = jwt.verify(accessToken, this.jwtSecret) as any;
 
       // Find user and remove all refresh tokens
-      const user = await User.findById(decoded.userId);
+      const user = await User.findById(decoded.sub);
       if (user) {
         user.refreshTokens = [];
         await user.save();
@@ -272,7 +298,7 @@ export class MongoAuthRepository implements IAuthRepository {
       const decoded = jwt.verify(accessToken, this.jwtSecret) as any;
 
       // Find user
-      const user = await User.findById(decoded.userId);
+      const user = await User.findById(decoded.sub);
       if (!user) {
         throw new Error('User not found');
       }
@@ -296,6 +322,31 @@ export class MongoAuthRepository implements IAuthRepository {
     }
   }
 
+  async updatePasswordByEmail(email: string, newPassword: string): Promise<void> {
+    try {
+      // Find user by email
+      const user = await User.findOne({ email });
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      // Update password
+      user.password = newPassword;
+      await user.save();
+
+      // Clear all refresh tokens for security
+      user.refreshTokens = [];
+      await user.save();
+
+      logger.info('✅ [MongoAuthRepository] Password updated by email successfully', {
+        email: user.email
+      });
+
+    } catch (error) {
+      logger.error('❌ [MongoAuthRepository] Update password by email failed:', error);
+      throw error;
+    }
+  }
   async confirmEmailByToken(token: string): Promise<AuthResponse> {
     try {
       logger.info('🔗 [MongoAuthRepository] Confirming email by token', { token });
@@ -390,7 +441,7 @@ export class MongoAuthRepository implements IAuthRepository {
   async getEmployeeByUserId(userId: string): Promise<any> {
     try {
       const employee = await Employee.findOne({ userId }).populate('userId');
-      return employee;
+      return employee ? employee.toObject() : null;
     } catch (error) {
       logger.error('❌ [MongoAuthRepository] Get employee by user ID failed:', error);
       throw error;
@@ -414,7 +465,7 @@ export class MongoAuthRepository implements IAuthRepository {
         status: employee.status
       });
 
-      return employee;
+      return employee.toObject();
     } catch (error) {
       logger.error('❌ [MongoAuthRepository] Create employee record failed:', error);
       throw error;
@@ -468,7 +519,7 @@ export class MongoAuthRepository implements IAuthRepository {
   private generateAccessToken(user: any): string {
     return jwt.sign(
       {
-        userId: user._id,
+        sub: user._id,
         email: user.email,
         role: user.role,
       },
@@ -480,7 +531,7 @@ export class MongoAuthRepository implements IAuthRepository {
   private generateRefreshToken(user: any): string {
     return jwt.sign(
       {
-        userId: user._id,
+        sub: user._id,
         email: user.email,
       },
       this.jwtRefreshSecret,

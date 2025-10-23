@@ -28,7 +28,7 @@ export class MongoEmployeeRepository implements IEmployeeRepository {
         email: employee.email
       });
 
-      return employee;
+      return employee.toObject();
 
     } catch (error) {
       logger.error('❌ [MongoEmployeeRepository] Create employee failed:', error);
@@ -85,7 +85,7 @@ export class MongoEmployeeRepository implements IEmployeeRepository {
       });
 
       return {
-        employees,
+        employees: employees.map(emp => emp.toObject()),
         total,
         page,
         limit,
@@ -108,11 +108,11 @@ export class MongoEmployeeRepository implements IEmployeeRepository {
           employeeId: employee._id,
           email: employee.email
         });
+        return employee.toObject();
       } else {
         logger.warn('⚠️ [MongoEmployeeRepository] Employee not found', { id });
+        return null;
       }
-
-      return employee;
 
     } catch (error) {
       logger.error('❌ [MongoEmployeeRepository] Find employee by ID failed:', error);
@@ -131,11 +131,11 @@ export class MongoEmployeeRepository implements IEmployeeRepository {
           employeeId: employee._id,
           email: employee.email
         });
+        return employee.toObject();
       } else {
         logger.warn('⚠️ [MongoEmployeeRepository] Employee not found', { userId });
+        return null;
       }
-
-      return employee;
 
     } catch (error) {
       logger.error('❌ [MongoEmployeeRepository] Find employee by user ID failed:', error);
@@ -162,14 +162,33 @@ export class MongoEmployeeRepository implements IEmployeeRepository {
         email: employee.email
       });
 
-      return employee;
+      return employee.toObject();
 
     } catch (error) {
       logger.error('❌ [MongoEmployeeRepository] Update employee failed:', error);
       throw error;
     }
   }
+  
+    async getEmployeeStats(): Promise<{ total: number; active: number; pending: number; rejected: number }> {
+    try {
+      logger.info('Getting employee stats');
 
+      const [total, active, pending, rejected] = await Promise.all([
+        Employee.countDocuments(),
+        Employee.countDocuments({ status: 'active' }),
+        Employee.countDocuments({ status: 'pending' }),
+        Employee.countDocuments({ status: 'rejected' })
+      ]);
+
+      logger.info('Employee stats fetched', { total, active, pending, rejected });
+
+      return { total, active, pending, rejected };
+    } catch (error) {
+      logger.error('Failed to get employee stats:', error);
+      throw error;
+    }
+  }
   async delete(id: string): Promise<void> {
     try {
       logger.info('🔍 [MongoEmployeeRepository] Deleting employee', { id });
@@ -209,7 +228,7 @@ export class MongoEmployeeRepository implements IEmployeeRepository {
         results: employees.length
       });
 
-      return employees;
+      return employees.map(emp => emp.toObject());
 
     } catch (error) {
       logger.error('❌ [MongoEmployeeRepository] Search employees failed:', error);
@@ -230,7 +249,7 @@ export class MongoEmployeeRepository implements IEmployeeRepository {
         count: employees.length
       });
 
-      return employees;
+      return employees.map(emp => emp.toObject());
 
     } catch (error) {
       logger.error('❌ [MongoEmployeeRepository] Get pending approvals failed:', error);
@@ -260,10 +279,37 @@ export class MongoEmployeeRepository implements IEmployeeRepository {
         email: employee.email
       });
 
-      return employee;
+      return employee.toObject();
 
     } catch (error) {
       logger.error('❌ [MongoEmployeeRepository] Approve employee failed:', error);
+      throw error;
+    }
+  }
+
+  async assignDepartment(id: string, department: string): Promise<IEmployee> {
+    try {
+      logger.info('🔍 [MongoEmployeeRepository] Assigning department', { id, department });
+
+      const employee = await Employee.findByIdAndUpdate(
+        id,
+        { department, updatedAt: new Date() },
+        { new: true, runValidators: true }
+      ).populate('userId');
+
+      if (!employee) {
+        throw new Error('Employee not found');
+      }
+
+      logger.info('✅ [MongoEmployeeRepository] Department assigned successfully', {
+        employeeId: employee._id,
+        department
+      });
+
+      return employee.toObject();
+
+    } catch (error) {
+      logger.error('❌ [MongoEmployeeRepository] Assign department failed:', error);
       throw error;
     }
   }

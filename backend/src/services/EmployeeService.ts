@@ -72,7 +72,7 @@ export class EmployeeService {
       }
 
       // Check permissions
-      if (currentUserRole !== 'admin' && employee.userId !== currentUserId) {
+      if (currentUserRole !== 'admin' && employee.userId.toString() !== currentUserId) {
         throw new Error('Access denied');
       }
 
@@ -101,7 +101,7 @@ export class EmployeeService {
       }
 
       // Check permissions
-      if (currentUserRole !== 'admin' && existingEmployee.userId !== currentUserId) {
+      if (currentUserRole !== 'admin' && existingEmployee.userId.toString() !== currentUserId) {
         throw new Error('Access denied');
       }
 
@@ -216,6 +216,15 @@ export class EmployeeService {
       return updatedEmployee;
     } catch (error) {
       logger.error('EmployeeService: Assign department failed', { error: (error as Error).message });
+      throw error;
+    }
+  }
+
+  async getEmployeeStats(): Promise<{ total: number; active: number; pending: number; rejected: number }> {
+    try {
+      return await this.employeeRepository.getEmployeeStats();
+    } catch (error) {
+      logger.error('EmployeeService: Get employee stats failed', { error: (error as Error).message });
       throw error;
     }
   }
