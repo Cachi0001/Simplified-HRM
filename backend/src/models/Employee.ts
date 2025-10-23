@@ -2,6 +2,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IEmployee extends Document {
   _id: mongoose.Types.ObjectId;
+  id?: string; // Virtual field from _id
   userId: mongoose.Types.ObjectId;
   email: string;
   fullName: string;
@@ -104,8 +105,15 @@ const EmployeeSchema = new Schema<IEmployee>(
   },
   {
     timestamps: true,
+    toObject: { virtuals: true },
+    toJSON: { virtuals: true }
   }
 );
+
+// Virtual field to provide 'id' alongside '_id' for API consistency
+EmployeeSchema.virtual('id').get(function(this: any) {
+  return this._id.toString();
+});
 
 // Indexes
 EmployeeSchema.index({ userId: 1 });

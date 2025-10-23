@@ -136,7 +136,8 @@ export class EmployeeService {
         throw new Error('Employee profile not found');
       }
 
-      return await this.updateEmployee(employee.id, employeeData, 'employee', userId);
+      const employeeId = employee.id || employee._id.toString();
+      return await this.updateEmployee(employeeId, employeeData, 'employee', userId);
     } catch (error) {
       logger.error('EmployeeService: Update my profile failed', { error: (error as Error).message });
       throw error;
@@ -176,7 +177,42 @@ export class EmployeeService {
 
   async approveEmployee(id: string): Promise<IEmployee> {
     try {
-      const updatedEmployee = await this.employeeRepository.approve(id); // Use repo.approve
+      // First, get the employee to find the associated user ID
+      const employee = await this.employeeRepository.findById(id);
+      if (!employee) {
+        throw new Error('Employee not found');
+      }
+
+      // Update the employee status to 'active'
+      const updatedEmployee = await this.employeeRepository.approve(id);
+
+      // CRITICAL: Also mark the user's email as verified so they can login
+      try {
+        const User = (await import('../models/User')).User;
+        const updatedUser = await User.findByIdAndUpdate(
+          employee.userId,
+          { emailVerified: true },
+          { new: true }
+        );
+        
+        if (!updatedUser) {
+          logger.warn('⚠️ User not found when updating emailVerified during approval', { 
+            userId: employee.userId,
+            employeeId: id 
+          });
+        } else {
+          logger.info('✅ User emailVerified set to true after approval', { 
+            userId: employee.userId,
+            employeeId: id 
+          });
+        }
+      } catch (userUpdateError) {
+        logger.error('❌ Failed to update user emailVerified during approval', {
+          error: (userUpdateError as Error).message,
+          employeeId: id
+        });
+        throw new Error('Failed to complete approval process');
+      }
 
       // Send email
       try {

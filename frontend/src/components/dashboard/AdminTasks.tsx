@@ -311,51 +311,66 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
         </div>
       ) : filteredTasks.length > 0 ? (
         <div className="space-y-3">
-          {filteredTasks.map((task) => (
-            <Card key={task.id} className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-              <div className="p-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+          {filteredTasks.map((task, index) => {
+            const assignedEmployee = employees.find(e => e.id === task.assigneeId);
+            return (
+              <Card key={task.id || `task-${index}`} className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                <div className="p-4">
+                  {/* Header: Title + Status + Priority */}
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      <h3 className={`font-semibold text-lg mb-1 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                         {task.title}
                       </h3>
-                      <Badge className={getPriorityColor(task.priority)}>
-                        {task.priority}
-                      </Badge>
-                      <Badge className={getStatusColor(task.status)}>
-                        {task.status.replace('_', ' ')}
-                      </Badge>
-                    </div>
-
-                    {task.description && (
-                      <p className={`text-sm mb-3 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                        {task.description}
-                      </p>
-                    )}
-
-                    <div className="flex items-center gap-4 text-sm">
-                      <div className={`flex items-center gap-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                        <User className="h-4 w-4" />
-                        <span>
-                          {employees.find(e => e.id === task.assigneeId)?.fullName || 'Unknown'}
-                        </span>
-                      </div>
-
-                      <div className={`flex items-center gap-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                        <Calendar className="h-4 w-4" />
-                        <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
-                      </div>
-
-                      <div className={`flex items-center gap-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                        <Clock className="h-4 w-4" />
-                        <span>Created: {new Date(task.createdAt).toLocaleDateString()}</span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge className={getStatusColor(task.status)}>
+                          {task.status.replace('_', ' ')}
+                        </Badge>
+                        <Badge className={getPriorityColor(task.priority)}>
+                          {task.priority}
+                        </Badge>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    {/* Status Update Buttons */}
+                  {/* Assignee Section - Prominent */}
+                  <div className={`mb-3 p-2 rounded ${darkMode ? 'bg-gray-700' : 'bg-blue-50'} border-l-4 ${darkMode ? 'border-blue-400' : 'border-blue-500'}`}>
+                    <div className={`flex items-center gap-2 ${darkMode ? 'text-blue-200' : 'text-blue-700'}`}>
+                      <User className="h-4 w-4" />
+                      <span className="font-medium">Assigned to:</span>
+                      <span className="font-semibold">{assignedEmployee?.fullName || 'Unknown Employee'}</span>
+                    </div>
+                    {assignedEmployee?.department && (
+                      <div className={`text-xs ml-6 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                        Department: {assignedEmployee.department}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Description */}
+                  {task.description && (
+                    <div className="mb-3">
+                      <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                        {task.description}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Metadata: Dates */}
+                  <div className={`flex items-center gap-4 text-xs mb-4 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    <div className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      <span>Created: {new Date(task.createdAt).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Status Management - For Admin to see progress */}
                     {task.status !== 'completed' && task.status !== 'cancelled' && (
                       <div className="flex gap-1">
                         {task.status === 'pending' && (
@@ -363,35 +378,48 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
                             onClick={() => handleStatusUpdate(task.id, 'in_progress')}
                             isLoading={updateStatusMutation.isPending}
                             disabled={updateStatusMutation.isPending || deleteTaskMutation.isPending}
+                            className="text-xs py-1"
                           >
-                            Start
+                            Mark In Progress
                           </Button>
                         )}
-                        <Button
-                          onClick={() => handleStatusUpdate(task.id, 'completed')}
-                          isLoading={updateStatusMutation.isPending}
-                          disabled={updateStatusMutation.isPending || deleteTaskMutation.isPending}
-                          className="text-green-600 border-green-600 hover:bg-green-600 hover:text-white"
-                        >
-                          <CheckCircle className="h-4 w-4" />
-                        </Button>
+                        {task.status === 'in_progress' && (
+                          <Button
+                            onClick={() => handleStatusUpdate(task.id, 'completed')}
+                            isLoading={updateStatusMutation.isPending}
+                            disabled={updateStatusMutation.isPending || deleteTaskMutation.isPending}
+                            className="text-green-600 border-green-600 hover:bg-green-600 hover:text-white text-xs py-1"
+                          >
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            Mark Complete
+                          </Button>
+                        )}
                       </div>
                     )}
 
-                    {/* Delete Button */}
+                    {/* Completion Status Badge */}
+                    {task.status === 'completed' && (
+                      <div className={`text-xs px-2 py-1 rounded flex items-center gap-1 ${darkMode ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-800'}`}>
+                        <CheckCircle className="h-3 w-3" />
+                        Completed
+                      </div>
+                    )}
+
+                    {/* Delete Button - Admin only */}
                     <Button
                       onClick={() => handleDeleteTask(task.id)}
                       isLoading={deleteTaskMutation.isPending}
                       disabled={updateStatusMutation.isPending || deleteTaskMutation.isPending}
-                      className="text-red-600 border-red-600 hover:bg-red-600 hover:text-white"
+                      className="text-red-600 border-red-600 hover:bg-red-600 hover:text-white text-xs py-1"
+                      title="Delete this task"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       ) : (
         <Card className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>

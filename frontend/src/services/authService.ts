@@ -74,8 +74,8 @@ export class AuthService {
   // Get current user
   async getCurrentUser(): Promise<User> {
     try {
-      const response = await api.get<{ user: User }>('/auth/me');
-      return response.data.user;
+      const response = await api.get<{ status: string; data: { user: User } }>('/auth/me');
+      return response.data.data.user;
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Failed to get user');
     }

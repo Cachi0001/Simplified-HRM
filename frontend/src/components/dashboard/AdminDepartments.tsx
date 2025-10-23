@@ -41,6 +41,16 @@ export function AdminDepartments({ darkMode = false }: AdminDepartmentsProps) {
       const response = await employeeService.getAllEmployees();
       // Filter out admin users for display purposes
       const nonAdminEmployees = response.employees.filter((emp: any) => emp.role !== 'admin');
+      
+      // Log employee data for debugging
+      console.log('📊 [AdminDepartments] Fetched employees:', nonAdminEmployees.map((emp: any) => ({
+        fullName: emp.fullName,
+        id: emp.id,
+        _id: emp._id,
+        idType: typeof emp.id,
+        _idType: typeof emp._id
+      })));
+      
       return nonAdminEmployees;
     },
   });
@@ -69,6 +79,12 @@ export function AdminDepartments({ darkMode = false }: AdminDepartmentsProps) {
       alert('Please select an employee and department');
       return;
     }
+
+    console.log(`🔄 [AdminDepartments] Assigning department:`, {
+      employeeId: selectedEmployee,
+      selectedEmployeeType: typeof selectedEmployee,
+      department: newDepartment
+    });
 
     assignDepartmentMutation.mutate({
       employeeId: selectedEmployee,
@@ -121,20 +137,33 @@ export function AdminDepartments({ darkMode = false }: AdminDepartmentsProps) {
                 </label>
                 <select
                   value={selectedEmployee}
-                  onChange={(e) => setSelectedEmployee(e.target.value)}
+                  onChange={(e) => {
+                    console.log('Selected employee value:', e.target.value);
+                    setSelectedEmployee(e.target.value);
+                  }}
                   className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
                 >
                   <option value="">Select Employee</option>
-                  {employeesWithoutDepartment.map(emp => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.fullName} (No Department)
-                    </option>
-                  ))}
-                  {employeesWithDepartment.map(emp => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.fullName} ({emp.department})
-                    </option>
-                  ))}
+                  {employeesWithoutDepartment.map(emp => {
+                    const empId = emp.id || emp._id || '';
+                    const idToUse = typeof empId === 'object' ? JSON.stringify(empId) : String(empId);
+                    console.log(`📋 [Dropdown] No Dept - fullName=${emp.fullName}, id=${emp.id}, _id=${emp._id}, final=${idToUse}, idType=${typeof empId}`);
+                    return (
+                      <option key={idToUse} value={idToUse}>
+                        {emp.fullName} (No Department)
+                      </option>
+                    );
+                  })}
+                  {employeesWithDepartment.map(emp => {
+                    const empId = emp.id || emp._id || '';
+                    const idToUse = typeof empId === 'object' ? JSON.stringify(empId) : String(empId);
+                    console.log(`📋 [Dropdown] With Dept - fullName=${emp.fullName}, id=${emp.id}, _id=${emp._id}, final=${idToUse}`);
+                    return (
+                      <option key={idToUse} value={idToUse}>
+                        {emp.fullName} ({emp.department})
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
@@ -212,7 +241,9 @@ export function AdminDepartments({ darkMode = false }: AdminDepartmentsProps) {
                 onClick={() => {
                   const employee = employeesWithoutDepartment[0];
                   if (employee) {
-                    handleQuickAssign(employee.id, dept);
+                    const empId = employee.id || employee._id || '';
+                    console.log(`Quick assign: employee=${employee.fullName}, id=${employee.id}, _id=${employee._id}, final=${empId}`);
+                    handleQuickAssign(empId, dept);
                   } else {
                     alert('No employees without departments found');
                   }

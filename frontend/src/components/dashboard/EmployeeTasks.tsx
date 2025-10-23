@@ -93,59 +93,100 @@ export function EmployeeTasks({ employeeId, darkMode = false }: EmployeeTasksPro
 
   return (
     <div className="space-y-4">
-      {tasks.map((task) => (
-        <Card key={task.id} className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+      {tasks.map((task, index) => (
+        <Card key={task.id || `task-${index}`} className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
           <div className="p-4">
-            <div className="flex items-start justify-between">
-              <div className="flex items-start gap-3 flex-1">
-                {getStatusIcon(task.status)}
-                <div className="flex-1">
-                  <h3 className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                    {task.title}
-                  </h3>
-                  {task.description && (
-                    <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                      {task.description}
-                    </p>
-                  )}
-                  <div className="flex items-center gap-4 mt-2">
-                    <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(task.status)} ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
-                      {task.status.replace('_', ' ').toUpperCase()}
+            {/* Header: Title + Status Badge */}
+            <div className="mb-2 flex items-start justify-between">
+              <div className="flex-1">
+                <h3 className={`font-semibold text-base mb-1 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                  {task.title}
+                </h3>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${getStatusColor(task.status)} ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                    {task.status.replace('_', ' ').toUpperCase()}
+                  </span>
+                  {task.priority && (
+                    <span className={`text-xs px-2 py-1 rounded ${
+                      task.priority === 'high' ? (darkMode ? 'bg-red-900 text-red-300' : 'bg-red-100 text-red-800') :
+                      task.priority === 'medium' ? (darkMode ? 'bg-yellow-900 text-yellow-300' : 'bg-yellow-100 text-yellow-800') :
+                      (darkMode ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-800')
+                    }`}>
+                      {task.priority.toUpperCase()} Priority
                     </span>
-                    {task.priority && (
-                      <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                        Priority: {task.priority}
-                      </span>
-                    )}
-                    {task.dueDate && (
-                      <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                        Due: {new Date(task.dueDate).toLocaleDateString()}
-                      </span>
-                    )}
-                  </div>
+                  )}
                 </div>
               </div>
-              <div className="flex gap-2 ml-4">
-                {task.status !== 'completed' && (
-                  <Button
-                    onClick={() => updateTaskStatus.mutate({ taskId: task.id, status: 'completed' })}
-                    disabled={updateTaskStatus.isPending}
-                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 text-sm"
-                  >
-                    <Check className="h-4 w-4 mr-1" />
-                    Complete
-                  </Button>
+            </div>
+
+            {/* Description */}
+            {task.description && (
+              <div className="mb-3">
+                <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  {task.description}
+                </p>
+              </div>
+            )}
+
+            {/* Meta Information */}
+            <div className={`text-xs mb-3 p-2 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+              <div className={`flex gap-2 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                {task.dueDate && (
+                  <span className="flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    Due: {new Date(task.dueDate).toLocaleDateString()}
+                  </span>
                 )}
-                {task.status === 'pending' && (
-                  <Button
-                    onClick={() => updateTaskStatus.mutate({ taskId: task.id, status: 'in_progress' })}
-                    disabled={updateTaskStatus.isPending}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 text-sm"
-                  >
-                    Start
-                  </Button>
+                {task.createdAt && (
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    Created: {new Date(task.createdAt).toLocaleDateString()}
+                  </span>
                 )}
               </div>
+            </div>
+
+            {/* Action Buttons - Progress Update */}
+            <div className="flex gap-2 flex-wrap">
+              {task.status === 'pending' && (
+                <Button
+                  onClick={() => updateTaskStatus.mutate({ taskId: task.id, status: 'in_progress' })}
+                  disabled={updateTaskStatus.isPending}
+                  isLoading={updateTaskStatus.isPending}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 text-sm"
+                  title="Start working on this task"
+                >
+                  <Clock className="h-4 w-4 mr-1" />
+                  Start Task
+                </Button>
+              )}
+
+              {task.status === 'in_progress' && (
+                <Button
+                  onClick={() => updateTaskStatus.mutate({ taskId: task.id, status: 'completed' })}
+                  disabled={updateTaskStatus.isPending}
+                  isLoading={updateTaskStatus.isPending}
+                  className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 text-sm"
+                  title="Mark this task as completed"
+                >
+                  <Check className="h-4 w-4 mr-1" />
+                  Complete Task
+                </Button>
+              )}
+
+              {task.status === 'completed' && (
+                <div className={`flex items-center gap-1 px-3 py-2 rounded text-sm font-medium ${darkMode ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-800'}`}>
+                  <Check className="h-4 w-4" />
+                  Task Completed
+                </div>
+              )}
+
+              {task.status === 'cancelled' && (
+                <div className={`flex items-center gap-1 px-3 py-2 rounded text-sm font-medium ${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'}`}>
+                  <AlertCircle className="h-4 w-4" />
+                  Task Cancelled
+                </div>
+              )}
             </div>
           </div>
         </Card>

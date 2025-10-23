@@ -3,6 +3,31 @@ import { Employee, CreateEmployeeRequest, UpdateEmployeeRequest, EmployeeQuery, 
 import databaseConfig from '../../config/database';
 import logger from '../../utils/logger';
 
+// Helper function to transform MongoDB _id to id for API responses
+function transformEmployeeForAPI(emp: any) {
+  // Call toObject with virtuals: true to include the virtual 'id' field
+  const obj = emp.toObject ? emp.toObject({ virtuals: true }) : emp;
+  
+  // The virtual field should already be in obj.id from the schema configuration
+  // But ensure id is always a string representing the ObjectId
+  const id = obj.id && typeof obj.id === 'string' ? obj.id : (obj._id ? obj._id.toString() : null);
+  
+  // Handle userId - could be an object (populated) or a string
+  let userId = obj.userId;
+  if (userId && typeof userId === 'object' && userId._id) {
+    userId = userId._id.toString();
+  } else if (userId && typeof userId !== 'string') {
+    userId = userId.toString();
+  }
+  
+  return {
+    ...obj,
+    id,
+    userId,
+    _id: obj._id // Keep _id for backward compatibility
+  };
+}
+
 export class MongoEmployeeRepository implements IEmployeeRepository {
   async create(employeeData: CreateEmployeeRequest, userId: string): Promise<IEmployee> {
     try {
@@ -28,7 +53,7 @@ export class MongoEmployeeRepository implements IEmployeeRepository {
         email: employee.email
       });
 
-      return employee.toObject();
+      return transformEmployeeForAPI(employee);
 
     } catch (error) {
       logger.error('❌ [MongoEmployeeRepository] Create employee failed:', error);
@@ -85,7 +110,7 @@ export class MongoEmployeeRepository implements IEmployeeRepository {
       });
 
       return {
-        employees: employees.map(emp => emp.toObject()),
+        employees: employees.map(emp => transformEmployeeForAPI(emp)),
         total,
         page,
         limit,
@@ -108,7 +133,7 @@ export class MongoEmployeeRepository implements IEmployeeRepository {
           employeeId: employee._id,
           email: employee.email
         });
-        return employee.toObject();
+        return transformEmployeeForAPI(employee);
       } else {
         logger.warn('⚠️ [MongoEmployeeRepository] Employee not found', { id });
         return null;
@@ -131,7 +156,7 @@ export class MongoEmployeeRepository implements IEmployeeRepository {
           employeeId: employee._id,
           email: employee.email
         });
-        return employee.toObject();
+        return transformEmployeeForAPI(employee);
       } else {
         logger.warn('⚠️ [MongoEmployeeRepository] Employee not found', { userId });
         return null;
@@ -162,7 +187,7 @@ export class MongoEmployeeRepository implements IEmployeeRepository {
         email: employee.email
       });
 
-      return employee.toObject();
+      return transformEmployeeForAPI(employee);
 
     } catch (error) {
       logger.error('❌ [MongoEmployeeRepository] Update employee failed:', error);
@@ -208,7 +233,7 @@ export class MongoEmployeeRepository implements IEmployeeRepository {
         results: employees.length
       });
 
-      return employees.map(emp => emp.toObject());
+      return employees.map(emp => transformEmployeeForAPI(emp));
 
     } catch (error) {
       logger.error('❌ [MongoEmployeeRepository] Search employees failed:', error);
@@ -229,7 +254,7 @@ export class MongoEmployeeRepository implements IEmployeeRepository {
         count: employees.length
       });
 
-      return employees.map(emp => emp.toObject());
+      return employees.map(emp => transformEmployeeForAPI(emp));
 
     } catch (error) {
       logger.error('❌ [MongoEmployeeRepository] Get pending approvals failed:', error);
@@ -259,7 +284,7 @@ export class MongoEmployeeRepository implements IEmployeeRepository {
         email: employee.email
       });
 
-      return employee.toObject();
+      return transformEmployeeForAPI(employee);
 
     } catch (error) {
       logger.error('❌ [MongoEmployeeRepository] Approve employee failed:', error);
@@ -286,7 +311,7 @@ export class MongoEmployeeRepository implements IEmployeeRepository {
         department
       });
 
-      return employee.toObject();
+      return transformEmployeeForAPI(employee);
 
     } catch (error) {
       logger.error('❌ [MongoEmployeeRepository] Assign department failed:', error);

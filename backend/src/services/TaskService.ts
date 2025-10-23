@@ -12,10 +12,20 @@ export class TaskService {
         throw new Error('Only administrators can assign tasks');
       }
 
-      logger.info('TaskService: Creating task', { title: taskData.title, assignedBy });
+      logger.info('TaskService: Creating task', { title: taskData.title, assignedBy, assigneeId: taskData.assigneeId });
 
       if (!taskData.title || !taskData.assigneeId || !taskData.dueDate) {
         throw new Error('Title, assignee ID, and due date are required');
+      }
+
+      // Validate assigneeId is a valid MongoDB ObjectId format
+      if (!taskData.assigneeId.match(/^[0-9a-f]{24}$/i)) {
+        logger.error('TaskService: Invalid assigneeId format', { 
+          assigneeId: taskData.assigneeId,
+          type: typeof taskData.assigneeId,
+          isString: typeof taskData.assigneeId === 'string'
+        });
+        throw new Error('Invalid assignee ID format. Expected MongoDB ObjectId.');
       }
 
       const task = await this.taskRepository.create(taskData, assignedBy);
@@ -71,7 +81,7 @@ export class TaskService {
         return null;
       }
 
-      if (currentUserRole !== 'admin' && task.assigneeId !== currentUserId) {
+      if (currentUserRole !== 'admin' && task.assigneeId.toString() !== currentUserId) {
         throw new Error('Access denied');
       }
 
@@ -97,7 +107,7 @@ export class TaskService {
       if (!existingTask) {
         throw new Error('Task not found');
       }
-      if (currentUserRole !== 'admin' && existingTask.assigneeId !== currentUserId) {
+      if (currentUserRole !== 'admin' && existingTask.assigneeId.toString() !== currentUserId) {
         throw new Error('Access denied');
       }
 
@@ -131,7 +141,7 @@ export class TaskService {
         throw new Error('Task not found');
       }
 
-      if (currentUserRole !== 'admin' && existingTask.assigneeId !== currentUserId) {
+      if (currentUserRole !== 'admin' && existingTask.assigneeId.toString() !== currentUserId) {
         throw new Error('Access denied');
       }
 

@@ -69,6 +69,7 @@ export interface User {
   email: string;
   fullName: string;
   role: 'admin' | 'employee';
+  status?: 'active' | 'inactive' | 'pending';
   emailVerified: boolean;
   createdAt: string;
   updatedAt: string;

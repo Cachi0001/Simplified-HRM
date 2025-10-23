@@ -262,7 +262,28 @@ export class MongoAuthRepository implements IAuthRepository {
         throw new Error('User not found');
       }
 
-      return user.toObject();
+      // Get the employee record to include approval status
+      const employee = await Employee.findOne({ userId: user._id });
+      
+      // Convert user to object
+      const userObject: any = user.toObject();
+      
+      // Add status from employee record if it exists
+      if (employee) {
+        userObject.status = employee.status;
+        logger.debug('✅ [MongoAuthRepository] Included employee status in user response', {
+          userId: user._id,
+          status: employee.status
+        });
+      } else {
+        logger.warn('⚠️ [MongoAuthRepository] No employee record found for user', {
+          userId: user._id
+        });
+        // Default to pending if no employee record
+        userObject.status = 'pending';
+      }
+
+      return userObject;
 
     } catch (error) {
       logger.error('❌ [MongoAuthRepository] Get current user failed:', error);

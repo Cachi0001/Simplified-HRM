@@ -26,33 +26,87 @@ export default function EmployeeDashboard() {
     localStorage.setItem('darkMode', JSON.stringify(darkMode));
   }, [darkMode]);
 
-  // Get current user from localStorage since we're using custom auth
+  // Get current user - fetch from backend to ensure fresh approval status
   useEffect(() => {
-    try {
-      const user = authService.getCurrentUserFromStorage();
-      console.log('Current employee user from localStorage:', user);
-      if (user && user.role === 'employee') {
-        // Check if user is approved
-        if (user.status !== 'active') {
-          setError('Your account is pending approval. An administrator will review your account shortly.');
-          setTimeout(() => {
-            window.location.href = '/auth?status=pending';
-          }, 3000);
+    const fetchAndValidateUser = async () => {
+      try {
+        // First check if there's a token
+        const token = localStorage.getItem('accessToken');
+        if (!token) {
+          console.log('❌ No access token found, redirecting to login');
+          window.location.href = '/auth';
           return;
         }
-        setCurrentUser(user);
-      } else if (user && user.role === 'admin') {
-        // Redirect admin to admin dashboard
-        window.location.href = '/dashboard';
-      } else {
-        // No valid user, redirect to login
-        console.log('No valid employee user found, redirecting to login');
-        window.location.href = '/auth';
+
+        // Get stored user from localStorage - but don't trust it for approval status
+        const storedUser = authService.getCurrentUserFromStorage();
+        
+        if (!storedUser) {
+          console.log('❌ No stored user found');
+          window.location.href = '/auth';
+          return;
+        }
+
+        // If admin, redirect immediately to admin dashboard
+        if (storedUser.role === 'admin') {
+          console.log('🔀 Admin user detected, redirecting to admin dashboard');
+          window.location.href = '/dashboard';
+          return;
+        }
+
+        if (storedUser.role !== 'employee') {
+          console.log('❌ Invalid user role:', storedUser.role);
+          window.location.href = '/auth';
+          return;
+        }
+
+        // Fetch fresh user data from backend to check current approval status
+        console.log('📡 Fetching fresh user data from backend to verify approval status...');
+        try {
+          const freshUser = await authService.getCurrentUser();
+          console.log('✅ Fresh user data received:', { status: freshUser.status, role: freshUser.role });
+
+          // Update localStorage with fresh data
+          localStorage.setItem('user', JSON.stringify(freshUser));
+
+          // Check if user is approved using FRESH data from backend
+          if (freshUser.status === 'active') {
+            // User is approved ✅
+            console.log('✅ User approved, setting as current user');
+            setCurrentUser(freshUser);
+          } else {
+            // User is NOT approved ❌
+            console.log('⏳ User status is not active:', freshUser.status);
+            setError('Your account is pending approval by an administrator. Please check your email for updates.');
+            setTimeout(() => {
+              authService.logout();
+              window.location.href = '/auth?status=pending';
+            }, 3000);
+          }
+        } catch (backendErr) {
+          // Backend call failed - but we have valid token and stored user
+          console.error('⚠️ Backend fetch failed:', backendErr);
+          
+          // If stored user appears to be approved, allow access (last known good state)
+          if (storedUser.status === 'active') {
+            console.log('⚠️ Using stored user (backend unavailable but user appears approved)');
+            setCurrentUser(storedUser);
+          } else {
+            // Don't allow unapproved users to proceed without fresh verification
+            console.log('❌ Cannot verify approval status - backend unavailable and user not marked approved');
+            setError('Unable to verify your approval status. Please check your connection and try again.');
+            setTimeout(() => {
+              window.location.href = '/auth';
+            }, 3000);
+          }
+        }
+      } catch (err) {
+        console.error('❌ Error in user validation:', err);
+        setError('An error occurred while loading your dashboard. Please try again.');
       }
-    } catch (err) {
-      console.error('Error getting current user:', err);
-      setError('Failed to load user data');
-    }
+    };
+
+    fetchAndValidateUser();
   }, []);
 
   const { data: employeeStats, isLoading: statsLoading } = useQuery({
