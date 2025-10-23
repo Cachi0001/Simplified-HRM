@@ -212,6 +212,19 @@ export class EmployeeService {
 
       const updatedEmployee = await this.employeeRepository.update(id, { department });
 
+      // Send notification email to employee
+      try {
+        const emailService = new (await import('../services/EmailService')).EmailService();
+        await emailService.sendDepartmentAssignmentNotification(
+          updatedEmployee.email,
+          updatedEmployee.fullName,
+          department
+        );
+        logger.info('Department assignment email sent', { employeeId: id, department });
+      } catch (emailError) {
+        logger.warn('Department assignment email failed (non-critical)', { error: (emailError as Error).message });
+      }
+
       logger.info('EmployeeService: Department assigned successfully', { employeeId: id, department });
       return updatedEmployee;
     } catch (error) {

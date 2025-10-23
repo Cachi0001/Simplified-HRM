@@ -35,13 +35,28 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401 && error.response?.data?.errorType !== 'email_not_confirmed') {
-      // Only redirect on 401 AND not email confirmation errors
+    // Only redirect on 401 errors for auth failures
+    // Don't redirect on 403 (account not approved) or other auth-related errors
+    if (error.response?.status === 401) {
+      // Don't redirect for email confirmation errors
+      if (error.response?.data?.errorType === 'email_not_confirmed') {
+        return Promise.reject(error);
+      }
+      
+      // Don't redirect for account approval errors
+      if (error.response?.data?.message?.includes('pending approval')) {
+        return Promise.reject(error);
+      }
+
+      // Clear auth data and redirect only for true 401 auth failures
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
       window.location.href = '/auth';
     }
+    
+    // For 403 errors (account not approved, etc), just reject without redirect
+    // The component will handle the error appropriately
     return Promise.reject(error);
   }
 );

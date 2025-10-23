@@ -169,7 +169,7 @@ export function AdminDepartments({ darkMode = false }: AdminDepartmentsProps) {
             </div>
 
             <div className="flex gap-3">
-              <Button onClick={handleAssignDepartment} disabled={assignDepartmentMutation.isPending}>
+              <Button onClick={handleAssignDepartment} isLoading={assignDepartmentMutation.isPending} disabled={assignDepartmentMutation.isPending}>
                 <Check className="h-4 w-4 mr-2" />
                 Assign Department
               </Button>
@@ -210,7 +210,8 @@ export function AdminDepartments({ darkMode = false }: AdminDepartmentsProps) {
                     alert('No employees without departments found');
                   }
                 }}
-                disabled={employeesWithoutDepartment.length === 0}
+                isLoading={assignDepartmentMutation.isPending}
+                disabled={employeesWithoutDepartment.length === 0 || assignDepartmentMutation.isPending}
                 className={`text-xs ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
               >
                 {dept}
@@ -239,7 +240,7 @@ export function AdminDepartments({ darkMode = false }: AdminDepartmentsProps) {
             {employeesLoading ? (
               <div className="space-y-2">
                 {[1, 2, 3].map(i => (
-                  <div key={i} className={`h-12 rounded animate-pulse ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`} />
+                  <div key={`skeleton-${i}`} className={`h-12 rounded animate-pulse ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`} />
                 ))}
               </div>
             ) : employeesWithoutDepartment.length > 0 ? (
@@ -284,7 +285,7 @@ export function AdminDepartments({ darkMode = false }: AdminDepartmentsProps) {
             {employeesLoading ? (
               <div className="space-y-2">
                 {[1, 2, 3].map(i => (
-                  <div key={i} className={`h-8 rounded animate-pulse ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`} />
+                  <div key={`skeleton-dept-${i}`} className={`h-8 rounded animate-pulse ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`} />
                 ))}
               </div>
             ) : (

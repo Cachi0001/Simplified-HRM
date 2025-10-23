@@ -32,6 +32,14 @@ export default function EmployeeDashboard() {
       const user = authService.getCurrentUserFromStorage();
       console.log('Current employee user from localStorage:', user);
       if (user && user.role === 'employee') {
+        // Check if user is approved
+        if (user.status !== 'active') {
+          setError('Your account is pending approval. An administrator will review your account shortly.');
+          setTimeout(() => {
+            window.location.href = '/auth?status=pending';
+          }, 3000);
+          return;
+        }
         setCurrentUser(user);
       } else if (user && user.role === 'admin') {
         // Redirect admin to admin dashboard

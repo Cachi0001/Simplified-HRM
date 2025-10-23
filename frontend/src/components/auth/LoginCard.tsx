@@ -47,6 +47,7 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
       if (response.data.requiresEmailVerification) {
         setShowResendButton(true);
         addToast('info', response.data.message || 'Please verify your email before logging in');
+        setIsLoading(false);
         return;
       }
 
@@ -90,38 +91,35 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
     } catch (err: any) {
       console.error('Login error:', err);
 
+      // IMPORTANT: Always ensure isLoading is false for error cases
+      setIsLoading(false);
+
+      // Check for email confirmation error first
       if (err.response?.data?.errorType === 'email_not_confirmed') {
         setShowResendButton(true);
         addToast('info', err.response.data.message);
         return; // Don't set error state for confirmation messages
       }
 
-      if (err instanceof Error) {
-        let errorMessage = err.message;
+      // Get error message from various possible locations
+      const errorMessage = err.response?.data?.message || err.message || 'An error occurred during login';
 
-        // Provide more specific guidance based on error type
-        if (errorMessage.includes('Invalid email or password')) {
-          errorMessage = 'Invalid email or password. Please check your credentials and try again.';
-          addToast('error', errorMessage);
-        } else if (errorMessage.includes('pending approval') || errorMessage.includes('pending admin approval')) {
-          // Use warning toast for pending status since it's expected behavior - DON'T refresh page
-          addToast('warning', 'Your account is pending admin approval. Please wait for admin approval before logging in.');
-          return; // Exit early - don't continue with error flow
-        } else if (errorMessage.includes('Account not found')) {
-          errorMessage = 'Account not found. Please check your email or contact support.';
-          addToast('error', errorMessage);
-        } else if (errorMessage.includes('Please verify your email') || errorMessage.includes('verify your email')) {
-          setShowResendButton(true);
-          addToast('info', 'Please verify your email address before logging in. Check your inbox for the confirmation link.');
-          return;
-        } else {
-          addToast('error', errorMessage);
-        }
+      // Provide more specific guidance based on error type
+      if (errorMessage.includes('Invalid email or password')) {
+        addToast('error', 'Invalid email or password. Please check your credentials and try again.');
+      } else if (errorMessage.includes('pending approval') || errorMessage.includes('pending admin approval')) {
+        // Use warning toast for pending status since it's expected behavior - DON'T refresh page
+        addToast('warning', 'Your account is pending admin approval. Please wait for admin approval before logging in.');
+        return; // Exit early - don't continue with error flow
+      } else if (errorMessage.includes('Account not found')) {
+        addToast('error', 'Account not found. Please check your email or contact support.');
+      } else if (errorMessage.includes('Please verify your email') || errorMessage.includes('verify your email')) {
+        setShowResendButton(true);
+        addToast('info', 'Please verify your email address before logging in. Check your inbox for the confirmation link.');
+        return;
       } else {
-        addToast('error', 'An unexpected error occurred.');
+        addToast('error', errorMessage);
       }
-    } finally {
-      setIsLoading(false);
     }
   };
 

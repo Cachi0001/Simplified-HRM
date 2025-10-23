@@ -235,7 +235,7 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
             </div>
 
             <div className="flex gap-3">
-              <Button onClick={handleCreateTask} disabled={createTaskMutation.isPending}>
+              <Button onClick={handleCreateTask} isLoading={createTaskMutation.isPending} disabled={createTaskMutation.isPending}>
                 Create Task
               </Button>
               <Button
@@ -287,7 +287,7 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
       {tasksLoading ? (
         <div className="space-y-3">
           {[1, 2, 3, 4, 5].map(i => (
-            <Card key={i} className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+            <Card key={`skeleton-task-${i}`} className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
               <div className={`p-4 h-20 rounded animate-pulse ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`} />
             </Card>
           ))}
@@ -344,12 +344,16 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
                         {task.status === 'pending' && (
                           <Button
                             onClick={() => handleStatusUpdate(task.id, 'in_progress')}
+                            isLoading={updateStatusMutation.isPending}
+                            disabled={updateStatusMutation.isPending || deleteTaskMutation.isPending}
                           >
                             Start
                           </Button>
                         )}
                         <Button
                           onClick={() => handleStatusUpdate(task.id, 'completed')}
+                          isLoading={updateStatusMutation.isPending}
+                          disabled={updateStatusMutation.isPending || deleteTaskMutation.isPending}
                           className="text-green-600 border-green-600 hover:bg-green-600 hover:text-white"
                         >
                           <CheckCircle className="h-4 w-4" />
@@ -360,6 +364,8 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
                     {/* Delete Button */}
                     <Button
                       onClick={() => handleDeleteTask(task.id)}
+                      isLoading={deleteTaskMutation.isPending}
+                      disabled={updateStatusMutation.isPending || deleteTaskMutation.isPending}
                       className="text-red-600 border-red-600 hover:bg-red-600 hover:text-white"
                     >
                       <Trash2 className="h-4 w-4" />

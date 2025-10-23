@@ -1,5 +1,6 @@
 import { ITaskRepository } from '../repositories/interfaces/ITaskRepository';
 import { Task as TaskModel, ITask, CreateTaskRequest, UpdateTaskRequest, TaskQuery } from '../models/Task';
+import { Employee } from '../models/Employee';
 import logger from '../utils/logger';
 
 export class TaskService {
@@ -21,14 +22,20 @@ export class TaskService {
 
       // Send notification email to assignee
       try {
-        const emailService = new (await import('../services/EmailService')).EmailService();
-        await emailService.sendTaskNotification(
-          taskData.assigneeId,
-          task.title,
-          task.description || '',
-          new Date(task.dueDate).toLocaleDateString()
-        );
-        logger.info('Task notification email sent', { assigneeId: taskData.assigneeId, taskId: task.id });
+        const employee = await Employee.findById(taskData.assigneeId);
+        if (employee) {
+          const emailService = new (await import('../services/EmailService')).EmailService();
+          await emailService.sendTaskNotification(
+            employee.email,
+            employee.fullName,
+            task.title,
+            task.description || '',
+            new Date(task.dueDate).toLocaleDateString()
+          );
+          logger.info('Task notification email sent', { assigneeId: taskData.assigneeId, taskId: task.id });
+        } else {
+          logger.warn('Employee not found for task notification', { assigneeId: taskData.assigneeId });
+        }
       } catch (emailError) {
         logger.warn('Task notification email failed (non-critical)', { error: (emailError as Error).message });
       }
@@ -133,13 +140,18 @@ export class TaskService {
       // Send notification if task is completed
       if (status === 'completed') {
         try {
-          const emailService = new (await import('../services/EmailService')).EmailService();
-          await emailService.sendTaskCompletionNotification(
-            existingTask.assigneeId,
-            updatedTask.title,
-            'Task completed successfully!'
-          );
-          logger.info('Task completion notification sent', { assigneeId: existingTask.assigneeId, taskId: id });
+          const admin = await Employee.findById(existingTask.assignedBy);
+          const employee = await Employee.findById(existingTask.assigneeId);
+          if (admin && employee) {
+            const emailService = new (await import('../services/EmailService')).EmailService();
+            await emailService.sendTaskCompletionNotification(
+              admin.email,
+              admin.fullName,
+              employee.fullName,
+              updatedTask.title
+            );
+            logger.info('Task completion notification sent', { adminId: existingTask.assignedBy, taskId: id });
+          }
         } catch (emailError) {
           logger.warn('Task completion notification failed (non-critical)', { error: (emailError as Error).message });
         }
