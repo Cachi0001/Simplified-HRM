@@ -23,12 +23,12 @@ const AuthPage: React.FC = () => {
   const renderView = () => {
     switch (view) {
       case 'signup':
-        return <SignupCard onSwitchToLogin={() => setView('login')} />;
+        return <SignupCard key="signup" onSwitchToLogin={() => setView('login')} />;
       case 'forgot-password':
-        return <ForgotPasswordCard onSwitchToLogin={() => setView('login')} />;
+        return <ForgotPasswordCard key="forgot-password" onSwitchToLogin={() => setView('login')} />;
       case 'login':
       default:
-        return <LoginCard onSwitchToSignup={() => setView('signup')} onSwitchToForgotPassword={() => setView('forgot-password')} />;
+        return <LoginCard key="login" onSwitchToSignup={() => setView('signup')} onSwitchToForgotPassword={() => setView('forgot-password')} />;
     }
   };
 

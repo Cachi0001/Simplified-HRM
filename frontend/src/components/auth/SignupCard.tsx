@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { authService } from '../../services/authService';
+import { AuthCard } from '../ui/Card';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
+import { PasswordInput } from '../ui/PasswordInput';
+import { authService } from '../../services/authService';
 import { useToast } from '../ui/Toast';
-import { AuthCard } from '../ui/Card';
 
 interface SignupCardProps {
   onSwitchToLogin: () => void;
@@ -104,15 +105,15 @@ const SignupCard: React.FC<SignupCardProps> = ({ onSwitchToLogin }) => {
           required
           autoComplete="email"
         />
-        <Input
+        <PasswordInput
           id="password"
-          type="password"
           label="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
           autoComplete="new-password"
           minLength={6}
+          placeholder="Create a strong password"
         />
 
         <Button type="submit" className="w-full" isLoading={isLoading}>

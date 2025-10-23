@@ -26,7 +26,7 @@ router.get('/me', authenticateToken, (req, res) => authController.getCurrentUser
 router.post('/refresh', authenticateToken, (req, res) => authController.refreshToken(req, res));
 router.post('/signout', (req, res) => authController.signOut(req, res));
 router.post('/forgot-password', (req, res) => authController.resetPassword(req, res));
-router.post('/google', (req, res) => authController.signInWithGoogle(req, res));
+router.post('/reset-password/:token', (req, res) => authController.resetPasswordWithToken(req, res));
 router.put('/update-password', (req, res) => authController.updatePassword(req, res));
 router.get('/debug/tokens', async (req, res) => {
   try {

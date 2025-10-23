@@ -328,7 +328,7 @@ export class EmailService {
     }
   }
 
-  async sendConfirmationEmail(email: string, fullName: string, confirmationUrl: string): Promise<void> {
+  async sendPasswordResetEmail(email: string, fullName: string, resetUrl: string): Promise<void> {
     try {
       if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
         throw new Error('SMTP credentials not configured');
@@ -337,61 +337,76 @@ export class EmailService {
       const mailOptions = {
         from: `"Go3net HR Management System" <${process.env.FROM_EMAIL}>`,
         to: email,
-        subject: 'Confirm Your Go3net Account',
+        subject: 'Reset Your Password - Go3net HR Management System',
         html: `
           <!DOCTYPE html>
-          <html>
+          <html lang="en">
           <head>
-            <meta charset="UTF-8">
-            <title>Confirm Your Go3net Account</title>
-            <style>
-              body {font-family: Arial, Helvetica, sans-serif; background:#f4f4f4; padding:20px;}
-              .container {max-width:600px; margin:auto; background:#fff; padding:30px; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,.1);}
-              .button {display:inline-block; background:#007bff; color:#000000; padding:14px 28px; text-decoration:none; border-radius:6px; font-weight:bold; font-size:15px; border: 2px solid #007bff;}
-              .fallback {margin-top:20px; font-size:13px; color:#555; word-break:break-all;}
-              .footer {margin-top:30px; font-size:12px; color:#777;}
-            </style>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Reset Your Password - Go3net HR Management System</title>
+              <style>
+                  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333333; margin: 0; padding: 0; background-color: #f4f4f4; }
+                  .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); overflow: hidden; }
+                  .header { background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); padding: 40px 30px; text-align: center; color: white; }
+                  .header h1 { margin: 0; font-size: 28px; font-weight: 600; letter-spacing: 0.5px; }
+                  .content { padding: 40px 30px; }
+                  .greeting { font-size: 18px; margin-bottom: 20px; color: #333333; }
+                  .message { font-size: 16px; line-height: 1.6; margin-bottom: 30px; color: #555555; }
+                  .warning-box { background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%); border: 1px solid #ffeaa7; border-radius: 8px; padding: 20px; margin: 20px 0; }
+                  .warning-box p { margin: 0; color: #856404; font-size: 14px; font-weight: 500; }
+                  .reset-button { display: inline-block; background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); color: #ffffff; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-weight: 600; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3); transition: all 0.3s ease; text-transform: uppercase; }
+                  .reset-button:hover { background: linear-gradient(135deg, #c82333 0%, #a71e2a 100%); box-shadow: 0 6px 20px rgba(220, 53, 69, 0.4); transform: translateY(-2px); }
+                  .footer { background-color: #f8f9fa; padding: 30px; text-align: center; border-top: 1px solid #e9ecef; }
+                  .footer p { margin: 0; font-size: 14px; color: #6c757d; }
+                  .fallback { margin-top: 20px; font-size: 13px; color: #555; word-break: break-all; }
+                  @media only screen and (max-width: 600px) { .email-container { margin: 0; border-radius: 0; } .header { padding: 30px 20px; } .content { padding: 30px 20px; } .reset-button { display: block; width: 100%; box-sizing: border-box; text-align: center; } }
+              </style>
           </head>
           <body>
-            <div class="container">
-              <h2>Welcome to Go3net HR Management System!</h2>
-              <p>Click below to confirm your account and complete your registration:</p>
-
-              <p style="text-align:center;">
-                <a href="${confirmationUrl}" class="button">
-                  Confirm Account
-                </a>
-              </p>
-
-              <p><strong>This link expires in 1 hour.</strong></p>
-
-              <div class="fallback">
-                <p>If the button doesn't work, copy & paste this URL into your browser:</p>
-                <p><a href="${confirmationUrl}">${confirmationUrl}</a></p>
+              <div class="email-container">
+                  <div class="header">
+                      <h1>🔒 Password Reset</h1>
+                      <p>Reset Your Account Password</p>
+                  </div>
+                  <div class="content">
+                      <p class="greeting">Hello ${fullName},</p>
+                      <p class="message">We received a request to reset your password for your Go3net HR Management System account. If you made this request, click the button below to create a new password.</p>
+                      <div class="warning-box">
+                          <p><strong>⚠️ Security Notice:</strong> This password reset link will expire in 1 hour for your security. If you didn't request this reset, please ignore this email.</p>
+                      </div>
+                      <div style="text-align: center; margin: 40px 0;">
+                          <a href="${resetUrl}" class="reset-button">Reset Password</a>
+                      </div>
+                      <div class="fallback">
+                          <p><strong>If the button doesn't work, copy & paste this URL into your browser:</strong></p>
+                          <p><a href="${resetUrl}">${resetUrl}</a></p>
+                      </div>
+                      <p class="message">After resetting your password, you'll be able to sign in to your account normally. If you need assistance, please contact your HR department.</p>
+                  </div>
+                  <div class="footer">
+                      <p>This is an automated message from Go3net HR Management System.</p>
+                      <p style="margin-top: 15px;">© Go3net HR Management System. All rights reserved.</p>
+                  </div>
               </div>
-
-              <div class="footer">
-                <p>© Go3net HR Management System. All rights reserved.</p>
-              </div>
-            </div>
           </body>
           </html>
         `
       };
 
-      logger.info('📧 Sending confirmation email', {
+      logger.info('📧 Sending password reset email', {
         to: email,
         from: process.env.FROM_EMAIL,
-        confirmationUrl: confirmationUrl.substring(0, 100) + '...' // Log partial URL for security
+        resetUrl: resetUrl.substring(0, 100) + '...' // Log partial URL for security
       });
 
       const result = await this.transporter.sendMail(mailOptions);
-      logger.info('✅ Confirmation email sent successfully', {
+      logger.info('✅ Password reset email sent successfully', {
         messageId: result.messageId,
         to: email
       });
     } catch (error) {
-      logger.error('❌ Failed to send confirmation email', {
+      logger.error('❌ Failed to send password reset email', {
         error: (error as Error).message,
         stack: (error as Error).stack,
         to: email,

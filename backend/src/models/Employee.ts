@@ -19,6 +19,8 @@ export interface IEmployee extends Document {
   status: 'active' | 'rejected' | 'pending';
   emailVerificationToken?: string;
   emailVerificationExpires?: Date;
+  passwordResetToken?: string;
+  passwordResetExpires?: Date;
   emailVerified: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -84,6 +86,14 @@ const EmployeeSchema = new Schema<IEmployee>(
       default: null,
     },
     emailVerificationExpires: {
+      type: Date,
+      default: null,
+    },
+    passwordResetToken: {
+      type: String,
+      default: null,
+    },
+    passwordResetExpires: {
       type: Date,
       default: null,
     },

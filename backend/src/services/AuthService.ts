@@ -1,6 +1,7 @@
 import { IAuthRepository } from '../repositories/interfaces/IAuthRepository';
 import { IUser, CreateUserRequest, LoginRequest, AuthResponse } from '../models/User';
 import logger from '../utils/logger';
+import bcrypt from 'bcryptjs';
 
 export class AuthService {
   constructor(private authRepository: IAuthRepository) {}
@@ -104,6 +105,29 @@ export class AuthService {
     }
   }
 
+  async updatePassword(email: string, currentPassword: string, newPassword: string): Promise<void> {
+    try {
+      if (!email || !currentPassword || !newPassword) {
+        throw new Error('Email, current password, and new password are required');
+      }
+
+      const user = await this.authRepository.getCurrentUser(email);
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      const isValid = await bcrypt.compare(currentPassword, user.passwordHash);
+      if (!isValid) {
+        throw new Error('Current password is incorrect');
+      }
+
+      user.passwordHash = await bcrypt.hash(newPassword, 10);
+      await user.save();
+    } catch (error) {
+      logger.error('AuthService: Update password failed', { error: (error as Error).message });
+      throw error;
+    }
+  }
   async getCurrentUser(accessToken: string): Promise<IUser> {
     try {
       if (!accessToken) {
@@ -238,16 +262,16 @@ export class AuthService {
     }
   }
 
-  async updatePasswordByEmail(email: string, newPassword: string): Promise<void> {
+  async resetPasswordWithToken(token: string, newPassword: string): Promise<void> {
     try {
-      if (!email || !newPassword) {
-        throw new Error('Email and new password are required');
+      if (!token || !newPassword) {
+        throw new Error('Token and new password are required');
       }
 
-      await this.authRepository.updatePasswordByEmail(email, newPassword);
-      logger.info('AuthService: Password updated by email');
+      await this.authRepository.resetPasswordWithToken(token, newPassword);
+      logger.info('AuthService: Password reset with token successful');
     } catch (error) {
-      logger.error('AuthService: Password update by email failed', { error: (error as Error).message });
+      logger.error('AuthService: Password reset with token failed', { error: (error as Error).message });
       throw error;
     }
   }

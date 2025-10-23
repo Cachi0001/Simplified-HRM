@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import HomePage from './src/pages/HomePage';
 import AuthPage from './src/pages/AuthPage';
 import ConfirmEmail from './src/pages/ConfirmEmail';
+import ResetPasswordCard from './src/components/auth/ResetPasswordCard';
 import AdminDashboard from './src/pages/AdminDashboard';
 import EmployeeDashboard from './src/pages/EmployeeDashboard';
 import Header from './src/components/layout/Header';
@@ -32,6 +33,7 @@ function App() {
                 <Route path="/" element={<HomePage />} />
                 <Route path="/auth" element={<AuthPage />} />
                 <Route path="/confirm" element={<ConfirmEmail />} />
+                <Route path="/reset-password" element={<ResetPasswordCard />} />
                 <Route path="/dashboard" element={
                   <ProtectedRoute>
                     <AdminDashboard />

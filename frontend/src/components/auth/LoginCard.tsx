@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AuthCard } from '../ui/Card';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
+import { PasswordInput } from '../ui/PasswordInput';
 import { authService } from '../../services/authService';
 import { useToast } from '../ui/Toast';
 
@@ -40,26 +41,37 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
         return;
       }
 
-      addToast('success', 'Login successful! Redirecting...');
-
-      // Store user data for UI state
-      localStorage.setItem('user', JSON.stringify(user));
-      localStorage.setItem('accessToken', accessToken);
-      localStorage.setItem('refreshToken', refreshToken);
-
       // Redirect based on user role with immediate navigation
       if (user.role === 'admin') {
+        addToast('success', 'Login successful! Redirecting to dashboard...');
         setTimeout(() => {
-          navigate('/dashboard');
-        }, 500);
+          try {
+            navigate('/dashboard', { replace: true });
+          } catch (error) {
+            console.error('Navigation error:', error);
+            window.location.href = '/dashboard';
+          }
+        }, 1000);
       } else if (user.role === 'employee') {
+        addToast('success', 'Login successful! Redirecting to dashboard...');
         setTimeout(() => {
-          navigate('/employee-dashboard');
-        }, 500);
+          try {
+            navigate('/employee-dashboard', { replace: true });
+          } catch (error) {
+            console.error('Navigation error:', error);
+            window.location.href = '/employee-dashboard';
+          }
+        }, 1000);
       } else {
+        addToast('success', 'Login successful! Redirecting...');
         setTimeout(() => {
-          navigate('/');
-        }, 500);
+          try {
+            navigate('/', { replace: true });
+          } catch (error) {
+            console.error('Navigation error:', error);
+            window.location.href = '/';
+          }
+        }, 1000);
       }
 
     } catch (err: any) {
@@ -124,14 +136,14 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
           required
           autoComplete="email"
         />
-        <Input
+        <PasswordInput
           id="password"
-          type="password"
           label="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
           autoComplete="current-password"
+          placeholder="Enter your password"
         />
 
         <div className="flex items-center justify-between">

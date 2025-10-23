@@ -4,7 +4,6 @@ import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { authService } from '../../services/authService';
 import { useToast } from '../ui/Toast';
-import { Eye, EyeOff } from 'lucide-react';
 
 interface ForgotPasswordCardProps {
   onSwitchToLogin: () => void;
@@ -12,49 +11,76 @@ interface ForgotPasswordCardProps {
 
 const ForgotPasswordCard: React.FC<ForgotPasswordCardProps> = ({ onSwitchToLogin }) => {
   const [email, setEmail] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isEmailSent, setIsEmailSent] = useState(false);
   const { addToast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (newPassword !== confirmPassword) {
-      addToast('error', 'Passwords do not match');
-      return;
-    }
-
-    if (newPassword.length < 8) {
-      addToast('error', 'Password must be at least 8 characters long');
+    if (!email.trim()) {
+      addToast('error', 'Please enter your email address');
       return;
     }
 
     setIsLoading(true);
 
     try {
-      // For now, we'll use the reset password functionality
-      // In a real implementation, you might want to use a token-based system
-      await authService.updatePassword(email, newPassword);
-      addToast('success', 'Password updated successfully! You can now sign in with your new password.');
-      onSwitchToLogin();
-    } catch (err) {
-      if (err instanceof Error) {
-        addToast('error', err.message);
-      } else {
-        addToast('error', 'An unexpected error occurred.');
-      }
+      await authService.resetPassword(email);
+      setIsEmailSent(true);
+      addToast('success', 'Password reset email sent! Please check your inbox and follow the instructions to reset your password.');
+    } catch (err: any) {
+      addToast('error', err.message || 'Failed to send password reset email. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
+  if (isEmailSent) {
+    return (
+      <AuthCard
+        title="Check Your Email"
+        subtitle="Password reset instructions sent"
+      >
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <p className="text-sm text-blue-800">
+              We've sent password reset instructions to <strong>{email}</strong>
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-sm text-gray-600">
+              Click the link in the email to reset your password. The link will expire in 1 hour.
+            </p>
+
+            <Button onClick={() => setIsEmailSent(false)} className="w-full bg-gray-100 text-gray-700 hover:bg-gray-200">
+              Send Another Email
+            </Button>
+
+            <button
+              type="button"
+              onClick={onSwitchToLogin}
+              className="w-full text-sm text-gray-600 hover:text-gray-800"
+            >
+              Back to Login
+            </button>
+          </div>
+        </div>
+      </AuthCard>
+    );
+  }
+
   return (
     <AuthCard
-      title="Reset Password"
-      subtitle="Enter your email and create a new password."
+      title="Forgot Password"
+      subtitle="Enter your email to receive password reset instructions"
     >
       <form onSubmit={handleSubmit} className="space-y-6">
         <Input
@@ -65,55 +91,22 @@ const ForgotPasswordCard: React.FC<ForgotPasswordCardProps> = ({ onSwitchToLogin
           onChange={(e) => setEmail(e.target.value)}
           required
           autoComplete="email"
+          placeholder="Enter your registered email address"
         />
 
-        <div className="relative">
-          <Input
-            id="newPassword"
-            type={showPassword ? "text" : "password"}
-            label="New Password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            required
-            autoComplete="new-password"
-          />
-          <button
-            type="button"
-            onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-8 text-gray-500 hover:text-gray-700"
-          >
-            {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-          </button>
-        </div>
-
-        <div className="relative">
-          <Input
-            id="confirmPassword"
-            type={showConfirmPassword ? "text" : "password"}
-            label="Confirm New Password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            required
-            autoComplete="new-password"
-          />
-          <button
-            type="button"
-            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-            className="absolute right-3 top-8 text-gray-500 hover:text-gray-700"
-          >
-            {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-          </button>
-        </div>
-
         <Button type="submit" className="w-full" isLoading={isLoading}>
-          Update Password
+          Send Reset Instructions
         </Button>
-        <p className="text-center text-sm text-gray-400">
-          Remember your password?{' '}
-          <button type="button" onClick={onSwitchToLogin} className="font-medium text-highlight hover:text-blue-500">
-            Sign in
+
+        <div className="text-center">
+          <button
+            type="button"
+            onClick={onSwitchToLogin}
+            className="text-sm text-gray-600 hover:text-gray-800"
+          >
+            Back to Login
           </button>
-        </p>
+        </div>
       </form>
     </AuthCard>
   );

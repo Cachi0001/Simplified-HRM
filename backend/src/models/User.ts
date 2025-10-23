@@ -9,6 +9,7 @@ export interface IUser extends Document {
   fullName: string;
   role: 'admin' | 'employee';
   emailVerified: boolean;
+  passwordHash: string;
   emailVerificationToken?: string;
   emailVerificationExpires?: Date;
   passwordResetToken?: string;

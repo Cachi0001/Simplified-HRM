@@ -24,14 +24,14 @@ export class AuthController {
 
       // Check if email confirmation is required
       if (result.requiresConfirmation) {
-        logger.info('📧 [AuthController] Magic link sent - returning confirmation response', {
+        logger.info('📧 [AuthController] Email confirmation required - returning confirmation response', {
           userId: result.user.id,
           email: userData.email
         });
 
         res.status(200).json({
           status: 'success',
-          message: result.message || 'Check your inbox – we sent you a magic link to confirm your account',
+          message: result.message || 'Please check your email and click the confirmation link to activate your account',
           data: {
             user: result.user.toObject ? result.user.toObject() : result.user, // Handle both Mongoose model and plain object
             requiresConfirmation: true
@@ -85,16 +85,47 @@ export class AuthController {
     try {
       const credentials: LoginRequest = req.body;
 
-      logger.info('🔐 [AuthController] Magic link signin request', { email: credentials.email });
+      logger.info('🔐 [AuthController] Password signin request', { email: credentials.email });
 
       const result = await this.authService.signIn(credentials);
 
+      // Check if response has the expected structure
+      if (!result || !result.user) {
+        console.error('Invalid response structure:', result);
+        throw new Error('Invalid response from server');
+      }
+
+      // Check if email verification is required
+      if (result.requiresEmailVerification) {
+        logger.info('📧 [AuthController] Email verification required', {
+          userId: result.user.id,
+          email: credentials.email
+        });
+
+        res.status(200).json({
+          status: 'success',
+          message: result.message || 'Please verify your email before logging in',
+          data: {
+            user: result.user.toObject ? result.user.toObject() : result.user,
+            requiresEmailVerification: true
+          }
+        });
+        return;
+      }
+
+      logger.info('✅ [AuthController] Login successful', {
+        userId: result.user.id,
+        email: credentials.email,
+        role: result.user.role
+      });
+
       res.status(200).json({
         status: 'success',
-        message: result.message || 'Check your inbox – we sent you a magic link to sign in',
+        message: result.message || 'Login successful! Redirecting...',
         data: {
-          user: result.user.toObject ? result.user.toObject() : result.user, // Handle both Mongoose model and plain object
-          requiresConfirmation: true
+          user: result.user.toObject ? result.user.toObject() : result.user,
+          accessToken: result.accessToken,
+          refreshToken: result.refreshToken
         }
       });
     } catch (error) {
@@ -125,6 +156,7 @@ export class AuthController {
       });
     }
   }
+
 
   async signInWithGoogle(req: Request, res: Response): Promise<void> {
     try {
@@ -179,6 +211,28 @@ export class AuthController {
     }
   }
 
+    async updatePassword(req: Request, res: Response): Promise<void> {
+    try {
+      const { email, currentPassword, newPassword } = req.body;
+
+      if (!email || !currentPassword || !newPassword) {
+        res.status(400).json({ status: 'error', message: 'Email, current password, and new password are required' });
+        return;
+      }
+
+      if (newPassword.length < 6) {
+        res.status(400).json({ status: 'error', message: 'New password must be at least 6 characters' });
+        return;
+      }
+
+      await this.authService.updatePassword(email, currentPassword, newPassword);
+
+      res.status(200).json({ status: 'success', message: 'Password updated successfully' });
+    } catch (error) {
+      logger.error('AuthController: Update password error', { error: (error as Error).message });
+      res.status(400).json({ status: 'error', message: (error as Error).message });
+    }
+  }
   async signOut(req: Request, res: Response): Promise<void> {
     try {
       const accessToken = req.headers.authorization?.split(' ')[1];
@@ -459,26 +513,35 @@ export class AuthController {
     }
   }
 
-  async updatePassword(req: Request, res: Response): Promise<void> {
+  async resetPasswordWithToken(req: Request, res: Response): Promise<void> {
     try {
-      const { email, newPassword } = req.body;
+      const { token } = req.params;
+      const { newPassword } = req.body;
 
-      if (!email || !newPassword) {
+      if (!token || !newPassword) {
         res.status(400).json({
           status: 'error',
-          message: 'Email and new password are required'
+          message: 'Token and new password are required'
         });
         return;
       }
 
-      await this.authService.updatePasswordByEmail(email, newPassword);
+      if (newPassword.length < 8) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Password must be at least 8 characters long'
+        });
+        return;
+      }
+
+      await this.authService.resetPasswordWithToken(token, newPassword);
 
       res.status(200).json({
         status: 'success',
-        message: 'Password updated successfully'
+        message: 'Password reset successfully! You can now sign in with your new password.'
       });
     } catch (error) {
-      logger.error('AuthController: Update password error', { error: (error as Error).message });
+      logger.error('AuthController: Password reset with token error', { error: (error as Error).message });
       res.status(400).json({
         status: 'error',
         message: (error as Error).message

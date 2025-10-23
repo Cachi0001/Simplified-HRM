@@ -98,7 +98,7 @@ export class MongoAuthRepository implements IAuthRepository {
       });
 
       const emailService = new (require('../../services/EmailService').EmailService)();
-      await emailService.sendConfirmationEmail(user.email, user.fullName, confirmationUrl);
+      await emailService.sendEmailConfirmation(user.email, user.fullName, confirmationUrl);
 
       logger.info('✅ [MongoAuthRepository] User created successfully', {
         userId: user._id,
@@ -280,8 +280,26 @@ export class MongoAuthRepository implements IAuthRepository {
       const resetToken = user.generatePasswordResetToken();
       await user.save();
 
-      // TODO: Send password reset email
-      logger.info('✅ [MongoAuthRepository] Password reset token generated', {
+      // Update employee record
+      const employee = await Employee.findOne({ userId: user._id });
+      if (employee) {
+        employee.passwordResetToken = resetToken;
+        employee.passwordResetExpires = user.passwordResetExpires;
+        await employee.save();
+      }
+
+      // Send password reset email with token
+      const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`;
+      logger.info('📧 [MongoAuthRepository] Sending password reset email', {
+        email: user.email,
+        resetUrl: resetUrl.substring(0, 100) + '...',
+        token: resetToken.substring(0, 10) + '...'
+      });
+
+      const emailService = new (require('../../services/EmailService').EmailService)();
+      await emailService.sendPasswordResetEmail(user.email, user.fullName, resetUrl);
+
+      logger.info('✅ [MongoAuthRepository] Password reset email sent', {
         userId: user._id,
         email: user.email
       });
@@ -344,6 +362,55 @@ export class MongoAuthRepository implements IAuthRepository {
 
     } catch (error) {
       logger.error('❌ [MongoAuthRepository] Update password by email failed:', error);
+      throw error;
+    }
+  }
+
+  async resetPasswordWithToken(token: string, newPassword: string): Promise<void> {
+    try {
+      logger.info('🔑 [MongoAuthRepository] Resetting password with token', { token });
+
+      // Find user by password reset token
+      const user = await User.findOne({ passwordResetToken: token });
+      if (!user) {
+        logger.warn('❌ [MongoAuthRepository] User not found with reset token', { token });
+        throw new Error('Invalid or expired reset token');
+      }
+
+      // Check if token is still valid (not expired)
+      if (!user.isValidPasswordResetToken(token)) {
+        logger.warn('❌ [MongoAuthRepository] Reset token expired', {
+          token,
+          expires: user.passwordResetExpires,
+          now: new Date()
+        });
+        throw new Error('Reset token has expired. Please request a new password reset.');
+      }
+
+      // Update password
+      user.password = newPassword;
+      user.passwordResetToken = undefined;
+      user.passwordResetExpires = undefined;
+
+      // Clear all refresh tokens for security
+      user.refreshTokens = [];
+      await user.save();
+
+      // Update employee record if exists
+      const employee = await Employee.findOne({ userId: user._id });
+      if (employee) {
+        employee.passwordResetToken = undefined;
+        employee.passwordResetExpires = undefined;
+        await employee.save();
+      }
+
+      logger.info('✅ [MongoAuthRepository] Password reset successfully', {
+        userId: user._id,
+        email: user.email
+      });
+
+    } catch (error) {
+      logger.error('❌ [MongoAuthRepository] Reset password with token failed:', error);
       throw error;
     }
   }
@@ -521,7 +588,7 @@ export class MongoAuthRepository implements IAuthRepository {
       // Send confirmation email with new verification token
       const confirmationUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/confirm?token=${verificationToken}`;
       const emailService = new (require('../../services/EmailService').EmailService)();
-      await emailService.sendConfirmationEmail(user.email, user.fullName, confirmationUrl);
+      await emailService.sendEmailConfirmation(user.email, user.fullName, confirmationUrl);
 
       return {
         message: 'Confirmation email resent successfully. Please check your inbox.'
