@@ -121,16 +121,16 @@ export class AuthService {
     }
   }
 
-  // Resend confirmation email
-  async resendConfirmationEmail(email: string): Promise<{ success: boolean; message: string }> {
+  // Reset password (request)
+  async resetPassword(email: string): Promise<{ success: boolean; message: string }> {
     try {
-      const response = await api.post('/auth/resend-confirmation', { email });
+      const response = await api.post('/auth/forgot-password', { email });
       return {
         success: true,
-        message: response.data.message || 'Confirmation email resent successfully'
+        message: response.data.message || 'Password reset email sent successfully'
       };
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to resend confirmation email');
+      throw new Error(error.response?.data?.message || 'Failed to send password reset email');
     }
   }
 

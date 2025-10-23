@@ -100,6 +100,14 @@ export class MongoAuthRepository implements IAuthRepository {
       const emailService = new (require('../../services/EmailService').EmailService)();
       await emailService.sendEmailConfirmation(user.email, user.fullName, confirmationUrl);
 
+      // Send notification to admins about new employee signup
+      try {
+        await this.notifyAdminsOfNewSignup(user, employee);
+      } catch (notificationError) {
+        logger.warn('⚠️ [MongoAuthRepository] Failed to send admin notification:', notificationError);
+        // Don't fail the signup if notification fails
+      }
+
       logger.info('✅ [MongoAuthRepository] User created successfully', {
         userId: user._id,
         email: user.email,
@@ -596,6 +604,48 @@ export class MongoAuthRepository implements IAuthRepository {
 
     } catch (error) {
       logger.error('❌ [MongoAuthRepository] Resend confirmation email failed:', error);
+      throw error;
+    }
+  }
+
+  private async notifyAdminsOfNewSignup(user: any, employee: any): Promise<void> {
+    try {
+      // Find all admin users
+      const adminUsers = await User.find({ role: 'admin' });
+
+      if (adminUsers.length === 0) {
+        logger.info('ℹ️ [MongoAuthRepository] No admin users found for notification');
+        return;
+      }
+
+      logger.info('📢 [MongoAuthRepository] Notifying admins of new signup', {
+        newUserId: user._id,
+        newUserEmail: user.email,
+        adminCount: adminUsers.length
+      });
+
+      // Send email notification to each admin
+      const emailService = new (require('../../services/EmailService').EmailService)();
+
+      for (const admin of adminUsers) {
+        try {
+          await emailService.sendApprovalNotification(admin.email, admin.fullName, {
+            employeeName: user.fullName,
+            employeeEmail: user.email,
+            signupDate: new Date().toLocaleDateString(),
+            approvalUrl: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard`
+          });
+        } catch (emailError) {
+          logger.warn('⚠️ [MongoAuthRepository] Failed to send notification email to admin:', {
+            adminEmail: admin.email,
+            error: emailError
+          });
+        }
+      }
+
+      logger.info('✅ [MongoAuthRepository] Admin notifications sent successfully');
+    } catch (error) {
+      logger.error('❌ [MongoAuthRepository] Failed to notify admins of new signup:', error);
       throw error;
     }
   }

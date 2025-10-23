@@ -21,6 +21,13 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+
+    // Double prevention - ensure no form submission
+    if (e.target !== e.currentTarget) {
+      return;
+    }
+
     setIsLoading(true);
 
     try {

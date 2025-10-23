@@ -49,7 +49,9 @@ const ConfirmEmail: React.FC<ConfirmEmailProps> = () => {
         console.log('🔑 VERIFYING TOKEN:', token);
         try {
           // Make API call to backend to verify token
-          const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000/api'}/auth/confirm/${token}`);
+          const baseUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3000');
+          const apiUrl = baseUrl.endsWith('/api') ? baseUrl : `${baseUrl}/api`;
+          const response = await fetch(`${apiUrl}/auth/confirm/${token}`);
           const result = await response.json();
 
           console.log('📧 CONFIRMATION RESPONSE:', { status: response.status, result });
@@ -117,7 +119,9 @@ const ConfirmEmail: React.FC<ConfirmEmailProps> = () => {
 
     setIsResending(true);
     try {
-      await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000/api'}/auth/resend-confirmation`, {
+      const baseUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3000');
+      const apiUrl = baseUrl.endsWith('/api') ? baseUrl : `${baseUrl}/api`;
+      await fetch(`${apiUrl}/auth/resend-confirmation`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
