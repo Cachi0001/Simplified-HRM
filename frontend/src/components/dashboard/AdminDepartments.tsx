@@ -5,6 +5,7 @@ import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Badge } from '../ui/Badge';
+import { useToast } from '../ui/Toast';
 import { Users, Building, Edit, Check, X } from 'lucide-react';
 
 interface AdminDepartmentsProps {
@@ -31,6 +32,7 @@ export function AdminDepartments({ darkMode = false }: AdminDepartmentsProps) {
   const [customDepartment, setCustomDepartment] = useState('');
 
   const queryClient = useQueryClient();
+  const { addToast } = useToast();
 
   // Fetch all employees
   const { data: employees = [], isLoading: employeesLoading } = useQuery({
@@ -48,12 +50,17 @@ export function AdminDepartments({ darkMode = false }: AdminDepartmentsProps) {
     mutationFn: async ({ employeeId, department }: { employeeId: string; department: string }) => {
       return await employeeService.assignDepartment(employeeId, department);
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       setShowAssignForm(false);
       setSelectedEmployee('');
       setNewDepartment('');
       setCustomDepartment('');
+      addToast('success', `Department assigned successfully!`);
+    },
+    onError: (error: any) => {
+      const errorMessage = error.message || error.response?.data?.message || 'Failed to assign department';
+      addToast('error', errorMessage);
     },
   });
 
@@ -199,9 +206,9 @@ export function AdminDepartments({ darkMode = false }: AdminDepartmentsProps) {
           </h3>
 
           <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">
-            {COMMON_DEPARTMENTS.map(dept => (
+            {COMMON_DEPARTMENTS.map((dept, idx) => (
               <Button
-                key={dept}
+                key={`quick-assign-${dept}-${idx}`}
                 onClick={() => {
                   const employee = employeesWithoutDepartment[0];
                   if (employee) {

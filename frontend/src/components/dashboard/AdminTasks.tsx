@@ -6,6 +6,7 @@ import { Badge } from '../ui/Badge';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { useToast } from '../ui/Toast';
 import {
   Plus,
   Search,
@@ -37,6 +38,7 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
   });
 
   const queryClient = useQueryClient();
+  const { addToast } = useToast();
 
   // Fetch all tasks
   const { data: tasks = [], isLoading: tasksLoading } = useQuery({
@@ -66,10 +68,15 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
     mutationFn: async (taskData: any) => {
       return await taskService.createTask(taskData);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['admin-tasks'] });
       setShowCreateForm(false);
       setNewTask({ title: '', description: '', assigneeId: '', priority: 'medium', dueDate: '' });
+      addToast('success', 'Task created successfully!');
+    },
+    onError: (error: any) => {
+      const errorMessage = error.message || error.response?.data?.message || 'Failed to create task';
+      addToast('error', errorMessage);
     },
   });
 
@@ -80,6 +87,11 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-tasks'] });
+      addToast('success', 'Task status updated successfully!');
+    },
+    onError: (error: any) => {
+      const errorMessage = error.message || 'Failed to update task status';
+      addToast('error', errorMessage);
     },
   });
 
@@ -90,6 +102,11 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-tasks'] });
+      addToast('success', 'Task deleted successfully!');
+    },
+    onError: (error: any) => {
+      const errorMessage = error.message || 'Failed to delete task';
+      addToast('error', errorMessage);
     },
   });
 

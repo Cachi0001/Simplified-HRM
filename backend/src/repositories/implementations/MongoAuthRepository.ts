@@ -85,24 +85,36 @@ export class MongoAuthRepository implements IAuthRepository {
         expires: employee.emailVerificationExpires
       });
 
-      // Send confirmation email with verification token
+      // Send confirmation email with verification token (non-blocking)
       const confirmationUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/confirm?token=${verificationToken}`;
-      logger.info('📧 [MongoAuthRepository] Sending confirmation email', {
+      logger.info('📧 [MongoAuthRepository] Queuing confirmation email', {
         email: user.email,
         confirmationUrl: confirmationUrl.substring(0, 100) + '...',
         token: verificationToken.substring(0, 10) + '...'
       });
 
       const emailService = new (require('../../services/EmailService').EmailService)();
-      await emailService.sendEmailConfirmation(user.email, user.fullName, confirmationUrl);
+      
+      // Send email in background without blocking signup response
+      emailService.sendEmailConfirmation(user.email, user.fullName, confirmationUrl)
+        .then(() => {
+          logger.info('✅ Confirmation email sent successfully', { email: user.email });
+        })
+        .catch((emailError: Error) => {
+          logger.error('⚠️ Failed to send confirmation email (non-blocking)', {
+            email: user.email,
+            error: emailError.message
+          });
+        });
 
-      // Send notification to admins about new employee signup
-      try {
-        await this.notifyAdminsOfNewSignup(user, employee);
-      } catch (notificationError) {
-        logger.warn('⚠️ [MongoAuthRepository] Failed to send admin notification:', notificationError);
-        // Don't fail the signup if notification fails
-      }
+      // Send notification to admins about new employee signup (non-blocking)
+      this.notifyAdminsOfNewSignup(user, employee)
+        .then(() => {
+          logger.info('✅ Admin notification sent successfully', { email: user.email });
+        })
+        .catch((notificationError) => {
+          logger.warn('⚠️ Failed to send admin notification (non-blocking):', notificationError);
+        });
 
       logger.info('✅ [MongoAuthRepository] User created successfully', {
         userId: user._id,

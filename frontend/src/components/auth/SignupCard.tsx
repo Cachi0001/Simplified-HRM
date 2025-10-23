@@ -70,24 +70,30 @@ const SignupCard: React.FC<SignupCardProps> = ({ onSwitchToLogin }) => {
       setEmail('');
       setPassword('');
 
-    } catch (err) {
+    } catch (err: any) {
+      let errorMessage = 'An unexpected error occurred. Please try again or contact support.';
+      
       if (err instanceof Error) {
-        let errorMessage = err.message;
-
-        // Provide more specific guidance based on error type
-        if (errorMessage.includes('Email already registered')) {
-          errorMessage = 'This email is already registered. Please try signing in instead, or contact support if you need help.';
-          setIsFirstSignup(false); // Reset to first signup state for new email
-        } else if (errorMessage.includes('Database error')) {
-          errorMessage = 'There was an issue creating your account. Please try again in a few minutes or contact support.';
-        }
-
-        // Show red error toast
-        addToast('error', errorMessage);
-      } else {
-        // Show red error toast
-        addToast('error', 'An unexpected error occurred. Please try again or contact support.');
+        errorMessage = err.message;
+      } else if (err?.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err?.message) {
+        errorMessage = err.message;
       }
+
+      // Provide more specific guidance based on error type
+      if (errorMessage.includes('Email already registered')) {
+        errorMessage = 'This email is already registered. Please try signing in instead, or contact support if you need help.';
+        setIsFirstSignup(false); // Reset to first signup state for new email
+      } else if (errorMessage.includes('Database error')) {
+        errorMessage = 'There was an issue creating your account. Please try again in a few minutes or contact support.';
+      } else if (errorMessage.includes('Email and full name are required')) {
+        errorMessage = 'Please fill in all required fields: full name, email, and password.';
+      }
+
+      // Show red error toast
+      addToast('error', errorMessage);
+      console.error('Signup error:', err);
     } finally {
       setIsLoading(false);
     }

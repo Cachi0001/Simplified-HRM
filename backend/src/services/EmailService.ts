@@ -198,7 +198,7 @@ export class EmailService {
   
   async sendApprovalConfirmation(email: string, fullName: string): Promise<void> {
     try {
-      const loginUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/auth/login`;
+      const loginUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/auth`;
 
       const mailOptions = {
         from: `"Go3net HR Management System" <${process.env.FROM_EMAIL}>`,
