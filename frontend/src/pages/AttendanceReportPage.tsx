@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { attendanceService } from '../services/attendanceService';
 import { employeeService } from '../services/employeeService';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Calendar, Clock, MapPin, Users, Filter, Download, ArrowLeft } from 'lucide-react';
+import { RefreshCw, Calendar, Clock, Users, Download, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Logo from '../components/ui/Logo';
 import { DarkModeToggle } from '../components/ui/DarkModeToggle';
@@ -16,7 +16,18 @@ interface AttendanceReportPageProps {
   darkMode?: boolean;
 }
 
-export default function AttendanceReportPage({ darkMode = false }: AttendanceReportPageProps) {
+export default function AttendanceReportPage({ darkMode: initialDarkMode = false }: AttendanceReportPageProps) {
+  const [darkMode, setDarkMode] = useState(() => {
+    // Load dark mode preference from localStorage
+    const saved = localStorage.getItem('darkMode');
+    return saved ? JSON.parse(saved) : initialDarkMode;
+  });
+
+  // Save dark mode preference whenever it changes
+  useEffect(() => {
+    localStorage.setItem('darkMode', JSON.stringify(darkMode));
+  }, [darkMode]);
+
   const [selectedEmployee, setSelectedEmployee] = useState<string>('');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
@@ -36,7 +47,7 @@ export default function AttendanceReportPage({ darkMode = false }: AttendanceRep
 
   // Fetch attendance report
   const { data: report, isLoading: reportLoading, refetch } = useQuery({
-    queryKey: ['attendance-report', selectedEmployee, startDate, endDate],
+    queryKey: ['attendance-report', selectedEmployee || 'all', startDate || 'none', endDate || 'none'],
     queryFn: async () => {
       // Set default date range to last 5 days if no dates are selected
       let start = startDate ? new Date(startDate) : undefined;
@@ -47,7 +58,17 @@ export default function AttendanceReportPage({ darkMode = false }: AttendanceRep
         start = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000); // 5 days ago
       }
 
-      return await attendanceService.getAttendanceReport(selectedEmployee || undefined, start, end);
+      console.log('AttendanceReportPage: Fetching attendance report', {
+        selectedEmployee,
+        startDate: start?.toISOString(),
+        endDate: end?.toISOString(),
+        start,
+        end
+      });
+
+      const result = await attendanceService.getAttendanceReport(selectedEmployee || undefined, start, end);
+      console.log('AttendanceReportPage: Received attendance data', result);
+      return result;
     },
     enabled: true,
   });
@@ -108,7 +129,7 @@ export default function AttendanceReportPage({ darkMode = false }: AttendanceRep
             </div>
           </div>
           <div className="flex items-center space-x-4">
-            <DarkModeToggle darkMode={darkMode} setDarkMode={() => {}} />
+            <DarkModeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
             <NotificationBell darkMode={darkMode} />
           </div>
         </div>
@@ -122,7 +143,7 @@ export default function AttendanceReportPage({ darkMode = false }: AttendanceRep
               Report Filters
             </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
               {currentUser.role === 'admin' && (
                 <div>
                   <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
@@ -169,8 +190,12 @@ export default function AttendanceReportPage({ darkMode = false }: AttendanceRep
                 />
               </div>
 
-              <div className="flex items-end">
-                <Button onClick={exportReport} className="w-full">
+              <div className="flex flex-col sm:flex-row items-stretch gap-2">
+                <Button onClick={() => refetch()} className="flex-1" isLoading={reportLoading}>
+                  <RefreshCw className={`h-4 w-4 mr-2 ${reportLoading ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+                <Button onClick={exportReport} className="flex-1">
                   <Download className="h-4 w-4 mr-2" />
                   Export CSV
                 </Button>

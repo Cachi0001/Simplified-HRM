@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import HomePage from './src/pages/HomePage';
 import AuthPage from './src/pages/AuthPage';
@@ -22,38 +22,49 @@ const queryClient = new QueryClient({
   },
 });
 
+function AppContent() {
+  const location = useLocation();
+  const isDashboardPage = location.pathname.startsWith('/dashboard') ||
+                         location.pathname.startsWith('/employee-dashboard') ||
+                         location.pathname.startsWith('/attendance-report');
+
+  return (
+    <div className="flex flex-col min-h-screen bg-primary">
+      {!isDashboardPage && <Header />}
+      <main className="flex-grow">
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/auth" element={<AuthPage />} />
+          <Route path="/confirm" element={<ConfirmEmail />} />
+          <Route path="/reset-password" element={<ResetPasswordCard />} />
+          <Route path="/dashboard" element={
+            <ProtectedRoute>
+              <AdminDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/employee-dashboard" element={
+            <ProtectedRoute>
+              <EmployeeDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/attendance-report" element={
+            <ProtectedRoute>
+              <AttendanceReportPage />
+            </ProtectedRoute>
+          } />
+        </Routes>
+      </main>
+      {!isDashboardPage && <Footer />}
+    </div>
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
         <BrowserRouter>
-          <div className="flex flex-col min-h-screen bg-primary">
-            <Header />
-            <main className="flex-grow">
-              <Routes>
-                <Route path="/" element={<HomePage />} />
-                <Route path="/auth" element={<AuthPage />} />
-                <Route path="/confirm" element={<ConfirmEmail />} />
-                <Route path="/reset-password" element={<ResetPasswordCard />} />
-                <Route path="/dashboard" element={
-                  <ProtectedRoute>
-                    <AdminDashboard />
-                  </ProtectedRoute>
-                } />
-                <Route path="/employee-dashboard" element={
-                  <ProtectedRoute>
-                    <EmployeeDashboard />
-                  </ProtectedRoute>
-                } />
-                <Route path="/attendance-report" element={
-                  <ProtectedRoute>
-                    <AttendanceReportPage />
-                  </ProtectedRoute>
-                } />
-              </Routes>
-            </main>
-            <Footer />
-          </div>
+          <AppContent />
         </BrowserRouter>
       </ToastProvider>
     </QueryClientProvider>

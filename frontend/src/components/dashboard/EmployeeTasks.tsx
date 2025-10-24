@@ -36,10 +36,12 @@ export function EmployeeTasks({ employeeId, darkMode = false }: EmployeeTasksPro
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employee-tasks', employeeId] });
+      addToast('success', 'Task status updated successfully');
     },
     onError: (error: any) => {
-      const message = error?.message || error?.response?.data?.message || 'Failed to update task status';
+      const message = error?.response?.data?.message || error?.message || 'Failed to update task status';
       addToast('error', message);
+      console.error('Task status update failed:', error);
     }
   });
 
@@ -153,13 +155,13 @@ export function EmployeeTasks({ employeeId, darkMode = false }: EmployeeTasksPro
             </div>
 
             {/* Action Buttons - Progress Update */}
-            <div className="flex gap-2 flex-wrap">
+            <div className="flex flex-col sm:flex-row gap-2">
               {task.status === 'pending' && (
                 <Button
                   onClick={() => updateTaskStatus.mutate({ taskId: task.id, status: 'in_progress' })}
                   disabled={updateTaskStatus.isPending}
                   isLoading={updateTaskStatus.isPending}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 text-sm"
+                  className="bg-blue-600 hover:bg-blue-700 text-white flex-1"
                   title="Start working on this task"
                 >
                   <Clock className="h-4 w-4 mr-1" />
@@ -172,7 +174,7 @@ export function EmployeeTasks({ employeeId, darkMode = false }: EmployeeTasksPro
                   onClick={() => updateTaskStatus.mutate({ taskId: task.id, status: 'completed' })}
                   disabled={updateTaskStatus.isPending}
                   isLoading={updateTaskStatus.isPending}
-                  className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 text-sm"
+                  className="bg-green-600 hover:bg-green-700 text-white flex-1"
                   title="Mark this task as completed"
                 >
                   <Check className="h-4 w-4 mr-1" />

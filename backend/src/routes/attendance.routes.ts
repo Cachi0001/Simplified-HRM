@@ -22,6 +22,6 @@ router.get('/status', (req, res) => attendanceController.getCurrentStatus(req, r
 router.get('/history', (req, res) => attendanceController.getAttendanceHistory(req, res));
 
 router.get('/employee/:employeeId', requireRole(['admin']), (req, res) => attendanceController.getEmployeeAttendance(req, res));
-router.get('/report', requireRole(['admin']), (req, res) => attendanceController.getAttendanceReport(req, res));
+router.get('/report', requireRole(['admin', 'employee']), (req, res) => attendanceController.getAttendanceReport(req, res));
 
 export default router;

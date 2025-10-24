@@ -190,6 +190,7 @@ export function PendingApprovals({ darkMode = false }: PendingApprovalsProps) {
                       }
                     }}
                     disabled={approveMutation.isPending}
+                    isLoading={approveMutation.isPending}
                     className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 text-sm"
                   >
                     <Check className="h-4 w-4 mr-1" />
@@ -204,6 +205,7 @@ export function PendingApprovals({ darkMode = false }: PendingApprovalsProps) {
                       }
                     }}
                     disabled={rejectMutation.isPending}
+                    isLoading={rejectMutation.isPending}
                     className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 text-sm"
                   >
                     <X className="h-4 w-4 mr-1" />
@@ -286,6 +288,7 @@ export function PendingApprovals({ darkMode = false }: PendingApprovalsProps) {
                       }
                     }}
                     disabled={approveMutation.isPending}
+                    isLoading={approveMutation.isPending}
                     className="flex-1 bg-green-600 hover:bg-green-700 text-white"
                   >
                     <Check className="h-4 w-4 mr-1" />
@@ -299,6 +302,7 @@ export function PendingApprovals({ darkMode = false }: PendingApprovalsProps) {
                       }
                     }}
                     disabled={rejectMutation.isPending}
+                    isLoading={rejectMutation.isPending}
                     className="flex-1 bg-red-600 hover:bg-red-700 text-white"
                   >
                     <X className="h-4 w-4 mr-1" />

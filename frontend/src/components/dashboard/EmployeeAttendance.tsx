@@ -17,7 +17,7 @@ const fetchEmployeeAttendance = async (employeeId: string) => {
       new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
       new Date(),
       1,
-      10
+      20 // Increased from 10 to 20 records
     );
     return history.attendances;
   } catch (error) {

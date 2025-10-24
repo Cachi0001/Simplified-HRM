@@ -5,7 +5,7 @@ import { employeeService } from '../../services/employeeService';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { Calendar, Clock, MapPin, Users, Filter, Download } from 'lucide-react';
+import { Calendar, Clock, MapPin, Users, Filter, Download, RefreshCw } from 'lucide-react';
 
 interface AdminAttendanceProps {
   darkMode?: boolean;
@@ -29,7 +29,7 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
 
   // Fetch attendance report
   const { data: report, isLoading: reportLoading, refetch } = useQuery({
-    queryKey: ['attendance-report', selectedEmployee, startDate, endDate],
+    queryKey: ['attendance-report', selectedEmployee || 'all', startDate || 'none', endDate || 'none'],
     queryFn: async () => {
       // Set default date range to last 5 days if no dates are selected
       let start = startDate ? new Date(startDate) : undefined;
@@ -40,7 +40,17 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
         start = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000); // 5 days ago
       }
 
-      return await attendanceService.getAttendanceReport(selectedEmployee || undefined, start, end);
+      console.log('AdminAttendance: Fetching attendance report', {
+        selectedEmployee,
+        startDate: start?.toISOString(),
+        endDate: end?.toISOString(),
+        start,
+        end
+      });
+
+      const result = await attendanceService.getAttendanceReport(selectedEmployee || undefined, start, end);
+      console.log('AdminAttendance: Received attendance data', result);
+      return result;
     },
     enabled: true,
   });
@@ -91,7 +101,7 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
             Attendance Management (Last 5 Days)
           </h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
             <div>
               <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                 Employee
@@ -136,8 +146,12 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
               />
             </div>
 
-            <div className="flex items-end">
-              <Button onClick={exportReport} className="w-full">
+            <div className="flex flex-col sm:flex-row items-stretch gap-2">
+              <Button onClick={() => refetch()} className="flex-1" isLoading={reportLoading}>
+                <RefreshCw className={`h-4 w-4 mr-2 ${reportLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+              <Button onClick={exportReport} className="flex-1">
                 <Download className="h-4 w-4 mr-2" />
                 Export CSV
               </Button>
