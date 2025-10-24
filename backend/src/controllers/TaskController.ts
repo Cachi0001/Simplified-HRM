@@ -165,6 +165,14 @@ export class TaskController {
       const { id } = req.params;
       const { status } = req.body;
 
+      if (!id) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Task ID is required'
+        });
+        return;
+      }
+
       if (!status || !['pending', 'in_progress', 'completed', 'cancelled'].includes(status)) {
         res.status(400).json({
           status: 'error',

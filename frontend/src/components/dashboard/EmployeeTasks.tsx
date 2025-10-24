@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { taskService } from '../../services/taskService';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
-import { Check, Clock, AlertCircle, CheckSquare } from 'lucide-react';
+import { Check, Clock, AlertCircle, CheckSquare, Calendar } from 'lucide-react';
 
 interface EmployeeTasksProps {
   employeeId: string;

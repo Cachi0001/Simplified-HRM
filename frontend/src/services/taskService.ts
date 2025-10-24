@@ -39,85 +39,121 @@ export interface TaskQuery {
   limit?: number;
 }
 
+const extractId = (value: any): string => {
+  if (!value) {
+    return '';
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (typeof value === 'object') {
+    if (value._id) {
+      return extractId(value._id);
+    }
+    if (value.id) {
+      return extractId(value.id);
+    }
+    if (typeof value.toString === 'function') {
+      return value.toString();
+    }
+  }
+  return String(value);
+};
+
+const toIsoString = (value: any): string => {
+  if (!value) {
+    return '';
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  return date.toISOString();
+};
+
+const normalizeTask = (task: any): Task => ({
+  id: extractId(task?._id ?? task?.id ?? ''),
+  title: task?.title ?? '',
+  description: task?.description ?? undefined,
+  assigneeId: extractId(task?.assigneeId ?? ''),
+  assignedBy: extractId(task?.assignedBy ?? ''),
+  status: task?.status ?? 'pending',
+  priority: task?.priority ?? 'medium',
+  dueDate: toIsoString(task?.dueDate ?? new Date().toISOString()),
+  completedAt: task?.completedAt ? toIsoString(task.completedAt) : undefined,
+  createdAt: toIsoString(task?.createdAt ?? new Date().toISOString()),
+  updatedAt: toIsoString(task?.updatedAt ?? new Date().toISOString())
+});
+
 class TaskService {
   async createTask(taskData: CreateTaskRequest): Promise<{ message: string; task: Task }> {
-    try {
-      const response = await api.post('/tasks', taskData);
-      return response.data.data;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to create task');
-    }
+    const response = await api.post('/tasks', taskData);
+    const payload = response.data?.data?.task ?? response.data?.task;
+    return {
+      message: response.data?.message ?? 'Task created successfully',
+      task: normalizeTask(payload)
+    };
   }
 
   async getAllTasks(query?: TaskQuery): Promise<{ tasks: Task[]; total: number; page: number; limit: number }> {
-    try {
-      const params = new URLSearchParams();
-      if (query?.assigneeId) params.append('assigneeId', query.assigneeId);
-      if (query?.assignedBy) params.append('assignedBy', query.assignedBy);
-      if (query?.status) params.append('status', query.status);
-      if (query?.priority) params.append('priority', query.priority);
-      if (query?.page) params.append('page', query.page.toString());
-      if (query?.limit) params.append('limit', query.limit.toString());
+    const params = new URLSearchParams();
+    if (query?.assigneeId) params.append('assigneeId', query.assigneeId);
+    if (query?.assignedBy) params.append('assignedBy', query.assignedBy);
+    if (query?.status) params.append('status', query.status);
+    if (query?.priority) params.append('priority', query.priority);
+    if (query?.page) params.append('page', query.page.toString());
+    if (query?.limit) params.append('limit', query.limit.toString());
 
-      const response = await api.get(`/tasks?${params.toString()}`);
-      return response.data.data;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to get tasks');
-    }
+    const response = await api.get(`/tasks?${params.toString()}`);
+    const data = response.data?.data ?? response.data;
+
+    return {
+      tasks: (data?.tasks ?? []).map(normalizeTask),
+      total: data?.total ?? 0,
+      page: data?.page ?? 1,
+      limit: data?.limit ?? (query?.limit ?? 10)
+    };
   }
 
   async searchTasks(query: string): Promise<Task[]> {
-    try {
-      const response = await api.get(`/tasks/search?q=${encodeURIComponent(query)}`);
-      return response.data.data.tasks;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to search tasks');
-    }
+    const response = await api.get(`/tasks/search?q=${encodeURIComponent(query)}`);
+    const tasks = response.data?.data?.tasks ?? response.data?.tasks ?? [];
+    return tasks.map(normalizeTask);
   }
 
   async getTaskById(id: string): Promise<Task> {
-    try {
-      const response = await api.get(`/tasks/${id}`);
-      return response.data.data.task;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to get task');
-    }
+    const response = await api.get(`/tasks/${id}`);
+    const task = response.data?.data?.task ?? response.data?.task;
+    return normalizeTask(task);
   }
 
   async getMyTasks(): Promise<Task[]> {
-    try {
-      const response = await api.get('/tasks/my-tasks');
-      return response.data.data.tasks;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to get my tasks');
-    }
+    const response = await api.get('/tasks/my-tasks');
+    const tasks = response.data?.data?.tasks ?? response.data?.tasks ?? [];
+    return tasks.map(normalizeTask);
   }
 
   async updateTask(id: string, taskData: UpdateTaskRequest): Promise<{ message: string; task: Task }> {
-    try {
-      const response = await api.put(`/tasks/${id}`, taskData);
-      return response.data.data;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to update task');
-    }
+    const response = await api.put(`/tasks/${id}`, taskData);
+    const payload = response.data?.data?.task ?? response.data?.task;
+    return {
+      message: response.data?.message ?? 'Task updated successfully',
+      task: normalizeTask(payload)
+    };
   }
 
   async updateTaskStatus(id: string, status: string): Promise<{ message: string; task: Task }> {
-    try {
-      const response = await api.patch(`/tasks/${id}/status`, { status });
-      return response.data.data;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to update task status');
-    }
+    const response = await api.patch(`/tasks/${id}/status`, { status });
+    const payload = response.data?.data?.task ?? response.data?.task;
+    return {
+      message: response.data?.message ?? 'Task status updated successfully',
+      task: normalizeTask(payload)
+    };
   }
 
   async deleteTask(id: string): Promise<{ message: string }> {
-    try {
-      const response = await api.delete(`/tasks/${id}`);
-      return response.data;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to delete task');
-    }
+    const response = await api.delete(`/tasks/${id}`);
+    return { message: response.data?.message ?? 'Task deleted successfully' };
   }
 }
 

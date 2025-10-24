@@ -68,7 +68,7 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
     mutationFn: async (taskData: any) => {
       return await taskService.createTask(taskData);
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-tasks'] });
       setShowCreateForm(false);
       setNewTask({ title: '', description: '', assigneeId: '', priority: 'medium', dueDate: '' });
@@ -80,22 +80,6 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
     },
   });
 
-  // Update task status mutation
-  const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      return await taskService.updateTaskStatus(id, status);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-tasks'] });
-      addToast('success', 'Task status updated successfully!');
-    },
-    onError: (error: any) => {
-      const errorMessage = error.message || 'Failed to update task status';
-      addToast('error', errorMessage);
-    },
-  });
-
-  // Delete task mutation
   const deleteTaskMutation = useMutation({
     mutationFn: async (id: string) => {
       return await taskService.deleteTask(id);
@@ -144,10 +128,6 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
       ...newTask,
       dueDate: new Date(newTask.dueDate).toISOString()
     });
-  };
-
-  const handleStatusUpdate = (taskId: string, newStatus: string) => {
-    updateStatusMutation.mutate({ id: taskId, status: newStatus });
   };
 
   const handleDeleteTask = (taskId: string) => {
@@ -377,53 +357,26 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
                     </div>
                   </div>
 
-                  {/* Action Buttons */}
                   <div className="flex items-center gap-2 flex-wrap">
-                    {/* Status Management - For Admin to see progress */}
-                    {task.status !== 'completed' && task.status !== 'cancelled' && (
-                      <div className="flex gap-1">
-                        {task.status === 'pending' && (
-                          <Button
-                            onClick={() => handleStatusUpdate(task.id, 'in_progress')}
-                            isLoading={updateStatusMutation.isPending}
-                            disabled={updateStatusMutation.isPending || deleteTaskMutation.isPending}
-                            className="text-xs py-1"
-                          >
-                            Mark In Progress
-                          </Button>
-                        )}
-                        {task.status === 'in_progress' && (
-                          <Button
-                            onClick={() => handleStatusUpdate(task.id, 'completed')}
-                            isLoading={updateStatusMutation.isPending}
-                            disabled={updateStatusMutation.isPending || deleteTaskMutation.isPending}
-                            className="text-green-600 border-green-600 hover:bg-green-600 hover:text-white text-xs py-1"
-                          >
-                            <CheckCircle className="h-4 w-4 mr-1" />
-                            Mark Complete
-                          </Button>
-                        )}
-                      </div>
-                    )}
+                    <div className={`text-xs px-2 py-1 rounded flex items-center gap-1 ${darkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-200 text-gray-700'}`}>
+                      <CheckCircle className="h-3 w-3" />
+                      Status: {task.status.replace('_', ' ')}
+                    </div>
 
-                    {/* Completion Status Badge */}
-                    {task.status === 'completed' && (
-                      <div className={`text-xs px-2 py-1 rounded flex items-center gap-1 ${darkMode ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-800'}`}>
-                        <CheckCircle className="h-3 w-3" />
-                        Completed
-                      </div>
-                    )}
-
-                    {/* Delete Button - Admin only */}
                     <Button
                       onClick={() => handleDeleteTask(task.id)}
                       isLoading={deleteTaskMutation.isPending}
-                      disabled={updateStatusMutation.isPending || deleteTaskMutation.isPending}
+                      disabled={deleteTaskMutation.isPending}
                       className="text-red-600 border-red-600 hover:bg-red-600 hover:text-white text-xs py-1"
                       title="Delete this task"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
+
+                    <div className={`text-xs px-2 py-1 rounded flex items-center gap-1 ${darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800'}`}>
+                      <Clock className="h-3 w-3" />
+                      Due: {new Date(task.dueDate).toLocaleDateString()}
+                    </div>
                   </div>
                 </div>
               </Card>

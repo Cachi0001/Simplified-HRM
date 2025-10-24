@@ -11,6 +11,7 @@ import Logo from '../components/ui/Logo';
 import { authService } from '../services/authService';
 import { BottomNavbar } from '../components/layout/BottomNavbar';
 import api from '../lib/api';
+import { taskService } from '../services/taskService';
 
 export default function EmployeeDashboard() {
   const [darkMode, setDarkMode] = useState(() => {
@@ -127,21 +128,19 @@ export default function EmployeeDashboard() {
       try {
         console.log('Fetching employee stats for user:', userId);
 
-        // Get tasks assigned to this employee
-        const [tasksResponse, attendanceResponse] = await Promise.all([
-          api.get(`/tasks?assigneeId=${userId}`),
-          api.get(`/attendance/employee/${userId}`)
+        const [tasks, attendanceResponse] = await Promise.all([
+          taskService.getMyTasks(),
+          api.get('/attendance/history')
         ]);
 
-        const tasks = tasksResponse.data.tasks || [];
-        const attendance = attendanceResponse.data.attendances || [];
+        const attendances = attendanceResponse.data?.data?.attendances || attendanceResponse.data?.attendances || [];
 
         const totalTasks = tasks.length;
-        const completedTasks = tasks.filter((t: any) => t.status === 'completed').length;
-        const pendingTasks = tasks.filter((t: any) => t.status === 'pending').length;
+        const completedTasks = tasks.filter((t) => t.status === 'completed').length;
+        const pendingTasks = tasks.filter((t) => t.status === 'pending').length;
 
-        const attendanceDays = attendance.length;
-        const totalHours = attendance.reduce((acc: number, record: any) => {
+        const attendanceDays = attendances.length;
+        const totalHours = attendances.reduce((acc: number, record: any) => {
           if (record.checkInTime && record.checkOutTime) {
             const checkIn = new Date(record.checkInTime);
             const checkOut = new Date(record.checkOutTime);

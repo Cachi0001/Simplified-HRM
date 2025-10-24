@@ -6,6 +6,20 @@ import logger from '../utils/logger';
 export class TaskService {
   constructor(private taskRepository: ITaskRepository) {}
 
+  private async resolveEmployeeId(userId?: string): Promise<string | null> {
+    if (!userId) {
+      return null;
+    }
+
+    const employee = await Employee.findOne({ userId }).select('_id');
+    if (!employee) {
+      logger.warn('TaskService: No employee found for user', { userId });
+      return null;
+    }
+
+    return employee._id.toString();
+  }
+
   async createTask(taskData: CreateTaskRequest, assignedBy: string, currentUserRole: string): Promise<ITask> {
     try {
       if (currentUserRole !== 'admin') {
@@ -18,9 +32,8 @@ export class TaskService {
         throw new Error('Title, assignee ID, and due date are required');
       }
 
-      // Validate assigneeId is a valid MongoDB ObjectId format
       if (!taskData.assigneeId.match(/^[0-9a-f]{24}$/i)) {
-        logger.error('TaskService: Invalid assigneeId format', { 
+        logger.error('TaskService: Invalid assigneeId format', {
           assigneeId: taskData.assigneeId,
           type: typeof taskData.assigneeId,
           isString: typeof taskData.assigneeId === 'string'
@@ -30,7 +43,6 @@ export class TaskService {
 
       const task = await this.taskRepository.create(taskData, assignedBy);
 
-      // Send notification email to assignee
       try {
         const employee = await Employee.findById(taskData.assigneeId);
         if (employee) {
@@ -63,7 +75,11 @@ export class TaskService {
       logger.info('TaskService: Getting all tasks', { role: currentUserRole });
 
       if (currentUserRole !== 'admin') {
-        query = { ...query, assigneeId: currentUserId };
+        const employeeId = await this.resolveEmployeeId(currentUserId);
+        if (!employeeId) {
+          return { tasks: [], total: 0, page: query?.page || 1, limit: query?.limit || 10 };
+        }
+        query = { ...query, assigneeId: employeeId };
       }
 
       return await this.taskRepository.findAll(query);
@@ -81,8 +97,11 @@ export class TaskService {
         return null;
       }
 
-      if (currentUserRole !== 'admin' && task.assigneeId.toString() !== currentUserId) {
-        throw new Error('Access denied');
+      if (currentUserRole !== 'admin') {
+        const employeeId = await this.resolveEmployeeId(currentUserId);
+        if (!employeeId || task.assigneeId.toString() !== employeeId) {
+          throw new Error('Access denied');
+        }
       }
 
       return task;
@@ -94,7 +113,11 @@ export class TaskService {
 
   async getMyTasks(userId: string): Promise<ITask[]> {
     try {
-      return await this.taskRepository.findByAssignee(userId);
+      const employeeId = await this.resolveEmployeeId(userId);
+      if (!employeeId) {
+        return [];
+      }
+      return await this.taskRepository.findByAssignee(employeeId);
     } catch (error) {
       logger.error('TaskService: Get my tasks failed', { error: (error as Error).message });
       throw error;
@@ -107,11 +130,13 @@ export class TaskService {
       if (!existingTask) {
         throw new Error('Task not found');
       }
-      if (currentUserRole !== 'admin' && existingTask.assigneeId.toString() !== currentUserId) {
-        throw new Error('Access denied');
-      }
 
       if (currentUserRole !== 'admin') {
+        const employeeId = await this.resolveEmployeeId(currentUserId);
+        if (!employeeId || existingTask.assigneeId.toString() !== employeeId) {
+          throw new Error('Access denied');
+        }
+
         const allowedFields = ['status'];
         const filteredData: UpdateTaskRequest = {};
 
@@ -141,13 +166,13 @@ export class TaskService {
         throw new Error('Task not found');
       }
 
-      if (currentUserRole !== 'admin' && existingTask.assigneeId.toString() !== currentUserId) {
-        throw new Error('Access denied');
+      const employeeId = await this.resolveEmployeeId(currentUserId);
+      if (!employeeId || currentUserRole !== 'employee' || existingTask.assigneeId.toString() !== employeeId) {
+        throw new Error('Only the assigned employee can update task status');
       }
 
       const updatedTask = await this.taskRepository.updateStatus(id, status);
 
-      // Send notification if task is completed
       if (status === 'completed') {
         try {
           const admin = await Employee.findById(existingTask.assignedBy);
@@ -200,7 +225,11 @@ export class TaskService {
       logger.info('TaskService: Searching tasks', { query, role: currentUserRole });
 
       if (currentUserRole !== 'admin') {
-        const myTasks = await this.taskRepository.findByAssignee(currentUserId!);
+        const employeeId = await this.resolveEmployeeId(currentUserId);
+        if (!employeeId) {
+          return [];
+        }
+        const myTasks = await this.taskRepository.findByAssignee(employeeId);
         return myTasks.filter(task =>
           task.title.toLowerCase().includes(query.toLowerCase()) ||
           (task.description && task.description.toLowerCase().includes(query.toLowerCase()))
