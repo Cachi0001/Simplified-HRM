@@ -29,16 +29,41 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const formatDateInput = (date: Date) => date.toISOString().split('T')[0];
+  const tomorrow = (() => {
+    const date = new Date();
+    date.setDate(date.getDate() + 1);
+    return date;
+  })();
   const [newTask, setNewTask] = useState({
     title: '',
     description: '',
     assigneeId: '',
     priority: 'medium' as 'low' | 'medium' | 'high',
-    dueDate: ''
+    dueDate: formatDateInput(tomorrow)
   });
 
   const queryClient = useQueryClient();
   const { addToast } = useToast();
+
+  const statusOptions = [
+    { value: 'all', label: 'All Status' },
+    { value: 'pending', label: 'Pending' },
+    { value: 'in_progress', label: 'In Progress' },
+    { value: 'completed', label: 'Completed' },
+    { value: 'cancelled', label: 'Cancelled' }
+  ];
+
+  const normalizeId = (value: any): string => {
+    if (!value) return '';
+    if (typeof value === 'string') return value;
+    if (typeof value === 'object') {
+      if (value._id) return normalizeId(value._id);
+      if (value.id) return normalizeId(value.id);
+      if (typeof value.toString === 'function') return value.toString();
+    }
+    return String(value);
+  };
 
   // Fetch all tasks
   const { data: tasks = [], isLoading: tasksLoading } = useQuery({
@@ -71,7 +96,7 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-tasks'] });
       setShowCreateForm(false);
-      setNewTask({ title: '', description: '', assigneeId: '', priority: 'medium', dueDate: '' });
+      setNewTask({ title: '', description: '', assigneeId: '', priority: 'medium', dueDate: formatDateInput(tomorrow) });
       addToast('success', 'Task created successfully!');
     },
     onError: (error: any) => {
@@ -143,7 +168,17 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
         <h2 className={`text-2xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
           Task Management
         </h2>
-        <Button onClick={() => setShowCreateForm(!showCreateForm)}>
+        <Button
+          onClick={() => {
+            setShowCreateForm(prev => {
+              const next = !prev;
+              if (!prev && !newTask.dueDate) {
+                setNewTask(current => ({ ...current, dueDate: formatDateInput(tomorrow) }));
+              }
+              return next;
+            });
+          }}
+        >
           <Plus className="h-4 w-4 mr-2" />
           New Task
         </Button>
@@ -181,11 +216,14 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
                   className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
                 >
                   <option value="">Select Employee</option>
-                  {employees.map(emp => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.fullName} ({emp.department || 'No Department'})
-                    </option>
-                  ))}
+                  {employees.map(emp => {
+                    const value = normalizeId(emp.id || emp._id);
+                    return (
+                      <option key={value} value={value}>
+                        {emp.fullName} ({emp.department || 'No Department'})
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
@@ -212,8 +250,17 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
                   id="dueDate"
                   label=""
                   type="date"
+                  min={formatDateInput(tomorrow)}
                   value={newTask.dueDate}
-                  onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
+                  onChange={(e) => {
+                    const selected = e.target.value;
+                    const selectedDate = new Date(selected);
+                    if (selected && selectedDate < tomorrow) {
+                      addToast('error', 'Due date cannot be in the past.');
+                      return;
+                    }
+                    setNewTask({ ...newTask, dueDate: selected });
+                  }}
                 />
               </div>
             </div>
@@ -269,11 +316,11 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className={`p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
               >
-                <option value="all">All Status</option>
-                <option value="pending">Pending</option>
-                <option value="in_progress">In Progress</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
+                {statusOptions.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </div>
           </div>

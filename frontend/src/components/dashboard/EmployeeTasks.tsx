@@ -4,6 +4,7 @@ import { taskService } from '../../services/taskService';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Check, Clock, AlertCircle, CheckSquare, Calendar } from 'lucide-react';
+import { useToast } from '../ui/Toast';
 
 interface EmployeeTasksProps {
   employeeId: string;
@@ -21,6 +22,7 @@ const fetchEmployeeTasks = async (employeeId: string) => {
 
 export function EmployeeTasks({ employeeId, darkMode = false }: EmployeeTasksProps) {
   const queryClient = useQueryClient();
+  const { addToast } = useToast();
 
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ['employee-tasks', employeeId],
@@ -35,6 +37,10 @@ export function EmployeeTasks({ employeeId, darkMode = false }: EmployeeTasksPro
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employee-tasks', employeeId] });
     },
+    onError: (error: any) => {
+      const message = error?.message || error?.response?.data?.message || 'Failed to update task status';
+      addToast('error', message);
+    }
   });
 
   if (isLoading) {

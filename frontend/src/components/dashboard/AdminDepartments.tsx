@@ -34,6 +34,19 @@ export function AdminDepartments({ darkMode = false }: AdminDepartmentsProps) {
   const queryClient = useQueryClient();
   const { addToast } = useToast();
 
+  const normalizeId = (value: any): string => {
+    if (!value) return '';
+    if (typeof value === 'string') return value;
+    if (typeof value === 'object') {
+      if (value._id) return normalizeId(value._id);
+      if (value.id) return normalizeId(value.id);
+      if (typeof value.toString === 'function') return value.toString();
+    }
+    return String(value);
+  };
+
+  const getEmployeeId = (employee: any) => normalizeId(employee?.id ?? employee?._id ?? '');
+
   // Fetch all employees
   const { data: employees = [], isLoading: employeesLoading } = useQuery({
     queryKey: ['employees'],
@@ -76,15 +89,9 @@ export function AdminDepartments({ darkMode = false }: AdminDepartmentsProps) {
 
   const handleAssignDepartment = () => {
     if (!selectedEmployee || !newDepartment) {
-      alert('Please select an employee and department');
+      addToast('error', 'Select an employee and department first.');
       return;
     }
-
-    console.log(`🔄 [AdminDepartments] Assigning department:`, {
-      employeeId: selectedEmployee,
-      selectedEmployeeType: typeof selectedEmployee,
-      department: newDepartment
-    });
 
     assignDepartmentMutation.mutate({
       employeeId: selectedEmployee,
@@ -93,6 +100,10 @@ export function AdminDepartments({ darkMode = false }: AdminDepartmentsProps) {
   };
 
   const handleQuickAssign = (employeeId: string, department: string) => {
+    if (!employeeId) {
+      addToast('error', 'Invalid employee selected.');
+      return;
+    }
     assignDepartmentMutation.mutate({ employeeId, department });
   };
 
@@ -137,29 +148,22 @@ export function AdminDepartments({ darkMode = false }: AdminDepartmentsProps) {
                 </label>
                 <select
                   value={selectedEmployee}
-                  onChange={(e) => {
-                    console.log('Selected employee value:', e.target.value);
-                    setSelectedEmployee(e.target.value);
-                  }}
+                  onChange={(e) => setSelectedEmployee(e.target.value)}
                   className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
                 >
                   <option value="">Select Employee</option>
                   {employeesWithoutDepartment.map(emp => {
-                    const empId = emp.id || emp._id || '';
-                    const idToUse = typeof empId === 'object' ? JSON.stringify(empId) : String(empId);
-                    console.log(`📋 [Dropdown] No Dept - fullName=${emp.fullName}, id=${emp.id}, _id=${emp._id}, final=${idToUse}, idType=${typeof empId}`);
+                    const id = getEmployeeId(emp);
                     return (
-                      <option key={idToUse} value={idToUse}>
+                      <option key={id || emp.email} value={id}>
                         {emp.fullName} (No Department)
                       </option>
                     );
                   })}
                   {employeesWithDepartment.map(emp => {
-                    const empId = emp.id || emp._id || '';
-                    const idToUse = typeof empId === 'object' ? JSON.stringify(empId) : String(empId);
-                    console.log(`📋 [Dropdown] With Dept - fullName=${emp.fullName}, id=${emp.id}, _id=${emp._id}, final=${idToUse}`);
+                    const id = getEmployeeId(emp);
                     return (
-                      <option key={idToUse} value={idToUse}>
+                      <option key={id || emp.email} value={id}>
                         {emp.fullName} ({emp.department})
                       </option>
                     );
@@ -241,11 +245,10 @@ export function AdminDepartments({ darkMode = false }: AdminDepartmentsProps) {
                 onClick={() => {
                   const employee = employeesWithoutDepartment[0];
                   if (employee) {
-                    const empId = employee.id || employee._id || '';
-                    console.log(`Quick assign: employee=${employee.fullName}, id=${employee.id}, _id=${employee._id}, final=${empId}`);
+                    const empId = getEmployeeId(employee);
                     handleQuickAssign(empId, dept);
                   } else {
-                    alert('No employees without departments found');
+                    addToast('info', 'No employees without departments available.');
                   }
                 }}
                 isLoading={assignDepartmentMutation.isPending}
@@ -284,7 +287,7 @@ export function AdminDepartments({ darkMode = false }: AdminDepartmentsProps) {
             ) : employeesWithoutDepartment.length > 0 ? (
               <div className="space-y-2">
                 {employeesWithoutDepartment.map(emp => (
-                  <div key={emp.id} className={`p-3 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
+                  <div key={getEmployeeId(emp) || emp.email} className={`p-3 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
                     <div className="flex items-center justify-between">
                       <div>
                         <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>

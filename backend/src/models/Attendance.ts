@@ -10,6 +10,7 @@ export interface IAttendance extends Document {
     longitude: number;
     accuracy?: number;
   };
+  locationType: 'onsite' | 'remote';
   status: 'checked_in' | 'checked_out';
   date: Date;
   totalHours?: number;
@@ -43,6 +44,11 @@ const AttendanceSchema = new Schema<IAttendance>(
       accuracy: {
         type: Number,
       },
+    },
+    locationType: {
+      type: String,
+      enum: ['onsite', 'remote'],
+      default: 'remote',
     },
     status: {
       type: String,
@@ -91,6 +97,7 @@ export interface CreateAttendanceRequest {
     longitude: number;
     accuracy?: number;
   };
+  locationType?: 'onsite' | 'remote';
   notes?: string;
 }
 

@@ -1,15 +1,17 @@
-
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import LoginCard from '../components/auth/LoginCard';
 import SignupCard from '../components/auth/SignupCard';
 import ForgotPasswordCard from '../components/auth/ForgotPasswordCard';
+import { useToast } from '../components/ui/Toast';
+import { consumeAuthMessage } from '../lib/api';
 
 type AuthView = 'login' | 'signup' | 'forgot-password';
 
 const AuthPage: React.FC = () => {
   
   const location = useLocation();
+  const { addToast } = useToast();
   const [view, setView] = useState<AuthView>('login');
 
   useEffect(() => {
@@ -20,6 +22,13 @@ const AuthPage: React.FC = () => {
       setView('login');
     }
   }, [location.state]);
+
+  useEffect(() => {
+    const message = consumeAuthMessage();
+    if (message) {
+      addToast('info', message);
+    }
+  }, [addToast]);
 
   const renderView = () => {
     switch (view) {
