@@ -72,7 +72,12 @@ class NotificationService {
 
       // For admin notifications (like pending approvals), only show to admins
       if (notification.category === 'approval' && user.role !== 'admin') {
-        return; // Don't show admin notifications to non-admins
+        // Check if this is an approval success notification for the current user
+        if (notification.type === 'approval_success' && notification.targetUserId === user.id) {
+          // Allow employee to see their own approval notification
+        } else {
+          return; // Don't show admin notifications to non-admins (except their own approval)
+        }
       }
     }
 
@@ -186,6 +191,37 @@ class NotificationService {
           console.warn('Failed to fetch pending approvals for notifications:', error);
         }
       } else if (user.role === 'employee') {
+        // EMPLOYEE: Check if employee is approved and show welcome notification
+        try {
+          // Check employee status
+          const employeeResponse = await api.get(`/employees/profile`);
+          const employee = employeeResponse.data.data?.employee;
+
+          if (employee && employee.status === 'active') {
+            // Employee is approved - show welcome notification if not already shown
+            const welcomeNotificationId = `welcome-${user.id}`;
+            const existingWelcomeNotification = allNotifications.find(n => n.id === welcomeNotificationId);
+
+            if (!existingWelcomeNotification) {
+              allNotifications.push({
+                id: welcomeNotificationId,
+                type: 'approval_success' as NotificationType,
+                priority: 'normal',
+                title: 'Welcome to Go3net!',
+                message: `Your account has been approved! You can now access all features.`,
+                timestamp: new Date(),
+                read: false,
+                targetUserId: user.id,
+                actions: [{ label: 'Get Started', action: 'login', url: '/auth' }],
+                source: 'system',
+                category: 'approval' as any
+              });
+            }
+          }
+        } catch (error) {
+          console.warn('Failed to fetch employee status for notifications:', error);
+        }
+
         // EMPLOYEE: Fetch real task assignments
         try {
           // Fetch tasks assigned to this employee
@@ -207,8 +243,8 @@ class NotificationService {
                 read: false,
                 targetUserId: effectiveUserId,
                 actions: [{ label: 'View Task', action: 'view', url: '/employee-dashboard#tasks' }],
-                source: 'task',
-                category: 'task' as any
+                source: 'system',
+                category: 'employee' as any
               });
             });
         } catch (error) {

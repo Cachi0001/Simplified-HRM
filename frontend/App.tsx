@@ -7,6 +7,7 @@ import ConfirmEmail from './src/pages/ConfirmEmail';
 import ResetPasswordCard from './src/components/auth/ResetPasswordCard';
 import AdminDashboard from './src/pages/AdminDashboard';
 import EmployeeDashboard from './src/pages/EmployeeDashboard';
+import AttendanceReportPage from './src/pages/AttendanceReportPage';
 import Header from './src/components/layout/Header';
 import Footer from './src/components/layout/Footer';
 import { ToastProvider } from './src/components/ui/Toast';
@@ -42,6 +43,11 @@ function App() {
                 <Route path="/employee-dashboard" element={
                   <ProtectedRoute>
                     <EmployeeDashboard />
+                  </ProtectedRoute>
+                } />
+                <Route path="/attendance-report" element={
+                  <ProtectedRoute>
+                    <AttendanceReportPage />
                   </ProtectedRoute>
                 } />
               </Routes>

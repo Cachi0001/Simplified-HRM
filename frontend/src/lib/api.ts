@@ -108,6 +108,12 @@ const applyFriendlyMessage = (error: any, fallback: string) => {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    // Handle pending approval errors first - don't treat as auth failure
+    if (error.response?.status === 403 && error.response?.data?.message?.includes('pending approval')) {
+      // Don't redirect or show session expired for pending approval
+      return Promise.reject(error);
+    }
+
     // Only redirect on 401 errors for auth failures
     // Don't redirect on 403 (account not approved) or other auth-related errors
     if (error.response?.status === 401) {
@@ -129,6 +135,10 @@ api.interceptors.response.use(
     }
 
     if (error.response?.status === 403) {
+      // Special handling for pending approval - don't show generic auth error
+      if (error.response?.data?.message?.includes('pending approval')) {
+        return Promise.reject(error);
+      }
       applyFriendlyMessage(error, 'You are not authorized to perform this action.');
     } else if (error.response?.status === 404) {
       applyFriendlyMessage(error, 'We could not find what you were looking for.');

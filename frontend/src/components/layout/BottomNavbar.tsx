@@ -64,7 +64,7 @@ export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
   const navItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: currentUser?.role === 'employee' ? '/employee-dashboard' : '/dashboard', active: location.pathname === (currentUser?.role === 'employee' ? '/employee-dashboard' : '/dashboard') },
     { icon: CheckSquare, label: 'Tasks', path: '/tasks', active: location.pathname === '/tasks' },
-    { icon: Clock, label: 'Attendance', path: '/attendance', active: location.pathname === '/attendance' },
+    { icon: Clock, label: 'Attendance', path: '/attendance-report', active: location.pathname === '/attendance-report' },
     { icon: Calendar, label: 'Leave', path: '/leave', active: location.pathname === '/leave' },
     { icon: BarChart3, label: 'Reports', path: '/reports', active: location.pathname === '/reports' },
   ];
@@ -73,16 +73,13 @@ export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
     // Handle placeholder functionality for unimplemented features
     switch (path) {
       case '/tasks':
-        alert('Tasks page is coming soon! Check the dashboard for task management.');
-        return;
-      case '/attendance':
-        alert('Attendance page is coming soon! Use the check-in/out feature in the dashboard.');
+        alert('Tasks page is coming soon!.');
         return;
       case '/leave':
-        alert('Leave management is coming soon! Contact your HR department for leave requests.');
+        alert('Leave management is coming soon!.');
         return;
       case '/reports':
-        alert('Reports feature is coming soon! Check the admin dashboard for attendance reports.');
+        alert('Reports feature is coming soon!.');
         return;
       default:
         navigate(path);

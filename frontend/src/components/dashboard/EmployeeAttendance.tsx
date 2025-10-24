@@ -4,6 +4,7 @@ import { attendanceService } from '../../services/attendanceService';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { MapPin, Clock, Calendar, Play, Square } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 interface EmployeeAttendanceProps {
   employeeId: string;
@@ -28,6 +29,7 @@ const fetchEmployeeAttendance = async (employeeId: string) => {
 export function EmployeeAttendance({ employeeId, darkMode = false }: EmployeeAttendanceProps) {
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [locationDenied, setLocationDenied] = useState<boolean>(false);
   const queryClient = useQueryClient();
 
   const { data: attendance = [], isLoading } = useQuery({
@@ -38,6 +40,10 @@ export function EmployeeAttendance({ employeeId, darkMode = false }: EmployeeAtt
 
   // Get current location
   useEffect(() => {
+    requestLocation();
+  }, []);
+
+  const requestLocation = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -46,21 +52,27 @@ export function EmployeeAttendance({ employeeId, darkMode = false }: EmployeeAtt
             lng: position.coords.longitude,
           });
           setLocationError(null);
+          setLocationDenied(false);
         },
         (error) => {
           console.error('Location error:', error);
-          setLocationError('Unable to get location. Please enable location services.');
+          if (error.code === error.PERMISSION_DENIED) {
+            setLocationDenied(true);
+            setLocationError('Location access denied. Please allow location access to check in.');
+          } else {
+            setLocationError('Unable to get location. Please enable location services.');
+          }
         }
       );
     } else {
       setLocationError('Geolocation is not supported by this browser.');
     }
-  }, []);
+  };
 
   const checkInMutation = useMutation({
     mutationFn: async () => {
       if (!currentLocation) {
-        throw new Error('Location not available');
+        throw new Error('You must allow location access to check in.');
       }
 
       return await attendanceService.checkIn({
@@ -136,6 +148,14 @@ export function EmployeeAttendance({ employeeId, darkMode = false }: EmployeeAtt
               <p className={`text-sm ${darkMode ? 'text-red-400' : 'text-red-600'}`}>
                 {locationError}
               </p>
+              {locationDenied && (
+                <Button
+                  onClick={requestLocation}
+                  className={`mt-2 ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+                >
+                  Enable Location Access
+                </Button>
+              )}
             </div>
           )}
 
@@ -169,9 +189,17 @@ export function EmployeeAttendance({ employeeId, darkMode = false }: EmployeeAtt
 
       {/* Attendance History */}
       <div>
-        <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-          Recent Attendance
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+            Recent Attendance
+          </h3>
+          <Link
+            to="/attendance-report"
+            className={`text-sm font-medium ${darkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800'}`}
+          >
+            View More
+          </Link>
+        </div>
 
         {attendance.length === 0 ? (
           <Card className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>

@@ -25,7 +25,7 @@ export class MongoAttendanceRepository implements IAttendanceRepository {
       });
 
       if (existingAttendance) {
-        throw new Error('Employee is already checked in today');
+        throw new Error('You have already checked in.');
       }
 
       const attendance = new Attendance({
