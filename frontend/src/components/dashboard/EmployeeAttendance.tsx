@@ -163,7 +163,7 @@ export function EmployeeAttendance({ employeeId, darkMode = false }: EmployeeAtt
             <Button
               onClick={() => checkInMutation.mutate()}
               disabled={checkInMutation.isPending || !currentLocation}
-              className="bg-green-600 hover:bg-green-700 text-white flex-1"
+              className="bg-green-600 hover:bg-green-700 text-white flex-1 min-h-[40px]"
             >
               <Play className="h-4 w-4 mr-2" />
               Check In
@@ -171,7 +171,7 @@ export function EmployeeAttendance({ employeeId, darkMode = false }: EmployeeAtt
             <Button
               onClick={() => checkOutMutation.mutate()}
               disabled={checkOutMutation.isPending || !attendance.some(a => a.status === 'checked_in')}
-              className="bg-red-600 hover:bg-red-700 text-white flex-1"
+              className="bg-red-600 hover:bg-red-700 text-white flex-1 min-h-[40px]"
             >
               <Square className="h-4 w-4 mr-2" />
               Check Out

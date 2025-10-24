@@ -147,11 +147,11 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
             </div>
 
             <div className="flex flex-col sm:flex-row items-stretch gap-2">
-              <Button onClick={() => refetch()} className="flex-1" isLoading={reportLoading}>
+              <Button onClick={() => refetch()} className="flex-1 min-h-[40px]" isLoading={reportLoading}>
                 <RefreshCw className={`h-4 w-4 mr-2 ${reportLoading ? 'animate-spin' : ''}`} />
                 Refresh
               </Button>
-              <Button onClick={exportReport} className="flex-1">
+              <Button onClick={exportReport} className="flex-1 min-h-[40px]">
                 <Download className="h-4 w-4 mr-2" />
                 Export CSV
               </Button>

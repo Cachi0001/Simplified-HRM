@@ -89,12 +89,14 @@
   - Added proper loading states with spinning animations to refresh buttons
   - Enhanced button responsive behavior with flex-1 classes
 
-### 18. Employee Approval Button Issues ✅
-- **Problem**: Approve/reject buttons not showing loading states or feedback
+### 19. Button Consistency Issues ✅
+- **Problem**: Export CSV and refresh buttons had inconsistent sizes across pages
 - **Solution**:
-  - Added loading states to all approve/reject buttons in PendingApprovals component
-  - Enhanced button responsiveness and user feedback
-  - Improved modal button layouts
+  - Added `min-h-[40px]` to all buttons for consistent height
+  - Improved Button component with consistent padding (`py-2.5 px-4`)
+  - Enhanced responsive layouts with `flex-col sm:flex-row` for mobile
+  - Added proper loading animations with spinning icons
+  - Standardized button sizing across all components (attendance, tasks, approvals)
 
 ## Files Modified
 

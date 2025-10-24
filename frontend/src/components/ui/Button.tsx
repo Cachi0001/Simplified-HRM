@@ -10,7 +10,7 @@ export const Button: React.FC<ButtonProps> = ({ children, className, isLoading =
     <button
       {...props}
       disabled={isLoading || props.disabled}
-      className={`flex justify-center items-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-highlight hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-highlight disabled:bg-accent disabled:cursor-not-allowed transition-colors ${className}`}
+      className={`flex justify-center items-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-highlight hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-highlight disabled:bg-accent disabled:cursor-not-allowed transition-colors duration-200 min-h-[40px] ${className}`}
     >
       {isLoading ? (
         <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

@@ -161,7 +161,7 @@ export function EmployeeTasks({ employeeId, darkMode = false }: EmployeeTasksPro
                   onClick={() => updateTaskStatus.mutate({ taskId: task.id, status: 'in_progress' })}
                   disabled={updateTaskStatus.isPending}
                   isLoading={updateTaskStatus.isPending}
-                  className="bg-blue-600 hover:bg-blue-700 text-white flex-1"
+                  className="bg-blue-600 hover:bg-blue-700 text-white flex-1 min-h-[40px]"
                   title="Start working on this task"
                 >
                   <Clock className="h-4 w-4 mr-1" />
@@ -174,7 +174,7 @@ export function EmployeeTasks({ employeeId, darkMode = false }: EmployeeTasksPro
                   onClick={() => updateTaskStatus.mutate({ taskId: task.id, status: 'completed' })}
                   disabled={updateTaskStatus.isPending}
                   isLoading={updateTaskStatus.isPending}
-                  className="bg-green-600 hover:bg-green-700 text-white flex-1"
+                  className="bg-green-600 hover:bg-green-700 text-white flex-1 min-h-[40px]"
                   title="Mark this task as completed"
                 >
                   <Check className="h-4 w-4 mr-1" />

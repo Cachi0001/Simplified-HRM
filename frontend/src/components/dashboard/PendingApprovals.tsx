@@ -289,7 +289,7 @@ export function PendingApprovals({ darkMode = false }: PendingApprovalsProps) {
                     }}
                     disabled={approveMutation.isPending}
                     isLoading={approveMutation.isPending}
-                    className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white min-h-[40px]"
                   >
                     <Check className="h-4 w-4 mr-1" />
                     Approve
@@ -303,7 +303,7 @@ export function PendingApprovals({ darkMode = false }: PendingApprovalsProps) {
                     }}
                     disabled={rejectMutation.isPending}
                     isLoading={rejectMutation.isPending}
-                    className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white min-h-[40px]"
                   >
                     <X className="h-4 w-4 mr-1" />
                     Reject
