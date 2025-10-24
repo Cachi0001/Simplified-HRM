@@ -38,8 +38,15 @@ export default function AttendanceReportPage({ darkMode = false }: AttendanceRep
   const { data: report, isLoading: reportLoading, refetch } = useQuery({
     queryKey: ['attendance-report', selectedEmployee, startDate, endDate],
     queryFn: async () => {
-      const start = startDate ? new Date(startDate) : undefined;
-      const end = endDate ? new Date(endDate) : undefined;
+      // Set default date range to last 5 days if no dates are selected
+      let start = startDate ? new Date(startDate) : undefined;
+      let end = endDate ? new Date(endDate) : undefined;
+
+      if (!startDate && !endDate) {
+        end = new Date();
+        start = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000); // 5 days ago
+      }
+
       return await attendanceService.getAttendanceReport(selectedEmployee || undefined, start, end);
     },
     enabled: true,
@@ -56,14 +63,6 @@ export default function AttendanceReportPage({ darkMode = false }: AttendanceRep
     return new Date(dateString).toLocaleDateString();
   };
 
-  const calculateHours = (checkIn: string, checkOut?: string) => {
-    if (!checkOut) return 0;
-    const checkInTime = new Date(checkIn);
-    const checkOutTime = new Date(checkOut);
-    const hours = (checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60 * 60);
-    return Math.round(hours * 10) / 10;
-  };
-
   const exportReport = () => {
     if (!report || report.length === 0) return;
 
@@ -76,7 +75,7 @@ export default function AttendanceReportPage({ darkMode = false }: AttendanceRep
         formatTime(record.checkInTime),
         record.checkOutTime ? formatTime(record.checkOutTime) : 'Active',
         record.totalHours ? record.totalHours.toFixed(1) : '0',
-        record.status || 'Unknown'
+        record.status === 'checked_out' ? 'Completed' : 'Active'
       ].join(','))
     ].join('\n');
 
@@ -104,7 +103,7 @@ export default function AttendanceReportPage({ darkMode = false }: AttendanceRep
                 Attendance Report
               </h1>
               <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                Detailed attendance history and analytics
+                Detailed attendance history and analytics (last 5 days)
               </p>
             </div>
           </div>
@@ -219,13 +218,12 @@ export default function AttendanceReportPage({ darkMode = false }: AttendanceRep
                       </div>
                     </div>
                     <div className="text-right">
-                      {record.checkOutTime ? (
-                        <div className={`text-sm font-medium ${darkMode ? 'text-green-400' : 'text-green-600'}`}>
-                          {calculateHours(record.checkInTime, record.checkOutTime)}h
-                        </div>
-                      ) : (
-                        <div className={`text-sm ${darkMode ? 'text-orange-400' : 'text-orange-600'}`}>
-                          Active
+                      <div className={`text-sm font-medium ${record.status === 'checked_out' ? (darkMode ? 'text-green-400' : 'text-green-600') : (darkMode ? 'text-orange-400' : 'text-orange-600')}`}>
+                        {record.status === 'checked_out' ? 'Completed' : 'Active'}
+                      </div>
+                      {record.totalHours && (
+                        <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                          {record.totalHours.toFixed(1)}h
                         </div>
                       )}
                     </div>

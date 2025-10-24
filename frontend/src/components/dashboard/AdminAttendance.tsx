@@ -31,8 +31,15 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
   const { data: report, isLoading: reportLoading, refetch } = useQuery({
     queryKey: ['attendance-report', selectedEmployee, startDate, endDate],
     queryFn: async () => {
-      const start = startDate ? new Date(startDate) : undefined;
-      const end = endDate ? new Date(endDate) : undefined;
+      // Set default date range to last 5 days if no dates are selected
+      let start = startDate ? new Date(startDate) : undefined;
+      let end = endDate ? new Date(endDate) : undefined;
+
+      if (!startDate && !endDate) {
+        end = new Date();
+        start = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000); // 5 days ago
+      }
+
       return await attendanceService.getAttendanceReport(selectedEmployee || undefined, start, end);
     },
     enabled: true,
@@ -49,14 +56,6 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
     return new Date(dateString).toLocaleDateString();
   };
 
-  const calculateHours = (checkIn: string, checkOut?: string) => {
-    if (!checkOut) return 0;
-    const checkInTime = new Date(checkIn);
-    const checkOutTime = new Date(checkOut);
-    const hours = (checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60 * 60);
-    return Math.round(hours * 10) / 10;
-  };
-
   const exportReport = () => {
     // Simple CSV export
     if (!report || report.length === 0) return;
@@ -70,7 +69,7 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
         formatTime(record.checkInTime),
         record.checkOutTime ? formatTime(record.checkOutTime) : 'Active',
         record.totalHours ? record.totalHours.toFixed(1) : '0',
-        record.status || 'Unknown'
+        record.status === 'checked_out' ? 'Completed' : 'Active'
       ].join(','))
     ].join('\n');
 
@@ -89,7 +88,7 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
       <Card className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
         <div className="p-6">
           <h2 className={`text-xl font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-            Attendance Management
+            Attendance Management (Last 5 Days)
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
