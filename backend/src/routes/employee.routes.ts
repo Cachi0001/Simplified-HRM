@@ -16,13 +16,17 @@ const employeeController = new EmployeeController(employeeService);
 
 router.use(authenticateToken);
 
-router.post('/', requireRole(['admin']), (req, res) => employeeController.createEmployee(req, res));
-router.get('/', (req, res) => employeeController.getAllEmployees(req, res));
+// Static routes before dynamic routes
 router.get('/search', (req, res) => employeeController.searchEmployees(req, res));
 router.get('/me', (req, res) => employeeController.getMyProfile(req, res));
 router.put('/me', (req, res) => employeeController.updateMyProfile(req, res));
 router.get('/pending', requireRole(['admin']), (req, res) => employeeController.getPendingApprovals(req, res));
 router.get('/stats', requireRole(['admin']), (req, res) => employeeController.getEmployeeStats(req, res));
+
+router.post('/', requireRole(['admin']), (req, res) => employeeController.createEmployee(req, res));
+router.get('/', (req, res) => employeeController.getAllEmployees(req, res));
+
+// Dynamic routes
 router.get('/:id', (req, res) => employeeController.getEmployeeById(req, res));
 router.put('/:id', (req, res) => employeeController.updateEmployee(req, res));
 router.delete('/:id', requireRole(['admin']), (req, res) => employeeController.deleteEmployee(req, res));

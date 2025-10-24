@@ -194,7 +194,7 @@ class NotificationService {
         // EMPLOYEE: Check if employee is approved and show welcome notification
         try {
           // Check employee status
-          const employeeResponse = await api.get(`/employees/profile`);
+          const employeeResponse = await api.get(`/employees/me`);
           const employee = employeeResponse.data.data?.employee;
 
           if (employee && employee.status === 'active') {

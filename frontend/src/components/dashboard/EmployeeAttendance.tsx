@@ -11,14 +11,9 @@ interface EmployeeAttendanceProps {
   darkMode?: boolean;
 }
 
-const fetchEmployeeAttendance = async (employeeId: string) => {
+const fetchEmployeeAttendance = async () => {
   try {
-    const history = await attendanceService.getAttendanceHistory(
-      new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
-      new Date(),
-      1,
-      20 // Increased from 10 to 20 records
-    );
+    const history = await attendanceService.getAttendanceHistory();
     return history.attendances;
   } catch (error) {
     console.error('Failed to fetch employee attendance:', error);
