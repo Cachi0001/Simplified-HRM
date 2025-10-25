@@ -34,8 +34,10 @@ async function initializeDatabase() {
   }
 }
 
-// Initialize database (await the connection)
-await initializeDatabase();
+// Wrap initialization in async IIFE to handle top-level await in CommonJS
+(async () => {
+  await initializeDatabase();
+})();
 
 // Security middleware
 app.use(helmet({

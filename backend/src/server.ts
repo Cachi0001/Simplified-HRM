@@ -311,17 +311,18 @@ export default app;
 
 // For local development
 if (require.main === module) {
-  initializeDatabase().then(() => {
+  (async () => {
+    await initializeDatabase();
     app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
       console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`Deployment: ${process.env.VERCEL ? 'Vercel' : 'Local'}`);
       console.log(`Health check available at http://localhost:${PORT}/api/health`);
-      
+
       logger.info(`Server is running on port ${PORT}`);
       logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
       logger.info(`Deployment: ${process.env.VERCEL ? 'Vercel' : 'Local'}`);
       logger.info(`Health check available at http://localhost:${PORT}/api/health`);
     });
-  });
+  })();
 }
