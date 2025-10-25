@@ -115,7 +115,6 @@ const api = axios.create({
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
-    'Origin': typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173',
   },
   withCredentials: false, // Set to true only if you need to send cookies
 });
@@ -138,11 +137,6 @@ api.interceptors.request.use(
     const token = localStorage.getItem('accessToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-    }
-    
-    // Ensure Origin header is set correctly
-    if (typeof window !== 'undefined') {
-      config.headers.Origin = window.location.origin;
     }
     
     // Special handling for password reset endpoints

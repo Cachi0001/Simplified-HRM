@@ -18,6 +18,56 @@ import databaseConfig from './config/database';
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const startTime = Date.now();
+  const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  (req as any).requestId = requestId;
+  const origin = req.headers.origin || 'No origin';
+  const forwardedFor = req.headers['x-forwarded-for'] || 'Not set';
+  const userAgent = req.headers['user-agent'] || 'Not set';
+  console.log('Incoming request', {
+    requestId,
+    method: req.method,
+    url: req.originalUrl,
+    origin,
+    host: req.headers.host || 'No host',
+    ip: req.ip,
+    forwardedFor,
+    userAgent
+  });
+  logger.info('Incoming request', {
+    requestId,
+    method: req.method,
+    url: req.originalUrl,
+    origin,
+    host: req.headers.host || 'No host',
+    ip: req.ip,
+    forwardedFor,
+    userAgent
+  });
+  res.on('finish', () => {
+    const duration = Date.now() - startTime;
+    const contentLength = res.getHeader('content-length') || 'Not set';
+    console.log('Request completed', {
+      requestId,
+      method: req.method,
+      url: req.originalUrl,
+      status: res.statusCode,
+      duration,
+      contentLength
+    });
+    logger.info('Request completed', {
+      requestId,
+      method: req.method,
+      url: req.originalUrl,
+      status: res.statusCode,
+      duration,
+      contentLength
+    });
+  });
+  next();
+});
+
 // Initialize database connection
 async function initializeDatabase() {
   try {
@@ -144,8 +194,16 @@ const corsOptions = {
     } else {
       // For security, only allow specific origins in production
       if (process.env.NODE_ENV === 'production') {
-        console.warn(`CORS: Blocking origin in production: ${origin}`);
-        logger.warn(`CORS: Blocking origin in production: ${origin}`);
+        const allowedOriginsSnapshot = [...allowedOrigins].filter(Boolean);
+        console.warn(`CORS: Blocking origin in production: ${origin}`, {
+          allowedOrigins: allowedOriginsSnapshot,
+          wildcardPatterns
+        });
+        logger.warn('CORS: Blocking origin in production', {
+          origin,
+          allowedOrigins: allowedOriginsSnapshot,
+          wildcardPatterns
+        });
         callback(new Error(`Not allowed by CORS: ${origin}`), false);
       } else {
         console.log(`CORS: Allowing non-listed origin in development: ${origin}`);
