@@ -11,20 +11,5 @@
       "src": "/(.*)",
       "dest": "api/index.js"
     }
-  ],
-  "env": {
-    "NODE_ENV": "production",
-    "LOG_LEVEL": "debug",
-    "FRONTEND_URL": "https://go3nethrm.vercel.app",
-    "FRONTEND_URL_PROD": "https://go3nethrm.vercel.app",
-    "ADDITIONAL_CORS_ORIGINS": "https://go3nethrm.com,https://admin.go3nethrm.com,https://*.go3nethrm.com",
-    "MONGODB_DB_NAME": "go3net-hrm",
-    "SMTP_HOST": "smtp.gmail.com",
-    "SMTP_PORT": "587",
-    "OFFICE_LATITUDE": "6.5244",
-    "OFFICE_LONGITUDE": "3.3792",
-    "OFFICE_RADIUS": "100",
-    "REQUIRE_OFFICE_LOCATION": "false",
-    "ALLOW_LOCATION_FALLBACK": "true"
-  }
+  ]
 }
