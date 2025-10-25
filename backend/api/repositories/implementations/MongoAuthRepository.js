@@ -37,35 +37,29 @@ class MongoAuthRepository {
                 password: userData.password,
                 fullName: userData.fullName,
                 role: userData.role || 'employee',
-                emailVerified: false,
+                emailVerified: true, // Auto-verify immediately
             });
             await user.save();
-            // Generate verification token BEFORE creating employee record
+
+            // Generate verification token for admin users (but still auto-verify)
             const verificationToken = user.generateEmailVerificationToken();
-            logger_1.default.info('🔑 [MongoAuthRepository] Generated verification token', {
+            logger_1.default.info('🔑 [MongoAuthRepository] Generated verification token (for admin)', {
                 userId: user._id,
                 email: user.email,
                 token: verificationToken.substring(0, 10) + '...',
                 expires: user.emailVerificationExpires
             });
-            await user.save(); // Save user with token first
-            logger_1.default.info('💾 [MongoAuthRepository] User saved with token', {
-                userId: user._id,
-                email: user.email,
-                token: user.emailVerificationToken?.substring(0, 10) + '...',
-                expires: user.emailVerificationExpires
-            });
-            // Create employee record with the same token
-            const employeeStatus = userData.role === 'admin' ? 'active' : 'pending';
+            await user.save();
+
+            // Create employee record with active status immediately
+            const employeeStatus = 'active'; // Always active now
             const employee = new Employee_1.Employee({
                 userId: user._id,
                 email: user.email,
                 fullName: user.fullName,
                 role: user.role,
                 status: employeeStatus,
-                emailVerified: false,
-                emailVerificationToken: verificationToken,
-                emailVerificationExpires: user.emailVerificationExpires,
+                emailVerified: true, // Auto-verify immediately
             });
             await employee.save();
             logger_1.default.info('💾 [MongoAuthRepository] Employee saved with token', {
@@ -111,8 +105,8 @@ class MongoAuthRepository {
             return {
                 user: user.toObject(),
                 accessToken: '',
-                requiresEmailVerification: true,
-                message: 'Please check your email to verify your account. You will be able to login after email verification and admin approval.',
+                requiresEmailVerification: false, // No longer required
+                message: 'Account created successfully! You can now log in.',
             };
         }
         catch (error) {
@@ -156,31 +150,7 @@ class MongoAuthRepository {
                 role: user.role
             });
 
-            // Check if email is verified
-            if (!user.emailVerified) {
-                logger_1.default.warn('❌ [MongoAuthRepository] Email not verified', {
-                    email: credentials.email,
-                    userEmailVerified: user.emailVerified,
-                    employeeEmailVerified: employee.emailVerified
-                });
-                throw new Error('Please verify your email before logging in');
-            }
-
-            // Check if employee is approved
-            if (employee.status !== 'active') {
-                logger_1.default.warn('❌ [MongoAuthRepository] Employee not approved', {
-                    email: credentials.email,
-                    status: employee.status,
-                    userEmailVerified: user.emailVerified,
-                    employeeEmailVerified: employee.emailVerified
-                });
-                // Return a special response for pending approval instead of throwing
-                const error = new Error('Your account is pending approval. Please wait for admin approval before logging in.');
-                error.code = 'PENDING_APPROVAL';
-                error.status = employee.status;
-                throw error;
-            }
-            // Generate JWT tokens
+            // Generate JWT tokens immediately - no approval required
             const accessToken = this.generateAccessToken(user);
             const refreshToken = this.generateRefreshToken(user);
             // Add refresh token to user
