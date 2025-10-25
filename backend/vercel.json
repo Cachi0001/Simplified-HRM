@@ -18,7 +18,13 @@
     "FRONTEND_URL": "https://go3nethrm.vercel.app",
     "FRONTEND_URL_PROD": "https://go3nethrm.vercel.app",
     "ADDITIONAL_CORS_ORIGINS": "https://go3nethrm.com,https://admin.go3nethrm.com,https://*.go3nethrm.com",
-    "MONGODB_URI": "mongodb+srv://onyemechicaleb4_db_user:jzgZeTkO7wto74h3@go3net-hrm.ayzjeu7.mongodb.net/?retryWrites=true&w=majority&appName=go3net-HRM",
-    "MONGODB_DB_NAME": "go3net-HRM"
+    "MONGODB_DB_NAME": "go3net-hrm",
+    "SMTP_HOST": "smtp.gmail.com",
+    "SMTP_PORT": "587",
+    "OFFICE_LATITUDE": "6.5244",
+    "OFFICE_LONGITUDE": "3.3792",
+    "OFFICE_RADIUS": "100",
+    "REQUIRE_OFFICE_LOCATION": "false",
+    "ALLOW_LOCATION_FALLBACK": "true"
   }
 }
