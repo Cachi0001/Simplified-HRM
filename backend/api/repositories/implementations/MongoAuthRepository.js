@@ -140,18 +140,39 @@ class MongoAuthRepository {
             // Get employee record to check status
             const employee = await Employee_1.Employee.findOne({ userId: user._id });
             if (!employee) {
+                logger_1.default.error('❌ [MongoAuthRepository] Employee record not found', {
+                    userId: user._id,
+                    email: user.email
+                });
                 throw new Error('Employee record not found');
             }
+
+            logger_1.default.info('🔍 [MongoAuthRepository] Signin validation check:', {
+                userId: user._id,
+                email: user.email,
+                userEmailVerified: user.emailVerified,
+                employeeEmailVerified: employee.emailVerified,
+                employeeStatus: employee.status,
+                role: user.role
+            });
+
             // Check if email is verified
             if (!user.emailVerified) {
-                logger_1.default.warn('❌ [MongoAuthRepository] Email not verified', { email: credentials.email });
+                logger_1.default.warn('❌ [MongoAuthRepository] Email not verified', {
+                    email: credentials.email,
+                    userEmailVerified: user.emailVerified,
+                    employeeEmailVerified: employee.emailVerified
+                });
                 throw new Error('Please verify your email before logging in');
             }
+
             // Check if employee is approved
             if (employee.status !== 'active') {
                 logger_1.default.warn('❌ [MongoAuthRepository] Employee not approved', {
                     email: credentials.email,
-                    status: employee.status
+                    status: employee.status,
+                    userEmailVerified: user.emailVerified,
+                    employeeEmailVerified: employee.emailVerified
                 });
                 // Return a special response for pending approval instead of throwing
                 const error = new Error('Your account is pending approval. Please wait for admin approval before logging in.');
