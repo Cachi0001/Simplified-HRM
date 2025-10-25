@@ -34,7 +34,6 @@ class DatabaseConfig {
             });
             this.isConnected = true;
             logger_1.default.info('✅ MongoDB connected successfully');
-            // Handle connection events
             mongoose_1.default.connection.on('error', (error) => {
                 logger_1.default.error('❌ MongoDB connection error:', { error });
             });
