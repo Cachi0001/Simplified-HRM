@@ -35,12 +35,32 @@ const ForgotPasswordCard: React.FC<ForgotPasswordCardProps> = ({ onSwitchToLogin
     }
 
     setIsLoading(true);
+    
+    // Generate a unique request ID for tracking
+    const requestId = `forgot_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+    
+    // Store the email in session storage for potential retry
+    try {
+      sessionStorage.setItem('last_password_reset_email', email);
+      sessionStorage.setItem('password_reset_request_id', requestId);
+    } catch (e) {
+      // Ignore storage errors
+    }
+    
+    console.log(`🔑 Requesting password reset for ${email} [Request ID: ${requestId}]`);
 
     try {
-      await authService.resetPassword(email);
+      // Use the authService to request password reset
+      const result = await authService.resetPassword(email);
+      
+      console.log(`✅ Password reset email sent successfully [Request ID: ${requestId}]`, result);
+      
       setIsEmailSent(true);
       addToast('success', 'Password reset email sent! Please check your inbox and follow the instructions to reset your password.');
     } catch (err: any) {
+      console.error(`❌ Failed to send password reset email [Request ID: ${requestId}]`, err);
+      
+      // Use the error message from the authService
       addToast('error', err.message || 'Failed to send password reset email. Please try again.');
     } finally {
       setIsLoading(false);

@@ -1,4 +1,16 @@
 import axios from 'axios';
+import { InternalAxiosRequestConfig, AxiosResponse } from 'axios';
+
+// Extend Axios types to include our custom properties
+declare module 'axios' {
+  export interface InternalAxiosRequestConfig<D = any> {
+    requestId?: string;
+  }
+  
+  export interface AxiosResponse<T = any, D = any> {
+    config: InternalAxiosRequestConfig<D>;
+  }
+}
 
 const SESSION_MESSAGE_KEY = 'authMessage';
 
@@ -48,9 +60,9 @@ const API_BASE_URL = (() => {
   // Check if we're in production mode
   const isProduction = import.meta.env.PROD;
   
-  // Get environment variables with fallbacks
-  const devApiUrl = (import.meta.env.VITE_API_URL as string) || 'http://localhost:3000/api';
-  const prodApiUrl = (import.meta.env.VITE_API_URL_PROD as string) || 'https://go3nethrm-backend.vercel.app/api';
+  // Get environment variables with fallbacks - use direct URLs without relying on proxy
+  const devApiUrl = 'http://localhost:3000/api';
+  const prodApiUrl = 'https://go3nethrm-backend.vercel.app/api';
   
   // Log API configuration for debugging
   console.log(`API Configuration:
@@ -93,45 +105,108 @@ const API_BASE_URL = (() => {
     console.log(`Final API URL: ${baseUrl} (Host: ${hostname})`);
   }
 
-  // If the base URL already includes /api, don't add it again
-  if (baseUrl.endsWith('/api')) {
-    return baseUrl;
-  }
-
-  // Otherwise, add /api for the API endpoints
-  return `${baseUrl}/api`;
+  // Return the base URL directly - no need to check or append /api
+  return baseUrl;
 })();
 
-// Create axios instance
+// Create axios instance with explicit CORS headers
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
+    'Origin': typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173',
   },
+  withCredentials: false, // Set to true only if you need to send cookies
 });
 
-// Request interceptor to add auth token
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('accessToken');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+// Request interceptor to add auth token and debug information
+api.interceptors.request.use(
+  (config) => {
+    // Generate a unique request ID for tracking
+    const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+    config.requestId = requestId;
+    
+    // Log request for debugging
+    console.log(`🚀 API Request [${requestId}]: ${config.method?.toUpperCase()} ${config.url}`, {
+      baseURL: config.baseURL,
+      headers: config.headers,
+      data: config.data
+    });
+    
+    // Add auth token if available
+    const token = localStorage.getItem('accessToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    
+    // Ensure Origin header is set correctly
+    if (typeof window !== 'undefined') {
+      config.headers.Origin = window.location.origin;
+    }
+    
+    // Special handling for password reset endpoints
+    if (config.url?.includes('/auth/reset-password/') || 
+        config.url?.includes('/auth/forgot-password')) {
+      console.log(`🔑 Password reset request detected [${requestId}]`);
+      
+      // Set a longer timeout for password reset requests
+      config.timeout = 15000; // 15 seconds
+      
+      // Add specific Accept header to handle potential non-JSON responses
+      config.headers.Accept = 'application/json, text/plain, */*';
+    }
+    
+    return config;
+  },
+  (error) => {
+    console.error('❌ Request interceptor error:', error);
+    return Promise.reject(error);
   }
-  return config;
-});
+);
 
 const handleAuthFailure = () => {
+  // Check if we've already shown a session expired message recently
+  // to prevent multiple redirects and messages
+  const hasShownExpiredMessage = sessionStorage.getItem('shown_session_expired');
+  if (hasShownExpiredMessage) {
+    console.log('Suppressing duplicate auth failure handling - already shown');
+    return;
+  }
+  
+  // Mark that we've shown the message to prevent duplicates
+  try {
+    sessionStorage.setItem('shown_session_expired', 'true');
+    
+    // Clear the flag after a delay
+    setTimeout(() => {
+      sessionStorage.removeItem('shown_session_expired');
+    }, 3000);
+  } catch {
+    /* noop - sessionStorage might not be available */
+  }
+  
+  // Clear all auth-related data
   localStorage.removeItem('accessToken');
   localStorage.removeItem('refreshToken');
   localStorage.removeItem('user');
   localStorage.removeItem('emailConfirmed');
   localStorage.removeItem('pendingConfirmationEmail');
+  
   try {
     sessionStorage.removeItem('confirmExecuted');
   } catch {
     /* noop */
   }
-  setSessionMessage('Session expired. Please log in again.');
+  
+  // Set a friendly message that will be shown on the login page
+  setSessionMessage('Your session has expired. Please log in again.');
+  
+  // Generate a unique ID for this auth failure event
+  const authFailureId = `auth_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+  console.log(`🔐 Auth failure handled [ID: ${authFailureId}] - redirecting to login`);
+  
+  // Redirect to the login page
   window.location.href = '/auth';
 };
 
@@ -150,53 +225,215 @@ const applyFriendlyMessage = (error: any, fallback: string) => {
   }
 };
 
-// Response interceptor to handle token refresh
+// Response interceptor to handle token refresh and provide better error handling
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Get the request ID from the config or generate a new one
+    const requestId = response.config.requestId || `resp_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+    
+    // Log successful responses for debugging
+    console.log(`✅ API Response Success [${requestId}]: ${response.config.method?.toUpperCase()} ${response.config.url}`, {
+      status: response.status,
+      statusText: response.statusText,
+      data: response.data,
+      contentType: response.headers?.['content-type']
+    });
+    
+    // Special handling for password reset endpoints
+    if (response.config.url?.includes('/auth/reset-password/') || 
+        response.config.url?.includes('/auth/forgot-password')) {
+      console.log(`🔑 Password reset response received [${requestId}]`);
+    }
+    
+    return response;
+  },
   async (error) => {
-    // Handle pending approval errors first - don't treat as auth failure
-    if (error.response?.status === 403 && error.response?.data?.message?.includes('pending approval')) {
-      // Don't redirect or show session expired for pending approval
+    // Get the request ID from the config or generate a new one
+    const requestId = error.config?.requestId || `req_unknown`;
+    
+    // Create a unique error ID for tracking
+    const errorId = `err_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+    
+    // Log detailed error information with the error ID
+    console.error(`❌ API Response Error [${errorId}] for request [${requestId}]: ${error.config?.method?.toUpperCase()} ${error.config?.url}`, {
+      errorId,
+      requestId,
+      message: error.message,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      headers: error.response?.headers,
+      request: {
+        baseURL: error.config?.baseURL,
+        url: error.config?.url,
+        method: error.config?.method,
+        headers: error.config?.headers,
+        data: error.config?.data
+      }
+    });
+
+    // Add error ID and request ID to the error object for reference
+    error.errorId = errorId;
+    error.requestId = requestId;
+    
+    // Special handling for password reset endpoints
+    if (error.config?.url?.includes('/auth/reset-password/') || 
+        error.config?.url?.includes('/auth/forgot-password')) {
+      console.log(`🔑 Password reset request failed [${requestId}] [${errorId}]`);
+    }
+
+    // CASE 1: Network errors (no response from server)
+    if (!error.response) {
+      // Check for specific network error types
+      if (error.message.includes('Network Error')) {
+        error.message = `Cannot connect to the server. Please check your internet connection and try again. (Error ID: ${errorId})`;
+      } else if (error.message.includes('timeout')) {
+        error.message = `Request timed out. The server is taking too long to respond. Please try again later. (Error ID: ${errorId})`;
+      } else if (error.message.includes('CORS')) {
+        error.message = `Cross-origin request blocked. This is a technical issue. Please contact support with Error ID: ${errorId}`;
+      } else {
+        error.message = `Network error. Please check your connection and try again. (Error ID: ${errorId})`;
+      }
       return Promise.reject(error);
     }
 
-    // Only redirect on 401 errors for auth failures
-    // Don't redirect on 403 (account not approved) or other auth-related errors
+    // CASE 2: Parse errors (invalid JSON)
+    if (error.message.includes('Unexpected token') || error.message.includes('JSON.parse')) {
+      console.error(`❌ JSON parse error detected [${errorId}]:`, error.message);
+      
+      // Check if this is the common "Unexpected token 'T', 'The page c'" error
+      // which happens when HTML is returned instead of JSON
+      if (error.message.includes("Unexpected token 'T', 'The page c'")) {
+        console.log(`🔍 Detected HTML response instead of JSON [${errorId}]`);
+        error.message = `The server returned an HTML page instead of JSON data. This usually means the server is not running correctly or the API endpoint is incorrect. Please try again later or contact support with Error ID: ${errorId}`;
+      } else {
+        // For other JSON parse errors
+        error.message = `The server returned an invalid response format. Please try again or contact support with Error ID: ${errorId}`;
+      }
+      
+      // Log additional information about the response if available
+      if (error.response) {
+        console.log(`📄 Response content type: ${error.response.headers?.['content-type']}`);
+        
+        // Try to log the first 200 characters of the response to help debugging
+        try {
+          const responseText = error.response.data ? 
+            (typeof error.response.data === 'string' ? 
+              error.response.data.substring(0, 200) : 
+              JSON.stringify(error.response.data).substring(0, 200)) : 
+            'No response data';
+          console.log(`📄 Response preview: ${responseText}...`);
+        } catch (e) {
+          console.log('📄 Could not preview response data');
+        }
+      }
+      
+      return Promise.reject(error);
+    }
+
+    // CASE 3: Authentication errors (401)
     if (error.response?.status === 401) {
-      if (error.response?.data?.errorType === 'email_not_confirmed') {
+      // Check if this is a login attempt with unverified email
+      const isLoginAttempt = error.config?.url?.includes('/auth/login') || 
+                            error.config?.url?.includes('/auth/signin');
+      
+      // Check for email verification error
+      if (error.response?.data?.message?.includes('verify your email') || 
+          error.response?.data?.errorType === 'email_not_confirmed') {
+        console.log(`🔑 Login attempt with unverified email [${requestId}]`);
+        error.message = 'Please verify your email address before logging in.';
         return Promise.reject(error);
       }
 
+      // Check for pending approval
       if (error.response?.data?.message?.includes('pending approval')) {
+        console.log(`🔑 Login attempt with pending approval [${requestId}]`);
+        error.message = 'Your account is pending admin approval. Please wait for approval email.';
+        return Promise.reject(error);
+      }
+      
+      // Check if this is a login attempt (we don't want to show session expired for login attempts)
+      if (isLoginAttempt) {
+        console.log(`🔑 Login attempt failed with 401 [${requestId}]`);
+        // Use the original error message or a generic one
+        error.message = error.response?.data?.message || 'Invalid email or password. Please try again.';
         return Promise.reject(error);
       }
 
-      const message = 'Session expired. Please log in again.';
-      if (error.response?.data) {
-        error.response.data.message = message;
+      // For actual session expiration (not during login)
+      const message = `Your session has expired. Please log in again. (Error ID: ${errorId})`;
+      
+      // Check if we've already shown this message to prevent duplicates
+      const hasShownExpiredMessage = sessionStorage.getItem('shown_session_expired');
+      if (!hasShownExpiredMessage) {
+        sessionStorage.setItem('shown_session_expired', 'true');
+        
+        if (error.response?.data) {
+          error.response.data.message = message;
+        }
+        error.message = message;
+        
+        // Clear the flag after a delay
+        setTimeout(() => {
+          sessionStorage.removeItem('shown_session_expired');
+        }, 3000);
+        
+        handleAuthFailure();
+      } else {
+        // Suppress duplicate message
+        console.log('Suppressing duplicate session expired message');
       }
-      error.message = message;
-      handleAuthFailure();
+      
       return Promise.reject(error);
     }
 
+    // CASE 4: Authorization errors (403)
     if (error.response?.status === 403) {
       // Special handling for pending approval - don't show generic auth error
       if (error.response?.data?.message?.includes('pending approval')) {
-        return Promise.reject(error);
+        error.message = 'Your account is pending admin approval. You will receive an email once approved.';
+      } else {
+        applyFriendlyMessage(error, `You don't have permission to perform this action. Please contact your administrator. (Error ID: ${errorId})`);
       }
-      applyFriendlyMessage(error, 'You are not authorized to perform this action.');
-    } else if (error.response?.status === 404) {
-      applyFriendlyMessage(error, 'We could not find what you were looking for.');
-    } else {
+    } 
+    // CASE 5: Not found errors (404)
+    else if (error.response?.status === 404) {
+      // Check if this is an API endpoint not found or a resource not found
+      if (error.config?.url?.includes('/api/')) {
+        applyFriendlyMessage(error, `The requested resource could not be found. Please check your input and try again. (Error ID: ${errorId})`);
+      } else {
+        applyFriendlyMessage(error, `We couldn't find what you were looking for. Please check the URL and try again. (Error ID: ${errorId})`);
+      }
+    } 
+    // CASE 6: Validation errors (400)
+    else if (error.response?.status === 400) {
+      // Check for specific validation error messages
+      if (error.response?.data?.message?.includes('already exists')) {
+        // Don't modify existing message for "already exists" errors
+      } else if (error.response?.data?.message?.includes('required')) {
+        // Don't modify existing message for "required field" errors
+      } else if (hasStatusCodeText(error.response?.data?.message)) {
+        applyFriendlyMessage(error, `Invalid request. Please check your input and try again. (Error ID: ${errorId})`);
+      }
+    }
+    // CASE 7: Server errors (500)
+    else if (error.response?.status >= 500) {
+      applyFriendlyMessage(error, `Server error. Our team has been notified. Please try again later. (Error ID: ${errorId})`);
+    }
+    // CASE 8: Connection refused
+    else if (error.response?.status === 0 || error.response?.status === 'ECONNREFUSED') {
+      error.message = `Cannot connect to the server. Please check if the server is running and try again. (Error ID: ${errorId})`;
+    } 
+    // CASE 9: Other errors
+    else {
       const message = error.response?.data?.message;
       if (hasStatusCodeText(message)) {
         if (error.response?.data) {
-          error.response.data.message = 'Something went wrong. Please try again.';
+          error.response.data.message = `Something went wrong. Please try again or contact support with Error ID: ${errorId}`;
         }
-        error.message = 'Something went wrong. Please try again.';
+        error.message = `Something went wrong. Please try again or contact support with Error ID: ${errorId}`;
       } else if (hasStatusCodeText(error.message)) {
-        error.message = 'Something went wrong. Please try again.';
+        error.message = `Something went wrong. Please try again or contact support with Error ID: ${errorId}`;
       }
     }
 

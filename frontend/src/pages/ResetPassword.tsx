@@ -4,6 +4,7 @@ import { useToast } from '../components/ui/Toast';
 import Logo from '../components/ui/Logo';
 import { Button } from '../components/ui/Button';
 import { PasswordInput } from '../components/ui/PasswordInput';
+import { authService } from '../services/authService';
 
 const ResetPassword: React.FC = () => {
   const navigate = useNavigate();
@@ -13,6 +14,7 @@ const ResetPassword: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [requestId, setRequestId] = useState(`reset_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`);
 
   const token = searchParams.get('token');
 
@@ -22,7 +24,17 @@ const ResetPassword: React.FC = () => {
       navigate('/auth');
       return;
     }
-  }, [token, navigate, addToast]);
+    
+    // Store the request ID in session storage to track across page refreshes
+    try {
+      sessionStorage.setItem('password_reset_request_id', requestId);
+    } catch (e) {
+      // Ignore storage errors
+    }
+    
+    // Log the reset password attempt for debugging
+    console.log(`🔑 Reset password page loaded with token [Request ID: ${requestId}]`);
+  }, [token, navigate, addToast, requestId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,34 +54,36 @@ const ResetPassword: React.FC = () => {
       return;
     }
 
+    if (!token) {
+      addToast('error', 'Invalid reset token. Please request a new password reset.');
+      return;
+    }
+
     setIsLoading(true);
+    
+    // Generate a unique request ID for tracking this specific request
+    const currentRequestId = `reset_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+    setRequestId(currentRequestId);
+    
+    console.log(`🔑 Submitting password reset [Request ID: ${currentRequestId}]`);
 
     try {
-      const baseUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3000');
-      const apiUrl = baseUrl.endsWith('/api') ? baseUrl : `${baseUrl}/api`;
+      // Use the authService instead of direct API calls
+      const result = await authService.completePasswordReset(token, newPassword);
+      
+      console.log(`✅ Password reset successful [Request ID: ${currentRequestId}]`, result);
+      
+      setIsSuccess(true);
+      addToast('success', result.message || 'Password reset successfully! You can now sign in with your new password.');
 
-      const response = await fetch(`${apiUrl}/auth/reset-password/${token}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ newPassword }),
-      });
-
-      const result = await response.json();
-
-      if (response.ok) {
-        setIsSuccess(true);
-        addToast('success', result.message || 'Password reset successfully! You can now sign in with your new password.');
-
-        // Redirect to login after a delay
-        setTimeout(() => {
-          navigate('/auth');
-        }, 3000);
-      } else {
-        throw new Error(result.message || 'Failed to reset password');
-      }
+      // Redirect to login after a delay
+      setTimeout(() => {
+        navigate('/auth');
+      }, 3000);
     } catch (err: any) {
+      console.error(`❌ Password reset failed [Request ID: ${currentRequestId}]`, err);
+      
+      // Use the error message from the authService
       addToast('error', err.message || 'Failed to reset password. Please try again.');
     } finally {
       setIsLoading(false);

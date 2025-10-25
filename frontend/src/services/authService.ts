@@ -129,13 +129,40 @@ export class AuthService {
   // Reset password (request)
   async resetPassword(email: string): Promise<{ success: boolean; message: string }> {
     try {
+      // Generate a unique request ID for tracking
+      const requestId = `forgot_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+      console.log(`🔑 Requesting password reset for ${email} [Request ID: ${requestId}]`);
+      
       const response = await api.post('/auth/forgot-password', { email });
+      
+      console.log(`✅ Password reset email sent successfully [Request ID: ${requestId}]`);
       return {
         success: true,
         message: response.data.message || 'Password reset email sent successfully'
       };
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to send password reset email');
+      console.error('❌ Failed to send password reset email', error);
+      throw new Error(error.message || 'Failed to send password reset email');
+    }
+  }
+  
+  // Complete password reset (with token)
+  async completePasswordReset(token: string, newPassword: string): Promise<{ success: boolean; message: string }> {
+    try {
+      // Generate a unique request ID for tracking
+      const requestId = `reset_complete_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+      console.log(`🔑 Completing password reset with token [Request ID: ${requestId}]`);
+      
+      const response = await api.post(`/auth/reset-password/${token}`, { newPassword });
+      
+      console.log(`✅ Password reset completed successfully [Request ID: ${requestId}]`);
+      return {
+        success: true,
+        message: response.data.message || 'Password reset successfully'
+      };
+    } catch (error: any) {
+      console.error('❌ Failed to complete password reset', error);
+      throw new Error(error.message || 'Failed to reset password');
     }
   }
 

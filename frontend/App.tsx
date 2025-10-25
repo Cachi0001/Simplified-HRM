@@ -12,6 +12,7 @@ import Header from './src/components/layout/Header';
 import Footer from './src/components/layout/Footer';
 import { ToastProvider } from './src/components/ui/Toast';
 import { ProtectedRoute } from './src/components/auth/ProtectedRoute';
+import ApiConnectionTest from './src/components/ApiConnectionTest';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -52,6 +53,7 @@ function AppContent() {
               <AttendanceReportPage />
             </ProtectedRoute>
           } />
+          <Route path="/api-test" element={<ApiConnectionTest />} />
         </Routes>
       </main>
       {!isDashboardPage && <Footer />}

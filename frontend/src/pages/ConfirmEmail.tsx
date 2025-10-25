@@ -8,6 +8,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useToast } from '../components/ui/Toast';
 import Logo from '../components/ui/Logo';
 import { Button } from '../components/ui/Button';
+import api from '../lib/api';
+import { authService } from '../services/authService';
 
 interface ConfirmEmailProps {}
 
@@ -30,8 +32,47 @@ const ConfirmEmail: React.FC<ConfirmEmailProps> = () => {
       return;
     }
 
-    // Don't auto-execute - let user click the button
-  }, [token]);
+    // Check if we have stored confirmation status from a previous attempt
+    try {
+      const status = sessionStorage.getItem('emailConfirmationStatus');
+      const message = sessionStorage.getItem('emailConfirmationMessage');
+      
+      if (status && message) {
+        console.log('Found stored confirmation status:', { status, message });
+        
+        // Handle different statuses
+        if (status === 'success') {
+          setIsSuccess(true);
+          setHasCompleted(true);
+          addToast('success', message);
+        } else if (status === 'error') {
+          const errorId = sessionStorage.getItem('emailConfirmationErrorId') || '';
+          setError(message);
+          addToast('error', message);
+          
+          // Check if it was an expired token error
+          if (message.includes('expired')) {
+            setIsExpired(true);
+          }
+        } else if (status === 'already-confirmed') {
+          // Already confirmed - redirect to login
+          addToast('info', message);
+          setTimeout(() => {
+            navigate('/auth', { replace: true });
+          }, 1000);
+        }
+        
+        // Clear the stored status to prevent showing the same message again
+        sessionStorage.removeItem('emailConfirmationStatus');
+        sessionStorage.removeItem('emailConfirmationMessage');
+        sessionStorage.removeItem('emailConfirmationErrorId');
+      }
+    } catch (e) {
+      console.warn('Failed to check sessionStorage for confirmation status', e);
+    }
+
+    // Don't auto-execute confirmation - let user click the button
+  }, [token, navigate, addToast]);
 
   const handleConfirm = async () => {
     // Prevent multiple simultaneous requests
@@ -54,17 +95,33 @@ const ConfirmEmail: React.FC<ConfirmEmailProps> = () => {
     setIsExpired(false);
 
     try {
-      const baseUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3000');
-      const apiUrl = baseUrl.endsWith('/api') ? baseUrl : `${baseUrl}/api`;
+      // Generate a unique request ID for tracking this confirmation attempt
+      const requestId = `confirm_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+      
+      console.log(`📡 Making confirmation API call... [RequestID: ${requestId}]`, {
+        token: token.substring(0, 5) + '...' // Only log part of the token for security
+      });
+      
+      // Use the API client instead of direct fetch
+      try {
+        // Set a longer timeout for this specific request
+        const response = await api.get(`/auth/confirm/${token}`, {
+          timeout: 15000, // 15 second timeout
+          headers: {
+            'Accept': 'application/json, text/plain, */*',
+            'X-Request-ID': requestId
+          }
+        });
+        
+        console.log(`📥 Confirmation API response [RequestID: ${requestId}]:`, { 
+          status: response.status, 
+          data: response.data,
+          contentType: response.headers['content-type']
+        });
 
-      console.log('📡 Making confirmation API call...');
-      const response = await fetch(`${apiUrl}/auth/confirm/${token}`);
-      const result = await response.json();
+        const result = response.data;
 
-      console.log('📥 Confirmation API response:', { status: response.status, result });
-
-      if (response.ok) {
-        console.log('✅ Confirmation successful - updating database');
+        console.log(`✅ Confirmation successful [RequestID: ${requestId}] - updating client state`);
 
         // Backend confirmed successfully - update localStorage
         localStorage.setItem('emailConfirmed', 'true');
@@ -81,6 +138,14 @@ const ConfirmEmail: React.FC<ConfirmEmailProps> = () => {
         setIsSuccess(true);
         addToast('success', result.message || 'Email confirmed successfully!');
 
+        // Store the email confirmation status in sessionStorage to persist across page refreshes
+        try {
+          sessionStorage.setItem('emailConfirmationStatus', 'success');
+          sessionStorage.setItem('emailConfirmationMessage', result.message || 'Email confirmed successfully!');
+        } catch (e) {
+          console.warn('Failed to store confirmation status in sessionStorage', e);
+        }
+
         setTimeout(() => {
           if (result.data?.user?.role === 'admin') {
             navigate('/dashboard', { replace: true });
@@ -90,35 +155,103 @@ const ConfirmEmail: React.FC<ConfirmEmailProps> = () => {
             navigate('/auth', { replace: true });
           }
         }, 3000);
-      } else {
-        if (result.message?.includes('expired') || result.message?.includes('Invalid')) {
+      } catch (apiError: any) {
+        console.error(`❌ API error during confirmation [RequestID: ${requestId}]:`, apiError);
+        
+        // Check for specific error messages
+        const errorMessage = apiError.response?.data?.message || apiError.message;
+        
+        if (errorMessage.includes('expired') || errorMessage.includes('Invalid')) {
           setIsExpired(true);
-          throw new Error(result.message);
+          throw new Error(errorMessage);
+        } else if (errorMessage.includes('already')) {
+          // Handle "already confirmed" as a special case
+          throw new Error(`This email has already been confirmed. ${errorMessage}`);
+        } else if (apiError.code === 'ECONNABORTED') {
+          throw new Error('The confirmation request timed out. Please check your internet connection and try again.');
         } else {
-          throw new Error(result.message || 'Confirmation failed');
+          throw apiError;
         }
       }
     } catch (err: any) {
-      console.error('❌ Confirmation failed:', err);
+      // Create a unique error ID for tracking
+      const errorId = `err_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+      
+      console.error(`❌ Confirmation failed [ErrorID: ${errorId}]:`, err);
 
-      if (err.message?.includes('already been verified') || err.message?.includes('already confirmed')) {
-        console.log('ℹ️ Email already confirmed - redirecting');
+      // Handle specific error cases with user-friendly messages
+      if (err.message?.includes('already been verified') || 
+          err.message?.includes('already confirmed') || 
+          err.message?.includes('already been confirmed')) {
+        console.log(`ℹ️ Email already confirmed [ErrorID: ${errorId}] - redirecting`);
+        
         // Backend says already confirmed - trust it and redirect
         localStorage.setItem('emailConfirmed', 'true');
         localStorage.removeItem('pendingConfirmationEmail'); // Clear pending email
         setHasCompleted(true); // Mark as completed
-        addToast('info', 'Email already confirmed');
+        
+        // Show a friendly message
+        const friendlyMessage = 'Your email has already been confirmed. You can now log in to your account.';
+        addToast('info', friendlyMessage);
+        
+        // Store in session storage for persistence
+        try {
+          sessionStorage.setItem('emailConfirmationStatus', 'already-confirmed');
+          sessionStorage.setItem('emailConfirmationMessage', friendlyMessage);
+        } catch (e) {
+          console.warn('Failed to store confirmation status in sessionStorage', e);
+        }
+        
         navigate('/auth', { replace: true });
         return;
       }
 
+      // Handle different error types with specific messages
+      let userFriendlyMessage = '';
+      
       if (err.message?.includes('expired')) {
         setIsExpired(true);
-        setError('This confirmation link has expired. Please request a new one.');
+        userFriendlyMessage = 'This confirmation link has expired. Please request a new confirmation email.';
+      } else if (err.message?.includes('HTML page instead of JSON') || 
+                err.message?.includes('invalid response format') ||
+                err.message?.includes('unexpected response')) {
+        userFriendlyMessage = `The server returned an unexpected response. This might be due to server maintenance or configuration issues. Please try again later or contact support. (Error ID: ${errorId})`;
+      } else if (err.message?.includes('Unexpected token') || 
+                err.message?.includes('JSON.parse') ||
+                err.message?.includes('invalid JSON')) {
+        userFriendlyMessage = `There was a problem processing the server response. This is likely a temporary issue. Please try again later. (Error ID: ${errorId})`;
+      } else if (err.message?.includes('timed out')) {
+        userFriendlyMessage = 'The confirmation request timed out. Please check your internet connection and try again.';
+      } else if (err.message?.includes('Network error') || err.message?.includes('internet connection')) {
+        userFriendlyMessage = 'Network error. Please check your internet connection and try again.';
       } else {
-        setError(err.message || 'Confirmation failed');
+        // Generic error message with the error ID for tracking
+        userFriendlyMessage = `Email confirmation failed: ${err.message || 'Unknown error'}. (Error ID: ${errorId})`;
       }
-      addToast('error', err.message || 'Confirmation failed');
+      
+      // Set the error message for display in the UI
+      setError(userFriendlyMessage);
+      
+      // Log detailed error information for debugging
+      console.error(`Confirmation error details [ErrorID: ${errorId}]:`, {
+        errorId,
+        message: err.message,
+        stack: err.stack,
+        name: err.name,
+        code: err.code
+      });
+      
+      // Show toast with the user-friendly message
+      addToast('error', userFriendlyMessage);
+      
+      // Store error in session storage for persistence across refreshes
+      try {
+        sessionStorage.setItem('emailConfirmationStatus', 'error');
+        sessionStorage.setItem('emailConfirmationMessage', userFriendlyMessage);
+        sessionStorage.setItem('emailConfirmationErrorId', errorId);
+      } catch (e) {
+        console.warn('Failed to store error in sessionStorage', e);
+      }
     } finally {
       setIsVerifying(false);
     }
@@ -126,26 +259,118 @@ const ConfirmEmail: React.FC<ConfirmEmailProps> = () => {
 
   const handleResendConfirmation = async () => {
     setIsResending(true);
+    
+    // Generate a unique request ID for tracking this resend attempt
+    const requestId = `resend_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+    
     try {
-      const baseUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3000');
-      const apiUrl = baseUrl.endsWith('/api') ? baseUrl : `${baseUrl}/api`;
-
-      // Try to get email from localStorage (set during signup) or use default
-      const email = localStorage.getItem('pendingConfirmationEmail') || 'passioncaleb5@gmail.com';
-
-      await fetch(`${apiUrl}/auth/resend-confirmation`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
+      // Try to get email from various sources
+      let email = localStorage.getItem('pendingConfirmationEmail');
+      
+      // If not found in pendingConfirmationEmail, try to get from user object
+      if (!email) {
+        try {
+          const userJson = localStorage.getItem('user');
+          if (userJson) {
+            const user = JSON.parse(userJson);
+            if (user && user.email) {
+              email = user.email;
+              console.log('Using email from user object:', email);
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to parse user JSON:', e);
+        }
+      }
+      
+      // If still not found, show a prompt to enter email
+      if (!email) {
+        // Ask the user for their email
+        const userEmail = window.prompt('Please enter your email address to receive a new confirmation link:');
+        
+        if (userEmail && userEmail.includes('@')) {
+          email = userEmail;
+          // Save it for future use
+          localStorage.setItem('pendingConfirmationEmail', email);
+          console.log('Using email from user prompt:', email);
+        } else {
+          throw new Error('Valid email address is required. Please try again with a valid email.');
+        }
+      }
+      
+      console.log(`📧 Resending confirmation email [RequestID: ${requestId}]...`, {
+        email: email.substring(0, 3) + '***' + email.substring(email.indexOf('@')) // Mask email for privacy
       });
-
-      addToast('success', 'Confirmation email resent successfully! Please check your inbox.');
-      setIsExpired(false);
-      setError(null);
+      
+      try {
+        // Use the authService to resend the confirmation email
+        const result = await authService.resendConfirmationEmail(email);
+        
+        console.log(`✅ Confirmation email resent successfully [RequestID: ${requestId}]`, result);
+        
+        const successMessage = result.message || 'Confirmation email resent successfully! Please check your inbox and spam folder.';
+        addToast('success', successMessage);
+        
+        // Reset UI state
+        setIsExpired(false);
+        setError(null);
+      } catch (apiError: any) {
+        console.error(`❌ API error during resend confirmation [RequestID: ${requestId}]:`, apiError);
+        
+        // Check for specific error messages
+        const errorMessage = apiError.response?.data?.message || apiError.message;
+        
+        if (errorMessage.includes('already verified') || errorMessage.includes('already confirmed')) {
+          // Handle "already confirmed" as a special case
+          throw new Error(`This email has already been confirmed. ${errorMessage}`);
+        } else if (apiError.code === 'ECONNABORTED') {
+          throw new Error('The request timed out. Please check your internet connection and try again.');
+        } else if (errorMessage.includes('rate limit') || errorMessage.includes('too many requests')) {
+          throw new Error('You have requested too many confirmation emails. Please wait a few minutes before trying again.');
+        } else {
+          throw apiError;
+        }
+      }
     } catch (err: any) {
-      addToast('error', err.message || 'Failed to resend confirmation email');
+      // Create a unique error ID for tracking
+      const errorId = `err_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+      
+      console.error(`❌ Resend confirmation failed [ErrorID: ${errorId}]:`, err);
+      
+      // Handle different error types with specific messages
+      let userFriendlyMessage = '';
+      
+      if (err.message?.includes('No email address found')) {
+        userFriendlyMessage = 'No email address found. Please go back to the login page and try again.';
+      } else if (err.message?.includes('already verified') || err.message?.includes('already confirmed')) {
+        userFriendlyMessage = 'This email has already been confirmed. You can now log in to your account.';
+        
+        // Redirect to login page after showing the message
+        setTimeout(() => {
+          navigate('/auth', { replace: true });
+        }, 3000);
+      } else if (err.message?.includes('timed out')) {
+        userFriendlyMessage = 'The request timed out. Please check your internet connection and try again.';
+      } else if (err.message?.includes('Network error') || err.message?.includes('internet connection')) {
+        userFriendlyMessage = 'Network error. Please check your internet connection and try again.';
+      } else if (err.message?.includes('rate limit') || err.message?.includes('too many requests')) {
+        userFriendlyMessage = 'You have requested too many confirmation emails. Please wait a few minutes before trying again.';
+      } else {
+        // Use the error message from the server if available, otherwise use a generic message
+        userFriendlyMessage = `Failed to resend confirmation email: ${err.message || 'Unknown error'}. (Error ID: ${errorId})`;
+      }
+      
+      // Show toast with the user-friendly message
+      addToast('error', userFriendlyMessage);
+      
+      // Log detailed error information for debugging
+      console.error(`Resend confirmation error details [ErrorID: ${errorId}]:`, {
+        errorId,
+        message: err.message,
+        stack: err.stack,
+        name: err.name,
+        code: err.code
+      });
     } finally {
       setIsResending(false);
     }
