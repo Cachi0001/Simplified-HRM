@@ -5,6 +5,9 @@ if (process.env.NODE_ENV !== 'production') {
   dotenv.config({ path: path.resolve(__dirname, '../.env') });
 }
 
+
+
+
 import express, { Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
 import logger from './utils/logger';

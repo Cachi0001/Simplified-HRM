@@ -1,9 +1,9 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "main": "dist/index.js",
+  "main": "dist/server.js",
   "scripts": {
-    "build": "tsc",
+    "build": "npx tsc && if not exist api mkdir api && xcopy /E /I /Y dist api",
     "dev": "ts-node src/server.ts",
     "start": "node dist/server.js",
     "start:prod": "NODE_ENV=production node dist/server.js",
