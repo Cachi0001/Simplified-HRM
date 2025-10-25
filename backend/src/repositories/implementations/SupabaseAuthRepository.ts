@@ -69,6 +69,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
           email_verified: false,
           email_verification_token: verificationToken,
           email_verification_expires: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 1 hour
+          refresh_tokens: [], // Initialize as empty array
         })
         .select()
         .single();
@@ -677,38 +678,80 @@ export class SupabaseAuthRepository implements IAuthRepository {
   // ======================================
 
   public async addRefreshToken(userId: string, token: string): Promise<void> {
-    const { error } = await this.supabase
-      .from('users')
-      .update({
-        refresh_tokens: this.supabase.rpc('array_append', { refresh_tokens: token }) as any
-      } as any)
-      .eq('id', userId);
+    try {
+      // First get current refresh tokens
+      const { data: user, error: fetchError } = await this.supabase
+        .from('users')
+        .select('refresh_tokens')
+        .eq('id', userId)
+        .single();
 
-    if (error) {
-      throw new Error(`Failed to add refresh token: ${error.message}`);
-    }
-  }
+      if (fetchError) {
+        throw new Error(`Failed to fetch user tokens: ${fetchError.message}`);
+      }
 
-  private async replaceRefreshToken(userId: string, oldToken: string, newToken: string): Promise<void> {
-    const { data: user } = await this.supabase
-      .from('users')
-      .select('refresh_tokens')
-      .eq('id', userId)
-      .single();
+      // Get current tokens or initialize empty array (handle NULL case)
+      const currentTokens = Array.isArray(user?.refresh_tokens) ? user.refresh_tokens : [];
 
-    if (user && user.refresh_tokens) {
-      const updatedTokens = user.refresh_tokens.map((t: string) =>
-        t === oldToken ? newToken : t
-      );
+      // Add new token to array
+      const updatedTokens = [...currentTokens, token];
 
-      const { error } = await this.supabase
+      // Update with new array
+      const { error: updateError } = await this.supabase
         .from('users')
         .update({ refresh_tokens: updatedTokens })
         .eq('id', userId);
 
-      if (error) {
-        throw new Error(`Failed to replace refresh token: ${error.message}`);
+      if (updateError) {
+        throw new Error(`Failed to add refresh token: ${updateError.message}`);
       }
+
+      logger.info('✅ [SupabaseAuthRepository] Refresh token added successfully', {
+        userId,
+        tokenCount: updatedTokens.length
+      });
+    } catch (error) {
+      logger.error('❌ [SupabaseAuthRepository] Add refresh token failed:', error);
+      throw error;
+    }
+  }
+
+  private async replaceRefreshToken(userId: string, oldToken: string, newToken: string): Promise<void> {
+    try {
+      const { data: user, error: fetchError } = await this.supabase
+        .from('users')
+        .select('refresh_tokens')
+        .eq('id', userId)
+        .single();
+
+      if (fetchError) {
+        throw new Error(`Failed to fetch user tokens: ${fetchError.message}`);
+      }
+
+      if (user && Array.isArray(user.refresh_tokens)) {
+        const updatedTokens = user.refresh_tokens.map((t: string) =>
+          t === oldToken ? newToken : t
+        );
+
+        const { error: updateError } = await this.supabase
+          .from('users')
+          .update({ refresh_tokens: updatedTokens })
+          .eq('id', userId);
+
+        if (updateError) {
+          throw new Error(`Failed to replace refresh token: ${updateError.message}`);
+        }
+
+        logger.info('✅ [SupabaseAuthRepository] Refresh token replaced successfully', {
+          userId,
+          tokenCount: updatedTokens.length
+        });
+      } else {
+        logger.warn('⚠️ [SupabaseAuthRepository] No refresh tokens found to replace', { userId });
+      }
+    } catch (error) {
+      logger.error('❌ [SupabaseAuthRepository] Replace refresh token failed:', error);
+      throw error;
     }
   }
 
