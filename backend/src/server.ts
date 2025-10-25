@@ -220,21 +220,16 @@ const corsOptions = {
 
 // Apply CORS middleware
 app.use(cors(corsOptions));
-
-// Add OPTIONS response for preflight requests
-// Handle specific API routes instead of using a wildcard
-// We'll use a middleware approach instead of individual routes
-app.use((req: Request, res: Response, next: NextFunction) => {
-  if (req.method === 'OPTIONS') {
-    console.log(`Handling OPTIONS request for: ${req.path}`, {
-      origin: req.headers.origin || 'No origin'
-    });
-    logger.info(`Handling OPTIONS request for: ${req.path}`, {
-      origin: req.headers.origin || 'No origin'
-    });
-    return cors(corsOptions)(req, res, next);
-  }
-  next();
+app.options('*', (req: Request, res: Response) => {
+  console.log(`Handling OPTIONS request for: ${req.path}`, {
+    origin: req.headers.origin || 'No origin'
+  });
+  logger.info(`Handling OPTIONS request for: ${req.path}`, {
+    origin: req.headers.origin || 'No origin'
+  });
+  cors(corsOptions)(req, res, () => {
+    res.sendStatus(204);
+  });
 });
 
 // Body parsing middleware
