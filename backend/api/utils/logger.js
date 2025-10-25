@@ -6,9 +6,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const winston_1 = __importDefault(require("winston"));
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
-// Ensure logs directory exists
+// Check if we're in a serverless environment
+const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.LAMBDA_TASK_ROOT;
+
+// Ensure logs directory exists (only if not in serverless)
 const logsDir = path_1.default.join(process.cwd(), 'logs');
-if (!fs_1.default.existsSync(logsDir)) {
+if (!isServerless && !fs_1.default.existsSync(logsDir)) {
     fs_1.default.mkdirSync(logsDir, { recursive: true });
 }
 // Custom format for better readability
@@ -35,36 +38,28 @@ const winstonLogger = winston_1.default.createLogger({
         deployment: process.env.VERCEL ? 'vercel' : 'local'
     },
     transports: [
-        // Write all logs with importance level of `error` or less to `error.log`
-        new winston_1.default.transports.File({
-            filename: path_1.default.join(logsDir, 'error.log'),
-            level: 'error',
-            format: fileFormat
-        }),
-        // Write all logs with importance level of `info` or less to `combined.log`
-        new winston_1.default.transports.File({
-            filename: path_1.default.join(logsDir, 'combined.log'),
-            format: fileFormat
-        }),
-        // Create a special CORS debug log
-        new winston_1.default.transports.File({
-            filename: path_1.default.join(logsDir, 'cors.log'),
-            level: 'debug',
-            format: fileFormat
+        // Always use console transport
+        new winston_1.default.transports.Console({
+            format: consoleFormat
         })
     ],
 });
-// Add console transport in non-production environments
-if (process.env.NODE_ENV !== 'production') {
-    winstonLogger.add(new winston_1.default.transports.Console({
-        format: consoleFormat
+
+// Only add file transports if not in serverless environment
+if (!isServerless && process.env.NODE_ENV !== 'production') {
+    winstonLogger.add(new winston_1.default.transports.File({
+        filename: path_1.default.join(logsDir, 'error.log'),
+        level: 'error',
+        format: fileFormat
     }));
-}
-else {
-    // In production, still log to console but with less verbose output
-    winstonLogger.add(new winston_1.default.transports.Console({
-        level: 'info',
-        format: consoleFormat
+    winstonLogger.add(new winston_1.default.transports.File({
+        filename: path_1.default.join(logsDir, 'combined.log'),
+        format: fileFormat
+    }));
+    winstonLogger.add(new winston_1.default.transports.File({
+        filename: path_1.default.join(logsDir, 'cors.log'),
+        level: 'debug',
+        format: fileFormat
     }));
 }
 // Create a more robust logger that handles errors gracefully

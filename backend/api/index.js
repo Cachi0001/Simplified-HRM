@@ -3,10 +3,10 @@ const cors = require('cors');
 const helmet = require('helmet');
 
 // Import route handlers
-const authRoutes = require('./routes/auth.routes');
-const employeeRoutes = require('./routes/employee.routes');
-const attendanceRoutes = require('./routes/attendance.routes');
-const taskRoutes = require('./routes/task.routes');
+const authRoutes = require('./routes/auth.routes').default;
+const employeeRoutes = require('./routes/employee.routes').default;
+const attendanceRoutes = require('./routes/attendance.routes').default;
+const taskRoutes = require('./routes/task.routes').default;
 
 const app = express();
 
