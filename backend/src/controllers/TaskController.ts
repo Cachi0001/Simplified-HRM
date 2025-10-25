@@ -35,8 +35,8 @@ export class TaskController {
       const query: TaskQuery = {
         page: req.query.page ? parseInt(req.query.page as string) : undefined,
         limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
-        assigneeId: req.query.assigneeId as string,
-        assignedBy: req.query.assignedBy as string,
+        assigned_to: req.query.assigned_to as string,
+        created_by: req.query.created_by as string,
         status: req.query.status as 'pending' | 'in_progress' | 'completed' | 'cancelled',
         priority: req.query.priority as 'low' | 'medium' | 'high'
       };

@@ -1,5 +1,6 @@
 import { IEmployeeRepository } from '../repositories/interfaces/IEmployeeRepository';
 import { IEmployee, CreateEmployeeRequest, UpdateEmployeeRequest, EmployeeQuery } from '../models/SupabaseEmployee';
+import { EmailService } from './EmailService';
 import logger from '../utils/logger';
 
 export class EmployeeService {
@@ -190,11 +191,14 @@ export class EmployeeService {
         employeeId: id
       });
 
-      // Send email notification (using Supabase)
-      logger.info('📧 Approval email would be sent', {
-        email: updatedEmployee.email,
-        fullName: updatedEmployee.fullName
-      });
+      // Send email notification
+      try {
+        const emailService = new EmailService();
+        await emailService.sendApprovalConfirmation(updatedEmployee.email, updatedEmployee.fullName);
+        logger.info('📧 Approval email sent', { email: updatedEmployee.email });
+      } catch (emailError) {
+        logger.warn('Approval email failed (non-critical)', { error: (emailError as Error).message });
+      }
 
       return updatedEmployee;
     } catch (error) {
@@ -221,8 +225,18 @@ export class EmployeeService {
 
       const updatedEmployee = await this.employeeRepository.assignDepartment(id, department);
 
-      // Send notification email to employee (using Supabase)
-      logger.info('📧 Department assignment email would be sent', { employeeId: id, department });
+      // Send notification email to employee
+      try {
+        const emailService = new EmailService();
+        await emailService.sendDepartmentAssignmentNotification(
+          updatedEmployee.email,
+          updatedEmployee.fullName,
+          department
+        );
+        logger.info('📧 Department assignment email sent', { employeeId: id, department });
+      } catch (emailError) {
+        logger.warn('Department assignment email failed (non-critical)', { error: (emailError as Error).message });
+      }
 
       logger.info('EmployeeService: Department assigned successfully', { employeeId: id, department });
       return updatedEmployee;

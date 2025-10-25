@@ -5,6 +5,7 @@ import logger from '../../utils/logger';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import { EmailService } from '../../services/EmailService';
 
 export class SupabaseAuthRepository implements IAuthRepository {
   private supabase: SupabaseClient;
@@ -99,16 +100,9 @@ export class SupabaseAuthRepository implements IAuthRepository {
         throw new Error(`Failed to create employee record: ${employeeError.message}`);
       }
 
-      // Send confirmation email (non-blocking)
+      // Send confirmation email
       const confirmationUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/confirm?token=${verificationToken}`;
-      logger.info('📧 [SupabaseAuthRepository] Queuing confirmation email', {
-        email: userData.email,
-        confirmationUrl: confirmationUrl.substring(0, 100) + '...',
-        token: verificationToken.substring(0, 10) + '...'
-      });
-
-      // TODO: Implement email service integration
-      // await this.sendConfirmationEmail(userData.email, userData.fullName, confirmationUrl);
+      await this.sendEmailConfirmation(userData.email, userData.fullName, confirmationUrl);
 
       logger.info('✅ [SupabaseAuthRepository] User created successfully', {
         userId: newUser.id,
@@ -176,8 +170,8 @@ export class SupabaseAuthRepository implements IAuthRepository {
         throw new Error('Please verify your email before logging in');
       }
 
-      // Check if employee is approved
-      if (employee.status !== 'active') {
+      // Check if employee is approved (admin users bypass this check)
+      if (user.role !== 'admin' && employee.status !== 'active') {
         logger.warn('❌ [SupabaseAuthRepository] Employee not approved', {
           email: credentials.email,
           status: employee.status
@@ -200,7 +194,8 @@ export class SupabaseAuthRepository implements IAuthRepository {
         userId: user.id,
         email: user.email,
         role: user.role,
-        employeeStatus: employee.status
+        employeeStatus: employee.status,
+        bypassReason: user.role === 'admin' ? 'Admin user bypass' : 'Employee approved'
       });
 
       return {
@@ -357,14 +352,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
 
       // Send password reset email
       const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`;
-      logger.info('📧 [SupabaseAuthRepository] Sending password reset email', {
-        email: user.email,
-        resetUrl: resetUrl.substring(0, 100) + '...',
-        token: resetToken.substring(0, 10) + '...'
-      });
-
-      // TODO: Implement email service integration
-      // await this.sendPasswordResetEmail(user.email, user.full_name, resetUrl);
+      await this.sendPasswordResetEmail(user.email, user.full_name, resetUrl);
 
       logger.info('✅ [SupabaseAuthRepository] Password reset email sent', {
         userId: user.id,
@@ -550,8 +538,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
 
       // Send confirmation email with new verification token
       const confirmationUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/confirm?token=${verificationToken}`;
-      // TODO: Implement email service integration
-      // await this.sendEmailConfirmation(user.email, user.full_name, confirmationUrl);
+      await this.sendEmailConfirmation(user.email, user.full_name, confirmationUrl);
 
       return {
         message: 'Confirmation email resent successfully. Please check your inbox.'
@@ -597,11 +584,11 @@ export class SupabaseAuthRepository implements IAuthRepository {
 
       const employee = updatedUser.employees;
 
-      // Generate JWT tokens (only if employee is active)
+      // Generate JWT tokens (admin users bypass employee approval, others need active status)
       let accessToken = '';
       let refreshToken = '';
 
-      if (employee.status === 'active') {
+      if (employee.status === 'active' || updatedUser.role === 'admin') {
         accessToken = this.generateAccessToken(updatedUser);
         refreshToken = this.generateRefreshToken(updatedUser);
         await this.addRefreshToken(updatedUser.id, refreshToken);
@@ -618,7 +605,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
         accessToken,
         refreshToken,
         requiresEmailVerification: false,
-        message: employee.status === 'active'
+        message: (employee.status === 'active' || updatedUser.role === 'admin')
           ? 'Email verified successfully! You can now log in.'
           : 'Email verified successfully! Please wait for admin approval before logging in.',
       };
@@ -829,5 +816,39 @@ export class SupabaseAuthRepository implements IAuthRepository {
 
   public getSupabaseClient(): SupabaseClient {
     return this.supabase;
+  }
+
+  // ======================================
+  // EMAIL METHODS
+  // ======================================
+
+  private async sendEmailConfirmation(email: string, fullName: string, confirmationUrl: string): Promise<void> {
+    try {
+      const emailService = new EmailService();
+      await emailService.sendEmailConfirmation(email, fullName, confirmationUrl);
+      logger.info('📧 Email confirmation sent successfully', { email, fullName });
+    } catch (error) {
+      logger.error('❌ Failed to send email confirmation', {
+        error: (error as Error).message,
+        email,
+        fullName
+      });
+      throw error;
+    }
+  }
+
+  private async sendPasswordResetEmail(email: string, fullName: string, resetUrl: string): Promise<void> {
+    try {
+      const emailService = new EmailService();
+      await emailService.sendPasswordResetEmail(email, fullName, resetUrl);
+      logger.info('📧 Password reset email sent successfully', { email, fullName });
+    } catch (error) {
+      logger.error('❌ Failed to send password reset email', {
+        error: (error as Error).message,
+        email,
+        fullName
+      });
+      throw error;
+    }
   }
 }

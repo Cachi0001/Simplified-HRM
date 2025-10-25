@@ -9,4 +9,7 @@ export interface ITaskRepository {
   delete(id: string): Promise<void>;
   search(query: string): Promise<ITask[]>;
   updateStatus(id: string, status: 'pending' | 'in_progress' | 'completed' | 'cancelled'): Promise<ITask>;
+
+  // Additional methods for Supabase
+  getEmployeeById(employeeId: string): Promise<any>;
 }

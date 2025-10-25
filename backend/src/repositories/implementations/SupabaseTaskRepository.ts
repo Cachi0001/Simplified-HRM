@@ -1,7 +1,9 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { ITaskRepository } from '../interfaces/ITaskRepository';
+import { ITask, CreateTaskRequest, UpdateTaskRequest, TaskQuery } from '../../models/SupabaseTask';
 import logger from '../../utils/logger';
 
-export class SupabaseTaskRepository {
+export class SupabaseTaskRepository implements ITaskRepository {
   private supabase: SupabaseClient;
 
   constructor() {
@@ -90,11 +92,17 @@ export class SupabaseTaskRepository {
     }
   }
 
-  async create(taskData: any): Promise<any> {
+  async create(taskData: CreateTaskRequest, assignedBy: string): Promise<any> {
     try {
+      const taskInsertData = {
+        ...taskData,
+        created_by: assignedBy,
+        assigned_to: taskData.assigneeId
+      };
+
       const { data, error } = await this.supabase
         .from('tasks')
-        .insert(taskData)
+        .insert(taskInsertData)
         .select()
         .single();
 
@@ -105,7 +113,8 @@ export class SupabaseTaskRepository {
       logger.info('✅ [SupabaseTaskRepository] Task created', {
         taskId: data.id,
         title: data.title,
-        assignedTo: data.assigned_to
+        assignedTo: data.assigned_to,
+        createdBy: data.created_by
       });
 
       return data;
@@ -115,11 +124,11 @@ export class SupabaseTaskRepository {
     }
   }
 
-  async update(id: string, updateData: any): Promise<any> {
+  async update(id: string, taskData: UpdateTaskRequest): Promise<any> {
     try {
       const { data, error } = await this.supabase
         .from('tasks')
-        .update(updateData)
+        .update(taskData)
         .eq('id', id)
         .select()
         .single();
@@ -173,6 +182,25 @@ export class SupabaseTaskRepository {
     }
   }
 
+  async getEmployeeById(employeeId: string): Promise<any> {
+    try {
+      const { data, error } = await this.supabase
+        .from('employees')
+        .select('id, full_name, email')
+        .eq('id', employeeId)
+        .single();
+
+      if (error) {
+        logger.error('❌ [SupabaseTaskRepository] Get employee by ID failed:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      logger.error('❌ [SupabaseTaskRepository] Get employee by ID failed:', error);
+      throw error;
+    }
+  }
   async updateStatus(id: string, status: string): Promise<any> {
     try {
       const { data, error } = await this.supabase

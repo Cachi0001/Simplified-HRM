@@ -422,7 +422,7 @@ export class AuthController {
           email: user.email!,
           full_name: user.fullName,
           role: user.role || 'employee',
-          status: 'pending'
+          status: user.role === 'admin' ? 'active' : 'pending' // Admin users are automatically active
         });
 
         logger.info('✅ [AuthController] Employee record created', {
@@ -432,25 +432,28 @@ export class AuthController {
 
         res.status(200).json({
           status: 'success',
-          message: 'Email confirmed successfully! Your account is pending admin approval.',
+          message: user.role === 'admin'
+            ? 'Email confirmed successfully! Welcome to the admin dashboard.'
+            : 'Email confirmed successfully! Your account is pending admin approval.',
           data: {
             user: {
               ...user,
-              status: 'pending'
+              status: user.role === 'admin' ? 'active' : 'pending'
             },
-            redirectTo: '/auth',
-            requiresApproval: true
+            redirectTo: user.role === 'admin' ? '/dashboard' : '/auth',
+            requiresApproval: user.role !== 'admin'
           }
         });
         return;
       }
 
-      // User exists - check their status
-      if (employee.status === 'active') {
-        // Approved user - redirect to dashboard
-        logger.info('✅ [AuthController] User is approved, redirecting to dashboard', {
+      // User exists - check their status (admin users bypass approval)
+      if (employee.status === 'active' || user.role === 'admin') {
+        // Approved user or admin - redirect to dashboard
+        logger.info('✅ [AuthController] User is approved or admin, redirecting to dashboard', {
           employeeId: employee.id,
-          role: employee.role
+          role: employee.role,
+          userRole: user.role
         });
 
         res.status(200).json({
@@ -573,6 +576,32 @@ export class AuthController {
 
       // Check employee status and return appropriate response
       const employee = await this.authService.getEmployeeByUserId(result.user.id);
+
+      // Admin users bypass employee approval process
+      if (result.user.role === 'admin') {
+        // Admin user - generate tokens and allow login
+        const accessToken = this.generateAccessToken(result.user);
+        const refreshToken = this.generateRefreshToken(result.user);
+
+        // Add refresh token to user (using Supabase)
+        await this.authService.addRefreshToken(result.user.id, refreshToken);
+
+        res.status(200).json({
+          status: 'success',
+          message: 'Email verified successfully! Welcome back!',
+          data: {
+            user: {
+              ...result.user,
+              role: result.user.role,
+              status: 'active' // Admin is always active
+            },
+            accessToken,
+            refreshToken,
+            requiresEmailVerification: false
+          }
+        });
+        return;
+      }
 
       if (employee && employee.status === 'active') {
         // User is approved - return tokens for auto-login

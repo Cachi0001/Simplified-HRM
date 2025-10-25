@@ -1,5 +1,6 @@
 import { ITaskRepository } from '../repositories/interfaces/ITaskRepository';
 import { ITask, CreateTaskRequest, UpdateTaskRequest, TaskQuery } from '../models/SupabaseTask';
+import { EmailService } from './EmailService';
 import logger from '../utils/logger';
 
 export class TaskService {
@@ -30,8 +31,26 @@ export class TaskService {
 
       const task = await this.taskRepository.create(taskData, assignedBy);
 
-      // TODO: Implement email notifications for Supabase
-      logger.info('Task notification would be sent', { assigneeId: taskData.assigneeId, taskId: task.id });
+      // Send task assignment notification email
+      try {
+        const emailService = new EmailService();
+        // Get employee data from the repository
+        const employee = await this.taskRepository.getEmployeeById(taskData.assigneeId);
+        if (employee) {
+          await emailService.sendTaskNotification(
+            employee.email,
+            employee.fullName,
+            task.title,
+            task.description || '',
+            new Date(task.due_date).toLocaleDateString()
+          );
+          logger.info('📧 Task assignment email sent', { assigneeId: taskData.assigneeId, taskId: task.id });
+        } else {
+          logger.warn('Employee not found for task notification', { assigneeId: taskData.assigneeId });
+        }
+      } catch (emailError) {
+        logger.warn('Task notification email failed (non-critical)', { error: (emailError as Error).message });
+      }
 
       logger.info('TaskService: Task created successfully', { taskId: task.id });
       return task;
@@ -50,7 +69,7 @@ export class TaskService {
         if (!employeeId) {
           return { tasks: [], total: 0, page: query?.page || 1, limit: query?.limit || 10 };
         }
-        query = { ...query, assigneeId: employeeId };
+        query = { ...query, assigned_to: employeeId };
       }
 
       return await this.taskRepository.findAll(query);
@@ -70,7 +89,7 @@ export class TaskService {
 
       if (currentUserRole !== 'admin') {
         const employeeId = await this.resolveEmployeeId(currentUserId);
-        if (!employeeId || task.assigneeId !== employeeId) {
+        if (!employeeId || task.assigned_to !== employeeId) {
           throw new Error('Access denied');
         }
       }
@@ -104,7 +123,7 @@ export class TaskService {
 
       if (currentUserRole !== 'admin') {
         const employeeId = await this.resolveEmployeeId(currentUserId);
-        if (!employeeId || existingTask.assigneeId !== employeeId) {
+        if (!employeeId || existingTask.assigned_to !== employeeId) {
           throw new Error('Access denied');
         }
 
@@ -138,14 +157,40 @@ export class TaskService {
       }
 
       const employeeId = await this.resolveEmployeeId(currentUserId);
-      if (!employeeId || currentUserRole !== 'employee' || existingTask.assigneeId !== employeeId) {
+      if (!employeeId || currentUserRole !== 'employee' || existingTask.assigned_to !== employeeId) {
         throw new Error('Only the assigned employee can update task status');
       }
 
       const updatedTask = await this.taskRepository.updateStatus(id, status);
 
       // TODO: Implement completion notifications for Supabase
-      logger.info('Task completion notification would be sent', { taskId: id, status });
+      if (status === 'completed') {
+        try {
+          const emailService = new EmailService();
+          // Get admin who assigned the task
+          const admin = await this.taskRepository.getEmployeeById(existingTask.created_by);
+          // Get employee who completed the task
+          const employee = await this.taskRepository.getEmployeeById(existingTask.assigned_to);
+
+          if (admin && employee) {
+            await emailService.sendTaskCompletionNotification(
+              admin.email,
+              admin.fullName,
+              employee.fullName,
+              updatedTask.title
+            );
+            logger.info('📧 Task completion email sent', { taskId: id, status });
+          } else {
+            logger.warn('Admin or employee not found for task completion notification', {
+              taskId: id,
+              adminId: existingTask.created_by,
+              employeeId: existingTask.assigned_to
+            });
+          }
+        } catch (emailError) {
+          logger.warn('Task completion email failed (non-critical)', { error: (emailError as Error).message });
+        }
+      }
 
       logger.info('TaskService: Task status updated successfully', { taskId: id, status });
       return updatedTask;

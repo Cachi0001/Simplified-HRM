@@ -3,14 +3,14 @@ export interface ITask {
   id: string;
   title: string;
   description?: string;
-  assigneeId: string; // Changed from ObjectId to string for Supabase
-  assignedBy: string; // Changed from ObjectId to string for Supabase
+  assigned_to: string; // Changed to match database schema
+  created_by: string; // Changed to match database schema
   status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
   priority: 'low' | 'medium' | 'high';
-  dueDate: Date;
-  completedAt?: Date;
-  createdAt: Date;
-  updatedAt: Date;
+  due_date: Date; // Changed to match database schema
+  completed_at?: Date; // Changed to match database schema
+  created_at: Date; // Changed to match database schema
+  updated_at: Date; // Changed to match database schema
 }
 
 // Request/Response interfaces
@@ -31,8 +31,8 @@ export interface UpdateTaskRequest {
 }
 
 export interface TaskQuery {
-  assigneeId?: string;
-  assignedBy?: string;
+  assigned_to?: string; // Changed to match database schema
+  created_by?: string; // Changed to match database schema
   status?: 'pending' | 'in_progress' | 'completed' | 'cancelled';
   priority?: 'low' | 'medium' | 'high';
   page?: number;
