@@ -220,7 +220,8 @@ export class SupabaseEmployeeRepository {
       const { data, error } = await this.supabase
         .from('employees')
         .select('*')
-        .eq('status', 'pending');
+        .eq('status', 'pending')
+        .neq('role', 'admin'); // Exclude admin users from pending approvals
 
       if (error) {
         logger.error('❌ [SupabaseEmployeeRepository] Get pending approvals failed:', error);
@@ -280,7 +281,8 @@ export class SupabaseEmployeeRepository {
     try {
       const { data, error } = await this.supabase
         .from('employees')
-        .select('status');
+        .select('status, role') // Also select role to filter out admins
+        .neq('role', 'admin'); // Exclude admin users from employee stats
 
       if (error) {
         logger.error('❌ [SupabaseEmployeeRepository] Get employee stats failed:', error);
@@ -293,6 +295,13 @@ export class SupabaseEmployeeRepository {
         pending: data?.filter(e => e.status === 'pending').length || 0,
         rejected: data?.filter(e => e.status === 'rejected').length || 0,
       };
+
+      logger.info('✅ [SupabaseEmployeeRepository] Employee stats calculated', {
+        total: stats.total,
+        active: stats.active,
+        pending: stats.pending,
+        rejected: stats.rejected
+      });
 
       return stats;
     } catch (error) {
