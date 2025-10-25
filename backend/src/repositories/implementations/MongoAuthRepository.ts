@@ -41,39 +41,31 @@ export class MongoAuthRepository implements IAuthRepository {
         password: userData.password,
         fullName: userData.fullName,
         role: userData.role || 'employee',
-        emailVerified: false,
+        emailVerified: true, // Auto-verify immediately
       });
 
       await user.save();
 
-      // Generate verification token BEFORE creating employee record
+      // Generate verification token for admin users (but still auto-verify)
       const verificationToken = user.generateEmailVerificationToken();
-      logger.info('🔑 [MongoAuthRepository] Generated verification token', {
+      logger.info('🔑 [MongoAuthRepository] Generated verification token (for admin)', {
         userId: user._id,
         email: user.email,
         token: verificationToken.substring(0, 10) + '...',
         expires: user.emailVerificationExpires
       });
 
-      await user.save(); // Save user with token first
-      logger.info('💾 [MongoAuthRepository] User saved with token', {
-        userId: user._id,
-        email: user.email,
-        token: user.emailVerificationToken?.substring(0, 10) + '...',
-        expires: user.emailVerificationExpires
-      });
+      await user.save();
 
-      // Create employee record with the same token
-      const employeeStatus = userData.role === 'admin' ? 'active' : 'pending';
+      // Create employee record with active status immediately
+      const employeeStatus = 'active'; // Always active now
       const employee = new Employee({
         userId: user._id,
         email: user.email,
         fullName: user.fullName,
         role: user.role,
         status: employeeStatus,
-        emailVerified: false,
-        emailVerificationToken: verificationToken,
-        emailVerificationExpires: user.emailVerificationExpires,
+        emailVerified: true, // Auto-verify immediately
       });
 
       await employee.save();
@@ -107,15 +99,6 @@ export class MongoAuthRepository implements IAuthRepository {
           });
         });
 
-      // Send notification to admins about new employee signup (non-blocking)
-      this.notifyAdminsOfNewSignup(user, employee)
-        .then(() => {
-          logger.info('✅ Admin notification sent successfully', { email: user.email });
-        })
-        .catch((notificationError) => {
-          logger.warn('⚠️ Failed to send admin notification (non-blocking):', notificationError);
-        });
-
       logger.info('✅ [MongoAuthRepository] User created successfully', {
         userId: user._id,
         email: user.email,
@@ -126,8 +109,8 @@ export class MongoAuthRepository implements IAuthRepository {
       return {
         user: user.toObject(),
         accessToken: '',
-        requiresEmailVerification: true,
-        message: 'Please check your email to verify your account. You will be able to login after email verification and admin approval.',
+        requiresEmailVerification: false, // No longer required
+        message: 'Account created successfully! You can now log in.',
       };
 
     } catch (error) {
@@ -159,29 +142,23 @@ export class MongoAuthRepository implements IAuthRepository {
       // Get employee record to check status
       const employee = await Employee.findOne({ userId: user._id });
       if (!employee) {
+        logger.error('❌ [MongoAuthRepository] Employee record not found', {
+          userId: user._id,
+          email: user.email
+        });
         throw new Error('Employee record not found');
       }
 
-      // Check if email is verified
-      if (!user.emailVerified) {
-        logger.warn('❌ [MongoAuthRepository] Email not verified', { email: credentials.email });
-        throw new Error('Please verify your email before logging in');
-      }
+      logger.info('🔍 [MongoAuthRepository] Signin validation check:', {
+        userId: user._id,
+        email: user.email,
+        userEmailVerified: user.emailVerified,
+        employeeEmailVerified: employee.emailVerified,
+        employeeStatus: employee.status,
+        role: user.role
+      });
 
-      // Check if employee is approved
-      if (employee.status !== 'active') {
-        logger.warn('❌ [MongoAuthRepository] Employee not approved', {
-          email: credentials.email,
-          status: employee.status
-        });
-        // Return a special response for pending approval instead of throwing
-        const error: any = new Error('Your account is pending approval. Please wait for admin approval before logging in.');
-        error.code = 'PENDING_APPROVAL';
-        error.status = employee.status;
-        throw error;
-      }
-
-      // Generate JWT tokens
+      // Generate JWT tokens immediately - no approval required
       const accessToken = this.generateAccessToken(user);
       const refreshToken = this.generateRefreshToken(user);
 
@@ -279,8 +256,8 @@ export class MongoAuthRepository implements IAuthRepository {
         logger.warn('⚠️ [MongoAuthRepository] No employee record found for user', {
           userId: user._id
         });
-        // Default to pending if no employee record
-        userObject.status = 'pending';
+        // Default to active since all users are auto-activated
+        userObject.status = 'active';
       }
 
       return userObject;
@@ -562,9 +539,7 @@ export class MongoAuthRepository implements IAuthRepository {
         accessToken,
         refreshToken,
         requiresEmailVerification: false,
-        message: employee.status === 'active'
-          ? 'Email verified successfully! You can now log in.'
-          : 'Email verified successfully! Please wait for admin approval before logging in.',
+        message: 'Account is already active! You can log in immediately.',
       };
 
     } catch (error) {

@@ -16,4 +16,7 @@ export interface IAuthRepository {
   setSession(accessToken: string, refreshToken: string): Promise<any>;
   getEmployeeByUserId(userId: string): Promise<any>;
   createEmployeeRecord(employeeData: any): Promise<any>;
+
+  // Supabase-specific method
+  getSupabaseClient?: () => any;
 }

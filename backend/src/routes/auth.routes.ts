@@ -6,14 +6,12 @@ import { Router } from 'express';
 import { AuthController } from '../controllers/AuthController';
 import { AuthService } from '../services/AuthService';
 import { EmailService } from '../services/EmailService';
-import { MongoAuthRepository } from '../repositories/implementations/MongoAuthRepository';
+import { SupabaseAuthRepository } from '../repositories/implementations/SupabaseAuthRepository';
 import { authenticateToken } from '../middleware/auth.middleware';
-import { User } from '../models/User';
-import { Employee } from '../models/Employee';
 
 const router = Router();
 
-const authRepository = new MongoAuthRepository();
+const authRepository = new SupabaseAuthRepository();
 const authService = new AuthService(authRepository);
 const authController = new AuthController(authService);
 
@@ -30,16 +28,32 @@ router.post('/reset-password/:token', (req, res) => authController.resetPassword
 router.put('/update-password', (req, res) => authController.updatePassword(req, res));
 router.get('/debug/tokens', async (req, res) => {
   try {
-    const usersWithTokens = await User.find({ emailVerificationToken: { $exists: true } })
-      .select('email emailVerificationToken emailVerificationExpires emailVerified createdAt');
-    const employeesWithTokens = await Employee.find({ emailVerificationToken: { $exists: true } })
-      .select('email emailVerificationToken emailVerificationExpires emailVerified status');
+    // Get Supabase client from the auth repository
+    const supabase = authRepository.getSupabaseClient();
+
+    const { data: usersWithTokens, error: usersError } = await supabase
+      .from('users')
+      .select('id, email, email_verified, email_verification_token, email_verification_expires, created_at')
+      .not('email_verification_token', 'is', null);
+
+    if (usersError) {
+      throw usersError;
+    }
+
+    const { data: employeesWithTokens, error: employeesError } = await supabase
+      .from('employees')
+      .select('id, email, status, email_verified, email_verification_token, email_verification_expires')
+      .not('email_verification_token', 'is', null);
+
+    if (employeesError) {
+      throw employeesError;
+    }
 
     res.status(200).json({
       status: 'success',
       data: {
-        users: usersWithTokens,
-        employees: employeesWithTokens,
+        users: usersWithTokens || [],
+        employees: employeesWithTokens || [],
         timestamp: new Date().toISOString()
       }
     });

@@ -9,7 +9,7 @@ if (result.error) {
   console.log('✅ .env file loaded successfully');
   console.log('🔍 Environment variables:', {
     NODE_ENV: process.env.NODE_ENV,
-    MONGODB_URI: process.env.MONGODB_URI ? 'SET' : 'NOT SET',
+    SUPABASE_URL: process.env.SUPABASE_URL ? 'SET' : 'NOT SET',
     PORT: process.env.PORT
   });
 }
@@ -29,7 +29,7 @@ import authRoutes from './routes/auth.routes';
 import employeeRoutes from './routes/employee.routes';
 import attendanceRoutes from './routes/attendance.routes';
 import taskRoutes from './routes/task.routes';
-import databaseConfig from './config/database';
+import supabaseConfig from './config/supabase';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -87,12 +87,12 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 // Initialize database connection
 async function initializeDatabase() {
   try {
-    await databaseConfig.connect();
-    console.log('✅ Database connected successfully');
-    logger.info('✅ Database connected successfully');
+    await supabaseConfig.connect();
+    console.log('✅ Supabase connected successfully');
+    logger.info('✅ Supabase connected successfully');
   } catch (error) {
-    console.error('❌ Database connection failed:', error);
-    logger.error('❌ Database connection failed:', { error });
+    console.error('❌ Supabase connection failed:', error);
+    logger.error('❌ Supabase connection failed:', { error });
     process.exit(1);
   }
 }
@@ -138,7 +138,7 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/tasks', taskRoutes);
 
 // Health check endpoint
-app.get('/api/health', (req: Request, res: Response) => {
+app.get('/api/health', async (req: Request, res: Response) => {
   console.log('Health check requested', {
     ip: req.ip,
     userAgent: req.headers['user-agent'],
@@ -149,14 +149,39 @@ app.get('/api/health', (req: Request, res: Response) => {
     userAgent: req.headers['user-agent'],
     origin: req.headers.origin || 'No origin'
   });
-  
-  res.status(200).json({
-    status: 'ok',
-    message: 'HR Management System Backend is running',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development',
-    deployment: process.env.VERCEL ? 'vercel' : 'local'
-  });
+
+  try {
+    const dbStatus = await supabaseConfig.healthCheck();
+
+    res.status(200).json({
+      status: 'ok',
+      message: 'HR Management System Backend is running',
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
+      deployment: process.env.VERCEL ? 'vercel' : 'local',
+      database: dbStatus,
+      config: {
+        NODE_ENV: process.env.NODE_ENV,
+        VERCEL: process.env.VERCEL,
+        SUPABASE_URL: process.env.SUPABASE_URL ? 'SET' : 'NOT SET',
+        SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'SET' : 'NOT SET'
+      }
+    });
+  } catch (error) {
+    logger.error('❌ Health check failed:', { error });
+    res.status(200).json({
+      status: 'ok',
+      message: 'HR Management System Backend is running',
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
+      deployment: process.env.VERCEL ? 'vercel' : 'local',
+      database: {
+        status: 'error',
+        connection: false,
+        error: error instanceof Error ? error.message : String(error)
+      }
+    });
+  }
 });
 
 // CORS diagnostic endpoint
