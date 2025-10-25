@@ -24,13 +24,17 @@ class DatabaseConfig {
         try {
             const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/go3net-hrm';
             const dbName = process.env.MONGODB_DB_NAME || 'go3net-hrm';
+
+            // Check if we're in serverless environment
+            const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.LAMBDA_TASK_ROOT;
+
             logger_1.default.info('🔌 Attempting to connect to MongoDB...', { mongoUri: mongoUri.replace(/\/\/.*@/, '//***:***@') });
             await mongoose_1.default.connect(mongoUri, {
                 dbName,
                 maxPoolSize: 10,
                 serverSelectionTimeoutMS: 5000,
                 socketTimeoutMS: 45000,
-                bufferCommands: false,
+                bufferCommands: !isServerless, // Allow buffering in serverless environments
             });
             this.isConnected = true;
             logger_1.default.info('✅ MongoDB connected successfully');

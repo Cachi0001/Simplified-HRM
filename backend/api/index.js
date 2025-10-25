@@ -13,9 +13,19 @@ const databaseConfig = require('./config/database').default;
 
 const app = express();
 
+// Debug: Log environment variables in serverless
+console.log('🔍 Vercel Environment Variables:', {
+  NODE_ENV: process.env.NODE_ENV,
+  VERCEL: process.env.VERCEL,
+  MONGODB_URI: process.env.MONGODB_URI ? 'SET' : 'NOT SET',
+  MONGODB_DB_NAME: process.env.MONGODB_DB_NAME,
+  FRONTEND_URL: process.env.FRONTEND_URL
+});
+
 // Initialize database connection
 async function initializeDatabase() {
   try {
+    console.log('🔌 Starting database connection...');
     await databaseConfig.connect();
     console.log('✅ Database connected successfully');
   } catch (error) {
@@ -70,7 +80,10 @@ app.get('/api/health', (req, res) => {
     deployment: process.env.VERCEL ? 'vercel' : 'local',
     database: {
       status: dbStatus,
-      connection: databaseConfig.isDbConnected()
+      connection: databaseConfig.isDbConnected(),
+      hasMongoUri: !!process.env.MONGODB_URI,
+      mongoUriLength: process.env.MONGODB_URI ? process.env.MONGODB_URI.length : 0,
+      dbName: process.env.MONGODB_DB_NAME
     }
   });
 });
