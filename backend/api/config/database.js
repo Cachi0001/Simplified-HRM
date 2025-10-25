@@ -34,7 +34,7 @@ class DatabaseConfig {
                 maxPoolSize: 10,
                 serverSelectionTimeoutMS: 5000,
                 socketTimeoutMS: 45000,
-                bufferCommands: !isServerless, // Allow buffering in serverless environments
+                bufferCommands: true, // Enable buffering for serverless environments
             });
             this.isConnected = true;
             logger_1.default.info('✅ MongoDB connected successfully');

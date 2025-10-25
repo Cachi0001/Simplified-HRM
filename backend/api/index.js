@@ -34,8 +34,8 @@ async function initializeDatabase() {
   }
 }
 
-// Initialize database
-initializeDatabase();
+// Initialize database (await the connection)
+await initializeDatabase();
 
 // Security middleware
 app.use(helmet({
@@ -70,7 +70,7 @@ app.use('/api/tasks', taskRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  const dbStatus = databaseConfig.isDbConnected() ? 'connected' : 'disconnected';
+  const dbStatus = databaseConfig.getConnection().connection.readyState === 1 ? 'connected' : 'disconnected';
 
   res.status(200).json({
     status: 'ok',
@@ -80,10 +80,11 @@ app.get('/api/health', (req, res) => {
     deployment: process.env.VERCEL ? 'vercel' : 'local',
     database: {
       status: dbStatus,
-      connection: databaseConfig.isDbConnected(),
+      connection: databaseConfig.getConnection().connection.readyState === 1,
       hasMongoUri: !!process.env.MONGODB_URI,
       mongoUriLength: process.env.MONGODB_URI ? process.env.MONGODB_URI.length : 0,
-      dbName: process.env.MONGODB_DB_NAME
+      dbName: process.env.MONGODB_DB_NAME,
+      readyState: databaseConfig.getConnection().connection.readyState
     }
   });
 });
