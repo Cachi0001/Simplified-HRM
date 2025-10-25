@@ -8,7 +8,24 @@ const employeeRoutes = require('./routes/employee.routes').default;
 const attendanceRoutes = require('./routes/attendance.routes').default;
 const taskRoutes = require('./routes/task.routes').default;
 
+// Import database configuration
+const databaseConfig = require('./config/database').default;
+
 const app = express();
+
+// Initialize database connection
+async function initializeDatabase() {
+  try {
+    await databaseConfig.connect();
+    console.log('✅ Database connected successfully');
+  } catch (error) {
+    console.error('❌ Database connection failed:', error);
+    // Don't throw error in serverless - let the app start and handle DB errors per request
+  }
+}
+
+// Initialize database
+initializeDatabase();
 
 // Security middleware
 app.use(helmet({
@@ -43,12 +60,18 @@ app.use('/api/tasks', taskRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
+  const dbStatus = databaseConfig.isDbConnected() ? 'connected' : 'disconnected';
+
   res.status(200).json({
     status: 'ok',
     message: 'HR Management System Backend is running',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
-    deployment: process.env.VERCEL ? 'vercel' : 'local'
+    deployment: process.env.VERCEL ? 'vercel' : 'local',
+    database: {
+      status: dbStatus,
+      connection: databaseConfig.isDbConnected()
+    }
   });
 });
 
