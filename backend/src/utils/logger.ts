@@ -36,7 +36,7 @@ const fileFormat = winston.format.combine(
 );
 
 // Create the logger
-const logger = winston.createLogger({
+const winstonLogger = winston.createLogger({
   level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
   defaultMeta: { 
     service: 'hr-management-backend',
@@ -66,38 +66,84 @@ const logger = winston.createLogger({
 
 // Add console transport in non-production environments
 if (process.env.NODE_ENV !== 'production') {
-  logger.add(new winston.transports.Console({
+  winstonLogger.add(new winston.transports.Console({
     format: consoleFormat
   }));
 } else {
   // In production, still log to console but with less verbose output
-  logger.add(new winston.transports.Console({
+  winstonLogger.add(new winston.transports.Console({
     level: 'info',
     format: consoleFormat
   }));
 }
 
-// Add special methods for CORS debugging
-const corsLogger = {
-  request: (origin: string, allowed: boolean) => {
-    logger.debug(`CORS Request: Origin=${origin}, Allowed=${allowed}`, { 
-      component: 'cors', 
-      origin, 
-      allowed 
-    });
+// Create a more robust logger that handles errors gracefully
+const logger = {
+  info: (message: string, meta?: any) => {
+    try {
+      winstonLogger.info(message, meta);
+    } catch (error) {
+      console.info(`[INFO] ${message}`, meta);
+      console.error('Logger error:', error);
+    }
   },
-  config: (config: any) => {
-    logger.debug(`CORS Config: ${JSON.stringify(config)}`, { 
-      component: 'cors', 
-      config 
-    });
+  
+  error: (message: string, meta?: any) => {
+    try {
+      winstonLogger.error(message, meta);
+    } catch (error) {
+      console.error(`[ERROR] ${message}`, meta);
+      console.error('Logger error:', error);
+    }
+  },
+  
+  warn: (message: string, meta?: any) => {
+    try {
+      winstonLogger.warn(message, meta);
+    } catch (error) {
+      console.warn(`[WARN] ${message}`, meta);
+      console.error('Logger error:', error);
+    }
+  },
+  
+  debug: (message: string, meta?: any) => {
+    try {
+      winstonLogger.debug(message, meta);
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.debug(`[DEBUG] ${message}`, meta);
+        console.error('Logger error:', error);
+      }
+    }
+  },
+  
+  // Add special methods for CORS debugging
+  cors: {
+    request: (origin: string, allowed: boolean) => {
+      try {
+        winstonLogger.debug(`CORS Request: Origin=${origin}, Allowed=${allowed}`, { 
+          component: 'cors', 
+          origin, 
+          allowed 
+        });
+      } catch (error) {
+        console.debug(`[CORS] Request: Origin=${origin}, Allowed=${allowed}`);
+        console.error('Logger error:', error);
+      }
+    },
+    
+    config: (config: any) => {
+      try {
+        winstonLogger.debug(`CORS Config: ${JSON.stringify(config)}`, { 
+          component: 'cors', 
+          config 
+        });
+      } catch (error) {
+        console.debug(`[CORS] Config:`, config);
+        console.error('Logger error:', error);
+      }
+    }
   }
 };
 
-// Extend the logger with CORS-specific methods
-const extendedLogger = {
-  ...logger,
-  cors: corsLogger
-};
-
-export default extendedLogger;
+export default logger;

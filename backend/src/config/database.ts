@@ -39,7 +39,7 @@ export class DatabaseConfig {
 
       // Handle connection events
       mongoose.connection.on('error', (error) => {
-        logger.error('❌ MongoDB connection error:', error);
+        logger.error('❌ MongoDB connection error:', { error });
       });
 
       mongoose.connection.on('disconnected', () => {
@@ -53,7 +53,7 @@ export class DatabaseConfig {
       });
 
     } catch (error) {
-      logger.error('❌ Failed to connect to MongoDB:', error);
+      logger.error('❌ Failed to connect to MongoDB:', { error });
       throw error;
     }
   }
@@ -64,7 +64,7 @@ export class DatabaseConfig {
       this.isConnected = false;
       logger.info('🔌 MongoDB disconnected');
     } catch (error) {
-      logger.error('❌ Error disconnecting from MongoDB:', error);
+      logger.error('❌ Error disconnecting from MongoDB:', { error });
       throw error;
     }
   }

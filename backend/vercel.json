@@ -21,6 +21,7 @@
     "NODE_ENV": "production",
     "LOG_LEVEL": "debug",
     "FRONTEND_URL": "https://go3nethrm.vercel.app",
-    "FRONTEND_URL_PROD": "https://go3nethrm.vercel.app"
+    "FRONTEND_URL_PROD": "https://go3nethrm.vercel.app",
+    "ADDITIONAL_CORS_ORIGINS": "https://go3nethrm.com,https://admin.go3nethrm.com,https://*.go3nethrm.com"
   }
 }

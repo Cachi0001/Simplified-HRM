@@ -22,9 +22,11 @@ const PORT = process.env.PORT || 3000;
 async function initializeDatabase() {
   try {
     await databaseConfig.connect();
+    console.log('✅ Database connected successfully');
     logger.info('✅ Database connected successfully');
   } catch (error) {
-    logger.error('❌ Database connection failed:', error);
+    console.error('❌ Database connection failed:', error);
+    logger.error('❌ Database connection failed:', { error });
     process.exit(1);
   }
 }
@@ -46,10 +48,12 @@ app.use(helmet({
 const corsOptions = {
   origin: function (origin: any, callback: any) {
     // Enhanced CORS logging for debugging
+    console.log(`CORS request from origin: ${origin || 'No origin'}`);
     logger.info(`CORS request from origin: ${origin || 'No origin'}`);
     
     // Allow requests with no origin (mobile apps, serverless, etc.)
     if (!origin) {
+      console.log('CORS: Allowing request with no origin');
       logger.info('CORS: Allowing request with no origin');
       return callback(null, true);
     }
@@ -77,12 +81,19 @@ const corsOptions = {
       .filter(Boolean);
     
     // Log environment variables for debugging
+    console.log(`CORS config - Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`CORS config - FRONTEND_URL: ${frontendUrl}`);
+    console.log(`CORS config - FRONTEND_URL_PROD: ${frontendUrlProd}`);
+    console.log(`CORS config - VERCEL_URL: ${vercelUrl || 'Not set'}`);
+    console.log(`CORS config - Additional Origins: ${additionalOrigins.join(', ') || 'None'}`);
+    
     logger.info(`CORS config - Environment: ${process.env.NODE_ENV || 'development'}`);
     logger.info(`CORS config - FRONTEND_URL: ${frontendUrl}`);
     logger.info(`CORS config - FRONTEND_URL_PROD: ${frontendUrlProd}`);
     logger.info(`CORS config - VERCEL_URL: ${vercelUrl || 'Not set'}`);
     logger.info(`CORS config - Additional Origins: ${additionalOrigins.join(', ') || 'None'}`);
     
+    // Add all possible variations of the frontend URL
     const productionOrigins = [
       frontendUrl,
       frontendUrlProd,
@@ -91,51 +102,82 @@ const corsOptions = {
       'https://www.go3nethrm.vercel.app',
       'https://go3nethrm.com',
       'https://www.go3nethrm.com',
+      // Remove wildcard patterns from the direct list - they'll be handled in the isAllowed check
       ...additionalOrigins
     ].filter(Boolean);
+    
+    // Define wildcard patterns separately
+    const wildcardPatterns = [
+      'https://*.go3nethrm.vercel.app',  // Wildcard for all Vercel preview deployments
+      'https://*.go3nethrm.com'          // Wildcard for all subdomains
+    ];
 
     // Combine all allowed origins
     const allowedOrigins = [...localhostOrigins, ...productionOrigins];
     
     // Log all allowed origins for debugging
+    console.log(`CORS allowed origins: ${JSON.stringify(allowedOrigins)}`);
+    console.log(`CORS wildcard patterns: ${JSON.stringify(wildcardPatterns)}`);
+    
     logger.debug(`CORS allowed origins: ${JSON.stringify(allowedOrigins)}`);
+    logger.debug(`CORS wildcard patterns: ${JSON.stringify(wildcardPatterns)}`);
 
     // Check if the origin is allowed
     const isAllowed = allowedOrigins.some(allowed => {
       if (!allowed) return false;
-      // Handle wildcard subdomains
-      if (allowed.includes('*')) {
-        const pattern = new RegExp('^' + allowed.replace('*', '.*') + '$');
-        return pattern.test(origin);
-      }
-      return origin.startsWith(allowed);
+      
+      // Exact match
+      return origin === allowed || origin.startsWith(allowed);
+    }) || wildcardPatterns.some(pattern => {
+      // Handle wildcard subdomains separately
+      // Convert the wildcard pattern to a proper regex pattern
+      // e.g., https://*.example.com becomes ^https://.*\.example\.com$
+      const regexPattern = new RegExp('^' + pattern.replace(/\./g, '\\.').replace('*', '.*') + '$');
+      return regexPattern.test(origin);
     });
 
     if (isAllowed) {
+      console.log(`CORS: Allowing origin: ${origin}`);
       logger.info(`CORS: Allowing origin: ${origin}`);
-      callback(null, true);
+      // Return the actual origin instead of true to ensure proper CORS headers
+      callback(null, origin);
     } else {
       // For security, only allow specific origins in production
       if (process.env.NODE_ENV === 'production') {
+        console.warn(`CORS: Blocking origin in production: ${origin}`);
         logger.warn(`CORS: Blocking origin in production: ${origin}`);
         callback(new Error(`Not allowed by CORS: ${origin}`), false);
       } else {
+        console.log(`CORS: Allowing non-listed origin in development: ${origin}`);
         logger.info(`CORS: Allowing non-listed origin in development: ${origin}`);
-        callback(null, true); // Allow all in development
+        callback(null, origin); // Allow all in development but return the actual origin
       }
     }
   },
   credentials: true,
   optionsSuccessStatus: 200,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Origin', 'Accept']
 };
 
 // Apply CORS middleware
 app.use(cors(corsOptions));
 
 // Add OPTIONS response for preflight requests
-app.options('*', cors(corsOptions));
+// Handle specific API routes instead of using a wildcard
+// We'll use a middleware approach instead of individual routes
+app.use((req: Request, res: Response, next: NextFunction) => {
+  if (req.method === 'OPTIONS') {
+    console.log(`Handling OPTIONS request for: ${req.path}`, {
+      origin: req.headers.origin || 'No origin'
+    });
+    logger.info(`Handling OPTIONS request for: ${req.path}`, {
+      origin: req.headers.origin || 'No origin'
+    });
+    return cors(corsOptions)(req, res, next);
+  }
+  next();
+});
 
 // Body parsing middleware
 app.use(express.json({ limit: '1mb' }));
@@ -149,6 +191,11 @@ app.use('/api/tasks', taskRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req: Request, res: Response) => {
+  console.log('Health check requested', {
+    ip: req.ip,
+    userAgent: req.headers['user-agent'],
+    origin: req.headers.origin || 'No origin'
+  });
   logger.info('Health check requested', {
     ip: req.ip,
     userAgent: req.headers['user-agent'],
@@ -169,12 +216,21 @@ app.get('/api/cors-test', (req: Request, res: Response) => {
   const origin = req.headers.origin || 'No origin';
   const referer = req.headers.referer || 'No referer';
   const userAgent = req.headers['user-agent'] || 'No user-agent';
+  const host = req.headers.host || 'No host';
   
+  console.log('CORS test requested', {
+    ip: req.ip,
+    origin,
+    referer,
+    userAgent,
+    host
+  });
   logger.info('CORS test requested', {
     ip: req.ip,
     origin,
     referer,
-    userAgent
+    userAgent,
+    host
   });
   
   // Log environment variables for debugging
@@ -186,7 +242,18 @@ app.get('/api/cors-test', (req: Request, res: Response) => {
     additionalOrigins: process.env.ADDITIONAL_CORS_ORIGINS
   };
   
+  // Get all request headers for debugging
+  const headers = { ...req.headers };
+  
+  // Remove sensitive information
+  delete headers.authorization;
+  delete headers.cookie;
+  
+  console.log('CORS configuration', { corsConfig });
+  console.log('Request headers', { headers });
+  
   logger.debug('CORS configuration', { corsConfig });
+  logger.debug('Request headers', { headers });
   
   res.status(200).json({
     status: 'ok',
@@ -196,9 +263,49 @@ app.get('/api/cors-test', (req: Request, res: Response) => {
       origin,
       referer,
       userAgent,
-      ip: req.ip
+      host,
+      ip: req.ip,
+      headers
     },
-    corsConfig
+    corsConfig,
+    serverInfo: {
+      environment: process.env.NODE_ENV || 'development',
+      deployment: process.env.VERCEL ? 'vercel' : 'local',
+      vercelUrl: process.env.VERCEL_URL || 'Not set'
+    }
+  });
+});
+
+// Add a simple preflight test endpoint
+app.options('/api/preflight-test', cors(corsOptions), (req: Request, res: Response) => {
+  console.log('Preflight test requested', {
+    origin: req.headers.origin || 'No origin',
+    method: req.method
+  });
+  logger.info('Preflight test requested', {
+    origin: req.headers.origin || 'No origin',
+    method: req.method
+  });
+  
+  res.status(200).end();
+});
+
+app.get('/api/preflight-test', (req: Request, res: Response) => {
+  const origin = req.headers.origin || 'No origin';
+  
+  console.log('Preflight test GET requested', {
+    origin,
+    method: req.method
+  });
+  logger.info('Preflight test GET requested', {
+    origin,
+    method: req.method
+  });
+  
+  res.status(200).json({
+    status: 'ok',
+    message: 'Preflight test successful',
+    origin
   });
 });
 
@@ -216,6 +323,13 @@ app.get('/api', (req: Request, res: Response) => {
 
 // Global error handler (optimized for serverless)
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  console.error('Unhandled error', {
+    error: err.message,
+    stack: err.stack,
+    url: req.originalUrl,
+    method: req.method,
+    ip: req.ip
+  });
   logger.error('Unhandled error', {
     error: err.message,
     stack: err.stack,
@@ -236,6 +350,7 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 
 // 404 handler
 app.use((req: Request, res: Response) => {
+  console.warn(`404 - Route not found: ${req.method} ${req.originalUrl}`, { ip: req.ip });
   logger.warn(`404 - Route not found: ${req.method} ${req.originalUrl}`, { ip: req.ip });
   res.status(404).json({
     status: 'error',
@@ -250,6 +365,11 @@ export default app;
 if (require.main === module) {
   initializeDatabase().then(() => {
     app.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
+      console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`Deployment: ${process.env.VERCEL ? 'Vercel' : 'Local'}`);
+      console.log(`Health check available at http://localhost:${PORT}/api/health`);
+      
       logger.info(`Server is running on port ${PORT}`);
       logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
       logger.info(`Deployment: ${process.env.VERCEL ? 'Vercel' : 'Local'}`);

@@ -66,16 +66,28 @@ const API_BASE_URL = (() => {
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
     
-    // If we're on Vercel but using localhost API, switch to production API
-    if (hostname.includes('vercel.app') && baseUrl.includes('localhost')) {
-      console.log('Detected Vercel deployment but using localhost API - switching to production API');
+    // Automatic environment detection based on hostname
+    const isVercelDeployment = hostname.includes('vercel.app');
+    const isCustomDomain = hostname.includes('go3nethrm.com');
+    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+    
+    // If we're on Vercel or custom domain but using localhost API, switch to production API
+    if ((isVercelDeployment || isCustomDomain) && baseUrl.includes('localhost')) {
+      console.log('Detected production deployment but using localhost API - switching to production API');
       baseUrl = prodApiUrl;
     }
     
     // If we're on localhost but using production API in dev mode, switch to localhost API
-    if (hostname === 'localhost' && !isProduction && baseUrl.includes('vercel.app')) {
+    if (isLocalhost && !isProduction && baseUrl.includes('vercel.app')) {
       console.log('Detected localhost in development mode but using production API - switching to localhost API');
       baseUrl = devApiUrl;
+    }
+    
+    // Special case for preview deployments
+    if (isVercelDeployment && hostname !== 'go3nethrm.vercel.app') {
+      console.log('Detected Vercel preview deployment');
+      // We still use the production API for preview deployments
+      baseUrl = prodApiUrl;
     }
     
     console.log(`Final API URL: ${baseUrl} (Host: ${hostname})`);
