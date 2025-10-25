@@ -43,9 +43,43 @@ const hasStatusCodeText = (value?: string) => {
   return /status\s*(code|error)/i.test(value);
 };
 
-// Backend API base URL - Update this when you deploy
+// Backend API base URL with enhanced logging and fallback handling
 const API_BASE_URL = (() => {
-  const baseUrl = (import.meta as any).env.VITE_API_URL || 'http://localhost:3000';
+  // Check if we're in production mode
+  const isProduction = import.meta.env.PROD;
+  
+  // Get environment variables with fallbacks
+  const devApiUrl = (import.meta.env.VITE_API_URL as string) || 'http://localhost:3000/api';
+  const prodApiUrl = (import.meta.env.VITE_API_URL_PROD as string) || 'https://go3nethrm-backend.vercel.app/api';
+  
+  // Log API configuration for debugging
+  console.log(`API Configuration:
+    - Environment: ${isProduction ? 'Production' : 'Development'}
+    - Dev API URL: ${devApiUrl}
+    - Prod API URL: ${prodApiUrl}
+  `);
+  
+  // Use production URL in production, localhost URL in development
+  let baseUrl = isProduction ? prodApiUrl : devApiUrl;
+  
+  // If running in a browser, check if we need to override based on hostname
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    
+    // If we're on Vercel but using localhost API, switch to production API
+    if (hostname.includes('vercel.app') && baseUrl.includes('localhost')) {
+      console.log('Detected Vercel deployment but using localhost API - switching to production API');
+      baseUrl = prodApiUrl;
+    }
+    
+    // If we're on localhost but using production API in dev mode, switch to localhost API
+    if (hostname === 'localhost' && !isProduction && baseUrl.includes('vercel.app')) {
+      console.log('Detected localhost in development mode but using production API - switching to localhost API');
+      baseUrl = devApiUrl;
+    }
+    
+    console.log(`Final API URL: ${baseUrl} (Host: ${hostname})`);
+  }
 
   // If the base URL already includes /api, don't add it again
   if (baseUrl.endsWith('/api')) {

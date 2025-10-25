@@ -10,6 +10,11 @@ yarn-error.log*
 .env.production.local
 *.env.local
 
+.zencoder
+.env.development
+.env.test
+.env.production
+*.env
 logs
 *.log
 npm-debug.log*
