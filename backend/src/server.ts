@@ -6,7 +6,6 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 import express, { Request, Response, NextFunction } from 'express';
-import cors from 'cors';
 import helmet from 'helmet';
 import logger from './utils/logger';
 import authRoutes from './routes/auth.routes';
@@ -95,221 +94,21 @@ app.use(helmet({
 }));
 
 // CORS configuration (optimized for serverless)
-const localhostOrigins = [
-  'http://localhost:3000',
-  'http://localhost:5173',
-  'http://localhost:4173',
-  'http://127.0.0.1:5173',
-  'http://127.0.0.1:3000',
-  'http://localhost:8080'
-];
-
-const corsAllowedMethods = ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'];
-const corsAllowedHeaders = ['Content-Type', 'Authorization', 'X-Requested-With', 'Origin', 'Accept'];
-
-const buildWildcardRegex = (pattern: string) => {
-  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
-  const normalized = escaped.replace(/\\\*/g, '.*');
-  return new RegExp(`^${normalized}$`);
-};
-
-const buildCorsConfig = () => {
-  const frontendUrl = process.env.FRONTEND_URL || 'https://go3nethrm.vercel.app';
-  const frontendUrlProd = process.env.FRONTEND_URL_PROD || 'https://go3nethrm.vercel.app';
-  const vercelUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null;
-  const additionalOriginsStr = process.env.ADDITIONAL_CORS_ORIGINS || '';
-  const parsedAdditionalOrigins = additionalOriginsStr
-    .split(',')
-    .map(originValue => originValue.trim())
-    .filter(Boolean);
-  const additionalWildcardPatterns = parsedAdditionalOrigins.filter(value => value.includes('*'));
-  const additionalExactOrigins = parsedAdditionalOrigins.filter(value => !value.includes('*'));
-
-  const productionOrigins = [
-    frontendUrl,
-    frontendUrlProd,
-    vercelUrl,
-    'https://go3nethrm.vercel.app',
-    'https://www.go3nethrm.vercel.app',
-    'https://go3nethrm.com',
-    'https://www.go3nethrm.com',
-    ...additionalExactOrigins
-  ].filter(Boolean);
-
-  const wildcardPatterns = [
-    'https://*.go3nethrm.vercel.app',
-    'https://*.go3nethrm.com',
-    ...additionalWildcardPatterns
-  ];
-
-  const allowedOrigins = [...localhostOrigins, ...productionOrigins];
-
-  return {
-    environment: process.env.NODE_ENV || 'development',
-    frontendUrl,
-    frontendUrlProd,
-    vercelUrl,
-    additionalOrigins: parsedAdditionalOrigins,
-    allowedOrigins,
-    wildcardPatterns
-  };
-};
-
-const resolveCorsOrigin = (origin: any, callback: any) => {
-  console.log(`CORS request from origin: ${origin || 'No origin'}`);
-  logger.info(`CORS request from origin: ${origin || 'No origin'}`);
-
-  if (!origin) {
-    console.log('CORS: Allowing request with no origin');
-    logger.info('CORS: Allowing request with no origin');
-    callback(null, true);
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const origin = req.headers.origin || '*';
+  res.header('Access-Control-Allow-Origin', origin);
+  if (origin !== '*') {
+    res.header('Vary', 'Origin');
+  }
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
     return;
   }
-
-  const corsConfig = buildCorsConfig();
-
-  console.log(`CORS config - Environment: ${corsConfig.environment}`);
-  console.log(`CORS config - FRONTEND_URL: ${corsConfig.frontendUrl}`);
-  console.log(`CORS config - FRONTEND_URL_PROD: ${corsConfig.frontendUrlProd}`);
-  console.log(`CORS config - VERCEL_URL: ${corsConfig.vercelUrl || 'Not set'}`);
-  console.log(`CORS config - Additional Origins: ${corsConfig.additionalOrigins.join(', ') || 'None'}`);
-
-  logger.info(`CORS config - Environment: ${corsConfig.environment}`);
-  logger.info(`CORS config - FRONTEND_URL: ${corsConfig.frontendUrl}`);
-  logger.info(`CORS config - FRONTEND_URL_PROD: ${corsConfig.frontendUrlProd}`);
-  logger.info(`CORS config - VERCEL_URL: ${corsConfig.vercelUrl || 'Not set'}`);
-  logger.info(`CORS config - Additional Origins: ${corsConfig.additionalOrigins.join(', ') || 'None'}`);
-
-  console.log(`CORS allowed origins: ${JSON.stringify(corsConfig.allowedOrigins)}`);
-  console.log(`CORS wildcard patterns: ${JSON.stringify(corsConfig.wildcardPatterns)}`);
-
-  logger.debug(`CORS allowed origins: ${JSON.stringify(corsConfig.allowedOrigins)}`);
-  logger.debug(`CORS wildcard patterns: ${JSON.stringify(corsConfig.wildcardPatterns)}`);
-
-  const allowedMatch = corsConfig.allowedOrigins.some(allowed => {
-    if (!allowed) {
-      return false;
-    }
-    return origin === allowed || origin.startsWith(allowed);
-  });
-
-  const wildcardMatch = corsConfig.wildcardPatterns.some(pattern => {
-    try {
-      return buildWildcardRegex(pattern).test(origin);
-    } catch (error) {
-      console.error('Invalid wildcard pattern', { pattern, error });
-      logger.error('Invalid wildcard pattern', { pattern, error });
-      return false;
-    }
-  });
-
-  if (allowedMatch || wildcardMatch) {
-    console.log(`CORS: Allowing origin: ${origin}`);
-    logger.info(`CORS: Allowing origin: ${origin}`);
-    callback(null, origin);
-    return;
-  }
-
-  if (process.env.NODE_ENV === 'production') {
-    console.warn(`CORS: Blocking origin in production: ${origin}`, {
-      allowedOrigins: corsConfig.allowedOrigins,
-      wildcardPatterns: corsConfig.wildcardPatterns
-    });
-    logger.warn('CORS: Blocking origin in production', {
-      origin,
-      allowedOrigins: corsConfig.allowedOrigins,
-      wildcardPatterns: corsConfig.wildcardPatterns
-    });
-    callback(new Error(`Not allowed by CORS: ${origin}`), false);
-    return;
-  }
-
-  console.log(`CORS: Allowing non-listed origin in development: ${origin}`);
-  logger.info(`CORS: Allowing non-listed origin in development: ${origin}`);
-  callback(null, origin);
-};
-
-const corsOptions = {
-  origin: resolveCorsOrigin,
-  credentials: true,
-  optionsSuccessStatus: 204,
-  preflightContinue: true,
-  methods: corsAllowedMethods,
-  allowedHeaders: corsAllowedHeaders
-};
-
-const handlePreflightRequest = (req: Request, res: Response) => {
-  const requestOrigin = req.headers.origin as string | undefined;
-  const requestedHeaders = req.headers['access-control-request-headers'];
-
-  resolveCorsOrigin(requestOrigin, (error: Error | null, resolvedOrigin?: string | boolean) => {
-    const corsConfig = buildCorsConfig();
-
-    if (error || resolvedOrigin === false) {
-      console.warn('CORS preflight blocked', {
-        origin: requestOrigin || 'No origin',
-        requestedHeaders: requestedHeaders || 'None',
-        allowedOrigins: corsConfig.allowedOrigins,
-        wildcardPatterns: corsConfig.wildcardPatterns
-      });
-      logger.warn('CORS preflight blocked', {
-        origin: requestOrigin || 'No origin',
-        requestedHeaders: requestedHeaders || 'None',
-        allowedOrigins: corsConfig.allowedOrigins,
-        wildcardPatterns: corsConfig.wildcardPatterns
-      });
-      res.status(403).json({
-        status: 'error',
-        message: 'CORS preflight not allowed'
-      });
-      return;
-    }
-
-    const originHeader = resolvedOrigin === true ? requestOrigin : resolvedOrigin;
-
-    if (originHeader) {
-      res.header('Access-Control-Allow-Origin', originHeader);
-      res.header('Vary', 'Origin');
-    } else {
-      res.header('Access-Control-Allow-Origin', '*');
-    }
-
-    res.header('Access-Control-Allow-Methods', corsAllowedMethods.join(', '));
-
-    if (requestedHeaders) {
-      const allowedHeadersValue = Array.isArray(requestedHeaders)
-        ? requestedHeaders.join(',')
-        : requestedHeaders;
-      res.header('Access-Control-Allow-Headers', allowedHeadersValue);
-    } else {
-      res.header('Access-Control-Allow-Headers', corsAllowedHeaders.join(', '));
-    }
-
-    if (corsOptions.credentials) {
-      res.header('Access-Control-Allow-Credentials', 'true');
-    }
-
-    res.header('Access-Control-Max-Age', '86400');
-
-    console.log('CORS preflight response sent', {
-      origin: requestOrigin || 'No origin',
-      resolvedOrigin: originHeader || 'Wildcard',
-      requestedHeaders: requestedHeaders || 'None'
-    });
-
-    logger.info('CORS preflight response sent', {
-      origin: requestOrigin || 'No origin',
-      resolvedOrigin: originHeader || 'Wildcard',
-      requestedHeaders: requestedHeaders || 'None'
-    });
-
-    res.status((corsOptions.optionsSuccessStatus as number) || 204).end();
-  });
-};
-
-// Apply CORS middleware
-app.use(cors(corsOptions));
-app.options('*', handlePreflightRequest);
+  next();
+});
 
 // Body parsing middleware
 app.use(express.json({ limit: '1mb' }));
@@ -409,7 +208,7 @@ app.get('/api/cors-test', (req: Request, res: Response) => {
 });
 
 // Add a simple preflight test endpoint
-app.options('/api/preflight-test', cors(corsOptions), (req: Request, res: Response) => {
+app.options('/api/preflight-test', (req: Request, res: Response) => {
   console.log('Preflight test requested', {
     origin: req.headers.origin || 'No origin',
     method: req.method
