@@ -1,4 +1,4 @@
-import { IAttendance, CreateAttendanceRequest, AttendanceQuery } from '../../models/Attendance';
+import { IAttendance, CreateAttendanceRequest, AttendanceQuery } from '../../models/SupabaseAttendance';
 
 export interface IAttendanceRepository {
   checkIn(employeeId: string, attendanceData: CreateAttendanceRequest): Promise<IAttendance>;

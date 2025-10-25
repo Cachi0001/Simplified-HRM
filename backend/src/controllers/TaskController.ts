@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { TaskService } from '../services/TaskService';
-import { CreateTaskRequest, UpdateTaskRequest, TaskQuery } from '../models/Task';
+import { CreateTaskRequest, UpdateTaskRequest, TaskQuery } from '../models/SupabaseTask';
 import logger from '../utils/logger';
 
 export class TaskController {

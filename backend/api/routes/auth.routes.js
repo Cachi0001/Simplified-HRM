@@ -9,20 +9,18 @@ dotenv_1.default.config({ path: path_1.default.resolve(__dirname, '../.env') });
 const express_1 = require("express");
 const AuthController_1 = require("../controllers/AuthController");
 const AuthService_1 = require("../services/AuthService");
-const MongoAuthRepository_1 = require("../repositories/implementations/MongoAuthRepository");
+const SupabaseAuthRepository_1 = require("../repositories/implementations/SupabaseAuthRepository");
 const auth_middleware_1 = require("../middleware/auth.middleware");
-const User_1 = require("../models/User");
-const Employee_1 = require("../models/Employee");
 const router = (0, express_1.Router)();
-const authRepository = new MongoAuthRepository_1.MongoAuthRepository();
+const authRepository = new SupabaseAuthRepository_1.SupabaseAuthRepository();
 const authService = new AuthService_1.AuthService(authRepository);
 const authController = new AuthController_1.AuthController(authService);
 
 // Log auth route initialization and environment variables
 console.log('🔐 Auth Routes Initialized');
 console.log('🔍 Auth Environment Check:', {
-  MONGODB_URI: process.env.MONGODB_URI ? 'SET' : 'NOT SET',
-  MONGODB_DB_NAME: process.env.MONGODB_DB_NAME,
+  SUPABASE_URL: process.env.SUPABASE_URL ? 'SET' : 'NOT SET',
+  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'SET' : 'NOT SET',
   SMTP_USER: process.env.SMTP_USER ? 'SET' : 'NOT SET',
   JWT_SECRET: process.env.JWT_SECRET ? 'SET' : 'NOT SET'
 });
@@ -52,15 +50,32 @@ router.post('/reset-password/:token', (req, res) => authController.resetPassword
 router.put('/update-password', (req, res) => authController.updatePassword(req, res));
 router.get('/debug/tokens', async (req, res) => {
     try {
-        const usersWithTokens = await User_1.User.find({ emailVerificationToken: { $exists: true } })
-            .select('email emailVerificationToken emailVerificationExpires emailVerified createdAt');
-        const employeesWithTokens = await Employee_1.Employee.find({ emailVerificationToken: { $exists: true } })
-            .select('email emailVerificationToken emailVerificationExpires emailVerified status');
+        // Get Supabase client from the auth repository
+        const supabaseClient = authRepository.getSupabaseClient();
+
+        const { data: usersWithTokens, error: usersError } = await supabaseClient
+            .from('users')
+            .select('id, email, email_verified, email_verification_token, email_verification_expires, created_at')
+            .not('email_verification_token', 'is', null);
+
+        if (usersError) {
+            throw usersError;
+        }
+
+        const { data: employeesWithTokens, error: employeesError } = await supabaseClient
+            .from('employees')
+            .select('id, email, status, email_verified, email_verification_token, email_verification_expires')
+            .not('email_verification_token', 'is', null);
+
+        if (employeesError) {
+            throw employeesError;
+        }
+
         res.status(200).json({
             status: 'success',
             data: {
-                users: usersWithTokens,
-                employees: employeesWithTokens,
+                users: usersWithTokens || [],
+                employees: employeesWithTokens || [],
                 timestamp: new Date().toISOString()
             }
         });

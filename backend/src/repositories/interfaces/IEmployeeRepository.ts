@@ -1,4 +1,4 @@
-import { CreateEmployeeRequest, UpdateEmployeeRequest, EmployeeQuery, IEmployee } from '../../models/Employee';
+import { CreateEmployeeRequest, UpdateEmployeeRequest, EmployeeQuery, IEmployee } from '../../models/SupabaseEmployee';
 
 export interface IEmployeeRepository {
   create(employeeData: CreateEmployeeRequest, userId: string): Promise<IEmployee>;

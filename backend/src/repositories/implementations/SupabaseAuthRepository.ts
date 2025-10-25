@@ -1,6 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { IAuthRepository } from '../interfaces/IAuthRepository';
-import { IUser, CreateUserRequest, LoginRequest, AuthResponse } from '../../models/User';
+import { IUser, CreateUserRequest, LoginRequest, AuthResponse } from '../../models/SupabaseUser';
 import logger from '../../utils/logger';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -689,7 +689,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
   // PRIVATE HELPER METHODS
   // ======================================
 
-  private async addRefreshToken(userId: string, token: string): Promise<void> {
+  public async addRefreshToken(userId: string, token: string): Promise<void> {
     const { error } = await this.supabase
       .from('users')
       .update({

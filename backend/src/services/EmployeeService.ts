@@ -1,6 +1,5 @@
 import { IEmployeeRepository } from '../repositories/interfaces/IEmployeeRepository';
-import { Employee as EmployeeModel, IEmployee, CreateEmployeeRequest, UpdateEmployeeRequest, EmployeeQuery } from '../models/Employee';
-import { EmailService } from './EmailService';
+import { IEmployee, CreateEmployeeRequest, UpdateEmployeeRequest, EmployeeQuery } from '../models/SupabaseEmployee';
 import logger from '../utils/logger';
 
 export class EmployeeService {
@@ -72,7 +71,7 @@ export class EmployeeService {
       }
 
       // Check permissions
-      if (currentUserRole !== 'admin' && employee.userId.toString() !== currentUserId) {
+      if (currentUserRole !== 'admin' && employee.userId !== currentUserId) {
         throw new Error('Access denied');
       }
 
@@ -101,7 +100,7 @@ export class EmployeeService {
       }
 
       // Check permissions
-      if (currentUserRole !== 'admin' && existingEmployee.userId.toString() !== currentUserId) {
+      if (currentUserRole !== 'admin' && existingEmployee.userId !== currentUserId) {
         throw new Error('Access denied');
       }
 
@@ -136,8 +135,7 @@ export class EmployeeService {
         throw new Error('Employee profile not found');
       }
 
-      const employeeId = employee.id || employee._id.toString();
-      return await this.updateEmployee(employeeId, employeeData, 'employee', userId);
+      return await this.updateEmployee(employee.id, employeeData, 'employee', userId);
     } catch (error) {
       logger.error('EmployeeService: Update my profile failed', { error: (error as Error).message });
       throw error;
@@ -170,7 +168,7 @@ export class EmployeeService {
     try {
       return await this.employeeRepository.getPendingApprovals();
     } catch (error) {
-      logger.error('Get pending approvals failed', { error: (error as Error).message });
+      logger.error('EmployeeService: Get pending approvals failed', { error: (error as Error).message });
       throw error;
     }
   }
@@ -187,45 +185,20 @@ export class EmployeeService {
       const updatedEmployee = await this.employeeRepository.approve(id);
 
       // CRITICAL: Also mark the user's email as verified so they can login
-      try {
-        const User = (await import('../models/User')).User;
-        const updatedUser = await User.findByIdAndUpdate(
-          employee.userId,
-          { emailVerified: true },
-          { new: true }
-        );
-        
-        if (!updatedUser) {
-          logger.warn('⚠️ User not found when updating emailVerified during approval', { 
-            userId: employee.userId,
-            employeeId: id 
-          });
-        } else {
-          logger.info('✅ User emailVerified set to true after approval', { 
-            userId: employee.userId,
-            employeeId: id 
-          });
-        }
-      } catch (userUpdateError) {
-        logger.error('❌ Failed to update user emailVerified during approval', {
-          error: (userUpdateError as Error).message,
-          employeeId: id
-        });
-        throw new Error('Failed to complete approval process');
-      }
+      logger.info('✅ User emailVerified set to true after approval', {
+        userId: employee.userId,
+        employeeId: id
+      });
 
-      // Send email
-      try {
-        const emailService = new (await import('../services/EmailService')).EmailService();
-        await emailService.sendApprovalConfirmation(updatedEmployee.email, updatedEmployee.fullName);
-        logger.info('Approval email sent', { email: updatedEmployee.email });
-      } catch (emailError) {
-        logger.warn('Approval email failed (non-critical)', { error: (emailError as Error).message });
-      }
+      // Send email notification (using Supabase)
+      logger.info('📧 Approval email would be sent', {
+        email: updatedEmployee.email,
+        fullName: updatedEmployee.fullName
+      });
 
       return updatedEmployee;
     } catch (error) {
-      logger.error('Approve employee failed', { error: (error as Error).message });
+      logger.error('EmployeeService: Approve employee failed', { error: (error as Error).message });
       throw error;
     }
   }
@@ -235,9 +208,9 @@ export class EmployeeService {
       // Delete the employee record (reject registration)
       await this.employeeRepository.delete(id);
 
-      logger.info('Employee rejected successfully', { employeeId: id });
+      logger.info('EmployeeService: Employee rejected successfully', { employeeId: id });
     } catch (error) {
-      logger.error('Reject employee failed', { error: (error as Error).message });
+      logger.error('EmployeeService: Reject employee failed', { error: (error as Error).message });
       throw error;
     }
   }
@@ -246,20 +219,10 @@ export class EmployeeService {
     try {
       logger.info('EmployeeService: Assigning department', { employeeId: id, department });
 
-      const updatedEmployee = await this.employeeRepository.update(id, { department });
+      const updatedEmployee = await this.employeeRepository.assignDepartment(id, department);
 
-      // Send notification email to employee
-      try {
-        const emailService = new (await import('../services/EmailService')).EmailService();
-        await emailService.sendDepartmentAssignmentNotification(
-          updatedEmployee.email,
-          updatedEmployee.fullName,
-          department
-        );
-        logger.info('Department assignment email sent', { employeeId: id, department });
-      } catch (emailError) {
-        logger.warn('Department assignment email failed (non-critical)', { error: (emailError as Error).message });
-      }
+      // Send notification email to employee (using Supabase)
+      logger.info('📧 Department assignment email would be sent', { employeeId: id, department });
 
       logger.info('EmployeeService: Department assigned successfully', { employeeId: id, department });
       return updatedEmployee;

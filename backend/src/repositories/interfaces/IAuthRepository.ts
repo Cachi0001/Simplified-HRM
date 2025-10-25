@@ -1,4 +1,4 @@
-import { IUser, CreateUserRequest, LoginRequest, AuthResponse } from '../../models/User';
+import { IUser, CreateUserRequest, LoginRequest, AuthResponse } from '../../models/SupabaseUser';
 
 export interface IAuthRepository {
   signUp(userData: CreateUserRequest): Promise<AuthResponse>;
@@ -17,6 +17,7 @@ export interface IAuthRepository {
   getEmployeeByUserId(userId: string): Promise<any>;
   createEmployeeRecord(employeeData: any): Promise<any>;
 
-  // Supabase-specific method
+  // Supabase-specific methods
   getSupabaseClient?: () => any;
+  addRefreshToken?: (userId: string, token: string) => Promise<void>;
 }

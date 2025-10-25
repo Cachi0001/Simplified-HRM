@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { EmployeeService } from '../services/EmployeeService';
-import { CreateEmployeeRequest, UpdateEmployeeRequest, EmployeeQuery } from '../models/Employee';
+import { CreateEmployeeRequest, UpdateEmployeeRequest, EmployeeQuery } from '../models/SupabaseEmployee';
 import logger from '../utils/logger';
 
 export class EmployeeController {

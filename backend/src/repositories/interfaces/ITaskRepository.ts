@@ -1,4 +1,4 @@
-import { ITask, CreateTaskRequest, UpdateTaskRequest, TaskQuery } from '../../models/Task';
+import { ITask, CreateTaskRequest, UpdateTaskRequest, TaskQuery } from '../../models/SupabaseTask';
 
 export interface ITaskRepository {
   create(taskData: CreateTaskRequest, assignedBy: string): Promise<ITask>;

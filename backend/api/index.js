@@ -9,7 +9,7 @@ const attendanceRoutes = require('./routes/attendance.routes').default;
 const taskRoutes = require('./routes/task.routes').default;
 
 // Import database configuration
-const databaseConfig = require('./config/database').default;
+const supabaseConfig = require('./config/supabase');
 
 const app = express();
 
@@ -17,8 +17,8 @@ const app = express();
 console.log('🔍 Vercel Environment Variables:', {
   NODE_ENV: process.env.NODE_ENV,
   VERCEL: process.env.VERCEL,
-  MONGODB_URI: process.env.MONGODB_URI ? 'SET' : 'NOT SET',
-  MONGODB_DB_NAME: process.env.MONGODB_DB_NAME,
+  SUPABASE_URL: process.env.SUPABASE_URL ? 'SET' : 'NOT SET',
+  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'SET' : 'NOT SET',
   FRONTEND_URL: process.env.FRONTEND_URL,
   SMTP_HOST: process.env.SMTP_HOST,
   SMTP_PORT: process.env.SMTP_PORT,
@@ -31,11 +31,11 @@ console.log('🔍 Vercel Environment Variables:', {
 // Initialize database connection
 async function initializeDatabase() {
   try {
-    console.log('🔌 Starting database connection...');
-    await databaseConfig.connect();
-    console.log('✅ Database connected successfully');
+    console.log('🔌 Starting Supabase connection...');
+    await supabaseConfig.connect();
+    console.log('✅ Supabase connected successfully');
   } catch (error) {
-    console.error('❌ Database connection failed:', error);
+    console.error('❌ Supabase connection failed:', error);
     // Don't throw error in serverless - let the app start and handle DB errors per request
   }
 }
@@ -89,52 +89,60 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/tasks', taskRoutes);
 
 // Health check endpoint
-app.get('/api/health', (req, res) => {
-  const dbStatus = databaseConfig.getConnection().connection.readyState === 1 ? 'connected' : 'disconnected';
+app.get('/api/health', async (req, res) => {
+  try {
+    const dbStatus = await supabaseConfig.healthCheck();
 
-  // Detailed environment variable status
-  const envStatus = {
-    NODE_ENV: process.env.NODE_ENV,
-    VERCEL: process.env.VERCEL,
-    MONGODB_URI: process.env.MONGODB_URI ? 'SET' : 'NOT SET',
-    MONGODB_DB_NAME: process.env.MONGODB_DB_NAME,
-    SMTP_HOST: process.env.SMTP_HOST,
-    SMTP_PORT: process.env.SMTP_PORT,
-    SMTP_USER: process.env.SMTP_USER ? 'SET' : 'NOT SET',
-    FROM_EMAIL: process.env.FROM_EMAIL,
-    JWT_SECRET: process.env.JWT_SECRET ? 'SET' : 'NOT SET',
-    VAPID_EMAIL: process.env.VAPID_EMAIL,
-    FRONTEND_URL: process.env.FRONTEND_URL
-  };
+    // Detailed environment variable status
+    const envStatus = {
+      NODE_ENV: process.env.NODE_ENV,
+      VERCEL: process.env.VERCEL,
+      SUPABASE_URL: process.env.SUPABASE_URL ? 'SET' : 'NOT SET',
+      SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'SET' : 'NOT SET',
+      SMTP_HOST: process.env.SMTP_HOST,
+      SMTP_PORT: process.env.SMTP_PORT,
+      SMTP_USER: process.env.SMTP_USER ? 'SET' : 'NOT SET',
+      FROM_EMAIL: process.env.FROM_EMAIL,
+      JWT_SECRET: process.env.JWT_SECRET ? 'SET' : 'NOT SET',
+      VAPID_EMAIL: process.env.VAPID_EMAIL,
+      FRONTEND_URL: process.env.FRONTEND_URL
+    };
 
-  console.log('🏥 Health Check Request:', {
-    timestamp: new Date().toISOString(),
-    dbStatus,
-    envStatus,
-    readyState: databaseConfig.getConnection().connection.readyState
-  });
+    console.log('🏥 Health Check Request:', {
+      timestamp: new Date().toISOString(),
+      dbStatus,
+      envStatus
+    });
 
-  res.status(200).json({
-    status: 'ok',
-    message: 'HR Management System Backend is running',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development',
-    deployment: process.env.VERCEL ? 'vercel' : 'local',
-    database: {
-      status: dbStatus,
-      connection: databaseConfig.getConnection().connection.readyState === 1,
-      hasMongoUri: !!process.env.MONGODB_URI,
-      mongoUriLength: process.env.MONGODB_URI ? process.env.MONGODB_URI.length : 0,
-      dbName: process.env.MONGODB_DB_NAME,
-      readyState: databaseConfig.getConnection().connection.readyState
-    },
-    environment: envStatus,
-    server: {
-      nodeVersion: process.version,
-      platform: process.platform,
-      memory: process.memoryUsage()
-    }
-  });
+    res.status(200).json({
+      status: 'ok',
+      message: 'HR Management System Backend is running',
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
+      deployment: process.env.VERCEL ? 'vercel' : 'local',
+      database: dbStatus,
+      config: envStatus,
+      server: {
+        nodeVersion: process.version,
+        platform: process.platform,
+        memory: process.memoryUsage()
+      }
+    });
+  } catch (error) {
+    console.error('❌ Health check failed:', error);
+    res.status(200).json({
+      status: 'ok',
+      message: 'HR Management System Backend is running',
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
+      deployment: process.env.VERCEL ? 'vercel' : 'local',
+      database: {
+        status: 'error',
+        connection: false,
+        error: error.message
+      }
+    });
+  }
 });
 
 // CORS diagnostic endpoint

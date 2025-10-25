@@ -1,5 +1,5 @@
 import { IAttendanceRepository } from '../repositories/interfaces/IAttendanceRepository';
-import { IAttendance, CreateAttendanceRequest } from '../models/Attendance';
+import { IAttendance, CreateAttendanceRequest } from '../models/SupabaseAttendance';
 import logger from '../utils/logger';
 
 export class AttendanceService {

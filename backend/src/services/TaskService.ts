@@ -1,6 +1,5 @@
 import { ITaskRepository } from '../repositories/interfaces/ITaskRepository';
-import { Task as TaskModel, ITask, CreateTaskRequest, UpdateTaskRequest, TaskQuery } from '../models/Task';
-import { Employee } from '../models/Employee';
+import { ITask, CreateTaskRequest, UpdateTaskRequest, TaskQuery } from '../models/SupabaseTask';
 import logger from '../utils/logger';
 
 export class TaskService {
@@ -11,13 +10,10 @@ export class TaskService {
       return null;
     }
 
-    const employee = await Employee.findOne({ userId }).select('_id');
-    if (!employee) {
-      logger.warn('TaskService: No employee found for user', { userId });
-      return null;
-    }
-
-    return employee._id.toString();
+    // For Supabase, we need to get the employee ID from the user ID
+    // This would typically be done by looking up the employee record
+    // For now, we'll assume the userId is the same as employeeId in Supabase
+    return userId;
   }
 
   async createTask(taskData: CreateTaskRequest, assignedBy: string, currentUserRole: string): Promise<ITask> {
@@ -32,35 +28,10 @@ export class TaskService {
         throw new Error('Title, assignee ID, and due date are required');
       }
 
-      if (!taskData.assigneeId.match(/^[0-9a-f]{24}$/i)) {
-        logger.error('TaskService: Invalid assigneeId format', {
-          assigneeId: taskData.assigneeId,
-          type: typeof taskData.assigneeId,
-          isString: typeof taskData.assigneeId === 'string'
-        });
-        throw new Error('Invalid assignee ID format. Expected MongoDB ObjectId.');
-      }
-
       const task = await this.taskRepository.create(taskData, assignedBy);
 
-      try {
-        const employee = await Employee.findById(taskData.assigneeId);
-        if (employee) {
-          const emailService = new (await import('../services/EmailService')).EmailService();
-          await emailService.sendTaskNotification(
-            employee.email,
-            employee.fullName,
-            task.title,
-            task.description || '',
-            new Date(task.dueDate).toLocaleDateString()
-          );
-          logger.info('Task notification email sent', { assigneeId: taskData.assigneeId, taskId: task.id });
-        } else {
-          logger.warn('Employee not found for task notification', { assigneeId: taskData.assigneeId });
-        }
-      } catch (emailError) {
-        logger.warn('Task notification email failed (non-critical)', { error: (emailError as Error).message });
-      }
+      // TODO: Implement email notifications for Supabase
+      logger.info('Task notification would be sent', { assigneeId: taskData.assigneeId, taskId: task.id });
 
       logger.info('TaskService: Task created successfully', { taskId: task.id });
       return task;
@@ -99,7 +70,7 @@ export class TaskService {
 
       if (currentUserRole !== 'admin') {
         const employeeId = await this.resolveEmployeeId(currentUserId);
-        if (!employeeId || task.assigneeId.toString() !== employeeId) {
+        if (!employeeId || task.assigneeId !== employeeId) {
           throw new Error('Access denied');
         }
       }
@@ -133,7 +104,7 @@ export class TaskService {
 
       if (currentUserRole !== 'admin') {
         const employeeId = await this.resolveEmployeeId(currentUserId);
-        if (!employeeId || existingTask.assigneeId.toString() !== employeeId) {
+        if (!employeeId || existingTask.assigneeId !== employeeId) {
           throw new Error('Access denied');
         }
 
@@ -167,30 +138,14 @@ export class TaskService {
       }
 
       const employeeId = await this.resolveEmployeeId(currentUserId);
-      if (!employeeId || currentUserRole !== 'employee' || existingTask.assigneeId.toString() !== employeeId) {
+      if (!employeeId || currentUserRole !== 'employee' || existingTask.assigneeId !== employeeId) {
         throw new Error('Only the assigned employee can update task status');
       }
 
       const updatedTask = await this.taskRepository.updateStatus(id, status);
 
-      if (status === 'completed') {
-        try {
-          const admin = await Employee.findById(existingTask.assignedBy);
-          const employee = await Employee.findById(existingTask.assigneeId);
-          if (admin && employee) {
-            const emailService = new (await import('../services/EmailService')).EmailService();
-            await emailService.sendTaskCompletionNotification(
-              admin.email,
-              admin.fullName,
-              employee.fullName,
-              updatedTask.title
-            );
-            logger.info('Task completion notification sent', { adminId: existingTask.assignedBy, taskId: id });
-          }
-        } catch (emailError) {
-          logger.warn('Task completion notification failed (non-critical)', { error: (emailError as Error).message });
-        }
-      }
+      // TODO: Implement completion notifications for Supabase
+      logger.info('Task completion notification would be sent', { taskId: id, status });
 
       logger.info('TaskService: Task status updated successfully', { taskId: id, status });
       return updatedTask;

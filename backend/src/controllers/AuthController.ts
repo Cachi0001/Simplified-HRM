@@ -1,8 +1,6 @@
 import { Request, Response } from 'express';
 import { AuthService } from '../services/AuthService';
-import { CreateUserRequest, LoginRequest } from '../models/User';
-import { EmailService } from '../services/EmailService';
-import { User } from '../models/User';
+import { CreateUserRequest, LoginRequest, IUser } from '../models/SupabaseUser';
 import logger from '../utils/logger';
 
 export class AuthController {
@@ -33,7 +31,7 @@ export class AuthController {
           status: 'success',
           message: result.message || 'Please check your email and click the confirmation link to activate your account',
           data: {
-            user: result.user.toObject ? result.user.toObject() : result.user, // Handle both Mongoose model and plain object
+            user: result.user, // Supabase returns plain objects, no toObject() needed
             requiresConfirmation: true
           }
         });
@@ -50,7 +48,7 @@ export class AuthController {
         status: 'success',
         message: result.message || 'User registered successfully',
         data: {
-          user: result.user.toObject ? result.user.toObject() : result.user, // Handle both Mongoose model and plain object
+          user: result.user, // Supabase returns plain objects, no toObject() needed
           accessToken: result.accessToken,
           refreshToken: result.refreshToken
         }
@@ -106,7 +104,7 @@ export class AuthController {
           status: 'success',
           message: result.message || 'Please verify your email before logging in',
           data: {
-            user: result.user.toObject ? result.user.toObject() : result.user,
+            user: result.user, // Supabase returns plain objects, no toObject() needed
             requiresEmailVerification: true
           }
         });
@@ -123,7 +121,7 @@ export class AuthController {
         status: 'success',
         message: result.message || 'Login successful! Redirecting...',
         data: {
-          user: result.user.toObject ? result.user.toObject() : result.user,
+          user: result.user, // Supabase returns plain objects, no toObject() needed
           accessToken: result.accessToken,
           refreshToken: result.refreshToken
         }
@@ -358,13 +356,16 @@ export class AuthController {
         return;
       }
 
-      // Send admin notification email
-      const emailService = new EmailService();
-      await emailService.sendApprovalNotification(email, fullName);
+      // Send admin notification email (using Supabase)
+      // TODO: Implement email service integration for Supabase
+      logger.info('📧 [AuthController] Admin notification would be sent', {
+        email: email,
+        fullName: fullName
+      });
 
       res.status(200).json({
         status: 'success',
-        message: 'Admin notification sent successfully'
+        message: 'Admin notification logged successfully'
       });
     } catch (error) {
       logger.error('AuthController: Admin notification error', { error: (error as Error).message });
@@ -578,12 +579,8 @@ export class AuthController {
         const accessToken = this.generateAccessToken(result.user);
         const refreshToken = this.generateRefreshToken(result.user);
 
-        // Add refresh token to user (get the Mongoose model from database)
-        const userModel = await User.findById(result.user.id);
-        if (userModel) {
-          userModel.addRefreshToken(refreshToken);
-          await userModel.save();
-        }
+        // Add refresh token to user (using Supabase)
+        await this.authService.addRefreshToken(result.user.id, refreshToken);
 
         res.status(200).json({
           status: 'success',
@@ -642,7 +639,7 @@ export class AuthController {
 
     return jwt.sign(
       {
-        sub: user._id,
+        sub: user.id, // Changed from _id to id for Supabase
         email: user.email,
         role: user.role,
       },
@@ -657,7 +654,7 @@ export class AuthController {
 
     return jwt.sign(
       {
-        sub: user._id,
+        sub: user.id, // Changed from _id to id for Supabase
         email: user.email,
       },
       jwtRefreshSecret,

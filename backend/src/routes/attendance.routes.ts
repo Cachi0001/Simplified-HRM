@@ -5,12 +5,12 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 import { Router } from 'express';
 import { AttendanceController } from '../controllers/AttendanceController';
 import { AttendanceService } from '../services/AttendanceService';
-import { MongoAttendanceRepository } from '../repositories/implementations/MongoAttendanceRepository';
+import { SupabaseAttendanceRepository } from '../repositories/implementations/SupabaseAttendanceRepository';
 import { authenticateToken, requireRole } from '../middleware/auth.middleware';
 
 const router = Router();
 
-const attendanceRepository = new MongoAttendanceRepository();
+const attendanceRepository = new SupabaseAttendanceRepository();
 const attendanceService = new AttendanceService(attendanceRepository);
 const attendanceController = new AttendanceController(attendanceService);
 

@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { AttendanceService } from '../services/AttendanceService';
-import { CreateAttendanceRequest } from '../models/Attendance';
+import { CreateAttendanceRequest } from '../models/SupabaseAttendance';
 import logger from '../utils/logger';
 
 export class AttendanceController {
