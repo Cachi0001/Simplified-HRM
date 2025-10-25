@@ -58,7 +58,8 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false,
 }));
 
-// CORS configuration
+// CORS configuration 
+//
 app.use(cors({
   origin: process.env.FRONTEND_URL || '*',
   credentials: true,
