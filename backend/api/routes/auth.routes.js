@@ -17,6 +17,28 @@ const router = (0, express_1.Router)();
 const authRepository = new MongoAuthRepository_1.MongoAuthRepository();
 const authService = new AuthService_1.AuthService(authRepository);
 const authController = new AuthController_1.AuthController(authService);
+
+// Log auth route initialization and environment variables
+console.log('🔐 Auth Routes Initialized');
+console.log('🔍 Auth Environment Check:', {
+  MONGODB_URI: process.env.MONGODB_URI ? 'SET' : 'NOT SET',
+  MONGODB_DB_NAME: process.env.MONGODB_DB_NAME,
+  SMTP_USER: process.env.SMTP_USER ? 'SET' : 'NOT SET',
+  JWT_SECRET: process.env.JWT_SECRET ? 'SET' : 'NOT SET'
+});
+
+// Middleware to log all auth requests
+router.use((req, res, next) => {
+  console.log('🔐 Auth Request:', {
+    method: req.method,
+    url: req.url,
+    ip: req.ip,
+    userAgent: req.headers['user-agent'],
+    timestamp: new Date().toISOString()
+  });
+  next();
+});
+
 router.post('/signup', (req, res) => authController.signUp(req, res));
 router.post('/login', (req, res) => authController.signIn(req, res));
 router.post('/resend-confirmation', (req, res) => authController.resendConfirmationEmail(req, res));

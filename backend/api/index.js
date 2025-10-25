@@ -19,7 +19,13 @@ console.log('🔍 Vercel Environment Variables:', {
   VERCEL: process.env.VERCEL,
   MONGODB_URI: process.env.MONGODB_URI ? 'SET' : 'NOT SET',
   MONGODB_DB_NAME: process.env.MONGODB_DB_NAME,
-  FRONTEND_URL: process.env.FRONTEND_URL
+  FRONTEND_URL: process.env.FRONTEND_URL,
+  SMTP_HOST: process.env.SMTP_HOST,
+  SMTP_PORT: process.env.SMTP_PORT,
+  SMTP_USER: process.env.SMTP_USER ? 'SET' : 'NOT SET',
+  FROM_EMAIL: process.env.FROM_EMAIL,
+  JWT_SECRET: process.env.JWT_SECRET ? 'SET' : 'NOT SET',
+  VAPID_EMAIL: process.env.VAPID_EMAIL
 });
 
 // Initialize database connection
@@ -74,6 +80,28 @@ app.use('/api/tasks', taskRoutes);
 app.get('/api/health', (req, res) => {
   const dbStatus = databaseConfig.getConnection().connection.readyState === 1 ? 'connected' : 'disconnected';
 
+  // Detailed environment variable status
+  const envStatus = {
+    NODE_ENV: process.env.NODE_ENV,
+    VERCEL: process.env.VERCEL,
+    MONGODB_URI: process.env.MONGODB_URI ? 'SET' : 'NOT SET',
+    MONGODB_DB_NAME: process.env.MONGODB_DB_NAME,
+    SMTP_HOST: process.env.SMTP_HOST,
+    SMTP_PORT: process.env.SMTP_PORT,
+    SMTP_USER: process.env.SMTP_USER ? 'SET' : 'NOT SET',
+    FROM_EMAIL: process.env.FROM_EMAIL,
+    JWT_SECRET: process.env.JWT_SECRET ? 'SET' : 'NOT SET',
+    VAPID_EMAIL: process.env.VAPID_EMAIL,
+    FRONTEND_URL: process.env.FRONTEND_URL
+  };
+
+  console.log('🏥 Health Check Request:', {
+    timestamp: new Date().toISOString(),
+    dbStatus,
+    envStatus,
+    readyState: databaseConfig.getConnection().connection.readyState
+  });
+
   res.status(200).json({
     status: 'ok',
     message: 'HR Management System Backend is running',
@@ -87,6 +115,12 @@ app.get('/api/health', (req, res) => {
       mongoUriLength: process.env.MONGODB_URI ? process.env.MONGODB_URI.length : 0,
       dbName: process.env.MONGODB_DB_NAME,
       readyState: databaseConfig.getConnection().connection.readyState
+    },
+    environment: envStatus,
+    server: {
+      nodeVersion: process.version,
+      platform: process.platform,
+      memory: process.memoryUsage()
     }
   });
 });
