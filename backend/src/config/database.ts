@@ -27,6 +27,14 @@ export class DatabaseConfig {
       // Check if we're in serverless environment
       const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.LAMBDA_TASK_ROOT;
 
+      // Debug: Log the actual URI being used (without credentials)
+      console.log('🔍 Database connection attempt:', {
+        hasMongoUri: !!process.env.MONGODB_URI,
+        mongoUriLength: mongoUri.length,
+        dbName,
+        nodeEnv: process.env.NODE_ENV
+      });
+
       logger.info('🔌 Attempting to connect to MongoDB...', { mongoUri: mongoUri.replace(/\/\/.*@/, '//***:***@') });
 
       await mongoose.connect(mongoUri, {

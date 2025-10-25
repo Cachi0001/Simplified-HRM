@@ -1,7 +1,21 @@
 import dotenv from 'dotenv';
 import path from 'path';
 
+// Load environment variables
+const result = dotenv.config({ path: path.resolve(__dirname, '../.env') });
+if (result.error) {
+  console.error('❌ Failed to load .env file:', result.error);
+} else {
+  console.log('✅ .env file loaded successfully');
+  console.log('🔍 Environment variables:', {
+    NODE_ENV: process.env.NODE_ENV,
+    MONGODB_URI: process.env.MONGODB_URI ? 'SET' : 'NOT SET',
+    PORT: process.env.PORT
+  });
+}
+
 if (process.env.NODE_ENV !== 'production') {
+  console.log('🔄 Loading .env file for development...');
   dotenv.config({ path: path.resolve(__dirname, '../.env') });
 }
 
