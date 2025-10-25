@@ -28,13 +28,24 @@ class DatabaseConfig {
             try {
                 const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/go3net-hrm';
                 const dbName = process.env.MONGODB_DB_NAME || 'go3net-hrm';
-                logger_1.default.info('🔌 Attempting to connect to MongoDB...', {
-                    mongoUri: mongoUri.replace(/\/\/.*@/, '//***:***@'),
-                    attempt,
-                    maxRetries
-                });
-                await mongoose_1.default.connect(mongoUri, {
+
+                // Check if the URI already contains a database name (MongoDB Atlas format)
+                const isAtlasUri = mongoUri.includes('mongodb+srv://');
+
+                // Debug: Log the actual URI being used (without credentials)
+                console.log('🔍 Database connection attempt:', {
+                    hasMongoUri: !!process.env.MONGODB_URI,
+                    mongoUriLength: mongoUri.length,
                     dbName,
+                    isAtlasUri,
+                    nodeEnv: process.env.NODE_ENV,
+                    attempt,
+                    isServerless
+                });
+
+                // For Atlas, use URI only (database name in URI)
+                // For local, use URI + dbName parameter
+                const connectOptions = {
                     maxPoolSize: isServerless ? 5 : 10,
                     minPoolSize: 1,
                     serverSelectionTimeoutMS: isServerless ? 10000 : 5000,
@@ -42,7 +53,14 @@ class DatabaseConfig {
                     bufferCommands: true,
                     maxIdleTimeMS: 30000,
                     heartbeatFrequencyMS: 10000,
-                });
+                };
+
+                // Only add dbName for local development (not Atlas)
+                if (!isAtlasUri) {
+                    connectOptions.dbName = dbName;
+                }
+
+                await mongoose_1.default.connect(mongoUri, connectOptions);
                 this.isConnected = true;
                 logger_1.default.info('✅ MongoDB connected successfully', { attempt, maxRetries });
                 mongoose_1.default.connection.on('error', (error) => {

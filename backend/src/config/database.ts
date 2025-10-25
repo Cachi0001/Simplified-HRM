@@ -29,11 +29,15 @@ export class DatabaseConfig {
         const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/go3net-hrm';
         const dbName = process.env.MONGODB_DB_NAME || 'go3net-hrm';
 
+        // Check if the URI already contains a database name (MongoDB Atlas format)
+        const isAtlasUri = mongoUri.includes('mongodb+srv://');
+
         // Debug: Log the actual URI being used (without credentials)
         console.log('🔍 Database connection attempt:', {
           hasMongoUri: !!process.env.MONGODB_URI,
           mongoUriLength: mongoUri.length,
           dbName,
+          isAtlasUri,
           nodeEnv: process.env.NODE_ENV,
           attempt,
           isServerless
@@ -45,16 +49,24 @@ export class DatabaseConfig {
           maxRetries
         });
 
-        await mongoose.connect(mongoUri, {
-          dbName,
-          maxPoolSize: isServerless ? 5 : 10, // Smaller pool for serverless
+        // For Atlas, use URI only (database name in URI)
+        // For local, use URI + dbName parameter
+        const connectOptions: any = {
+          maxPoolSize: isServerless ? 5 : 10,
           minPoolSize: 1,
-          serverSelectionTimeoutMS: isServerless ? 10000 : 5000, // Longer timeout for serverless cold starts
+          serverSelectionTimeoutMS: isServerless ? 10000 : 5000,
           socketTimeoutMS: 45000,
-          bufferCommands: true, // Enable buffering for serverless environments
-          maxIdleTimeMS: 30000, // Close connections after 30s of inactivity
-          heartbeatFrequencyMS: 10000, // Check connection every 10s
-        });
+          bufferCommands: true,
+          maxIdleTimeMS: 30000,
+          heartbeatFrequencyMS: 10000,
+        };
+
+        // Only add dbName for local development (not Atlas)
+        if (!isAtlasUri) {
+          connectOptions.dbName = dbName;
+        }
+
+        await mongoose.connect(mongoUri, connectOptions);
 
         this.isConnected = true;
         logger.info('✅ MongoDB connected successfully', { attempt, maxRetries });
