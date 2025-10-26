@@ -62,7 +62,7 @@ const API_BASE_URL = (() => {
   
   // Get environment variables with fallbacks - use direct URLs without relying on proxy
   const devApiUrl = 'http://localhost:3000/api';
-  const prodApiUrl = 'https://go3nethrm-backend.vercel.app/api';
+  const prodApiUrl = 'https://go3nethrm-backend.vercel.app/api'; // Fixed: removed trailing slash
   
   // Log API configuration for debugging
   console.log(`API Configuration:

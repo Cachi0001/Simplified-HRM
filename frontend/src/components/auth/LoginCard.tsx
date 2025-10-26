@@ -43,6 +43,20 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
       const user = response.data.user;
       const { accessToken, refreshToken } = response.data;
 
+      console.log('🔍 Login response details:', {
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          emailVerified: user.emailVerified,
+          status: user.status
+        },
+        hasTokens: !!(accessToken && refreshToken),
+        requiresEmailVerification: response.data.requiresEmailVerification,
+        requiresConfirmation: response.data.requiresConfirmation,
+        fullResponse: response
+      });
+
       // Check if email verification is required
       if (response.data.requiresEmailVerification) {
         setShowResendButton(true);
@@ -89,7 +103,20 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
       setShowResendButton(false);
 
     } catch (err: any) {
-      console.error('Login error:', err);
+      console.error('Login error details:', {
+        error: err,
+        message: err.message,
+        response: err.response,
+        responseData: err.response?.data,
+        responseStatus: err.response?.status
+      });
+
+      // Clear any cached user data that might be stale
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
+      localStorage.removeItem('emailConfirmed');
+      localStorage.removeItem('pendingConfirmationEmail');
 
       // IMPORTANT: Always ensure isLoading is false for error cases
       setIsLoading(false);
@@ -104,10 +131,17 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
       // Get error message from various possible locations
       const errorMessage = err.response?.data?.message || err.message || 'An error occurred during login';
 
+      console.log('🔍 Processing error message:', {
+        errorMessage,
+        fullError: err,
+        responseData: err.response?.data
+      });
+
       // Provide more specific guidance based on error type
       if (errorMessage.includes('Invalid email or password')) {
         addToast('error', 'Invalid email or password. Please check your credentials and try again.');
       } else if (errorMessage.includes('pending approval') || errorMessage.includes('pending admin approval')) {
+        console.log('🔄 Handling pending approval message');
         // Use warning toast for pending status since it's expected behavior - DON'T refresh page
         addToast('warning', 'Your account is pending admin approval. Please wait for admin approval before logging in.');
         return; // Exit early - don't continue with error flow

@@ -175,7 +175,12 @@ export class SupabaseAuthRepository implements IAuthRepository {
       if (user.role !== 'admin' && employee.status !== 'active') {
         logger.warn('❌ [SupabaseAuthRepository] Employee not approved', {
           email: credentials.email,
-          status: employee.status
+          status: employee.status,
+          role: user.role,
+          userId: user.id,
+          employeeId: employee.id,
+          userEmailVerified: user.email_verified,
+          employeeEmailVerified: employee.email_verified
         });
         // Return a special response for pending approval instead of throwing
         const error: any = new Error('Your account is pending approval. Please wait for admin approval before logging in.');
@@ -183,6 +188,14 @@ export class SupabaseAuthRepository implements IAuthRepository {
         error.status = employee.status;
         throw error;
       }
+
+      logger.info('✅ [SupabaseAuthRepository] Employee approved - allowing login', {
+        email: credentials.email,
+        status: employee.status,
+        role: user.role,
+        userId: user.id,
+        employeeId: employee.id
+      });
 
       // Generate JWT tokens
       const accessToken = this.generateAccessToken(user);
@@ -905,6 +918,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
       password: '', // Not returned for security
       fullName: user.full_name,
       role: user.role,
+      status: employee?.status || 'pending', // Include employee status
       emailVerified: user.email_verified,
       passwordHash: user.password_hash,
       emailVerificationToken: user.email_verification_token,

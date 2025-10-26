@@ -111,20 +111,53 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false, // Disable for API responses
 }));
 
-// CORS configuration (optimized for serverless)
 app.use((req: Request, res: Response, next: NextFunction) => {
-  const origin = req.headers.origin || '*';
-  res.header('Access-Control-Allow-Origin', origin);
-  if (origin !== '*') {
-    res.header('Vary', 'Origin');
-  }
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
-  }
+  const startTime = Date.now();
+  const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  (req as any).requestId = requestId;
+  const origin = req.headers.origin || 'No origin';
+  const forwardedFor = req.headers['x-forwarded-for'] || 'Not set';
+  const userAgent = req.headers['user-agent'] || 'Not set';
+  console.log('Incoming request', {
+    requestId,
+    method: req.method,
+    url: req.originalUrl,
+    origin,
+    host: req.headers.host || 'No host',
+    ip: req.ip,
+    forwardedFor,
+    userAgent
+  });
+  logger.info('Incoming request', {
+    requestId,
+    method: req.method,
+    url: req.originalUrl,
+    origin,
+    host: req.headers.host || 'No host',
+    ip: req.ip,
+    forwardedFor,
+    userAgent
+  });
+  res.on('finish', () => {
+    const duration = Date.now() - startTime;
+    const contentLength = res.getHeader('content-length') || 'Not set';
+    console.log('Request completed', {
+      requestId,
+      method: req.method,
+      url: req.originalUrl,
+      status: res.statusCode,
+      duration,
+      contentLength
+    });
+    logger.info('Request completed', {
+      requestId,
+      method: req.method,
+      url: req.originalUrl,
+      status: res.statusCode,
+      duration,
+      contentLength
+    });
+  });
   next();
 });
 
@@ -261,13 +294,13 @@ app.options('/api/preflight-test', (req: Request, res: Response) => {
     origin: req.headers.origin || 'No origin',
     method: req.method
   });
-  
+
   res.status(200).end();
 });
 
 app.get('/api/preflight-test', (req: Request, res: Response) => {
   const origin = req.headers.origin || 'No origin';
-  
+
   console.log('Preflight test GET requested', {
     origin,
     method: req.method
@@ -276,12 +309,28 @@ app.get('/api/preflight-test', (req: Request, res: Response) => {
     origin,
     method: req.method
   });
-  
+
   res.status(200).json({
     status: 'ok',
     message: 'Preflight test successful',
     origin
   });
+});
+
+// Specific test for password reset CORS
+app.options('/api/auth/reset-password/:token', (req: Request, res: Response) => {
+  console.log('🔑 Password reset preflight requested', {
+    origin: req.headers.origin || 'No origin',
+    token: req.params.token ? 'PRESENT' : 'MISSING',
+    method: req.method
+  });
+  logger.info('🔑 Password reset preflight requested', {
+    origin: req.headers.origin || 'No origin',
+    token: req.params.token ? 'PRESENT' : 'MISSING',
+    method: req.method
+  });
+
+  res.status(200).end();
 });
 
 // API info endpoint
