@@ -11,37 +11,44 @@ export class TaskService {
       return null;
     }
 
-    // For Supabase, we need to get the employee ID from the user ID
-    // This would typically be done by looking up the employee record
-    // For now, we'll assume the userId is the same as employeeId in Supabase
-    return userId;
-  }
+    const employee = await this.taskRepository.getEmployeeByUserId(userId);
+    if (!employee) {
+      logger.warn('TaskService: Employee record not found for user', { userId });
+      return null;
+    }
 
-  // Helper method to map frontend fields to database fields
-  private mapFrontendToDatabase(taskData: CreateTaskRequest): any {
-    return {
-      title: taskData.title,
-      description: taskData.description,
-      assigned_to: taskData.assigneeId, // Map assigneeId to assigned_to
-      priority: taskData.priority || 'medium',
-      due_date: taskData.dueDate, // Map dueDate to due_date
-    };
+    return employee.id;
   }
 
   // Helper method to map database fields to frontend fields
   private mapDatabaseToFrontend(task: ITask): any {
+    const toIso = (value?: string | Date) => value ? new Date(value).toISOString() : undefined;
+
     return {
       id: task.id,
       title: task.title,
       description: task.description,
-      assigneeId: task.assigned_to, // Map assigned_to to assigneeId
-      assignedBy: task.created_by, // Map created_by to assignedBy
+      assigneeId: task.assigned_to,
+      assignedBy: task.created_by,
       status: task.status,
       priority: task.priority,
-      dueDate: task.due_date.toISOString(), // Map due_date to dueDate
-      completedAt: task.completed_at?.toISOString(), // Map completed_at to completedAt
-      createdAt: task.created_at.toISOString(), // Map created_at to createdAt
-      updatedAt: task.updated_at.toISOString(), // Map updated_at to updatedAt
+      dueDate: toIso(task.due_date)!,
+      completedAt: toIso(task.completed_at),
+      createdAt: toIso(task.created_at)!,
+      updatedAt: toIso(task.updated_at)!,
+    };
+  }
+
+  private mapFrontendToDatabase(taskData: CreateTaskRequest): any {
+    const normalizeDueDate = (value: string) => new Date(value).toISOString();
+
+    return {
+      title: taskData.title,
+      description: taskData.description,
+      assigned_to: taskData.assigned_to ?? taskData.assigneeId,
+      priority: taskData.priority ?? 'medium',
+      due_date: normalizeDueDate(taskData.due_date ?? taskData.dueDate),
+      status: taskData.status ?? 'pending'
     };
   }
 
@@ -191,7 +198,13 @@ export class TaskService {
       if (taskData.description !== undefined) mappedUpdateData.description = taskData.description;
       if (taskData.status) mappedUpdateData.status = taskData.status;
       if (taskData.priority) mappedUpdateData.priority = taskData.priority;
-      if (taskData.dueDate) mappedUpdateData.due_date = taskData.dueDate;
+      if (taskData.assigneeId || taskData.assigned_to) {
+        mappedUpdateData.assigned_to = taskData.assigned_to ?? taskData.assigneeId;
+      }
+      if (taskData.dueDate || (taskData as any).due_date) {
+        const dueValue = (taskData as any).due_date ?? taskData.dueDate;
+        mappedUpdateData.due_date = dueValue ? new Date(dueValue).toISOString() : undefined;
+      }
 
       const updatedTask = await this.taskRepository.update(id, mappedUpdateData);
 

@@ -124,7 +124,7 @@ export default function AttendanceReportPage({ darkMode: initialDarkMode = false
                 Attendance Report
               </h1>
               <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                Detailed attendance history and analytics (last 5 days)
+                Detailed attendance history and analytics
               </p>
             </div>
           </div>

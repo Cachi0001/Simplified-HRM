@@ -30,6 +30,7 @@ export function AdminDepartments({ darkMode = false }: AdminDepartmentsProps) {
   const [newDepartment, setNewDepartment] = useState<string>('');
   const [showAssignForm, setShowAssignForm] = useState(false);
   const [customDepartment, setCustomDepartment] = useState('');
+  const [quickAssignDepartment, setQuickAssignDepartment] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
   const { addToast } = useToast();
@@ -104,7 +105,13 @@ export function AdminDepartments({ darkMode = false }: AdminDepartmentsProps) {
       addToast('error', 'Invalid employee selected.');
       return;
     }
-    assignDepartmentMutation.mutate({ employeeId, department });
+
+    setQuickAssignDepartment(department);
+    assignDepartmentMutation.mutate({ employeeId, department }, {
+      onSettled: () => {
+        setQuickAssignDepartment(null);
+      }
+    });
   };
 
   const addCustomDepartment = () => {
@@ -251,8 +258,11 @@ export function AdminDepartments({ darkMode = false }: AdminDepartmentsProps) {
                     addToast('info', 'No employees without departments available.');
                   }
                 }}
-                isLoading={assignDepartmentMutation.isPending}
-                disabled={employeesWithoutDepartment.length === 0 || assignDepartmentMutation.isPending}
+                isLoading={assignDepartmentMutation.isPending && quickAssignDepartment === dept}
+                disabled={
+                  employeesWithoutDepartment.length === 0 ||
+                  (assignDepartmentMutation.isPending && quickAssignDepartment !== dept)
+                }
                 className={`text-xs ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
               >
                 {dept}

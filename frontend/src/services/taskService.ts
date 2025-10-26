@@ -4,14 +4,14 @@ export interface Task {
   id: string;
   title: string;
   description?: string;
-  assigned_to: string; // Changed from assigneeId to match Supabase schema
-  created_by: string; // Changed from assignedBy to match Supabase schema
+  assigneeId: string;
+  assignedBy: string;
   status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
   priority: 'low' | 'medium' | 'high';
-  due_date: string; // Changed from dueDate to match Supabase schema
-  completed_at?: string; // Changed from completedAt to match Supabase schema
-  created_at: string; // Changed from createdAt to match Supabase schema
-  updated_at: string; // Changed from updatedAt to match Supabase schema
+  dueDate: string;
+  completedAt?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CreateTaskRequest {
@@ -75,14 +75,14 @@ const normalizeTask = (task: any): Task => ({
   id: extractId(task?._id ?? task?.id ?? ''),
   title: task?.title ?? '',
   description: task?.description ?? undefined,
-  assigned_to: extractId(task?.assigned_to ?? task?.assigneeId ?? ''),
-  created_by: extractId(task?.created_by ?? task?.assignedBy ?? ''),
+  assigneeId: extractId(task?.assigned_to ?? task?.assigneeId ?? ''),
+  assignedBy: extractId(task?.created_by ?? task?.assignedBy ?? ''),
   status: task?.status ?? 'pending',
   priority: task?.priority ?? 'medium',
-  due_date: toIsoString(task?.due_date ?? task?.dueDate ?? new Date().toISOString()),
-  completed_at: task?.completed_at ? toIsoString(task.completed_at) : task?.completedAt ? toIsoString(task.completedAt) : undefined,
-  created_at: toIsoString(task?.created_at ?? task?.createdAt ?? new Date().toISOString()),
-  updated_at: toIsoString(task?.updated_at ?? task?.updatedAt ?? new Date().toISOString())
+  dueDate: toIsoString(task?.due_date ?? task?.dueDate ?? new Date().toISOString()),
+  completedAt: task?.completed_at ? toIsoString(task.completed_at) : task?.completedAt ? toIsoString(task.completedAt) : undefined,
+  createdAt: toIsoString(task?.created_at ?? task?.createdAt ?? new Date().toISOString()),
+  updatedAt: toIsoString(task?.updated_at ?? task?.updatedAt ?? new Date().toISOString())
 });
 
 class TaskService {

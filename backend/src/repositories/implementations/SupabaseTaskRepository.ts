@@ -33,6 +33,26 @@ export class SupabaseTaskRepository implements ITaskRepository {
     }
   }
 
+  async getEmployeeByUserId(userId: string): Promise<any> {
+    try {
+      const { data, error } = await this.supabase
+        .from('employees')
+        .select('id, email, status, full_name')
+        .eq('user_id', userId)
+        .single();
+
+      if (error) {
+        logger.error('❌ [SupabaseTaskRepository] Get employee by user ID failed:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      logger.error('❌ [SupabaseTaskRepository] Get employee by user ID failed:', error);
+      throw error;
+    }
+  }
+
   async findByEmployeeId(employeeId: string): Promise<any[]> {
     try {
       const { data, error } = await this.supabase
@@ -94,39 +114,36 @@ export class SupabaseTaskRepository implements ITaskRepository {
 
   async create(taskData: CreateTaskRequest, assignedBy: string): Promise<any> {
     try {
-      // Validate that the assignedBy user exists
       const { data: creator, error: creatorError } = await this.supabase
-        .from('users')
-        .select('id, email, role')
-        .eq('id', assignedBy)
+        .from('employees')
+        .select('id, email, status, full_name, user_id')
+        .eq('user_id', assignedBy)
         .single();
 
       if (creatorError || !creator) {
-        throw new Error(`Task creator not found: ${creatorError?.message || 'User does not exist'}`);
+        throw new Error(`Task creator not found: ${creatorError?.message || 'Employee record does not exist'}`);
       }
 
-      // Validate that the assignee exists (if provided)
-      if (taskData.assigneeId) {
+      const validatedAssigneeId = taskData.assigned_to;
+      if (validatedAssigneeId) {
         const { data: assignee, error: assigneeError } = await this.supabase
           .from('employees')
-          .select('id, email, status')
-          .eq('id', taskData.assigneeId)
+          .select('id, email, status, full_name')
+          .eq('id', validatedAssigneeId)
           .single();
 
         if (assigneeError || !assignee) {
           throw new Error(`Task assignee not found: ${assigneeError?.message || 'Employee does not exist'}`);
         }
 
-        logger.info('✅ [SupabaseTaskRepository] Task validation passed', {
-          creator: { id: creator.id, email: creator.email, role: creator.role },
-          assignee: { id: assignee.id, email: assignee.email, status: assignee.status }
-        });
       }
 
       const taskInsertData = {
         ...taskData,
-        created_by: assignedBy,
-        assigned_to: taskData.assigneeId
+        created_by: creator.id,
+        assigned_to: validatedAssigneeId,
+        priority: taskData.priority ?? 'medium',
+        status: taskData.status ?? 'pending'
       };
 
       const { data, error } = await this.supabase
@@ -155,9 +172,15 @@ export class SupabaseTaskRepository implements ITaskRepository {
 
   async update(id: string, taskData: UpdateTaskRequest): Promise<any> {
     try {
+      const updateData: any = { ...taskData };
+
+      if ((taskData as any).dueDate || (taskData as any).due_date) {
+        updateData.due_date = (taskData as any).due_date ?? (taskData as any).dueDate;
+      }
+
       const { data, error } = await this.supabase
         .from('tasks')
-        .update(taskData)
+        .update(updateData)
         .eq('id', id)
         .select()
         .single();
@@ -232,9 +255,15 @@ export class SupabaseTaskRepository implements ITaskRepository {
   }
   async updateStatus(id: string, status: string): Promise<any> {
     try {
+      const updatePayload: any = { status };
+
+      if (status === 'completed') {
+        updatePayload.completed_at = new Date().toISOString();
+      }
+
       const { data, error } = await this.supabase
         .from('tasks')
-        .update({ status })
+        .update(updatePayload)
         .eq('id', id)
         .select()
         .single();

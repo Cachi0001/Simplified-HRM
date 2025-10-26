@@ -150,9 +150,8 @@ export function PendingApprovals({ darkMode = false }: PendingApprovalsProps) {
   return (
     <div className={`space-y-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
       <h2 className={`text-2xl font-semibold mb-6 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-        Pending Approvals ({pending.length})
-      </h2>
-
+-        Pending Approvals ({pending.length})
+-      </h2>
       {pending.map((emp) => (
         <div key={emp.id || emp._id} className={`cursor-pointer hover:shadow-md transition-shadow ${darkMode ? 'text-white' : 'text-gray-900'}`} onClick={() => openEmployeeModal(emp)}>
           <Card className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>

@@ -7,10 +7,10 @@ export interface ITask {
   created_by: string; // Changed to match database schema
   status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
   priority: 'low' | 'medium' | 'high';
-  due_date: Date; // Changed to match database schema
-  completed_at?: Date; // Changed to match database schema
-  created_at: Date; // Changed to match database schema
-  updated_at: Date; // Changed to match database schema
+  due_date: string | Date; // Changed to match database schema
+  completed_at?: string | Date; // Changed to match database schema
+  created_at: string | Date; // Changed to match database schema
+  updated_at: string | Date; // Changed to match database schema
 }
 
 // Frontend request/response interfaces (camelCase for API)
@@ -19,7 +19,10 @@ export interface CreateTaskRequest {
   description?: string;
   assigneeId: string; // Frontend sends camelCase
   priority?: 'low' | 'medium' | 'high';
-  dueDate: Date; // Frontend sends camelCase
+  dueDate: string; // Frontend sends camelCase
+  status?: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  assigned_to?: string;
+  due_date?: string;
 }
 
 export interface UpdateTaskRequest {
@@ -27,7 +30,10 @@ export interface UpdateTaskRequest {
   description?: string;
   status?: 'pending' | 'in_progress' | 'completed' | 'cancelled';
   priority?: 'low' | 'medium' | 'high';
-  dueDate?: Date; // Frontend sends camelCase
+  dueDate?: string; // Frontend sends camelCase
+  assigned_to?: string;
+  due_date?: string;
+  assigneeId?: string;
 }
 
 export interface TaskQuery {
