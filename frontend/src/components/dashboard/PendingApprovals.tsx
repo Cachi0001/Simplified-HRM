@@ -242,7 +242,7 @@ export function PendingApprovals({ darkMode = false }: PendingApprovalsProps) {
                   </div>
                   <div>
                     <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                      {selectedEmployee.fullName}
+                      fullName: {selectedEmployee.fullName}
                     </p>
                     <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                       {selectedEmployee.email}
@@ -262,10 +262,6 @@ export function PendingApprovals({ darkMode = false }: PendingApprovalsProps) {
                   <div className="flex justify-between">
                     <span>Position:</span>
                     <span>{selectedEmployee.position || 'Not specified'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Phone:</span>
-                    <span>{selectedEmployee.phone || 'Not provided'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Email Verified:</span>
