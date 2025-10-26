@@ -4,6 +4,7 @@ import { AuthCard } from '../ui/Card';
 import { PasswordInput } from '../ui/PasswordInput';
 import { Button } from '../ui/Button';
 import { useToast } from '../ui/Toast';
+import api from '../../lib/api';
 
 interface ResetPasswordCardProps {}
 
@@ -48,30 +49,18 @@ const ResetPasswordCard: React.FC<ResetPasswordCardProps> = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000/api'}/auth/reset-password/${token}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ newPassword }),
-      });
+      const response = await api.post(`auth/reset-password/${token}`, { newPassword });
 
-      const result = await response.json();
-
-      if (response.ok) {
+      if (response.status === 200) {
         addToast('success', 'Password reset successfully! You can now sign in with your new password.');
 
-        // Clear any existing tokens to ensure clean login
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
 
-        // Add delay before redirect to ensure backend processing is complete
         setTimeout(() => {
           navigate('/auth', { replace: true });
-        }, 2000); // 2 second delay to ensure backend processes the reset
-      } else {
-        addToast('error', result.message || 'Failed to reset password. Please try again.');
+        }, 2000);
       }
     } catch (err: any) {
       addToast('error', err.message || 'Network error occurred. Please try again.');

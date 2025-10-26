@@ -6,6 +6,35 @@ import logger from '../utils/logger';
 export class EmployeeService {
   constructor(private employeeRepository: IEmployeeRepository) {}
 
+  private mapEmployee(record: any): IEmployee {
+    return {
+      id: record.id,
+      userId: record.user_id,
+      email: record.email,
+      fullName: record.full_name,
+      role: record.role,
+      department: record.department ?? undefined,
+      position: record.position ?? undefined,
+      phone: record.phone ?? undefined,
+      address: record.address ?? undefined,
+      dateOfBirth: record.date_of_birth ? new Date(record.date_of_birth) : undefined,
+      hireDate: record.hire_date ? new Date(record.hire_date) : undefined,
+      profilePicture: record.profile_picture ?? undefined,
+      status: record.status,
+      emailVerified: record.email_verified ?? false,
+      emailVerificationToken: record.email_verification_token ?? undefined,
+      emailVerificationExpires: record.email_verification_expires ? new Date(record.email_verification_expires) : undefined,
+      passwordResetToken: record.password_reset_token ?? undefined,
+      passwordResetExpires: record.password_reset_expires ? new Date(record.password_reset_expires) : undefined,
+      createdAt: record.created_at ? new Date(record.created_at) : new Date(),
+      updatedAt: record.updated_at ? new Date(record.updated_at) : new Date()
+    };
+  }
+
+  private mapEmployees(records: any[]): IEmployee[] {
+    return records.map(record => this.mapEmployee(record));
+  }
+
   async createEmployee(employeeData: CreateEmployeeRequest, userId: string, currentUserRole: string): Promise<IEmployee> {
     try {
       if (currentUserRole !== 'admin') {
@@ -21,7 +50,7 @@ export class EmployeeService {
       const employee = await this.employeeRepository.create(employeeData, userId);
 
       logger.info('EmployeeService: Employee created successfully', { employeeId: employee.id });
-      return employee;
+      return this.mapEmployee(employee);
     } catch (error) {
       logger.error('EmployeeService: Create employee failed', { error: (error as Error).message });
       throw error;
@@ -32,12 +61,15 @@ export class EmployeeService {
     try {
       logger.info('EmployeeService: Getting all employees', { role: currentUserRole });
 
-      // Non-admin users can only see active employees
       if (currentUserRole !== 'admin') {
         query = { ...query, status: 'active' };
       }
 
-      return await this.employeeRepository.findAll(query);
+      const result = await this.employeeRepository.findAll(query);
+      return {
+        ...result,
+        employees: this.mapEmployees(result.employees)
+      };
     } catch (error) {
       logger.error('EmployeeService: Get all employees failed', { error: (error as Error).message });
       throw error;
@@ -48,15 +80,12 @@ export class EmployeeService {
     try {
       logger.info('EmployeeService: Searching employees', { query, role: currentUserRole });
 
-      // Non-admin users can only search active employees (already handled in repository)
-      // For admins, search all employees
       if (currentUserRole === 'admin') {
-        // For admins, we need to modify the query to search all statuses
-        // Since the repository filters for active only, we'll need to modify the query
-        query = query; // Keep as is, repository will handle the filtering
+        query = query;
       }
 
-      return await this.employeeRepository.search(query);
+      const employees = await this.employeeRepository.search(query);
+      return this.mapEmployees(employees);
     } catch (error) {
       logger.error('EmployeeService: Search employees failed', { error: (error as Error).message });
       throw error;
@@ -71,12 +100,11 @@ export class EmployeeService {
         return null;
       }
 
-      // Check permissions
-      if (currentUserRole !== 'admin' && employee.userId !== currentUserId) {
+      if (currentUserRole !== 'admin' && employee.user_id !== currentUserId) {
         throw new Error('Access denied');
       }
 
-      return employee;
+      return this.mapEmployee(employee);
     } catch (error) {
       logger.error('EmployeeService: Get employee by ID failed', { error: (error as Error).message });
       throw error;
@@ -85,7 +113,8 @@ export class EmployeeService {
 
   async getMyProfile(userId: string): Promise<IEmployee | null> {
     try {
-      return await this.employeeRepository.findByUserId(userId);
+      const employee = await this.employeeRepository.findByUserId(userId);
+      return employee ? this.mapEmployee(employee) : null;
     } catch (error) {
       logger.error('EmployeeService: Get my profile failed', { error: (error as Error).message });
       throw error;
@@ -94,18 +123,15 @@ export class EmployeeService {
 
   async updateEmployee(id: string, employeeData: UpdateEmployeeRequest, currentUserRole: string, currentUserId?: string): Promise<IEmployee> {
     try {
-      // Check if employee exists
       const existingEmployee = await this.employeeRepository.findById(id);
       if (!existingEmployee) {
         throw new Error('Employee not found');
       }
 
-      // Check permissions
-      if (currentUserRole !== 'admin' && existingEmployee.userId !== currentUserId) {
+      if (currentUserRole !== 'admin' && existingEmployee.user_id !== currentUserId) {
         throw new Error('Access denied');
       }
 
-      // Non-admin users can only update specific fields
       if (currentUserRole !== 'admin') {
         const allowedFields = ['fullName', 'department', 'position', 'phone', 'address', 'dateOfBirth', 'hireDate', 'profilePicture', 'status'];
         const filteredData: UpdateEmployeeRequest = {};
@@ -122,7 +148,7 @@ export class EmployeeService {
       const updatedEmployee = await this.employeeRepository.update(id, employeeData);
 
       logger.info('EmployeeService: Employee updated successfully', { employeeId: id });
-      return updatedEmployee;
+      return this.mapEmployee(updatedEmployee);
     } catch (error) {
       logger.error('EmployeeService: Update employee failed', { error: (error as Error).message });
       throw error;
@@ -145,12 +171,10 @@ export class EmployeeService {
 
   async deleteEmployee(id: string, currentUserRole: string): Promise<void> {
     try {
-      // Only admins can delete employees
       if (currentUserRole !== 'admin') {
         throw new Error('Only administrators can delete employees');
       }
 
-      // Check if employee exists
       const employee = await this.employeeRepository.findById(id);
       if (!employee) {
         throw new Error('Employee not found');
@@ -167,7 +191,8 @@ export class EmployeeService {
 
   async getPendingApprovals(): Promise<IEmployee[]> {
     try {
-      return await this.employeeRepository.getPendingApprovals();
+      const employees = await this.employeeRepository.getPendingApprovals();
+      return this.mapEmployees(employees);
     } catch (error) {
       logger.error('EmployeeService: Get pending approvals failed', { error: (error as Error).message });
       throw error;
@@ -178,7 +203,6 @@ export class EmployeeService {
     try {
       logger.info('🔄 [EmployeeService] Starting employee approval process', { employeeId: id });
 
-      // First, get the employee to find the associated user ID
       const employee = await this.employeeRepository.findById(id);
       if (!employee) {
         logger.error('❌ [EmployeeService] Employee not found', { employeeId: id });
@@ -187,47 +211,46 @@ export class EmployeeService {
 
       logger.info('✅ [EmployeeService] Employee found', {
         employeeId: id,
-        userId: employee.userId,
+        userId: employee.user_id,
         email: employee.email,
         currentStatus: employee.status
       });
 
-      // Update the employee status to 'active'
       const updatedEmployee = await this.employeeRepository.approve(id);
       logger.info('✅ [EmployeeService] Employee status updated to active', {
         employeeId: id,
         newStatus: updatedEmployee.status
       });
 
-      // CRITICAL: Also mark the user's email as verified so they can login
       logger.info('🔄 [EmployeeService] Updating user email verification', {
-        userId: employee.userId,
+        userId: employee.user_id,
         employeeId: id
       });
 
-      await this.employeeRepository.updateEmailVerification(employee.userId, true);
+      await this.employeeRepository.updateEmailVerification(employee.user_id, true);
 
       logger.info('✅ [EmployeeService] User email verification updated successfully', {
-        userId: employee.userId,
+        userId: employee.user_id,
         employeeId: id
       });
 
-      // Send email notification
+      const mappedEmployee = this.mapEmployee(updatedEmployee);
+
       try {
         const emailService = new EmailService();
-        await emailService.sendApprovalConfirmation(updatedEmployee.email, updatedEmployee.fullName);
-        logger.info('📧 [EmployeeService] Approval email sent', { email: updatedEmployee.email });
+        await emailService.sendApprovalConfirmation(mappedEmployee.email, mappedEmployee.fullName);
+        logger.info('📧 [EmployeeService] Approval email sent', { email: mappedEmployee.email });
       } catch (emailError) {
         logger.warn('⚠️ [EmployeeService] Approval email failed (non-critical)', { error: (emailError as Error).message });
       }
 
       logger.info('✅ [EmployeeService] Employee approval process completed successfully', {
         employeeId: id,
-        userId: employee.userId,
+        userId: employee.user_id,
         email: employee.email
       });
 
-      return updatedEmployee;
+      return mappedEmployee;
     } catch (error) {
       logger.error('❌ [EmployeeService] Approve employee failed', {
         error: (error as Error).message,
@@ -239,7 +262,6 @@ export class EmployeeService {
 
   async rejectEmployee(id: string): Promise<void> {
     try {
-      // Delete the employee record (reject registration)
       await this.employeeRepository.delete(id);
 
       logger.info('EmployeeService: Employee rejected successfully', { employeeId: id });
@@ -254,13 +276,13 @@ export class EmployeeService {
       logger.info('EmployeeService: Assigning department', { employeeId: id, department });
 
       const updatedEmployee = await this.employeeRepository.assignDepartment(id, department);
+      const mappedEmployee = this.mapEmployee(updatedEmployee);
 
-      // Send notification email to employee
       try {
         const emailService = new EmailService();
         await emailService.sendDepartmentAssignmentNotification(
-          updatedEmployee.email,
-          updatedEmployee.fullName,
+          mappedEmployee.email,
+          mappedEmployee.fullName,
           department
         );
         logger.info('📧 Department assignment email sent', { employeeId: id, department });
@@ -269,7 +291,7 @@ export class EmployeeService {
       }
 
       logger.info('EmployeeService: Department assigned successfully', { employeeId: id, department });
-      return updatedEmployee;
+      return mappedEmployee;
     } catch (error) {
       logger.error('EmployeeService: Assign department failed', { error: (error as Error).message });
       throw error;
