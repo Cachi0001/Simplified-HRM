@@ -176,19 +176,38 @@ export class EmployeeService {
 
   async approveEmployee(id: string): Promise<IEmployee> {
     try {
+      logger.info('🔄 [EmployeeService] Starting employee approval process', { employeeId: id });
+
       // First, get the employee to find the associated user ID
       const employee = await this.employeeRepository.findById(id);
       if (!employee) {
+        logger.error('❌ [EmployeeService] Employee not found', { employeeId: id });
         throw new Error('Employee not found');
       }
 
+      logger.info('✅ [EmployeeService] Employee found', {
+        employeeId: id,
+        userId: employee.userId,
+        email: employee.email,
+        currentStatus: employee.status
+      });
+
       // Update the employee status to 'active'
       const updatedEmployee = await this.employeeRepository.approve(id);
+      logger.info('✅ [EmployeeService] Employee status updated to active', {
+        employeeId: id,
+        newStatus: updatedEmployee.status
+      });
 
       // CRITICAL: Also mark the user's email as verified so they can login
+      logger.info('🔄 [EmployeeService] Updating user email verification', {
+        userId: employee.userId,
+        employeeId: id
+      });
+
       await this.employeeRepository.updateEmailVerification(employee.userId, true);
 
-      logger.info('✅ User emailVerified set to true after approval', {
+      logger.info('✅ [EmployeeService] User email verification updated successfully', {
         userId: employee.userId,
         employeeId: id
       });
@@ -197,14 +216,23 @@ export class EmployeeService {
       try {
         const emailService = new EmailService();
         await emailService.sendApprovalConfirmation(updatedEmployee.email, updatedEmployee.fullName);
-        logger.info('📧 Approval email sent', { email: updatedEmployee.email });
+        logger.info('📧 [EmployeeService] Approval email sent', { email: updatedEmployee.email });
       } catch (emailError) {
-        logger.warn('Approval email failed (non-critical)', { error: (emailError as Error).message });
+        logger.warn('⚠️ [EmployeeService] Approval email failed (non-critical)', { error: (emailError as Error).message });
       }
+
+      logger.info('✅ [EmployeeService] Employee approval process completed successfully', {
+        employeeId: id,
+        userId: employee.userId,
+        email: employee.email
+      });
 
       return updatedEmployee;
     } catch (error) {
-      logger.error('EmployeeService: Approve employee failed', { error: (error as Error).message });
+      logger.error('❌ [EmployeeService] Approve employee failed', {
+        error: (error as Error).message,
+        employeeId: id
+      });
       throw error;
     }
   }

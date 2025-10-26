@@ -131,7 +131,13 @@ export class SupabaseEmployeeRepository {
 
   async updateEmailVerification(userId: string, verified: boolean): Promise<void> {
     try {
-      // Update both users and employees tables for email verification
+      logger.info('🔄 [SupabaseEmployeeRepository] Starting email verification update', {
+        userId,
+        verified,
+        timestamp: new Date().toISOString()
+      });
+
+      // Update users table first
       const { error: userError } = await this.supabase
         .from('users')
         .update({
@@ -142,9 +148,21 @@ export class SupabaseEmployeeRepository {
         .eq('id', userId);
 
       if (userError) {
+        logger.error('❌ [SupabaseEmployeeRepository] Failed to update user email verification', {
+          userId,
+          verified,
+          error: userError.message,
+          code: userError.code
+        });
         throw new Error(`Failed to update user email verification: ${userError.message}`);
       }
 
+      logger.info('✅ [SupabaseEmployeeRepository] User email verification updated successfully', {
+        userId,
+        verified
+      });
+
+      // Update employees table
       const { error: empError } = await this.supabase
         .from('employees')
         .update({
@@ -155,10 +173,44 @@ export class SupabaseEmployeeRepository {
         .eq('user_id', userId);
 
       if (empError) {
+        logger.error('❌ [SupabaseEmployeeRepository] Failed to update employee email verification', {
+          userId,
+          verified,
+          error: empError.message,
+          code: empError.code
+        });
         throw new Error(`Failed to update employee email verification: ${empError.message}`);
       }
 
-      logger.info('✅ [SupabaseEmployeeRepository] Email verification updated for both tables', { userId, verified });
+      logger.info('✅ [SupabaseEmployeeRepository] Employee email verification updated successfully', {
+        userId,
+        verified
+      });
+
+      // Verify the update worked
+      const { data: updatedUser, error: verifyError } = await this.supabase
+        .from('users')
+        .select('id, email, email_verified')
+        .eq('id', userId)
+        .single();
+
+      if (verifyError) {
+        logger.warn('⚠️ [SupabaseEmployeeRepository] Could not verify user update', {
+          userId,
+          error: verifyError.message
+        });
+      } else {
+        logger.info('✅ [SupabaseEmployeeRepository] Verification confirmed', {
+          userId,
+          email: updatedUser.email,
+          emailVerified: updatedUser.email_verified
+        });
+      }
+
+      logger.info('✅ [SupabaseEmployeeRepository] Email verification update completed for both tables', {
+        userId,
+        verified
+      });
     } catch (error) {
       logger.error('❌ [SupabaseEmployeeRepository] Update email verification failed:', error);
       throw error;

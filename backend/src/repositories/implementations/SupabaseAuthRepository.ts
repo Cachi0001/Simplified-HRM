@@ -553,66 +553,135 @@ export class SupabaseAuthRepository implements IAuthRepository {
 
   async confirmEmailByToken(token: string): Promise<AuthResponse> {
     try {
-      logger.info('🔗 [SupabaseAuthRepository] Confirming email by token', { token });
+      logger.info('🔗 [SupabaseAuthRepository] Confirming email by token', {
+        token: token.substring(0, 20) + '...',
+        fullToken: token,
+        timestamp: new Date().toISOString()
+      });
 
-      // Find user by verification token
-      const { data: result, error: verifyError } = await this.supabase
-        .rpc('verify_email_token', { p_token: token });
+      // Find user by verification token using direct query instead of RPC
+      const { data: user, error: userError } = await this.supabase
+        .from('users')
+        .select('*')
+        .eq('email_verification_token', token)
+        .gt('email_verification_expires', new Date().toISOString())
+        .single();
 
-      if (verifyError || !result || result.length === 0) {
-        logger.warn('❌ [SupabaseAuthRepository] User not found with token', { token });
+      if (userError || !user) {
+        logger.warn('❌ [SupabaseAuthRepository] User not found with token', {
+          token: token.substring(0, 20) + '...',
+          error: userError?.message,
+          code: userError?.code,
+          currentTime: new Date().toISOString()
+        });
+
+        // Check if token exists but is expired
+        const { data: expiredUser, error: expiredError } = await this.supabase
+          .from('users')
+          .select('id, email, email_verification_expires')
+          .eq('email_verification_token', token)
+          .single();
+
+        if (expiredUser) {
+          logger.warn('⚠️ [SupabaseAuthRepository] Token found but expired', {
+            userId: expiredUser.id,
+            email: expiredUser.email,
+            expires: expiredUser.email_verification_expires,
+            currentTime: new Date().toISOString()
+          });
+        }
+
         throw new Error('Invalid or expired verification token');
       }
 
-      const userData = result[0];
+      logger.info('✅ [SupabaseAuthRepository] User found with valid token', {
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+        tokenExpires: user.email_verification_expires
+      });
+
+      // Get employee data if exists
+      const { data: employee, error: empError } = await this.supabase
+        .from('employees')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (empError && empError.code !== 'PGRST116') { // PGRST116 means no rows found, which is OK
+        logger.warn('⚠️ [SupabaseAuthRepository] Employee record not found:', empError);
+      }
+
+      logger.info('✅ [SupabaseAuthRepository] Employee data retrieved', {
+        userId: user.id,
+        employeeExists: !!employee,
+        employeeStatus: employee?.status
+      });
 
       // Mark email as verified in both tables
-      await this.updateEmailVerification(userData.user_id, true);
+      logger.info('🔄 [SupabaseAuthRepository] Updating email verification status', {
+        userId: user.id,
+        verified: true
+      });
 
-      // Get updated user data
-      const { data: updatedUser, error: userError } = await this.supabase
+      await this.updateEmailVerification(user.id, true);
+
+      logger.info('✅ [SupabaseAuthRepository] Email verification updated successfully');
+
+      // Get updated user data with employee info
+      const { data: updatedUser, error: updatedUserError } = await this.supabase
         .from('users')
         .select(`
           *,
           employees!inner(*)
         `)
-        .eq('id', userData.user_id)
+        .eq('id', user.id)
         .single();
 
-      if (userError || !updatedUser) {
+      if (updatedUserError || !updatedUser) {
         throw new Error('Failed to retrieve updated user data');
       }
 
-      const employee = updatedUser.employees;
+      const employeeData = updatedUser.employees;
 
       // Generate JWT tokens (admin users bypass employee approval, others need active status)
       let accessToken = '';
       let refreshToken = '';
 
-      if (employee.status === 'active' || updatedUser.role === 'admin') {
+      if (employeeData.status === 'active' || updatedUser.role === 'admin') {
         accessToken = this.generateAccessToken(updatedUser);
         refreshToken = this.generateRefreshToken(updatedUser);
         await this.addRefreshToken(updatedUser.id, refreshToken);
+
+        logger.info('✅ [SupabaseAuthRepository] Generated tokens for active user', {
+          userId: updatedUser.id,
+          employeeStatus: employeeData.status,
+          role: updatedUser.role
+        });
       }
 
       logger.info('✅ [SupabaseAuthRepository] Email confirmed successfully', {
         userId: updatedUser.id,
         email: updatedUser.email,
-        employeeStatus: employee.status
+        employeeStatus: employeeData.status,
+        hasTokens: !!(accessToken && refreshToken)
       });
 
       return {
-        user: this.mapSupabaseUserToInterface(updatedUser, employee),
+        user: this.mapSupabaseUserToInterface(updatedUser, employeeData),
         accessToken,
         refreshToken,
         requiresEmailVerification: false,
-        message: (employee.status === 'active' || updatedUser.role === 'admin')
+        message: (employeeData.status === 'active' || updatedUser.role === 'admin')
           ? 'Email verified successfully! You can now log in.'
           : 'Email verified successfully! Please wait for admin approval before logging in.',
       };
 
     } catch (error) {
-      logger.error('❌ [SupabaseAuthRepository] Confirm email by token failed:', error);
+      logger.error('❌ [SupabaseAuthRepository] Confirm email by token failed:', {
+        error: (error as Error).message,
+        token: token.substring(0, 20) + '...'
+      });
       throw error;
     }
   }

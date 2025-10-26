@@ -8,6 +8,7 @@ import { AuthService } from '../services/AuthService';
 import { EmailService } from '../services/EmailService';
 import { SupabaseAuthRepository } from '../repositories/implementations/SupabaseAuthRepository';
 import { authenticateToken } from '../middleware/auth.middleware';
+import logger from '../utils/logger';
 
 const router = Router();
 
@@ -19,6 +20,7 @@ router.post('/signup', (req, res) => authController.signUp(req, res));
 router.post('/login', (req, res) => authController.signIn(req, res));
 router.post('/resend-confirmation', (req, res) => authController.resendConfirmationEmail(req, res));
 router.post('/confirm/:token', (req, res) => authController.confirmEmailByToken(req, res));
+router.get('/confirm/:token', (req, res) => authController.confirmEmailByToken(req, res));
 router.get('/me', authenticateToken, (req, res) => authController.getCurrentUser(req, res));
 router.post('/refresh', authenticateToken, (req, res) => authController.refreshToken(req, res));
 router.post('/signout', (req, res) => authController.signOut(req, res));
@@ -60,6 +62,80 @@ router.get('/debug/tokens', async (req, res) => {
     res.status(500).json({
       status: 'error',
       message: 'Debug query failed',
+      error: (error as Error).message
+    });
+  }
+});
+
+// Debug endpoint to manually update email verification
+router.post('/debug/verify-email/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    logger.info('🔧 [DEBUG] Manual email verification update', { userId });
+
+    // Use the service instead of direct repository call
+    const supabase = authRepository.getSupabaseClient();
+
+    // Update users table
+    const { error: userError } = await supabase
+      .from('users')
+      .update({
+        email_verified: true,
+        email_verification_token: null,
+        email_verification_expires: null,
+      })
+      .eq('id', userId);
+
+    if (userError) {
+      throw new Error(`Failed to update user: ${userError.message}`);
+    }
+
+    // Update employees table
+    const { error: empError } = await supabase
+      .from('employees')
+      .update({
+        email_verified: true,
+        email_verification_token: null,
+        email_verification_expires: null,
+      })
+      .eq('user_id', userId);
+
+    if (empError) {
+      logger.warn('⚠️ [DEBUG] Failed to update employee record:', empError);
+    }
+
+    // Get updated data
+    const { data: updatedUser, error: userQueryError } = await supabase
+      .from('users')
+      .select('id, email, email_verified')
+      .eq('id', userId)
+      .single();
+
+    if (userQueryError) {
+      throw userQueryError;
+    }
+
+    const { data: updatedEmployee, error: empQueryError } = await supabase
+      .from('employees')
+      .select('id, email, status, email_verified')
+      .eq('user_id', userId)
+      .single();
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Email verification updated manually',
+      data: {
+        user: updatedUser,
+        employee: updatedEmployee || null,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    logger.error('❌ [DEBUG] Manual email verification failed', { error: (error as Error).message });
+    res.status(500).json({
+      status: 'error',
+      message: 'Manual verification failed',
       error: (error as Error).message
     });
   }
