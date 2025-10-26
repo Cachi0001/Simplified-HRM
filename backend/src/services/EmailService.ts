@@ -362,7 +362,7 @@ export class EmailService {
     }
   }
 
-  async sendTaskCompletionNotification(adminEmail: string, adminName: string, employeeName: string, taskTitle: string): Promise<void> {
+  async sendTaskCompletionNotification(adminEmail: string, adminName: string, employeeName: string, taskTitle: string, completionDate?: string): Promise<void> {
     try {
       const dashboardUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard/tasks`;
 

@@ -20,6 +20,7 @@ import {
   Trash2,
   Bell
 } from 'lucide-react';
+import { notificationService } from '../../services/notificationService';
 
 interface AdminTasksProps {
   darkMode?: boolean;
@@ -93,11 +94,12 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
     mutationFn: async (taskData: any) => {
       return await taskService.createTask(taskData);
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['admin-tasks'] });
       setShowCreateForm(false);
       setNewTask({ title: '', description: '', assigneeId: '', priority: 'medium', dueDate: formatDateInput(tomorrow) });
       addToast('success', 'Task created successfully!');
+
     },
     onError: (error: any) => {
       const errorMessage = error.message || error.response?.data?.message || 'Failed to create task';

@@ -74,8 +74,8 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
     const csvContent = [
       headers.join(','),
       ...report.map(record => [
-        record._id.employeeName || 'Unknown',
-        formatDate(record._id.date),
+        record._id?.employeeName ?? record.employeeName ?? 'Unknown',
+        formatDate(record._id?.date ?? record.date),
         formatTime(record.checkInTime),
         record.checkOutTime ? formatTime(record.checkOutTime) : 'Active',
         record.totalHours ? record.totalHours.toFixed(1) : '0',
@@ -182,7 +182,7 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
           ) : report && report.length > 0 ? (
             <div className="space-y-3">
               {report.map((record, index) => (
-                <div key={`${record._id.employeeId}-${record._id.date}-${index}`} className={`p-4 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
+                <div key={`${record._id?.employeeId ?? record.employeeId ?? index}-${record._id?.date ?? record.date}-${index}`} className={`p-4 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center ${darkMode ? 'bg-gray-600' : 'bg-gray-200'}`}>
@@ -190,10 +190,10 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
                       </div>
                       <div>
                         <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                          {record._id.employeeName || 'Unknown Employee'}
+                          {record._id?.employeeName ?? record.employeeName ?? 'Unknown Employee'}
                         </p>
                         <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                          {formatDate(record._id.date)}
+                          {formatDate(record._id?.date ?? record.date)}
                         </p>
                       </div>
                     </div>

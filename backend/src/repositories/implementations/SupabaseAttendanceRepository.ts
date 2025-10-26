@@ -203,7 +203,7 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
         employee_id: employeeId,
         date: today,
         check_in_time: new Date().toISOString(),
-        status: 'present',
+        status: 'checked_in',
         ...(attendanceData.check_in_location && { check_in_location: attendanceData.check_in_location })
       };
 
@@ -232,7 +232,7 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
       // Update the existing record with check-out time
       const updateData = {
         check_out_time: new Date().toISOString(),
-        status: 'present',
+        status: 'checked_out',
         ...(attendanceData.check_out_location && { check_out_location: attendanceData.check_out_location })
       };
 

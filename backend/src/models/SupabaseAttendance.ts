@@ -7,7 +7,7 @@ export interface IAttendance {
   check_out_time?: string;
   check_in_location?: any;
   check_out_location?: any;
-  status: 'present' | 'absent' | 'late' | 'half_day';
+  status: 'checked_in' | 'checked_out' | 'absent' | 'late' | 'half_day';
   total_hours?: number;
   created_at: string;
   updated_at: string;
@@ -22,14 +22,14 @@ export interface CreateAttendanceRequest {
   };
   check_in_location?: any;
   check_out_location?: any;
-  status?: 'present' | 'absent' | 'late' | 'half_day';
+  status?: 'checked_in' | 'checked_out' | 'absent' | 'late' | 'half_day';
 }
 
 export interface AttendanceQuery {
   employee_id?: string;
   start_date?: string;
   end_date?: string;
-  status?: 'present' | 'absent' | 'late' | 'half_day';
+  status?: 'checked_in' | 'checked_out' | 'absent' | 'late' | 'half_day';
   page?: number;
   limit?: number;
 }
