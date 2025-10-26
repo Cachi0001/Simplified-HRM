@@ -148,8 +148,8 @@ api.interceptors.request.use(
     }
 
     // Special handling for password reset endpoints
-    if (config.url?.includes('/auth/reset-password/') ||
-        config.url?.includes('/auth/forgot-password')) {
+    if (config.url?.includes('auth/reset-password/') ||
+        config.url?.includes('auth/forgot-password')) {
       console.log(`🔑 Password reset request detected [${requestId}]`);
 
       // Set a longer timeout for password reset requests
@@ -242,8 +242,8 @@ api.interceptors.response.use(
     });
     
     // Special handling for password reset endpoints
-    if (response.config.url?.includes('/auth/reset-password/') || 
-        response.config.url?.includes('/auth/forgot-password')) {
+    if (response.config.url?.includes('auth/reset-password/') ||
+        response.config.url?.includes('auth/forgot-password')) {
       console.log(`🔑 Password reset response received [${requestId}]`);
     }
     
@@ -279,8 +279,8 @@ api.interceptors.response.use(
     error.requestId = requestId;
     
     // Special handling for password reset endpoints
-    if (error.config?.url?.includes('/auth/reset-password/') || 
-        error.config?.url?.includes('/auth/forgot-password')) {
+    if (error.config?.url?.includes('auth/reset-password/') ||
+        error.config?.url?.includes('auth/forgot-password')) {
       console.log(`🔑 Password reset request failed [${requestId}] [${errorId}]`);
     }
 
@@ -336,11 +336,11 @@ api.interceptors.response.use(
     // CASE 3: Authentication errors (401)
     if (error.response?.status === 401) {
       // Check if this is a login attempt with unverified email
-      const isLoginAttempt = error.config?.url?.includes('/auth/login') || 
-                            error.config?.url?.includes('/auth/signin');
-      
+      const isLoginAttempt = error.config?.url?.includes('auth/login') ||
+                            error.config?.url?.includes('auth/signin');
+
       // Check for email verification error
-      if (error.response?.data?.message?.includes('verify your email') || 
+      if (error.response?.data?.message?.includes('verify your email') ||
           error.response?.data?.errorType === 'email_not_confirmed') {
         console.log(`🔑 Login attempt with unverified email [${requestId}]`);
         error.message = 'Please verify your email address before logging in.';
@@ -353,7 +353,7 @@ api.interceptors.response.use(
         error.message = 'Your account is pending admin approval. Please wait for approval email.';
         return Promise.reject(error);
       }
-      
+
       // Check if this is a login attempt (we don't want to show session expired for login attempts)
       if (isLoginAttempt) {
         console.log(`🔑 Login attempt failed with 401 [${requestId}]`);
@@ -364,28 +364,28 @@ api.interceptors.response.use(
 
       // For actual session expiration (not during login)
       const message = `Your session has expired. Please log in again. (Error ID: ${errorId})`;
-      
+
       // Check if we've already shown this message to prevent duplicates
       const hasShownExpiredMessage = sessionStorage.getItem('shown_session_expired');
       if (!hasShownExpiredMessage) {
         sessionStorage.setItem('shown_session_expired', 'true');
-        
+
         if (error.response?.data) {
           error.response.data.message = message;
         }
         error.message = message;
-        
+
         // Clear the flag after a delay
         setTimeout(() => {
           sessionStorage.removeItem('shown_session_expired');
         }, 3000);
-        
+
         handleAuthFailure();
       } else {
         // Suppress duplicate message
         console.log('Suppressing duplicate session expired message');
       }
-      
+
       return Promise.reject(error);
     }
 
@@ -401,7 +401,7 @@ api.interceptors.response.use(
     // CASE 5: Not found errors (404)
     else if (error.response?.status === 404) {
       // Check if this is an API endpoint not found or a resource not found
-      if (error.config?.url?.includes('/api/')) {
+      if (error.config?.url?.includes('api/')) {
         applyFriendlyMessage(error, `The requested resource could not be found. Please check your input and try again. (Error ID: ${errorId})`);
       } else {
         applyFriendlyMessage(error, `We couldn't find what you were looking for. Please check the URL and try again. (Error ID: ${errorId})`);

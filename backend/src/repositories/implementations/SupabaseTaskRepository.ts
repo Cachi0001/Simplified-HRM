@@ -94,6 +94,35 @@ export class SupabaseTaskRepository implements ITaskRepository {
 
   async create(taskData: CreateTaskRequest, assignedBy: string): Promise<any> {
     try {
+      // Validate that the assignedBy user exists
+      const { data: creator, error: creatorError } = await this.supabase
+        .from('users')
+        .select('id, email, role')
+        .eq('id', assignedBy)
+        .single();
+
+      if (creatorError || !creator) {
+        throw new Error(`Task creator not found: ${creatorError?.message || 'User does not exist'}`);
+      }
+
+      // Validate that the assignee exists (if provided)
+      if (taskData.assigneeId) {
+        const { data: assignee, error: assigneeError } = await this.supabase
+          .from('employees')
+          .select('id, email, status')
+          .eq('id', taskData.assigneeId)
+          .single();
+
+        if (assigneeError || !assignee) {
+          throw new Error(`Task assignee not found: ${assigneeError?.message || 'Employee does not exist'}`);
+        }
+
+        logger.info('✅ [SupabaseTaskRepository] Task validation passed', {
+          creator: { id: creator.id, email: creator.email, role: creator.role },
+          assignee: { id: assignee.id, email: assignee.email, status: assignee.status }
+        });
+      }
+
       const taskInsertData = {
         ...taskData,
         created_by: assignedBy,

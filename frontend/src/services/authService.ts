@@ -133,8 +133,8 @@ export class AuthService {
       const requestId = `forgot_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
       console.log(`🔑 Requesting password reset for ${email} [Request ID: ${requestId}]`);
 
-      // Ensure proper URL construction without double slashes
-      const forgotUrl = `/auth/forgot-password`;
+      // Use relative URL without leading slash to prevent double slash issues
+      const forgotUrl = `auth/forgot-password`;
       console.log(`🔗 Password reset request URL: ${forgotUrl}`);
 
       const response = await api.post(forgotUrl, { email });
@@ -149,7 +149,7 @@ export class AuthService {
       throw new Error(error.message || 'Failed to send password reset email');
     }
   }
-  
+
   // Complete password reset (with token)
   async completePasswordReset(token: string, newPassword: string): Promise<{ success: boolean; message: string }> {
     try {
@@ -157,8 +157,8 @@ export class AuthService {
       const requestId = `reset_complete_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
       console.log(`🔑 Completing password reset with token [Request ID: ${requestId}]`);
 
-      // Ensure proper URL construction without double slashes
-      const resetUrl = `/auth/reset-password/${token}`;
+      // Use relative URL without leading slash to prevent double slash issues
+      const resetUrl = `auth/reset-password/${token}`;
       console.log(`🔗 Password reset URL: ${resetUrl}`);
 
       const response = await api.post(resetUrl, { newPassword });
