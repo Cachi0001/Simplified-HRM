@@ -62,51 +62,51 @@ const API_BASE_URL = (() => {
   
   // Get environment variables with fallbacks - use direct URLs without relying on proxy
   const devApiUrl = 'http://localhost:3000/api';
-  const prodApiUrl = 'https://go3nethrm-backend.vercel.app/api'; // Fixed: removed trailing slash
-  
+  const prodApiUrl = 'https://go3nethrm-backend.vercel.app/api';
+
   // Log API configuration for debugging
   console.log(`API Configuration:
     - Environment: ${isProduction ? 'Production' : 'Development'}
     - Dev API URL: ${devApiUrl}
     - Prod API URL: ${prodApiUrl}
   `);
-  
+
   // Use production URL in production, localhost URL in development
   let baseUrl = isProduction ? prodApiUrl : devApiUrl;
-  
+
   // If running in a browser, check if we need to override based on hostname
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
-    
+
     // Automatic environment detection based on hostname
     const isVercelDeployment = hostname.includes('vercel.app');
     const isCustomDomain = hostname.includes('go3nethrm.com');
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
-    
+
     // If we're on Vercel or custom domain but using localhost API, switch to production API
     if ((isVercelDeployment || isCustomDomain) && baseUrl.includes('localhost')) {
       console.log('Detected production deployment but using localhost API - switching to production API');
       baseUrl = prodApiUrl;
     }
-    
+
     // If we're on localhost but using production API in dev mode, switch to localhost API
     if (isLocalhost && !isProduction && baseUrl.includes('vercel.app')) {
       console.log('Detected localhost in development mode but using production API - switching to localhost API');
       baseUrl = devApiUrl;
     }
-    
+
     // Special case for preview deployments
     if (isVercelDeployment && hostname !== 'go3nethrm.vercel.app') {
       console.log('Detected Vercel preview deployment');
       // We still use the production API for preview deployments
       baseUrl = prodApiUrl;
     }
-    
+
     console.log(`Final API URL: ${baseUrl} (Host: ${hostname})`);
   }
 
-  // Return the base URL directly - no need to check or append /api
-  return baseUrl;
+  // Ensure no trailing slash to prevent double slash issues
+  return baseUrl.replace(/\/$/, '');
 })();
 
 // Create axios instance with explicit CORS headers
@@ -125,32 +125,40 @@ api.interceptors.request.use(
     // Generate a unique request ID for tracking
     const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
     config.requestId = requestId;
-    
-    // Log request for debugging
-    console.log(`🚀 API Request [${requestId}]: ${config.method?.toUpperCase()} ${config.url}`, {
-      baseURL: config.baseURL,
-      headers: config.headers,
-      data: config.data
-    });
-    
+
+    // Ensure URL doesn't have double slashes by normalizing the path
+    if (config.url) {
+      // Remove leading slash from the URL path to prevent double slashes
+      config.url = config.url.replace(/^\//, '');
+
+      // Log the full URL being constructed for debugging
+      const fullUrl = `${config.baseURL}/${config.url}`;
+      console.log(`🚀 API Request [${requestId}]: ${config.method?.toUpperCase()} ${fullUrl}`, {
+        baseURL: config.baseURL,
+        url: config.url,
+        headers: config.headers,
+        data: config.data
+      });
+    }
+
     // Add auth token if available
     const token = localStorage.getItem('accessToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    
+
     // Special handling for password reset endpoints
-    if (config.url?.includes('/auth/reset-password/') || 
+    if (config.url?.includes('/auth/reset-password/') ||
         config.url?.includes('/auth/forgot-password')) {
       console.log(`🔑 Password reset request detected [${requestId}]`);
-      
+
       // Set a longer timeout for password reset requests
       config.timeout = 15000; // 15 seconds
-      
+
       // Add specific Accept header to handle potential non-JSON responses
       config.headers.Accept = 'application/json, text/plain, */*';
     }
-    
+
     return config;
   },
   (error) => {

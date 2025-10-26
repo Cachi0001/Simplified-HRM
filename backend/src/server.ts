@@ -108,56 +108,76 @@ app.use(helmet({
       imgSrc: ["'self'", "data:", "https:"],
     },
   },
-  crossOriginEmbedderPolicy: false, // Disable for API responses
+  crossOriginEmbedderPolicy: false, // CORS configuration - MUST come first before any other middleware
 }));
 
 app.use((req: Request, res: Response, next: NextFunction) => {
-  const startTime = Date.now();
-  const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  (req as any).requestId = requestId;
-  const origin = req.headers.origin || 'No origin';
-  const forwardedFor = req.headers['x-forwarded-for'] || 'Not set';
-  const userAgent = req.headers['user-agent'] || 'Not set';
-  console.log('Incoming request', {
-    requestId,
-    method: req.method,
-    url: req.originalUrl,
-    origin,
-    host: req.headers.host || 'No host',
-    ip: req.ip,
-    forwardedFor,
-    userAgent
+  const origin = req.headers.origin;
+
+  // Define allowed origins - be more permissive for debugging
+  const allowedOrigins = [
+    'https://go3nethrm.vercel.app',
+    'https://go3nethrm.com',
+    'https://www.go3nethrm.com',
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:3000'
+  ];
+
+  // Check if origin is allowed (more permissive matching)
+  const isAllowedOrigin = !origin || allowedOrigins.some(allowed => {
+    const cleanOrigin = origin.replace(/^https?:\/\//, '').toLowerCase();
+    const cleanAllowed = allowed.replace(/^https?:\/\//, '').toLowerCase();
+    return cleanOrigin === cleanAllowed || cleanOrigin.endsWith('.' + cleanAllowed);
   });
-  logger.info('Incoming request', {
-    requestId,
-    method: req.method,
-    url: req.originalUrl,
-    origin,
-    host: req.headers.host || 'No host',
-    ip: req.ip,
-    forwardedFor,
-    userAgent
-  });
-  res.on('finish', () => {
-    const duration = Date.now() - startTime;
-    const contentLength = res.getHeader('content-length') || 'Not set';
-    console.log('Request completed', {
-      requestId,
-      method: req.method,
-      url: req.originalUrl,
-      status: res.statusCode,
-      duration,
-      contentLength
+
+  if (isAllowedOrigin) {
+    res.header('Access-Control-Allow-Origin', origin || '*');
+    res.header('Vary', 'Origin');
+  } else {
+    // Log rejected origins for debugging
+    console.log('❌ CORS: Rejected origin', {
+      origin,
+      allowedOrigins,
+      timestamp: new Date().toISOString()
     });
-    logger.info('Request completed', {
-      requestId,
-      method: req.method,
-      url: req.originalUrl,
-      status: res.statusCode,
-      duration,
-      contentLength
+    logger.warn('❌ CORS: Rejected origin', {
+      origin,
+      allowedOrigins,
+      timestamp: new Date().toISOString()
     });
-  });
+  }
+
+  // Enhanced CORS headers for password reset and other requests
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Access-Control-Request-Method, Access-Control-Request-Headers, X-Forwarded-For, Cache-Control');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Max-Age', '86400'); // Cache preflight for 24 hours
+
+  // Handle preflight requests - must come before any other middleware
+  if (req.method === 'OPTIONS') {
+    console.log('🔄 CORS: Handling preflight request', {
+      origin,
+      method: req.headers['access-control-request-method'],
+      headers: req.headers['access-control-request-headers'],
+      url: req.originalUrl,
+      timestamp: new Date().toISOString(),
+      userAgent: req.headers['user-agent']
+    });
+    logger.info('🔄 CORS: Handling preflight request', {
+      origin,
+      method: req.headers['access-control-request-method'],
+      headers: req.headers['access-control-request-headers'],
+      url: req.originalUrl,
+      timestamp: new Date().toISOString()
+    });
+
+    // Immediately respond to preflight without calling next()
+    res.status(200).end();
+    return;
+  }
+
   next();
 });
 

@@ -26,6 +26,19 @@ router.post('/refresh', authenticateToken, (req, res) => authController.refreshT
 router.post('/signout', (req, res) => authController.signOut(req, res));
 router.post('/forgot-password', (req, res) => authController.resetPassword(req, res));
 router.post('/reset-password/:token', (req, res) => authController.resetPasswordWithToken(req, res));
+
+// Handle OPTIONS requests for password reset routes
+router.options('/forgot-password', (req, res) => {
+  console.log('🔑 Password reset forgot-password OPTIONS request');
+  res.status(200).end();
+});
+
+router.options('/reset-password/:token', (req, res) => {
+  console.log('🔑 Password reset with token OPTIONS request', {
+    token: req.params.token ? 'PRESENT' : 'MISSING'
+  });
+  res.status(200).end();
+});
 router.put('/update-password', (req, res) => authController.updatePassword(req, res));
 router.get('/debug/tokens', async (req, res) => {
   try {
