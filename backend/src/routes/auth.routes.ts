@@ -67,6 +67,96 @@ router.get('/debug/tokens', async (req, res) => {
   }
 });
 
+// Debug endpoint to fix email verification mismatch between users and employees tables
+router.post('/debug/fix-email-verification/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    logger.info('🔧 [DEBUG] Fixing email verification mismatch', { userId });
+
+    const supabase = authRepository.getSupabaseClient();
+
+    // Get current employee status
+    const { data: employee, error: empError } = await supabase
+      .from('employees')
+      .select('id, email, status, email_verified')
+      .eq('user_id', userId)
+      .single();
+
+    if (empError || !employee) {
+      throw new Error(`Employee not found: ${empError?.message}`);
+    }
+
+    // Update users table to match employee table
+    const { error: userError } = await supabase
+      .from('users')
+      .update({
+        email_verified: employee.email_verified,
+        email_verification_token: employee.email_verified ? null : undefined,
+        email_verification_expires: employee.email_verified ? null : undefined,
+      })
+      .eq('id', userId);
+
+    if (userError) {
+      throw new Error(`Failed to update user: ${userError.message}`);
+    }
+
+    // Update employees table to match (in case it's not verified)
+    if (!employee.email_verified) {
+      const { error: empUpdateError } = await supabase
+        .from('employees')
+        .update({
+          email_verified: true,
+          email_verification_token: null,
+          email_verification_expires: null,
+        })
+        .eq('user_id', userId);
+
+      if (empUpdateError) {
+        logger.warn('⚠️ [DEBUG] Failed to update employee verification:', empUpdateError);
+      }
+    }
+
+    // Get final state
+    const { data: finalUser, error: finalUserError } = await supabase
+      .from('users')
+      .select('id, email, email_verified')
+      .eq('id', userId)
+      .single();
+
+    const { data: finalEmployee, error: finalEmpError } = await supabase
+      .from('employees')
+      .select('id, email, status, email_verified')
+      .eq('user_id', userId)
+      .single();
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Email verification mismatch fixed',
+      data: {
+        user: finalUser,
+        employee: finalEmployee,
+        timestamp: new Date().toISOString()
+      }
+    });
+
+    logger.info('✅ [DEBUG] Email verification mismatch fixed successfully', {
+      userId,
+      userEmailVerified: finalUser?.email_verified,
+      employeeEmailVerified: finalEmployee?.email_verified,
+      employeeStatus: finalEmployee?.status
+    });
+
+  } catch (error) {
+    logger.error('❌ [DEBUG] Fix email verification mismatch failed', { error: (error as Error).message });
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to fix email verification mismatch',
+      error: (error as Error).message
+    });
+  }
+});
+
 // Debug endpoint to manually update email verification
 router.post('/debug/verify-email/:userId', async (req, res) => {
   try {

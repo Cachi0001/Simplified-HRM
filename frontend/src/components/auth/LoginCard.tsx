@@ -57,14 +57,6 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
         fullResponse: response
       });
 
-      // Check if email verification is required
-      if (response.data.requiresEmailVerification) {
-        setShowResendButton(true);
-        addToast('info', response.data.message || 'Please verify your email before logging in');
-        setIsLoading(false);
-        return;
-      }
-
       // Redirect based on user role with immediate navigation
       if (user.role === 'admin') {
         addToast('success', 'Login successful! Redirecting to dashboard...');
@@ -147,10 +139,6 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
         return; // Exit early - don't continue with error flow
       } else if (errorMessage.includes('Account not found')) {
         addToast('error', 'Account not found. Please check your email or contact support.');
-      } else if (errorMessage.includes('Please verify your email') || errorMessage.includes('verify your email')) {
-        setShowResendButton(true);
-        addToast('info', 'Please verify your email address before logging in. Check your inbox for the confirmation link.');
-        return;
       } else {
         addToast('error', errorMessage);
       }

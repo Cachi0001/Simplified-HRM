@@ -132,9 +132,13 @@ export class AuthService {
       // Generate a unique request ID for tracking
       const requestId = `forgot_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
       console.log(`🔑 Requesting password reset for ${email} [Request ID: ${requestId}]`);
-      
-      const response = await api.post('/auth/forgot-password', { email });
-      
+
+      // Ensure proper URL construction without double slashes
+      const forgotUrl = `/auth/forgot-password`;
+      console.log(`🔗 Password reset request URL: ${forgotUrl}`);
+
+      const response = await api.post(forgotUrl, { email });
+
       console.log(`✅ Password reset email sent successfully [Request ID: ${requestId}]`);
       return {
         success: true,
@@ -152,9 +156,13 @@ export class AuthService {
       // Generate a unique request ID for tracking
       const requestId = `reset_complete_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
       console.log(`🔑 Completing password reset with token [Request ID: ${requestId}]`);
-      
-      const response = await api.post(`/auth/reset-password/${token}`, { newPassword });
-      
+
+      // Ensure proper URL construction without double slashes
+      const resetUrl = `/auth/reset-password/${token}`;
+      console.log(`🔗 Password reset URL: ${resetUrl}`);
+
+      const response = await api.post(resetUrl, { newPassword });
+
       console.log(`✅ Password reset completed successfully [Request ID: ${requestId}]`);
       return {
         success: true,

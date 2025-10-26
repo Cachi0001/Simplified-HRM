@@ -165,12 +165,6 @@ export class SupabaseAuthRepository implements IAuthRepository {
         role: user.role
       });
 
-      // Check if email is verified
-      if (!user.email_verified) {
-        logger.warn('❌ [SupabaseAuthRepository] Email not verified', { email: credentials.email });
-        throw new Error('Please verify your email before logging in');
-      }
-
       // Check if employee is approved (admin users bypass this check)
       if (user.role !== 'admin' && employee.status !== 'active') {
         logger.warn('❌ [SupabaseAuthRepository] Employee not approved', {
