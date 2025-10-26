@@ -131,20 +131,34 @@ export class SupabaseEmployeeRepository {
 
   async updateEmailVerification(userId: string, verified: boolean): Promise<void> {
     try {
-      const { error } = await this.supabase
+      // Update both users and employees tables for email verification
+      const { error: userError } = await this.supabase
+        .from('users')
+        .update({
+          email_verified: verified,
+          email_verification_token: verified ? null : undefined,
+          email_verification_expires: verified ? null : undefined,
+        })
+        .eq('id', userId);
+
+      if (userError) {
+        throw new Error(`Failed to update user email verification: ${userError.message}`);
+      }
+
+      const { error: empError } = await this.supabase
         .from('employees')
         .update({
           email_verified: verified,
           email_verification_token: verified ? null : undefined,
-          email_verification_expires: verified ? null : undefined
+          email_verification_expires: verified ? null : undefined,
         })
         .eq('user_id', userId);
 
-      if (error) {
-        throw new Error(`Failed to update email verification: ${error.message}`);
+      if (empError) {
+        throw new Error(`Failed to update employee email verification: ${empError.message}`);
       }
 
-      logger.info('✅ [SupabaseEmployeeRepository] Email verification updated', { userId, verified });
+      logger.info('✅ [SupabaseEmployeeRepository] Email verification updated for both tables', { userId, verified });
     } catch (error) {
       logger.error('❌ [SupabaseEmployeeRepository] Update email verification failed:', error);
       throw error;

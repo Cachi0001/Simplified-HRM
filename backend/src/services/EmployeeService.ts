@@ -186,6 +186,8 @@ export class EmployeeService {
       const updatedEmployee = await this.employeeRepository.approve(id);
 
       // CRITICAL: Also mark the user's email as verified so they can login
+      await this.employeeRepository.updateEmailVerification(employee.userId, true);
+
       logger.info('✅ User emailVerified set to true after approval', {
         userId: employee.userId,
         employeeId: id

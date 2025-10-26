@@ -193,7 +193,7 @@ class NotificationService {
       } else if (user.role === 'employee') {
         // EMPLOYEE: Check if employee is approved and show welcome notification
         try {
-          // Check employee status
+          // Check employee status via notifications endpoint or keep existing logic
           const employeeResponse = await api.get(`/employees/me`);
           const employee = employeeResponse.data.data?.employee;
 

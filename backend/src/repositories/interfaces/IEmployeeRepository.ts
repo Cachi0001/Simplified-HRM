@@ -12,4 +12,5 @@ export interface IEmployeeRepository {
   approve(id: string): Promise<IEmployee>;
   getEmployeeStats(): Promise<{ total: number; active: number; pending: number; rejected: number }>;
   assignDepartment(id: string, department: string): Promise<IEmployee>;
+  updateEmailVerification(userId: string, verified: boolean): Promise<void>;
 }

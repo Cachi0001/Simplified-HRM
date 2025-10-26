@@ -17,7 +17,35 @@ export class TaskService {
     return userId;
   }
 
-  async createTask(taskData: CreateTaskRequest, assignedBy: string, currentUserRole: string): Promise<ITask> {
+  // Helper method to map frontend fields to database fields
+  private mapFrontendToDatabase(taskData: CreateTaskRequest): any {
+    return {
+      title: taskData.title,
+      description: taskData.description,
+      assigned_to: taskData.assigneeId, // Map assigneeId to assigned_to
+      priority: taskData.priority || 'medium',
+      due_date: taskData.dueDate, // Map dueDate to due_date
+    };
+  }
+
+  // Helper method to map database fields to frontend fields
+  private mapDatabaseToFrontend(task: ITask): any {
+    return {
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      assigneeId: task.assigned_to, // Map assigned_to to assigneeId
+      assignedBy: task.created_by, // Map created_by to assignedBy
+      status: task.status,
+      priority: task.priority,
+      dueDate: task.due_date.toISOString(), // Map due_date to dueDate
+      completedAt: task.completed_at?.toISOString(), // Map completed_at to completedAt
+      createdAt: task.created_at.toISOString(), // Map created_at to createdAt
+      updatedAt: task.updated_at.toISOString(), // Map updated_at to updatedAt
+    };
+  }
+
+  async createTask(taskData: CreateTaskRequest, assignedBy: string, currentUserRole: string): Promise<any> {
     try {
       if (currentUserRole !== 'admin') {
         throw new Error('Only administrators can assign tasks');
@@ -29,7 +57,9 @@ export class TaskService {
         throw new Error('Title, assignee ID, and due date are required');
       }
 
-      const task = await this.taskRepository.create(taskData, assignedBy);
+      // Map frontend fields to database fields
+      const mappedTaskData = this.mapFrontendToDatabase(taskData);
+      const task = await this.taskRepository.create(mappedTaskData, assignedBy);
 
       // Send task assignment notification email
       try {
@@ -53,14 +83,16 @@ export class TaskService {
       }
 
       logger.info('TaskService: Task created successfully', { taskId: task.id });
-      return task;
+
+      // Map database format back to frontend format
+      return this.mapDatabaseToFrontend(task);
     } catch (error) {
       logger.error('TaskService: Create task failed', { error: (error as Error).message });
       throw error;
     }
   }
 
-  async getAllTasks(query?: TaskQuery, currentUserRole?: string, currentUserId?: string): Promise<{ tasks: ITask[]; total: number; page: number; limit: number }> {
+  async getAllTasks(query?: TaskQuery, currentUserRole?: string, currentUserId?: string): Promise<{ tasks: any[]; total: number; page: number; limit: number }> {
     try {
       logger.info('TaskService: Getting all tasks', { role: currentUserRole });
 
@@ -72,14 +104,24 @@ export class TaskService {
         query = { ...query, assigned_to: employeeId };
       }
 
-      return await this.taskRepository.findAll(query);
+      const result = await this.taskRepository.findAll(query);
+
+      // Map database format to frontend format
+      const mappedTasks = result.tasks.map(task => this.mapDatabaseToFrontend(task));
+
+      return {
+        tasks: mappedTasks,
+        total: result.total,
+        page: result.page,
+        limit: result.limit
+      };
     } catch (error) {
       logger.error('TaskService: Get all tasks failed', { error: (error as Error).message });
       throw error;
     }
   }
 
-  async getTaskById(id: string, currentUserRole: string, currentUserId?: string): Promise<ITask | null> {
+  async getTaskById(id: string, currentUserRole: string, currentUserId?: string): Promise<any> {
     try {
       const task = await this.taskRepository.findById(id);
 
@@ -94,27 +136,31 @@ export class TaskService {
         }
       }
 
-      return task;
+      // Map database format to frontend format
+      return this.mapDatabaseToFrontend(task);
     } catch (error) {
       logger.error('TaskService: Get task by ID failed', { error: (error as Error).message });
       throw error;
     }
   }
 
-  async getMyTasks(userId: string): Promise<ITask[]> {
+  async getMyTasks(userId: string): Promise<any[]> {
     try {
       const employeeId = await this.resolveEmployeeId(userId);
       if (!employeeId) {
         return [];
       }
-      return await this.taskRepository.findByAssignee(employeeId);
+      const tasks = await this.taskRepository.findByAssignee(employeeId);
+
+      // Map database format to frontend format
+      return tasks.map(task => this.mapDatabaseToFrontend(task));
     } catch (error) {
       logger.error('TaskService: Get my tasks failed', { error: (error as Error).message });
       throw error;
     }
   }
 
-  async updateTask(id: string, taskData: UpdateTaskRequest, currentUserRole: string, currentUserId?: string): Promise<ITask> {
+  async updateTask(id: string, taskData: UpdateTaskRequest, currentUserRole: string, currentUserId?: string): Promise<any> {
     try {
       const existingTask = await this.taskRepository.findById(id);
       if (!existingTask) {
@@ -139,17 +185,25 @@ export class TaskService {
         taskData = filteredData;
       }
 
-      const updatedTask = await this.taskRepository.update(id, taskData);
+      // Map frontend fields to database fields for updates
+      const mappedUpdateData: any = {};
+      if (taskData.title) mappedUpdateData.title = taskData.title;
+      if (taskData.description !== undefined) mappedUpdateData.description = taskData.description;
+      if (taskData.status) mappedUpdateData.status = taskData.status;
+      if (taskData.priority) mappedUpdateData.priority = taskData.priority;
+      if (taskData.dueDate) mappedUpdateData.due_date = taskData.dueDate;
 
-      logger.info('TaskService: Task updated successfully', { taskId: id });
-      return updatedTask;
+      const updatedTask = await this.taskRepository.update(id, mappedUpdateData);
+
+      // Map database format back to frontend format
+      return this.mapDatabaseToFrontend(updatedTask);
     } catch (error) {
       logger.error('TaskService: Update task failed', { error: (error as Error).message });
       throw error;
     }
   }
 
-  async updateTaskStatus(id: string, status: 'pending' | 'in_progress' | 'completed' | 'cancelled', currentUserRole: string, currentUserId?: string): Promise<ITask> {
+  async updateTaskStatus(id: string, status: 'pending' | 'in_progress' | 'completed' | 'cancelled', currentUserRole: string, currentUserId?: string): Promise<any> {
     try {
       const existingTask = await this.taskRepository.findById(id);
       if (!existingTask) {
@@ -193,7 +247,9 @@ export class TaskService {
       }
 
       logger.info('TaskService: Task status updated successfully', { taskId: id, status });
-      return updatedTask;
+
+      // Map database format back to frontend format
+      return this.mapDatabaseToFrontend(updatedTask);
     } catch (error) {
       logger.error('TaskService: Update task status failed', { error: (error as Error).message });
       throw error;
@@ -220,7 +276,7 @@ export class TaskService {
     }
   }
 
-  async searchTasks(query: string, currentUserRole?: string, currentUserId?: string): Promise<ITask[]> {
+  async searchTasks(query: string, currentUserRole?: string, currentUserId?: string): Promise<any[]> {
     try {
       logger.info('TaskService: Searching tasks', { query, role: currentUserRole });
 
@@ -230,13 +286,19 @@ export class TaskService {
           return [];
         }
         const myTasks = await this.taskRepository.findByAssignee(employeeId);
-        return myTasks.filter(task =>
+        const filteredTasks = myTasks.filter(task =>
           task.title.toLowerCase().includes(query.toLowerCase()) ||
           (task.description && task.description.toLowerCase().includes(query.toLowerCase()))
         );
+
+        // Map database format to frontend format
+        return filteredTasks.map(task => this.mapDatabaseToFrontend(task));
       }
 
-      return await this.taskRepository.search(query);
+      const tasks = await this.taskRepository.search(query);
+
+      // Map database format to frontend format
+      return tasks.map(task => this.mapDatabaseToFrontend(task));
     } catch (error) {
       logger.error('TaskService: Search tasks failed', { error: (error as Error).message });
       throw error;

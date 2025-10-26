@@ -112,7 +112,7 @@ const API_BASE_URL = (() => {
 // Create axios instance with explicit CORS headers
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 15000, // Increased timeout to 15 seconds
   headers: {
     'Content-Type': 'application/json',
   },
@@ -279,14 +279,14 @@ api.interceptors.response.use(
     // CASE 1: Network errors (no response from server)
     if (!error.response) {
       // Check for specific network error types
-      if (error.message.includes('Network Error')) {
-        error.message = `Cannot connect to the server. Please check your internet connection and try again. (Error ID: ${errorId})`;
-      } else if (error.message.includes('timeout')) {
-        error.message = `Request timed out. The server is taking too long to respond. Please try again later. (Error ID: ${errorId})`;
+      if (error.message.includes('Network Error') || error.message.includes('ERR_NETWORK')) {
+        error.message = `🌐 No internet connection detected. Please check your network and try again. (Error ID: ${errorId})`;
+      } else if (error.message.includes('timeout') || error.code === 'ECONNABORTED') {
+        error.message = `⏰ Request timed out. The server is taking too long to respond. Please check your connection and try again. (Error ID: ${errorId})`;
       } else if (error.message.includes('CORS')) {
-        error.message = `Cross-origin request blocked. This is a technical issue. Please contact support with Error ID: ${errorId}`;
+        error.message = `🔒 Cross-origin request blocked. This is a technical issue. Please contact support with Error ID: ${errorId}`;
       } else {
-        error.message = `Network error. Please check your connection and try again. (Error ID: ${errorId})`;
+        error.message = `🌐 Network error occurred. Please check your internet connection and try again. (Error ID: ${errorId})`;
       }
       return Promise.reject(error);
     }
@@ -478,7 +478,7 @@ export interface Employee {
   id: string;
   userId: string;
   email: string;
-  fullName: string;
+  fullName: string; // Backend maps full_name to fullName
   role: 'admin' | 'employee';
   department?: string;
   position?: string;

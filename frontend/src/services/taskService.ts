@@ -4,14 +4,14 @@ export interface Task {
   id: string;
   title: string;
   description?: string;
-  assigneeId: string;
-  assignedBy: string;
+  assigned_to: string; // Changed from assigneeId to match Supabase schema
+  created_by: string; // Changed from assignedBy to match Supabase schema
   status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
   priority: 'low' | 'medium' | 'high';
-  dueDate: string;
-  completedAt?: string;
-  createdAt: string;
-  updatedAt: string;
+  due_date: string; // Changed from dueDate to match Supabase schema
+  completed_at?: string; // Changed from completedAt to match Supabase schema
+  created_at: string; // Changed from createdAt to match Supabase schema
+  updated_at: string; // Changed from updatedAt to match Supabase schema
 }
 
 export interface CreateTaskRequest {
@@ -31,8 +31,8 @@ export interface UpdateTaskRequest {
 }
 
 export interface TaskQuery {
-  assigneeId?: string;
-  assignedBy?: string;
+  assigned_to?: string; // Changed from assigneeId to match Supabase schema
+  assignedBy?: string; // Changed from assignedBy to match Supabase schema
   status?: 'pending' | 'in_progress' | 'completed' | 'cancelled';
   priority?: 'low' | 'medium' | 'high';
   page?: number;
@@ -75,14 +75,14 @@ const normalizeTask = (task: any): Task => ({
   id: extractId(task?._id ?? task?.id ?? ''),
   title: task?.title ?? '',
   description: task?.description ?? undefined,
-  assigneeId: extractId(task?.assigneeId ?? ''),
-  assignedBy: extractId(task?.assignedBy ?? ''),
+  assigned_to: extractId(task?.assigned_to ?? task?.assigneeId ?? ''),
+  created_by: extractId(task?.created_by ?? task?.assignedBy ?? ''),
   status: task?.status ?? 'pending',
   priority: task?.priority ?? 'medium',
-  dueDate: toIsoString(task?.dueDate ?? new Date().toISOString()),
-  completedAt: task?.completedAt ? toIsoString(task.completedAt) : undefined,
-  createdAt: toIsoString(task?.createdAt ?? new Date().toISOString()),
-  updatedAt: toIsoString(task?.updatedAt ?? new Date().toISOString())
+  due_date: toIsoString(task?.due_date ?? task?.dueDate ?? new Date().toISOString()),
+  completed_at: task?.completed_at ? toIsoString(task.completed_at) : task?.completedAt ? toIsoString(task.completedAt) : undefined,
+  created_at: toIsoString(task?.created_at ?? task?.createdAt ?? new Date().toISOString()),
+  updated_at: toIsoString(task?.updated_at ?? task?.updatedAt ?? new Date().toISOString())
 });
 
 class TaskService {
@@ -97,8 +97,8 @@ class TaskService {
 
   async getAllTasks(query?: TaskQuery): Promise<{ tasks: Task[]; total: number; page: number; limit: number }> {
     const params = new URLSearchParams();
-    if (query?.assigneeId) params.append('assigneeId', query.assigneeId);
-    if (query?.assignedBy) params.append('assignedBy', query.assignedBy);
+    if (query?.assigned_to) params.append('assigned_to', query.assigned_to);
+    if (query?.assignedBy) params.append('created_by', query.assignedBy);
     if (query?.status) params.append('status', query.status);
     if (query?.priority) params.append('priority', query.priority);
     if (query?.page) params.append('page', query.page.toString());
