@@ -154,7 +154,17 @@ export class SupabaseAuthRepository implements IAuthRepository {
         throw new Error('Invalid email or password');
       }
 
-      const employee = user.employees;
+      const employeeRecords = Array.isArray(user.employees) ? user.employees : [user.employees].filter(Boolean);
+      const employee = employeeRecords[0];
+
+      if (!employee) {
+        logger.error('❌ [SupabaseAuthRepository] Employee record not found for user', {
+          userId: user.id,
+          email: user.email,
+          role: user.role
+        });
+        throw new Error('Employee record not found. Please contact support.');
+      }
 
       logger.info('🔍 [SupabaseAuthRepository] Signin validation check:', {
         userId: user.id,
@@ -165,7 +175,6 @@ export class SupabaseAuthRepository implements IAuthRepository {
         role: user.role
       });
 
-      // Check if employee is approved (admin users bypass this check)
       if (user.role !== 'admin' && employee.status !== 'active') {
         logger.warn('❌ [SupabaseAuthRepository] Employee not approved', {
           email: credentials.email,
@@ -176,7 +185,6 @@ export class SupabaseAuthRepository implements IAuthRepository {
           userEmailVerified: user.email_verified,
           employeeEmailVerified: employee.email_verified
         });
-        // Return a special response for pending approval instead of throwing
         const error: any = new Error('Your account is pending approval. Please wait for admin approval before logging in.');
         error.code = 'PENDING_APPROVAL';
         error.status = employee.status;
@@ -906,14 +914,16 @@ export class SupabaseAuthRepository implements IAuthRepository {
   }
 
   private mapSupabaseUserToInterface(user: any, employee: any): IUser {
+    const employeeRecord = Array.isArray(employee) ? employee[0] : employee;
+
     return {
       _id: user.id,
       email: user.email,
-      password: '', // Not returned for security
+      password: '',
       fullName: user.full_name,
       role: user.role,
-      status: employee?.status || 'pending', // Include employee status
-      emailVerified: user.email_verified,
+      status: employeeRecord?.status || 'pending',
+      emailVerified: user.email_verified ?? employeeRecord?.email_verified ?? false,
       passwordHash: user.password_hash,
       emailVerificationToken: user.email_verification_token,
       emailVerificationExpires: user.email_verification_expires ? new Date(user.email_verification_expires) : undefined,
@@ -923,8 +933,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
       createdAt: new Date(user.created_at),
       updatedAt: new Date(user.updated_at),
 
-      // Methods (these would need to be implemented differently for Supabase)
-      comparePassword: async () => false, // Not used in Supabase context
+      comparePassword: async () => false,
       generateEmailVerificationToken: () => '',
       generatePasswordResetToken: () => '',
       isValidPasswordResetToken: () => false,
