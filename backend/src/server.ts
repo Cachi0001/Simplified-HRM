@@ -33,6 +33,7 @@ import notificationRoutes from './routes/notification.routes';
 import leaveRoutes from './routes/leave.routes';
 import purchaseRoutes from './routes/purchase.routes';
 import chatRoutes from './routes/chat.routes';
+import typingRoutes from './routes/typing.routes';
 import announcementRoutes from './routes/announcement.routes';
 import supabaseConfig from './config/supabase';
 
@@ -198,6 +199,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/leave', leaveRoutes);
 app.use('/api/purchase', purchaseRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/typing', typingRoutes);
 app.use('/api/announcements', announcementRoutes);
 
 // Health check endpoint
