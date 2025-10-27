@@ -44,3 +44,28 @@ export interface PushNotificationPayload {
   requireInteraction?: boolean;
   silent?: boolean;
 }
+
+// Database notification types
+export type DatabaseNotificationType = 'chat' | 'leave' | 'purchase' | 'task' | 'birthday' | 'checkout' | 'announcement';
+
+export interface DatabaseNotification {
+  id: string;
+  user_id: string;
+  type: DatabaseNotificationType;
+  title: string;
+  message: string;
+  related_id?: string;
+  action_url?: string;
+  is_read: boolean;
+  created_at: string;
+  expires_at: string;
+}
+
+export interface CreateNotificationRequest {
+  userId: string;
+  type: DatabaseNotificationType;
+  title: string;
+  message: string;
+  relatedId?: string;
+  actionUrl?: string;
+}
