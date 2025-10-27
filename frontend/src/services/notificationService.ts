@@ -10,6 +10,34 @@ class NotificationService {
     this.vapidPublicKey = (import.meta as any).env?.VITE_VAPID_PUBLIC_KEY || '';
   }
 
+  private getReadStorageKey(userId: string) {
+    return `read-notifications:${userId}`;
+  }
+
+  private getReadNotificationIds(userId: string): string[] {
+    try {
+      const stored = localStorage.getItem(this.getReadStorageKey(userId));
+      if (!stored) {
+        return [];
+      }
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((id): id is string => typeof id === 'string');
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  }
+
+  private saveReadNotificationIds(userId: string, ids: string[]) {
+    try {
+      localStorage.setItem(this.getReadStorageKey(userId), JSON.stringify(Array.from(new Set(ids))));
+    } catch {
+      /* noop */
+    }
+  }
+
   static getInstance(): NotificationService {
     if (!NotificationService.instance) {
       NotificationService.instance = new NotificationService();
@@ -147,8 +175,26 @@ class NotificationService {
   }
 
   async markNotificationAsRead(notificationId: string): Promise<void> {
-    // For MongoDB implementation, this would call the API
-    console.log('Marking notification as read:', notificationId);
+    const currentUserRaw = localStorage.getItem('user');
+    if (!currentUserRaw) {
+      return;
+    }
+
+    try {
+      const currentUser = JSON.parse(currentUserRaw);
+      const userId = currentUser?.id || currentUser?._id;
+      if (!userId) {
+        return;
+      }
+
+      const existing = this.getReadNotificationIds(userId);
+      if (!existing.includes(notificationId)) {
+        existing.push(notificationId);
+        this.saveReadNotificationIds(userId, existing);
+      }
+    } catch {
+      /* noop */
+    }
   }
 
   async getNotifications(userId?: string): Promise<Go3netNotification[]> {
@@ -163,6 +209,7 @@ class NotificationService {
 
       const user = JSON.parse(currentUser);
       const effectiveUserId = userId || user?.id || user?._id;
+      const readIds = effectiveUserId ? this.getReadNotificationIds(effectiveUserId) : [];
 
       if (user.role === 'admin') {
         // ADMIN: Fetch pending approvals
@@ -173,14 +220,15 @@ class NotificationService {
 
           // Create notifications for each pending approval
           pendingEmployees.forEach((emp: any, index: number) => {
+            const id = `pending-${emp.id || emp._id}-${Date.now()}-${index}`;
             allNotifications.push({
-              id: `pending-${emp.id || emp._id}-${Date.now()}-${index}`,
+              id,
               type: 'info' as NotificationType,
               priority: 'normal',
               title: 'New Employee Signup',
               message: `${emp.fullName} (${emp.email}) requires approval`,
               timestamp: new Date(emp.createdAt || Date.now()),
-              read: false,
+              read: readIds.includes(id),
               targetUserId: emp.id || emp._id,
               actions: [{ label: 'Review', action: 'review', url: '/dashboard#pending-approvals' }],
               source: 'system',
@@ -210,7 +258,7 @@ class NotificationService {
                 title: 'Welcome to Go3net!',
                 message: `Your account has been approved! You can now access all features.`,
                 timestamp: new Date(),
-                read: false,
+                read: readIds.includes(welcomeNotificationId),
                 targetUserId: user.id,
                 actions: [{ label: 'Get Started', action: 'login', url: '/auth' }],
                 source: 'system',
@@ -233,14 +281,15 @@ class NotificationService {
           tasks
             .filter((task: any) => ['pending', 'in_progress'].includes(task.status))
             .forEach((task: any, index: number) => {
+              const id = `task-${task.id || task._id}-${index}`;
               allNotifications.push({
-                id: `task-${task.id || task._id}-${index}`,
+                id,
                 type: 'info' as NotificationType,
                 priority: task.priority === 'high' ? 'high' : 'normal',
                 title: 'New Task Assigned',
                 message: `You have been assigned: ${task.title}`,
                 timestamp: new Date(task.createdAt || Date.now()),
-                read: false,
+                read: readIds.includes(id),
                 targetUserId: effectiveUserId,
                 actions: [{ label: 'View Task', action: 'view', url: '/employee-dashboard#tasks' }],
                 source: 'system',

@@ -28,7 +28,7 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
   });
 
   // Fetch attendance report
-  const { data: report, isLoading: reportLoading, refetch } = useQuery({
+  const { data: report, isLoading: reportLoading, isFetching: reportFetching, refetch } = useQuery({
     queryKey: ['attendance-report', selectedEmployee || 'all', startDate || 'none', endDate || 'none'],
     queryFn: async () => {
       // Set default date range to last 5 days if no dates are selected
@@ -173,8 +173,8 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
             </div>
 
             <div className="flex flex-col sm:flex-row items-stretch gap-2">
-              <Button onClick={() => refetch()} className="flex-1 min-h-[40px]" isLoading={reportLoading}>
-                <RefreshCw className={`h-4 w-4 mr-2 ${reportLoading ? 'animate-spin' : ''}`} />
+              <Button onClick={() => refetch()} className="flex-1 min-h-[40px]" isLoading={reportFetching}>
+                <RefreshCw className={`h-4 w-4 mr-2 ${reportFetching ? 'animate-spin' : ''}`} />
                 Refresh
               </Button>
               <Button onClick={exportReport} className="flex-1 min-h-[40px]">

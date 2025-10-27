@@ -29,19 +29,17 @@ export function NotificationBell({ darkMode = false }: NotificationBellProps) {
     queryFn: async () => {
       return await notificationService.getNotifications();
     },
-    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchInterval: 30000,
   });
 
   const handleNotificationClick = async (notification: any) => {
-    // Mark as read using the service
     await notificationService.markNotificationAsRead(notification.id);
 
-    // Update local state
     notification.read = true;
-    refetch();
+    void refetch();
+    localStorage.setItem('notifications:lastInteraction', Date.now().toString());
 
-    // Navigate based on notification category and type
-    let navigateUrl = '/dashboard'; // Default
+    let navigateUrl = '/dashboard';
 
     if (notification.category === 'employee') {
       // For employee approval notifications, navigate to login

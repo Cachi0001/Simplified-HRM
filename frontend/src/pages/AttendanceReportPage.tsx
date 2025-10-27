@@ -5,7 +5,7 @@ import { employeeService } from '../services/employeeService';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { RefreshCw, Calendar, Clock, Users, Download, ArrowLeft } from 'lucide-react';
+import { RefreshCw, Calendar, Clock, Users, Download, ArrowLeft, MapPin } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Logo from '../components/ui/Logo';
 import { DarkModeToggle } from '../components/ui/DarkModeToggle';
@@ -46,7 +46,7 @@ export default function AttendanceReportPage({ darkMode: initialDarkMode = false
   });
 
   // Fetch attendance report
-  const { data: report, isLoading: reportLoading, refetch } = useQuery({
+  const { data: report, isLoading: reportLoading, isFetching: reportFetching, refetch } = useQuery({
     queryKey: ['attendance-report', selectedEmployee || 'all', startDate || 'none', endDate || 'none'],
     queryFn: async () => {
       // Set default date range to last 5 days if no dates are selected
@@ -215,17 +215,17 @@ export default function AttendanceReportPage({ darkMode: initialDarkMode = false
                   onChange={(e) => setEndDate(e.target.value)}
                 />
               </div>
+            </div>
 
-              <div className="flex flex-col sm:flex-row items-stretch gap-2">
-                <Button onClick={() => refetch()} className="flex-1 min-h-[40px]" isLoading={reportLoading}>
-                  <RefreshCw className={`h-4 w-4 mr-2 ${reportLoading ? 'animate-spin' : ''}`} />
-                  Refresh
-                </Button>
-                <Button onClick={exportReport} className="flex-1 min-h-[40px]">
-                  <Download className="h-4 w-4 mr-2" />
-                  Export CSV
-                </Button>
-              </div>
+            <div className="flex flex-col sm:flex-row items-stretch gap-2">
+              <Button onClick={() => refetch()} className="flex-1 min-h-[40px]" isLoading={reportFetching}>
+                <RefreshCw className={`h-4 w-4 mr-2 ${reportFetching ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+              <Button onClick={exportReport} className="flex-1 min-h-[40px]">
+                <Download className="h-4 w-4 mr-2" />
+                Export CSV
+              </Button>
             </div>
           </div>
         </Card>
