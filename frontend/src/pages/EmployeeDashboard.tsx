@@ -12,6 +12,7 @@ import { authService } from '../services/authService';
 import { BottomNavbar } from '../components/layout/BottomNavbar';
 import api from '../lib/api';
 import { taskService } from '../services/taskService';
+import { useTokenValidation } from '../hooks/useTokenValidation';
 
 export default function EmployeeDashboard() {
   const [darkMode, setDarkMode] = useState(() => {
@@ -109,6 +110,14 @@ export default function EmployeeDashboard() {
 
     fetchAndValidateUser();
   }, []);
+
+  // Add token validation to automatically logout on token expiry
+  useTokenValidation({
+    checkInterval: 2 * 60 * 1000, // Check every 2 minutes
+    onTokenExpired: () => {
+      console.log('Employee token expired, redirecting to login');
+    }
+  });
 
   const { data: employeeStats, isLoading: statsLoading } = useQuery({
     queryKey: ['employee-stats', currentUser?._id || currentUser?.id],

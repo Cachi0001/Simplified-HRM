@@ -11,6 +11,7 @@ import Logo from '../components/ui/Logo';
 import { DarkModeToggle } from '../components/ui/DarkModeToggle';
 import { NotificationBell } from '../components/dashboard/NotificationBell';
 import { BottomNavbar } from '../components/layout/BottomNavbar';
+import { useTokenValidation } from '../hooks/useTokenValidation';
 
 interface AttendanceReportPageProps {
   darkMode?: boolean;
@@ -32,8 +33,16 @@ export default function AttendanceReportPage({ darkMode: initialDarkMode = false
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
 
-  // Fetch current user
+  // Get current user
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+
+  // Add token validation to automatically logout on token expiry
+  useTokenValidation({
+    checkInterval: 2 * 60 * 1000, // Check every 2 minutes
+    onTokenExpired: () => {
+      console.log('Attendance report token expired, redirecting to login');
+    }
+  });
 
   // Fetch all employees for filtering (if admin)
   const { data: employees = [], isLoading: employeesLoading } = useQuery({

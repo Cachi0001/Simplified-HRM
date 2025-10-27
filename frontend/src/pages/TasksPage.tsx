@@ -30,6 +30,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { notificationService } from '../services/notificationService';
+import { useTokenValidation } from '../hooks/useTokenValidation';
 
 export default function TasksPage() {
   const [darkMode, setDarkMode] = useState(() => {
@@ -63,6 +64,14 @@ export default function TasksPage() {
       console.error('Error getting current user:', err);
     }
   }, []);
+
+  // Add token validation to automatically logout on token expiry
+  useTokenValidation({
+    checkInterval: 2 * 60 * 1000, // Check every 2 minutes
+    onTokenExpired: () => {
+      console.log('Tasks page token expired, redirecting to login');
+    }
+  });
 
   const formatDateInput = (date: Date) => date.toISOString().split('T')[0];
   const tomorrow = (() => {

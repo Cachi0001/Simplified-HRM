@@ -14,6 +14,7 @@ import { NotificationBell } from '../components/dashboard/NotificationBell';
 import { OverviewCards } from '../components/dashboard/OverviewCards';
 import { PendingApprovals } from '../components/dashboard/PendingApprovals';
 import api from '../lib/api';
+import { useTokenValidation } from '../hooks/useTokenValidation';
 
 export default function AdminDashboard() {
   const [darkMode, setDarkMode] = useState(() => {
@@ -26,6 +27,14 @@ export default function AdminDashboard() {
   const [error, setError] = useState<string | null>(null);
 
   const { addToast } = useToast();
+
+  // Add token validation to automatically logout on token expiry
+  useTokenValidation({
+    checkInterval: 2 * 60 * 1000, // Check every 2 minutes
+    onTokenExpired: () => {
+      addToast('warning', 'Your session has expired. Redirecting to login...');
+    }
+  });
 
   // Save dark mode preference whenever it changes
   useEffect(() => {
