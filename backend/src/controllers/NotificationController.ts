@@ -39,7 +39,7 @@ export class NotificationController {
 
       // Filter if unreadOnly requested
       const filtered = unreadOnly
-        ? notifications.filter((n) => !n.read_at)
+        ? notifications.filter((n) => !n.is_read)
         : notifications;
 
       res.status(200).json({
@@ -308,7 +308,7 @@ export class NotificationController {
         notificationType
       });
 
-      const users = await this.notificationService.getUsersWithPushTokens();
+      const users = await this.notificationService.getUsersWithPushTokens([]);
 
       res.status(200).json({
         status: 'success',

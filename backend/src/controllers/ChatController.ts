@@ -5,10 +5,6 @@ import logger from '../utils/logger';
 export class ChatController {
   constructor(private chatService: ChatService) {}
 
-  /**
-   * Send a message to a chat
-   * POST /api/chat/send
-   */
   async sendMessage(req: Request, res: Response): Promise<void> {
     try {
       const { chatId, message } = req.body;
@@ -47,10 +43,6 @@ export class ChatController {
     }
   }
 
-  /**
-   * Mark a single message as read
-   * PATCH /api/chat/message/:messageId/read
-   */
   async markMessageAsRead(req: Request, res: Response): Promise<void> {
     try {
       const { messageId } = req.params;
@@ -86,10 +78,6 @@ export class ChatController {
     }
   }
 
-  /**
-   * Mark entire chat as read
-   * PATCH /api/chat/:chatId/read
-   */
   async markChatAsRead(req: Request, res: Response): Promise<void> {
     try {
       const { chatId } = req.params;
@@ -132,24 +120,26 @@ export class ChatController {
   async getChatHistory(req: Request, res: Response): Promise<void> {
     try {
       const { chatId } = req.params;
+      const userId = req.user?.id;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
       const offset = req.query.offset ? parseInt(req.query.offset as string) : 0;
 
-      if (!chatId) {
+      if (!chatId || !userId) {
         res.status(400).json({
           status: 'error',
-          message: 'chatId is required'
+          message: 'chatId and userId are required'
         });
         return;
       }
 
       logger.info('📜 [ChatController] Get chat history', {
         chatId,
+        userId,
         limit,
         offset
       });
 
-      const messages = await this.chatService.getChatHistory(chatId, limit, offset);
+      const messages = await this.chatService.getChatHistory(chatId, userId, limit, offset);
 
       res.status(200).json({
         status: 'success',
