@@ -72,9 +72,6 @@ export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
   const handleNavigation = (path: string) => {
     // Handle placeholder functionality for unimplemented features
     switch (path) {
-      case '/tasks':
-        alert('Tasks page is coming soon!.');
-        return;
       case '/leave':
         alert('Leave management is coming soon!.');
         return;

@@ -154,8 +154,8 @@ export const NotificationUtils = {
     read: false,
     targetUserId: employeeId,
     actions: [
-      { label: 'View Task', action: 'view', url: '/employee-dashboard#tasks' },
-      { label: 'Mark Complete', action: 'complete', url: '/employee-dashboard#tasks' }
+      { label: 'View Task', action: 'view', url: '/tasks' },
+      { label: 'Mark Complete', action: 'complete', url: '/tasks' }
     ],
     source: 'admin',
     category: 'task'

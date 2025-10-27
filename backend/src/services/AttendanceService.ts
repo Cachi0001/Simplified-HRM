@@ -23,7 +23,9 @@ export class AttendanceService {
         if (process.env.REQUIRE_OFFICE_LOCATION === 'true') {
           const isValidLocation = this.verifyOfficeLocation(latitude, longitude);
           if (!isValidLocation) {
-            const distance = this.calculateDistanceFromOffice(latitude, longitude);
+            const officeLatitude = parseFloat(process.env.OFFICE_LATITUDE || '0');
+            const officeLongitude = parseFloat(process.env.OFFICE_LONGITUDE || '0');
+            const distance = this.calculateDistance(latitude, longitude, officeLatitude, officeLongitude);
             const allowFallback = process.env.ALLOW_LOCATION_FALLBACK === 'true';
 
             if (!allowFallback) {
@@ -41,7 +43,17 @@ export class AttendanceService {
       // Get employee ID from user ID
       const employeeId = await this.getEmployeeIdFromUserId(userId);
 
-      const attendance = await this.attendanceRepository.checkIn(employeeId, attendanceData);
+      const checkInRequest: CreateAttendanceRequest = { ...attendanceData };
+
+      if (attendanceData.location && typeof attendanceData.location.latitude === 'number' && typeof attendanceData.location.longitude === 'number') {
+        checkInRequest.check_in_location = {
+          latitude: attendanceData.location.latitude,
+          longitude: attendanceData.location.longitude,
+          ...(typeof attendanceData.location.accuracy === 'number' ? { accuracy: attendanceData.location.accuracy } : {})
+        };
+      }
+
+      const attendance = await this.attendanceRepository.checkIn(employeeId, checkInRequest);
 
       logger.info('AttendanceService: Check-in successful', { attendanceId: attendance.id });
       return attendance;
@@ -69,7 +81,17 @@ export class AttendanceService {
       // Get employee ID from user ID
       const employeeId = await this.getEmployeeIdFromUserId(userId);
 
-      const attendance = await this.attendanceRepository.checkOut(employeeId, attendanceData);
+      const checkOutRequest: CreateAttendanceRequest = { ...attendanceData };
+
+      if (attendanceData.location && typeof attendanceData.location.latitude === 'number' && typeof attendanceData.location.longitude === 'number') {
+        checkOutRequest.check_out_location = {
+          latitude: attendanceData.location.latitude,
+          longitude: attendanceData.location.longitude,
+          ...(typeof attendanceData.location.accuracy === 'number' ? { accuracy: attendanceData.location.accuracy } : {})
+        };
+      }
+
+      const attendance = await this.attendanceRepository.checkOut(employeeId, checkOutRequest);
 
       logger.info('AttendanceService: Check-out successful', { attendanceId: attendance.id });
       return attendance;
@@ -154,7 +176,18 @@ export class AttendanceService {
 
   async getAttendanceReport(employeeId?: string, startDate?: Date, endDate?: Date): Promise<any[]> {
     try {
-      return await this.attendanceRepository.getAttendanceReport(employeeId, startDate, endDate);
+      const report = await this.attendanceRepository.getAttendanceReport(employeeId, startDate, endDate);
+
+      return report.map((record: any) => {
+        const analysis = this.analyzeLocation(record.checkInLocation);
+
+        return {
+          ...record,
+          locationStatus: analysis.status,
+          distanceFromOffice: analysis.distance,
+          officeRadius: analysis.radius
+        };
+      });
     } catch (error) {
       logger.error('AttendanceService: Get attendance report failed', { error: (error as Error).message });
       throw error;
@@ -171,26 +204,46 @@ export class AttendanceService {
       return true;
     }
 
-    const distance = this.calculateDistanceFromOffice(latitude, longitude);
+    const distance = this.calculateDistance(latitude, longitude, officeLatitude, officeLongitude);
     return distance <= officeRadius;
   }
 
-  private calculateDistanceFromOffice(latitude: number, longitude: number): number {
+  private analyzeLocation(location: any): { status: 'onsite' | 'remote' | 'unknown'; distance: number | null; radius: number } {
+    const radius = parseFloat(process.env.OFFICE_RADIUS || '100');
+
+    if (!location || typeof location.latitude !== 'number' || typeof location.longitude !== 'number') {
+      return { status: 'unknown', distance: null, radius };
+    }
+
     const officeLatitude = parseFloat(process.env.OFFICE_LATITUDE || '0');
     const officeLongitude = parseFloat(process.env.OFFICE_LONGITUDE || '0');
 
-    const R = 6371e3; // Earth's radius in meters
-    const φ1 = latitude * Math.PI / 180;
-    const φ2 = officeLatitude * Math.PI / 180;
-    const Δφ = (officeLatitude - latitude) * Math.PI / 180;
-    const Δλ = (officeLongitude - longitude) * Math.PI / 180;
+    if (officeLatitude === 0 || officeLongitude === 0) {
+      return { status: 'unknown', distance: null, radius };
+    }
+
+    const distance = this.calculateDistance(location.latitude, location.longitude, officeLatitude, officeLongitude);
+
+    return {
+      status: distance <= radius ? 'onsite' : 'remote',
+      distance,
+      radius
+    };
+  }
+
+  private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371e3;
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
 
     const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
               Math.cos(φ1) * Math.cos(φ2) *
               Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-    return R * c; // Distance in meters
+    return R * c;
   }
 
   private async getEmployeeIdFromUserId(userId: string): Promise<string> {

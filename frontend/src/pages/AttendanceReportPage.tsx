@@ -102,6 +102,14 @@ export default function AttendanceReportPage({ darkMode: initialDarkMode = false
     return parsed.toLocaleDateString();
   };
 
+  const getEmployeeName = (record: any) => record?._id?.employeeName ?? record?.employeeName ?? record?.employee?.fullName ?? 'Unknown Employee';
+
+  const getLocationMeta = (record: any) => {
+    const status = record?.locationStatus ?? 'unknown';
+    const distance = typeof record?.distanceFromOffice === 'number' ? Math.round(record.distanceFromOffice) : null;
+    return { status, distance };
+  };
+
   const exportReport = () => {
     if (!report || report.length === 0) return;
 
@@ -241,9 +249,9 @@ export default function AttendanceReportPage({ darkMode: initialDarkMode = false
                       <Users className={`h-5 w-5 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
                       <div>
                         <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                          {record?._id?.employeeName ?? record?.employeeName ?? record?.employee?.fullName ?? 'Unknown Employee'}
+                          {getEmployeeName(record)}
                         </p>
-                        <div className={`flex items-center gap-4 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                        <div className={`flex items-center flex-wrap gap-3 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                           <span className="flex items-center gap-1">
                             <Calendar className="h-4 w-4" />
                             {formatDate(record?._id?.date ?? record?.date)}
@@ -257,6 +265,22 @@ export default function AttendanceReportPage({ darkMode: initialDarkMode = false
                               Check-out: {formatTime(record.checkOutTime)}
                             </span>
                           )}
+                          {(() => {
+                            const meta = getLocationMeta(record);
+                            const badgeClass = meta.status === 'onsite'
+                              ? darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-700'
+                              : meta.status === 'remote'
+                                ? darkMode ? 'bg-orange-900 text-orange-200' : 'bg-orange-100 text-orange-700'
+                                : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700';
+                            const label = meta.status === 'onsite' ? 'Onsite' : meta.status === 'remote' ? 'Remote' : 'Unknown';
+                            return (
+                              <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${badgeClass}`}>
+                                <MapPin className="h-3 w-3" />
+                                {label}
+                                {typeof meta.distance === 'number' ? `· ${meta.distance}m` : ''}
+                              </span>
+                            );
+                          })()}
                         </div>
                       </div>
                     </div>

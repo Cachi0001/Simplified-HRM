@@ -4,7 +4,7 @@ export interface Task {
   id: string;
   title: string;
   description?: string;
-  assigneeId: string;
+  assigneeId: string | null;
   assignedBy: string;
   status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
   priority: 'low' | 'medium' | 'high';
@@ -17,7 +17,7 @@ export interface Task {
 export interface CreateTaskRequest {
   title: string;
   description?: string;
-  assigneeId: string;
+  assigneeId: string | null;
   priority?: 'low' | 'medium' | 'high';
   dueDate: string;
 }

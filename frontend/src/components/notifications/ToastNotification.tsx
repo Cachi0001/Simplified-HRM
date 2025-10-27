@@ -241,6 +241,8 @@ function getNotificationUrl(notification: Go3netNotification): string {
       return `/employee/${notification.targetUserId}`;
     case 'approval':
       return '/dashboard#pending-approvals';
+    case 'task':
+      return '/tasks';
     case 'system':
       return '/dashboard';
     default:

@@ -84,6 +84,14 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
     return parsed.toLocaleDateString();
   };
 
+  const getEmployeeName = (record: any) => record._id?.employeeName ?? record.employeeName ?? record.employee?.fullName ?? 'Unknown Employee';
+
+  const getLocationMeta = (record: any) => {
+    const status = record.locationStatus ?? 'unknown';
+    const distance = typeof record.distanceFromOffice === 'number' ? Math.round(record.distanceFromOffice) : null;
+    return { status, distance };
+  };
+
   const exportReport = () => {
     // Simple CSV export
     if (!report || report.length === 0) return;
@@ -199,47 +207,64 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
             </div>
           ) : report && report.length > 0 ? (
             <div className="space-y-3">
-              {report.map((record, index) => (
-                <div key={`${record._id?.employeeId ?? record.employeeId ?? index}-${record._id?.date ?? record.date ?? index}-${index}`} className={`p-4 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${darkMode ? 'bg-gray-600' : 'bg-gray-200'}`}>
-                        <Users className={`h-5 w-5 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
-                      </div>
-                      <div>
-                        <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                          {record._id?.employeeName ?? record.employeeName ?? record.employee?.fullName ?? 'Unknown Employee'}
-                        </p>
-                        <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                          {formatDate(record._id?.date ?? record.date)}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                        {record.status === 'checked_out' ? 'Completed' : 'Active'}
-                      </p>
-                      <div className={`flex items-center gap-2 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                        <Clock className="h-4 w-4" />
-                        <span>{formatTime(record.checkInTime)}</span>
-                        {record.checkOutTime ? (
-                          <>
-                            <span>-</span>
-                            <span>{formatTime(record.checkOutTime)}</span>
-                            <span className={`ml-2 px-2 py-1 rounded text-xs ${darkMode ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-800'}`}>
-                              {record.totalHours ? `${record.totalHours.toFixed(1)}h` : '0h'}
+              {report.map((record, index) => {
+                const locationMeta = getLocationMeta(record);
+                const locationBadgeClass = locationMeta.status === 'onsite'
+                  ? darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-700'
+                  : locationMeta.status === 'remote'
+                    ? darkMode ? 'bg-orange-900 text-orange-200' : 'bg-orange-100 text-orange-700'
+                    : darkMode ? 'bg-gray-600 text-gray-200' : 'bg-gray-200 text-gray-700';
+                const locationLabel = locationMeta.status === 'onsite' ? 'Onsite' : locationMeta.status === 'remote' ? 'Remote' : 'Unknown';
+
+                return (
+                  <div key={`${record._id?.employeeId ?? record.employeeId ?? index}-${record._id?.date ?? record.date ?? index}-${index}`} className={`p-4 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${darkMode ? 'bg-gray-600' : 'bg-gray-200'}`}>
+                          <Users className={`h-5 w-5 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
+                        </div>
+                        <div>
+                          <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                            {getEmployeeName(record)}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                              {formatDate(record._id?.date ?? record.date)}
+                            </p>
+                            <span className={`text-xs px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${locationBadgeClass}`}>
+                              <MapPin className="h-3 w-3" />
+                              {locationLabel}
+                              {typeof locationMeta.distance === 'number' ? `· ${locationMeta.distance}m` : ''}
                             </span>
-                          </>
-                        ) : (
-                          <span className={`ml-2 px-2 py-1 rounded text-xs ${darkMode ? 'bg-orange-900 text-orange-300' : 'bg-orange-100 text-orange-800'}`}>
-                            Active
-                          </span>
-                        )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                          {record.status === 'checked_out' ? 'Completed' : 'Active'}
+                        </p>
+                        <div className={`flex items-center gap-2 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                          <Clock className="h-4 w-4" />
+                          <span>{formatTime(record.checkInTime)}</span>
+                          {record.checkOutTime ? (
+                            <>
+                              <span>-</span>
+                              <span>{formatTime(record.checkOutTime)}</span>
+                              <span className={`ml-2 px-2 py-1 rounded text-xs ${darkMode ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-800'}`}>
+                                {record.totalHours ? `${record.totalHours.toFixed(1)}h` : '0h'}
+                              </span>
+                            </>
+                          ) : (
+                            <span className={`ml-2 px-2 py-1 rounded text-xs ${darkMode ? 'bg-orange-900 text-orange-300' : 'bg-orange-100 text-orange-800'}`}>
+                              Active
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className={`text-center py-8 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>

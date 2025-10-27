@@ -406,8 +406,9 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
         .from('attendance')
         .select(
           `id, employee_id, date, check_in_time, check_out_time, total_hours, status,
+           check_in_location, check_out_location,
            created_at, updated_at,
-           employee:employees (full_name)`
+           employee:employees (id, full_name, department)`
         );
 
       if (employeeId) {
@@ -436,20 +437,33 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
       }
 
       return data.map(record => {
-        const employeeName = (record as any)?.employee?.full_name ?? 'Unknown Employee';
+        const rawEmployee = (record as any)?.employee;
+        const employeeId = rawEmployee?.id ?? record.employee_id;
+        const employeeName = rawEmployee?.full_name ?? 'Unknown Employee';
         const date = record.date ?? (record as any)?.created_at ?? new Date().toISOString();
+        const checkInLocation = this.parseLocation((record as any)?.check_in_location);
+        const checkOutLocation = this.parseLocation((record as any)?.check_out_location);
 
         return {
           _id: {
-            employeeId: record.employee_id,
+            employeeId,
             employeeName,
             date
           },
-          employeeId: record.employee_id,
+          employeeId,
           employeeName,
+          employee: rawEmployee
+            ? {
+                id: rawEmployee.id,
+                fullName: rawEmployee.full_name,
+                department: rawEmployee.department
+              }
+            : undefined,
           date,
           checkInTime: record.check_in_time,
           checkOutTime: record.check_out_time,
+          checkInLocation,
+          checkOutLocation,
           totalHours: record.total_hours,
           status: record.status,
           createdAt: record.created_at,
@@ -460,6 +474,22 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
       logger.error('❌ [SupabaseAttendanceRepository] Get attendance report failed:', error);
       throw error;
     }
+  }
+
+  private parseLocation(location: any): any {
+    if (!location) {
+      return null;
+    }
+
+    if (typeof location === 'string') {
+      try {
+        return JSON.parse(location);
+      } catch {
+        return null;
+      }
+    }
+
+    return location;
   }
 
   async deleteAttendance(id: string): Promise<void> {

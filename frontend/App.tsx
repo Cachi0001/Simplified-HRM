@@ -8,6 +8,7 @@ import ResetPasswordCard from './src/components/auth/ResetPasswordCard';
 import AdminDashboard from './src/pages/AdminDashboard';
 import EmployeeDashboard from './src/pages/EmployeeDashboard';
 import AttendanceReportPage from './src/pages/AttendanceReportPage';
+import TasksPage from './src/pages/TasksPage';
 import Header from './src/components/layout/Header';
 import Footer from './src/components/layout/Footer';
 import { ToastProvider } from './src/components/ui/Toast';
@@ -27,7 +28,8 @@ function AppContent() {
   const location = useLocation();
   const isDashboardPage = location.pathname.startsWith('/dashboard') ||
                          location.pathname.startsWith('/employee-dashboard') ||
-                         location.pathname.startsWith('/attendance-report');
+                         location.pathname.startsWith('/attendance-report') ||
+                         location.pathname.startsWith('/tasks');
 
   return (
     <div className="flex flex-col min-h-screen bg-primary">
@@ -46,6 +48,11 @@ function AppContent() {
           <Route path="/employee-dashboard" element={
             <ProtectedRoute>
               <EmployeeDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/tasks" element={
+            <ProtectedRoute>
+              <TasksPage />
             </ProtectedRoute>
           } />
           <Route path="/attendance-report" element={
