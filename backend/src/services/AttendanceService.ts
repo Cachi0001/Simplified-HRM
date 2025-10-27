@@ -19,7 +19,7 @@ export class AttendanceService {
           throw new Error('Invalid location accuracy');
         }
 
-        // Verify office location if required
+        
         if (process.env.REQUIRE_OFFICE_LOCATION === 'true') {
           const isValidLocation = this.verifyOfficeLocation(latitude, longitude);
           if (!isValidLocation) {
@@ -246,7 +246,7 @@ export class AttendanceService {
     return R * c;
   }
 
-  private async getEmployeeIdFromUserId(userId: string): Promise<string> {
+  async getEmployeeIdFromUserId(userId: string): Promise<string> {
     try {
       return await this.attendanceRepository.getEmployeeIdFromUserId(userId);
     } catch (error) {

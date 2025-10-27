@@ -5,6 +5,7 @@ import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { MapPin, Clock, Calendar, Play, Square } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useToast } from '../ui/Toast';
 
 interface EmployeeAttendanceProps {
   employeeId: string;
@@ -26,10 +27,11 @@ export function EmployeeAttendance({ employeeId, darkMode = false }: EmployeeAtt
   const [locationError, setLocationError] = useState<string | null>(null);
   const [locationDenied, setLocationDenied] = useState<boolean>(false);
   const queryClient = useQueryClient();
+  const { addToast } = useToast();
 
   const { data: attendance = [], isLoading } = useQuery({
     queryKey: ['employee-attendance', employeeId],
-    queryFn: () => fetchEmployeeAttendance(employeeId),
+    queryFn: () => fetchEmployeeAttendance(),
     refetchInterval: 30000,
   });
 
@@ -78,9 +80,13 @@ export function EmployeeAttendance({ employeeId, darkMode = false }: EmployeeAtt
         }
       });
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['employee-attendance', employeeId] });
+      addToast('success', 'Successfully checked in!');
     },
+    onError: (error: any) => {
+      addToast('error', error.message || 'Check-in failed');
+    }
   });
 
   const checkOutMutation = useMutation({
@@ -93,9 +99,13 @@ export function EmployeeAttendance({ employeeId, darkMode = false }: EmployeeAtt
         } : undefined
       });
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['employee-attendance', employeeId] });
+      addToast('success', 'Successfully checked out!');
     },
+    onError: (error: any) => {
+      addToast('error', error.message || 'Check-out failed');
+    }
   });
 
   if (isLoading) {

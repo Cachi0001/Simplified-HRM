@@ -165,9 +165,19 @@ export default function TasksPage() {
     mutationFn: async ({ taskId, status }: { taskId: string; status: string }) => {
       return await taskService.updateTaskStatus(taskId, status);
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       addToast('success', 'Task status updated successfully');
+
+      // Trigger task completion notification if task was completed
+      if (variables.status === 'completed' && !isAdmin) {
+        const completedTask = data.task;
+        if (completedTask) {
+          // The notification should be handled by the backend
+          // But we can show a local notification for immediate feedback
+          addToast('success', 'Task completed! The assignee has been notified.');
+        }
+      }
     },
     onError: (error: any) => {
       const message = error?.response?.data?.message || error?.message || 'Failed to update task status';

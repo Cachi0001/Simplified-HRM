@@ -71,15 +71,18 @@ export class TaskService {
       // Send task assignment notification email
       try {
         const emailService = new EmailService();
-        // Get employee data from the repository
         const employee = await this.taskRepository.getEmployeeById(taskData.assigneeId);
-        if (employee) {
+        if (employee && employee.email) {
+          const employeeName = employee.full_name ?? employee.fullName ?? 'Team Member';
+          const taskTitle = task.title ?? taskData.title;
+          const taskDescription = task.description ?? taskData.description ?? '';
+          const dueDateValue = task.due_date ? new Date(task.due_date).toLocaleDateString() : new Date(taskData.dueDate).toLocaleDateString();
           await emailService.sendTaskNotification(
             employee.email,
-            employee.fullName,
-            task.title,
-            task.description || '',
-            new Date(task.due_date).toLocaleDateString()
+            employeeName,
+            taskTitle,
+            taskDescription,
+            dueDateValue
           );
           logger.info('📧 Task assignment email sent', { assigneeId: taskData.assigneeId, taskId: task.id });
         } else {
@@ -239,12 +242,15 @@ export class TaskService {
           // Get employee who completed the task
           const employee = await this.taskRepository.getEmployeeById(existingTask.assigned_to);
 
-          if (admin && employee) {
+          if (admin && admin.email && employee && employee.email) {
+            const adminName = admin.full_name ?? admin.fullName ?? 'Administrator';
+            const employeeName = employee.full_name ?? employee.fullName ?? 'Employee';
+            const taskTitle = updatedTask.title ?? existingTask.title ?? 'Task';
             await emailService.sendTaskCompletionNotification(
               admin.email,
-              admin.fullName,
-              employee.fullName,
-              updatedTask.title
+              adminName,
+              employeeName,
+              taskTitle
             );
             logger.info('📧 Task completion email sent', { taskId: id, status });
           } else {

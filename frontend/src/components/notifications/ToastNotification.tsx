@@ -243,6 +243,8 @@ function getNotificationUrl(notification: Go3netNotification): string {
       return '/dashboard#pending-approvals';
     case 'system':
       return '/dashboard';
+    case 'task':
+      return '/tasks';
     default:
       return '/dashboard';
   }

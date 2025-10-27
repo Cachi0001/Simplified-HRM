@@ -145,13 +145,13 @@ class NotificationService {
         if (notification.type === 'approval_success' || notification.message.includes('approved') || notification.message.includes('Welcome')) {
           return '/auth';
         }
-        return `/employee/${notification.targetUserId}`;
+        return 'employee-dashboard';
       case 'approval':
         return '/dashboard#pending-approvals';
       case 'system':
         return '/dashboard';
       case 'task':
-        return '/employee-dashboard#tasks';
+        return '/tasks';
       default:
         return '/dashboard';
     }
@@ -291,7 +291,7 @@ class NotificationService {
                 timestamp: new Date(task.createdAt || Date.now()),
                 read: readIds.includes(id),
                 targetUserId: effectiveUserId,
-                actions: [{ label: 'View Task', action: 'view', url: '/employee-dashboard#tasks' }],
+                actions: [{ label: 'View Task', action: 'view', url: '/tasks' }],
                 source: 'system',
                 category: 'employee' as any
               });

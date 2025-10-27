@@ -124,31 +124,34 @@ export class AttendanceController {
       const userRole = req.user?.role;
       const userId = req.user?.id;
 
-      // If employee, they can only access their own attendance data
+      const start = startDate ? new Date(startDate as string) : undefined;
+      const end = endDate ? new Date(endDate as string) : undefined;
+
+      let targetEmployeeId: string | undefined;
+
       if (userRole === 'employee') {
-        if (employeeId && employeeId !== userId) {
+        if (!userId) {
+          res.status(400).json({
+            status: 'error',
+            message: 'User ID is required'
+          });
+          return;
+        }
+
+        const employeeRecordId = await this.attendanceService.getEmployeeIdFromUserId(userId);
+
+        if (employeeId && employeeId !== employeeRecordId) {
           res.status(403).json({
             status: 'error',
             message: 'You can only access your own attendance data'
           });
           return;
         }
-        // If no employeeId specified, use the current user's ID
-        const targetEmployeeId = employeeId || userId;
-        if (!targetEmployeeId) {
-          res.status(400).json({
-            status: 'error',
-            message: 'Employee ID is required'
-          });
-          return;
-        }
+
+        targetEmployeeId = employeeRecordId;
+      } else if (employeeId) {
+        targetEmployeeId = employeeId as string;
       }
-
-      const start = startDate ? new Date(startDate as string) : undefined;
-      const end = endDate ? new Date(endDate as string) : undefined;
-
-      // For employees, use their own user ID as employee ID
-      const targetEmployeeId = userRole === 'employee' ? userId : (employeeId as string);
 
       const report = await this.attendanceService.getAttendanceReport(
         targetEmployeeId,

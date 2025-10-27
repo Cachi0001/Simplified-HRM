@@ -20,28 +20,25 @@ export function NotificationManager({
   const [toasts, setToasts] = useState<Go3netNotification[]>([]);
   const { showToast } = useNotifications(userId);
 
-  // Listen for new notifications from the service
   useEffect(() => {
     const handleNewNotification = (notification: Go3netNotification) => {
-      // Add to toasts if not already there
       setToasts(prev => {
         const exists = prev.find(t => t.id === notification.id);
         if (exists) return prev;
 
         const newToasts = [notification, ...prev];
-        return newToasts.slice(0, maxToasts); // Keep only the latest toasts
+        return newToasts.slice(0, maxToasts);
       });
     };
 
-    // Listen for custom events from the notification service
     const handleServiceNotification = (event: CustomEvent) => {
       handleNewNotification(event.detail);
     };
 
-    window.addEventListener('go3net-notification', handleServiceNotification);
+    window.addEventListener('go3net-notification', handleServiceNotification as EventListener);
 
     return () => {
-      window.removeEventListener('go3net-notification', handleServiceNotification);
+      window.removeEventListener('go3net-notification', handleServiceNotification as EventListener);
     };
   }, [maxToasts]);
 
@@ -50,10 +47,7 @@ export function NotificationManager({
   };
 
   const handleToastClick = (notification: Go3netNotification) => {
-    // Mark as read in the service
     notificationService.markNotificationAsRead(notification.id);
-
-    // Remove from local toasts
     removeToast(notification.id);
   };
 
@@ -80,20 +74,16 @@ export function NotificationManager({
   );
 }
 
-// Helper function to trigger notifications from anywhere in the app
 export function triggerNotification(notification: Go3netNotification): void {
-  // Show local notification
   notificationService.showLocalNotification(notification);
 
-  // Dispatch custom event for the NotificationManager
   const event = new CustomEvent('go3net-notification', {
     detail: notification
   });
   window.dispatchEvent(event);
 }
 
-// Utility functions for common notification types
-export const NotificationUtils = {
+const NotificationUtils = {
   employeeSignup: (employeeName: string, employeeId: string): Go3netNotification => ({
     id: `signup-${employeeId}-${Date.now()}`,
     type: 'signup',
@@ -160,4 +150,22 @@ export const NotificationUtils = {
     source: 'admin',
     category: 'task'
   }),
+
+  taskCompleted: (taskTitle: string, completedByName: string, assigneeName: string, employeeId: string): Go3netNotification => ({
+    id: `task-completed-${employeeId}-${Date.now()}`,
+    type: 'success',
+    priority: 'normal',
+    title: 'Task Completed',
+    message: `${completedByName} completed ${taskTitle}.`,
+    timestamp: new Date(),
+    read: false,
+    targetUserId: employeeId,
+    actions: [
+      { label: 'View Task', action: 'view', url: '/tasks' }
+    ],
+    source: 'system',
+    category: 'task'
+  })
 };
+
+export { NotificationUtils };
