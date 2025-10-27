@@ -233,15 +233,12 @@ export class TaskService {
 
       const updatedTask = await this.taskRepository.updateStatus(id, status);
 
-      // TODO: Implement completion notifications for Supabase
+      const admin = await this.taskRepository.getEmployeeById(existingTask.created_by);
+      const employee = await this.taskRepository.getEmployeeById(existingTask.assigned_to);
+
       if (status === 'completed') {
         try {
           const emailService = new EmailService();
-          // Get admin who assigned the task
-          const admin = await this.taskRepository.getEmployeeById(existingTask.created_by);
-          // Get employee who completed the task
-          const employee = await this.taskRepository.getEmployeeById(existingTask.assigned_to);
-
           if (admin && admin.email && employee && employee.email) {
             const adminName = admin.full_name ?? admin.fullName ?? 'Administrator';
             const employeeName = employee.full_name ?? employee.fullName ?? 'Employee';
@@ -263,6 +260,34 @@ export class TaskService {
         } catch (emailError) {
           logger.warn('Task completion email failed (non-critical)', { error: (emailError as Error).message });
         }
+      }
+
+      if (admin && employee) {
+        const employeeName = employee.full_name ?? employee.fullName ?? 'Employee';
+        const taskTitle = updatedTask.title ?? existingTask.title ?? 'Task';
+
+        const notificationPayload = {
+          id: `task-${id}-${status}-${Date.now()}`,
+          type: 'task',
+          priority: status === 'completed' ? 'high' : 'normal',
+          title: status === 'completed' ? 'Task Completed' : 'Task Started',
+          message: status === 'completed'
+            ? `${employeeName} completed ${taskTitle}`
+            : `${employeeName} started ${taskTitle}`,
+          timestamp: new Date(),
+          read: false,
+          userId: admin.user_id ?? admin.userId ?? admin.id,
+          targetUserId: admin.user_id ?? admin.userId ?? admin.id,
+          source: 'employee',
+          category: 'task'
+        };
+
+        logger.info('TaskService: Admin notification prepared', {
+          notificationId: notificationPayload.id,
+          taskId: id,
+          status,
+          adminId: admin.id
+        });
       }
 
       logger.info('TaskService: Task status updated successfully', { taskId: id, status });

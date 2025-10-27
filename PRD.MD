@@ -144,6 +144,7 @@ Validate: CRUD ops, role enforcement.
 
 Validate: Record save, location verify.
 
+
 ## Step 5: Task Assignments
 
 ### Backend
@@ -159,3 +160,4 @@ Validate: Record save, location verify.
 Validate: Assign/view/update.
 
 Final: Full integration, tests, deploy-ready (Supabase cloud). Local dev: Switch repo to Mongo/MySQL impl.
+

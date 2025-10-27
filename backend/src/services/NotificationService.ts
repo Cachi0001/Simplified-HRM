@@ -11,11 +11,26 @@ export class NotificationService {
 
       if (userRole === 'admin') {
         const supabase = supabaseConfig.getClient();
-        const recentThreshold = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const recentThreshold = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
+
+        const { data: adminEmployee, error: adminError } = await supabase
+          .from('employees')
+          .select('id, full_name')
+          .eq('user_id', userId)
+          .single();
+
+        if (adminError || !adminEmployee?.id) {
+          logger.warn('NotificationService: Admin employee record not found for notifications', {
+            userId,
+            error: adminError?.message
+          });
+          return notifications;
+        }
 
         const { data: tasks, error: taskError } = await supabase
           .from('tasks')
           .select('id, title, status, updated_at, assigned_to')
+          .eq('created_by', adminEmployee.id)
           .in('status', ['in_progress', 'completed'])
           .gte('updated_at', recentThreshold)
           .order('updated_at', { ascending: false });

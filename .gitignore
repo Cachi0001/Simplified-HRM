@@ -78,6 +78,7 @@ dist
 
 # Gatsby files
 .cache/
+MODELS_SUMMARY.md
 
 
 # Storybook build outputs
@@ -137,3 +138,4 @@ Vercel_Deployment.md
 .qoder/rules/byterover-rules.md
 .augment/rules/byterover-rules.md
 database-schema.sql
+TODO.md

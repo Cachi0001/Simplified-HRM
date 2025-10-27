@@ -30,6 +30,10 @@ import employeeRoutes from './routes/employee.routes';
 import attendanceRoutes from './routes/attendance.routes';
 import taskRoutes from './routes/task.routes';
 import notificationRoutes from './routes/notification.routes';
+import leaveRoutes from './routes/leave.routes';
+import purchaseRoutes from './routes/purchase.routes';
+import chatRoutes from './routes/chat.routes';
+import announcementRoutes from './routes/announcement.routes';
 import supabaseConfig from './config/supabase';
 
 const app = express();
@@ -191,6 +195,10 @@ app.use('/api/employees', employeeRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/leave', leaveRoutes);
+app.use('/api/purchase', purchaseRoutes);
+app.use('/api/chat', chatRoutes);
+app.use('/api/announcements', announcementRoutes);
 
 // Health check endpoint
 app.get('/api/health', async (req: Request, res: Response) => {

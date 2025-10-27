@@ -219,7 +219,7 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
                 >
                   <option value="">Select Employee</option>
                   {employees.map(emp => {
-                    const value = normalizeId(emp.id || emp._id);
+                    const value = normalizeId(emp.id);
                     return (
                       <option key={value} value={value}>
                         {emp.fullName} ({emp.department || 'No Department'})
@@ -341,16 +341,15 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
       ) : filteredTasks.length > 0 ? (
         <div className="space-y-3">
           {filteredTasks.map((task, index) => {
-            // Handle both cases: assigneeId as object (populated) or string
-            const assigneeId = typeof task.assigneeId === 'object' 
-              ? (task.assigneeId?._id || task.assigneeId?.id)
-              : task.assigneeId;
-            
-            // Match employee using _id field (MongoDB native field)
-            const assignedEmployee = employees.find(e => 
-              e._id === assigneeId || e.id === assigneeId
-            );
-            
+            const rawAssignee = task.assigneeId ?? null;
+            const assigneeId = rawAssignee
+              ? (typeof rawAssignee === 'object' ? normalizeId(rawAssignee) : normalizeId(rawAssignee))
+              : '';
+
+            const assignedEmployee = assigneeId
+              ? employees.find(e => normalizeId(e.id) === assigneeId)
+              : undefined;
+
             return (
               <Card key={task.id || `task-${index}`} className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
                 <div className="p-4">

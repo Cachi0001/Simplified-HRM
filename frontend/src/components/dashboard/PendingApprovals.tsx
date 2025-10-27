@@ -156,7 +156,7 @@ export function PendingApprovals({ darkMode = false }: PendingApprovalsProps) {
         <div key={emp.id || emp._id} className={`cursor-pointer hover:shadow-md transition-shadow ${darkMode ? 'text-white' : 'text-gray-900'}`} onClick={() => openEmployeeModal(emp)}>
           <Card className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
             <div className="p-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div className="flex items-center gap-4 flex-1">
                   <div className={`w-10 h-10 rounded-full ${darkMode ? 'bg-gray-600' : 'bg-gray-200'} flex items-center justify-center`}>
                     <span className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
@@ -179,7 +179,7 @@ export function PendingApprovals({ darkMode = false }: PendingApprovalsProps) {
                     <span>View Details</span>
                   </div>
                 </div>
-                <div className="flex gap-2 ml-4">
+                <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:ml-4">
                   <Button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -190,7 +190,7 @@ export function PendingApprovals({ darkMode = false }: PendingApprovalsProps) {
                     }}
                     disabled={approveMutation.isPending}
                     isLoading={approveMutation.isPending}
-                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 text-sm"
+                    className="w-full bg-green-600 hover:bg-green-700 text-white px-3 py-1 text-sm md:w-auto"
                   >
                     <Check className="h-4 w-4 mr-1" />
                     Approve
@@ -205,7 +205,7 @@ export function PendingApprovals({ darkMode = false }: PendingApprovalsProps) {
                     }}
                     disabled={rejectMutation.isPending}
                     isLoading={rejectMutation.isPending}
-                    className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 text-sm"
+                    className="w-full bg-red-600 hover:bg-red-700 text-white px-3 py-1 text-sm md:w-auto"
                   >
                     <X className="h-4 w-4 mr-1" />
                     Reject

@@ -18,6 +18,8 @@ export interface IEmployee {
   emailVerificationExpires?: Date;
   passwordResetToken?: string;
   passwordResetExpires?: Date;
+  profileUpdatedAt?: Date; // Timestamp of when profile was last updated
+  performanceScore?: number; // Performance score for the employee
   createdAt: Date;
   updatedAt: Date;
 }
@@ -46,6 +48,8 @@ export interface UpdateEmployeeRequest {
   hireDate?: Date;
   profilePicture?: string;
   status?: 'active' | 'rejected' | 'pending';
+  profileUpdatedAt?: Date;
+  performanceScore?: number;
 }
 
 export interface EmployeeQuery {
