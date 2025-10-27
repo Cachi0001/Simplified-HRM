@@ -55,15 +55,33 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
     enabled: true,
   });
 
-  const formatTime = (dateString: string) => {
-    return new Date(dateString).toLocaleTimeString([], {
+  const formatTime = (dateString?: string) => {
+    if (!dateString) {
+      return '—';
+    }
+
+    const parsed = new Date(dateString);
+    if (Number.isNaN(parsed.getTime())) {
+      return '—';
+    }
+
+    return parsed.toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit'
     });
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
+  const formatDate = (dateString?: string) => {
+    if (!dateString) {
+      return '—';
+    }
+
+    const parsed = new Date(dateString);
+    if (Number.isNaN(parsed.getTime())) {
+      return '—';
+    }
+
+    return parsed.toLocaleDateString();
   };
 
   const exportReport = () => {
@@ -182,7 +200,7 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
           ) : report && report.length > 0 ? (
             <div className="space-y-3">
               {report.map((record, index) => (
-                <div key={`${record._id?.employeeId ?? record.employeeId ?? index}-${record._id?.date ?? record.date}-${index}`} className={`p-4 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
+                <div key={`${record._id?.employeeId ?? record.employeeId ?? index}-${record._id?.date ?? record.date ?? index}-${index}`} className={`p-4 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center ${darkMode ? 'bg-gray-600' : 'bg-gray-200'}`}>
@@ -190,7 +208,7 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
                       </div>
                       <div>
                         <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                          {record._id?.employeeName ?? record.employeeName ?? 'Unknown Employee'}
+                          {record._id?.employeeName ?? record.employeeName ?? record.employee?.fullName ?? 'Unknown Employee'}
                         </p>
                         <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                           {formatDate(record._id?.date ?? record.date)}

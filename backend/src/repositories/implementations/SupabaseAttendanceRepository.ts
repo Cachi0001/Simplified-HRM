@@ -402,16 +402,27 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
 
   async getAttendanceReport(employeeId?: string, startDate?: Date, endDate?: Date): Promise<any[]> {
     try {
-      let query = this.supabase.from('attendance').select('*');
+      let query = this.supabase
+        .from('attendance')
+        .select(
+          `id, employee_id, date, check_in_time, check_out_time, total_hours, status,
+           created_at, updated_at,
+           employee:employees (full_name)`
+        );
 
       if (employeeId) {
         query = query.eq('employee_id', employeeId);
       }
 
-      if (startDate && endDate) {
-        query = query.gte('date', startDate.toISOString().split('T')[0])
-                    .lte('date', endDate.toISOString().split('T')[0]);
+      if (startDate) {
+        query = query.gte('date', startDate.toISOString().split('T')[0]);
       }
+
+      if (endDate) {
+        query = query.lte('date', endDate.toISOString().split('T')[0]);
+      }
+
+      query = query.order('date', { ascending: false }).order('check_in_time', { ascending: false });
 
       const { data, error } = await query;
 
@@ -420,7 +431,31 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
         return [];
       }
 
-      return data || [];
+      if (!data || data.length === 0) {
+        return [];
+      }
+
+      return data.map(record => {
+        const employeeName = (record as any)?.employee?.full_name ?? 'Unknown Employee';
+        const date = record.date ?? (record as any)?.created_at ?? new Date().toISOString();
+
+        return {
+          _id: {
+            employeeId: record.employee_id,
+            employeeName,
+            date
+          },
+          employeeId: record.employee_id,
+          employeeName,
+          date,
+          checkInTime: record.check_in_time,
+          checkOutTime: record.check_out_time,
+          totalHours: record.total_hours,
+          status: record.status,
+          createdAt: record.created_at,
+          updatedAt: record.updated_at
+        };
+      });
     } catch (error) {
       logger.error('❌ [SupabaseAttendanceRepository] Get attendance report failed:', error);
       throw error;

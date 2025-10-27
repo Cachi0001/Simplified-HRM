@@ -73,15 +73,33 @@ export default function AttendanceReportPage({ darkMode: initialDarkMode = false
     enabled: true,
   });
 
-  const formatTime = (dateString: string) => {
-    return new Date(dateString).toLocaleTimeString([], {
+  const formatTime = (dateString?: string) => {
+    if (!dateString) {
+      return '—';
+    }
+
+    const parsed = new Date(dateString);
+    if (Number.isNaN(parsed.getTime())) {
+      return '—';
+    }
+
+    return parsed.toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit'
     });
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
+  const formatDate = (dateString?: string) => {
+    if (!dateString) {
+      return '—';
+    }
+
+    const parsed = new Date(dateString);
+    if (Number.isNaN(parsed.getTime())) {
+      return '—';
+    }
+
+    return parsed.toLocaleDateString();
   };
 
   const exportReport = () => {
@@ -91,12 +109,12 @@ export default function AttendanceReportPage({ darkMode: initialDarkMode = false
     const csvContent = [
       headers.join(','),
       ...report.map((record: any) => [
-        record._id.employeeName || 'Unknown',
-        formatDate(record._id.date),
-        formatTime(record.checkInTime),
-        record.checkOutTime ? formatTime(record.checkOutTime) : 'Active',
-        record.totalHours ? record.totalHours.toFixed(1) : '0',
-        record.status === 'checked_out' ? 'Completed' : 'Active'
+        record?._id?.employeeName ?? record?.employeeName ?? record?.employee?.fullName ?? 'Unknown',
+        formatDate(record?._id?.date ?? record?.date),
+        formatTime(record?.checkInTime),
+        record?.checkOutTime ? formatTime(record.checkOutTime) : 'Active',
+        record?.totalHours ? record.totalHours.toFixed(1) : '0',
+        record?.status === 'checked_out' ? 'Completed' : 'Active'
       ].join(','))
     ].join('\n');
 
@@ -223,18 +241,18 @@ export default function AttendanceReportPage({ darkMode: initialDarkMode = false
                       <Users className={`h-5 w-5 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
                       <div>
                         <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                          {record._id.employeeName || 'Unknown Employee'}
+                          {record?._id?.employeeName ?? record?.employeeName ?? record?.employee?.fullName ?? 'Unknown Employee'}
                         </p>
                         <div className={`flex items-center gap-4 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                           <span className="flex items-center gap-1">
                             <Calendar className="h-4 w-4" />
-                            {formatDate(record._id.date)}
+                            {formatDate(record?._id?.date ?? record?.date)}
                           </span>
                           <span className="flex items-center gap-1">
                             <Clock className="h-4 w-4" />
-                            Check-in: {formatTime(record.checkInTime)}
+                            Check-in: {formatTime(record?.checkInTime)}
                           </span>
-                          {record.checkOutTime && (
+                          {record?.checkOutTime && (
                             <span className="flex items-center gap-1">
                               Check-out: {formatTime(record.checkOutTime)}
                             </span>
@@ -243,10 +261,10 @@ export default function AttendanceReportPage({ darkMode: initialDarkMode = false
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className={`text-sm font-medium ${record.status === 'checked_out' ? (darkMode ? 'text-green-400' : 'text-green-600') : (darkMode ? 'text-orange-400' : 'text-orange-600')}`}>
-                        {record.status === 'checked_out' ? 'Completed' : 'Active'}
+                      <div className={`text-sm font-medium ${record?.status === 'checked_out' ? (darkMode ? 'text-green-400' : 'text-green-600') : (darkMode ? 'text-orange-400' : 'text-orange-600')}`}>
+                        {record?.status === 'checked_out' ? 'Completed' : 'Active'}
                       </div>
-                      {record.totalHours && (
+                      {record?.totalHours && (
                         <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                           {record.totalHours.toFixed(1)}h
                         </div>
