@@ -61,7 +61,9 @@ export class EmployeeService {
     try {
       logger.info('EmployeeService: Getting all employees', { role: currentUserRole });
 
-      if (currentUserRole !== 'admin') {
+      // Admin and HR can see all employees regardless of status
+      // Regular employees and others can only see active employees
+      if (currentUserRole !== 'admin' && currentUserRole !== 'hr') {
         query = { ...query, status: 'active' };
       }
 
@@ -128,26 +130,49 @@ export class EmployeeService {
         throw new Error('Employee not found');
       }
 
-      if (currentUserRole !== 'admin' && existingEmployee.user_id !== currentUserId) {
+      // Allow admin or HR to update any employee, or allow employee to update themselves
+      if (currentUserRole !== 'admin' && currentUserRole !== 'hr' && existingEmployee.user_id !== currentUserId) {
         throw new Error('Access denied');
       }
 
+      // For non-admin users, restrict fields they can update
       if (currentUserRole !== 'admin') {
-        const allowedFields = ['fullName', 'department', 'position', 'phone', 'address', 'dateOfBirth', 'hireDate', 'profilePicture', 'status'];
-        const filteredData: UpdateEmployeeRequest = {};
+        // HR can update role, department, position, and other fields
+        // But cannot change themselves to admin
+        if (currentUserRole === 'hr' && employeeData.role === 'admin') {
+          throw new Error('HR cannot assign admin role');
+        }
 
-        allowedFields.forEach(field => {
-          if (employeeData[field as keyof UpdateEmployeeRequest] !== undefined) {
-            (filteredData as any)[field] = employeeData[field as keyof UpdateEmployeeRequest];
-          }
-        });
+        // HR updating others - allow more fields
+        if (existingEmployee.user_id !== currentUserId) {
+          const hrAllowedFields = ['fullName', 'department', 'position', 'phone', 'address', 'dateOfBirth', 'hireDate', 'profilePicture', 'role', 'status'];
+          const filteredData: UpdateEmployeeRequest = {};
 
-        employeeData = filteredData;
+          hrAllowedFields.forEach(field => {
+            if (employeeData[field as keyof UpdateEmployeeRequest] !== undefined) {
+              (filteredData as any)[field] = employeeData[field as keyof UpdateEmployeeRequest];
+            }
+          });
+
+          employeeData = filteredData;
+        } else {
+          // Employee updating themselves - only allow personal fields
+          const allowedFields = ['fullName', 'department', 'position', 'phone', 'address', 'dateOfBirth', 'hireDate', 'profilePicture', 'status'];
+          const filteredData: UpdateEmployeeRequest = {};
+
+          allowedFields.forEach(field => {
+            if (employeeData[field as keyof UpdateEmployeeRequest] !== undefined) {
+              (filteredData as any)[field] = employeeData[field as keyof UpdateEmployeeRequest];
+            }
+          });
+
+          employeeData = filteredData;
+        }
       }
 
       const updatedEmployee = await this.employeeRepository.update(id, employeeData);
 
-      logger.info('EmployeeService: Employee updated successfully', { employeeId: id });
+      logger.info('EmployeeService: Employee updated successfully', { employeeId: id, updatedFields: Object.keys(employeeData), updatedBy: currentUserRole });
       return this.mapEmployee(updatedEmployee);
     } catch (error) {
       logger.error('EmployeeService: Update employee failed', { error: (error as Error).message });

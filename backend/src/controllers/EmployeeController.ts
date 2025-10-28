@@ -38,7 +38,7 @@ export class EmployeeController {
         search: req.query.search as string,
         department: req.query.department as string,
         status: req.query.status as 'active' | 'rejected' | 'pending',
-        role: req.query.role as 'admin' | 'employee'
+        role: req.query.role as 'admin' | 'employee' | 'hr'
       };
 
       const userRole = req.user?.role;

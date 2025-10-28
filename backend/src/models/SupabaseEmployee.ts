@@ -4,7 +4,7 @@ export interface IEmployee {
   userId: string;
   email: string;
   fullName: string;
-  role: 'admin' | 'employee';
+  role: 'admin' | 'employee' | 'hr';
   department?: string;
   position?: string;
   phone?: string;
@@ -28,7 +28,7 @@ export interface IEmployee {
 export interface CreateEmployeeRequest {
   email: string;
   fullName: string;
-  role: 'admin' | 'employee';
+  role: 'admin' | 'employee' | 'hr';
   department?: string;
   position?: string;
   phone?: string;
@@ -47,6 +47,7 @@ export interface UpdateEmployeeRequest {
   dateOfBirth?: Date;
   hireDate?: Date;
   profilePicture?: string;
+  role?: 'admin' | 'employee' | 'hr';
   status?: 'active' | 'rejected' | 'pending';
   profileUpdatedAt?: Date;
   performanceScore?: number;
@@ -58,5 +59,5 @@ export interface EmployeeQuery {
   search?: string;
   department?: string;
   status?: 'active' | 'rejected' | 'pending';
-  role?: 'admin' | 'employee';
+  role?: 'admin' | 'employee' | 'hr';
 }

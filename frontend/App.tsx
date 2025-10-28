@@ -9,6 +9,7 @@ import AdminDashboard from './src/pages/AdminDashboard';
 import EmployeeDashboard from './src/pages/EmployeeDashboard';
 import AttendanceReportPage from './src/pages/AttendanceReportPage';
 import TasksPage from './src/pages/TasksPage';
+import UserSettingsPage from './src/pages/UserSettingsPage';
 import Header from './src/components/layout/Header';
 import Footer from './src/components/layout/Footer';
 import { ToastProvider } from './src/components/ui/Toast';
@@ -29,7 +30,8 @@ function AppContent() {
   const isDashboardPage = location.pathname.startsWith('/dashboard') ||
                          location.pathname.startsWith('/employee-dashboard') ||
                          location.pathname.startsWith('/attendance-report') ||
-                         location.pathname.startsWith('/tasks');
+                         location.pathname.startsWith('/tasks') ||
+                         location.pathname.startsWith('/settings');
 
   return (
     <div className="flex flex-col min-h-screen bg-primary">
@@ -58,6 +60,11 @@ function AppContent() {
           <Route path="/attendance-report" element={
             <ProtectedRoute>
               <AttendanceReportPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/settings" element={
+            <ProtectedRoute>
+              <UserSettingsPage />
             </ProtectedRoute>
           } />
           <Route path="/api-test" element={<ApiConnectionTest />} />
