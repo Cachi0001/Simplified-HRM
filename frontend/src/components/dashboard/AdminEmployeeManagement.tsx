@@ -93,8 +93,8 @@ export const AdminEmployeeManagement: React.FC<AdminEmployeeManagementProps> = (
   // Filter and search employees
   const filteredEmployees = useMemo(() => {
     return employees.filter((emp: Employee) => {
-      const matchesSearch = emp.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           emp.email.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = (emp.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           (emp.email || '').toLowerCase().includes(searchTerm.toLowerCase());
       const matchesRole = filterRole === 'all' || emp.role === filterRole;
       const matchesStatus = filterStatus === 'all' || emp.status === filterStatus;
       return matchesSearch && matchesRole && matchesStatus;

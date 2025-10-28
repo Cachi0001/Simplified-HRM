@@ -3,6 +3,7 @@ import { AdminAttendance } from '../components/dashboard/AdminAttendance';
 import { AdminTasks } from '../components/dashboard/AdminTasks';
 import { AdminDepartments } from '../components/dashboard/AdminDepartments';
 import { AdminEmployeeManagement } from '../components/dashboard/AdminEmployeeManagement';
+import { AdminLeaveRequests } from '../components/dashboard/AdminLeaveRequests';
 import { NotificationManager, triggerNotification, NotificationUtils } from '../components/notifications/NotificationManager';
 import { useQuery } from '@tanstack/react-query';
 import { notificationService } from '../services/notificationService';
@@ -190,6 +191,11 @@ export default function AdminDashboard() {
             Pending Approvals
           </h2>
           <PendingApprovals darkMode={darkMode} />
+        </section>
+
+        {/* Leave Requests Management */}
+        <section className="mb-8">
+          <AdminLeaveRequests darkMode={darkMode} />
         </section>
 
         {/* Employee Role Management */}

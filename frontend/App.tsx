@@ -7,9 +7,12 @@ import ConfirmEmail from './src/pages/ConfirmEmail';
 import ResetPasswordCard from './src/components/auth/ResetPasswordCard';
 import AdminDashboard from './src/pages/AdminDashboard';
 import EmployeeDashboard from './src/pages/EmployeeDashboard';
+import HRDashboard from './src/pages/HRDashboard';
 import AttendanceReportPage from './src/pages/AttendanceReportPage';
 import TasksPage from './src/pages/TasksPage';
 import UserSettingsPage from './src/pages/UserSettingsPage';
+import { LeaveRequestsPage } from './src/pages/LeaveRequestsPage';
+import { PurchaseRequestsPage } from './src/pages/PurchaseRequestsPage';
 import Header from './src/components/layout/Header';
 import Footer from './src/components/layout/Footer';
 import { ToastProvider } from './src/components/ui/Toast';
@@ -29,9 +32,12 @@ function AppContent() {
   const location = useLocation();
   const isDashboardPage = location.pathname.startsWith('/dashboard') ||
                          location.pathname.startsWith('/employee-dashboard') ||
+                         location.pathname.startsWith('/hr-dashboard') ||
                          location.pathname.startsWith('/attendance-report') ||
                          location.pathname.startsWith('/tasks') ||
-                         location.pathname.startsWith('/settings');
+                         location.pathname.startsWith('/settings') ||
+                         location.pathname.startsWith('/leave-requests') ||
+                         location.pathname.startsWith('/purchase-requests');
 
   return (
     <div className="flex flex-col min-h-screen bg-primary">
@@ -52,6 +58,11 @@ function AppContent() {
               <EmployeeDashboard />
             </ProtectedRoute>
           } />
+          <Route path="/hr-dashboard" element={
+            <ProtectedRoute>
+              <HRDashboard />
+            </ProtectedRoute>
+          } />
           <Route path="/tasks" element={
             <ProtectedRoute>
               <TasksPage />
@@ -65,6 +76,16 @@ function AppContent() {
           <Route path="/settings" element={
             <ProtectedRoute>
               <UserSettingsPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/leave-requests" element={
+            <ProtectedRoute>
+              <LeaveRequestsPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/purchase-requests" element={
+            <ProtectedRoute>
+              <PurchaseRequestsPage />
             </ProtectedRoute>
           } />
           <Route path="/api-test" element={<ApiConnectionTest />} />
