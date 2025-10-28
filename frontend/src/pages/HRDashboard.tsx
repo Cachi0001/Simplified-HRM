@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { AdminLeaveRequests } from '../components/dashboard/AdminLeaveRequests';
 import { AdminEmployeeManagement } from '../components/dashboard/AdminEmployeeManagement';
-import DraggableHamburgerMenu from '../components/layout/DraggableHamburgerMenu';
-import BottomNavbar from '../components/layout/BottomNavbar';
+import { DraggableHamburgerMenu } from '../components/layout/DraggableHamburgerMenu';
+import { BottomNavbar } from '../components/layout/BottomNavbar';
 import { Clock, Users, FileText } from 'lucide-react';
 
 export default function HRDashboard() {

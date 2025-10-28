@@ -34,7 +34,18 @@ export const AdminEmployeeManagement: React.FC<AdminEmployeeManagementProps> = (
     queryKey: ['employees-management'],
     queryFn: async () => {
       const response = await api.get('/employees');
-      return response.data.data.employees || [];
+      const employeesData = response.data.data?.employees || [];
+      // Validate and normalize employee data
+      return employeesData.filter((emp: any) => emp && emp.id).map((emp: any) => ({
+        id: emp.id || '',
+        full_name: emp.full_name || '',
+        email: emp.email || '',
+        phone: emp.phone || '',
+        department: emp.department || '',
+        role: emp.role || 'employee',
+        status: emp.status || 'pending',
+        created_at: emp.created_at || new Date().toISOString()
+      }));
     },
   });
 
@@ -92,9 +103,13 @@ export const AdminEmployeeManagement: React.FC<AdminEmployeeManagementProps> = (
 
   // Filter and search employees
   const filteredEmployees = useMemo(() => {
+    if (!Array.isArray(employees)) return [];
     return employees.filter((emp: Employee) => {
-      const matchesSearch = (emp.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           (emp.email || '').toLowerCase().includes(searchTerm.toLowerCase());
+      if (!emp || typeof emp !== 'object') return false;
+      const fullName = String(emp.full_name || '').toLowerCase();
+      const email = String(emp.email || '').toLowerCase();
+      const search = String(searchTerm || '').toLowerCase();
+      const matchesSearch = fullName.includes(search) || email.includes(search);
       const matchesRole = filterRole === 'all' || emp.role === filterRole;
       const matchesStatus = filterStatus === 'all' || emp.status === filterStatus;
       return matchesSearch && matchesRole && matchesStatus;

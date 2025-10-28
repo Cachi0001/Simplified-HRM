@@ -450,7 +450,7 @@ export interface User {
   id: string;
   email: string;
   fullName: string;
-  role: 'admin' | 'employee';
+  role: 'admin' | 'employee' | 'hr';
   status?: 'active' | 'inactive' | 'pending';
   emailVerified: boolean;
   createdAt: string;
@@ -479,7 +479,7 @@ export interface SignupRequest {
   email: string;
   password?: string; // Optional for passwordless magic link signup
   fullName: string;
-  role?: 'admin' | 'employee';
+  role?: 'admin' | 'employee' | 'hr';
 }
 
 export interface Employee {
