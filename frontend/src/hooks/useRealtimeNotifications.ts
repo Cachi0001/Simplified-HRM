@@ -1,5 +1,4 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
-import logger from '../utils/logger';
 
 export interface Notification {
   id: string;
@@ -37,12 +36,12 @@ export const useRealtimeNotifications = () => {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       
       if (userError || !user) {
-        logger.warn('No authenticated user, cannot subscribe to notifications');
+        console.warn('No authenticated user, cannot subscribe to notifications');
         setIsSubscribed(false);
         return;
       }
 
-      logger.info(`🔔 Subscribing to notifications for user: ${user.id}`);
+      console.info(`🔔 Subscribing to notifications for user: ${user.id}`);
 
       const subscription = supabase
         .channel(`notifications:${user.id}`)
@@ -55,7 +54,7 @@ export const useRealtimeNotifications = () => {
             filter: `user_id=eq.${user.id}`,
           },
           (payload: any) => {
-            logger.info('📬 New notification:', payload);
+            console.info('📬 New notification:', payload);
             const newNotification = payload.new as Notification;
             
             setNotifications((prev) => [newNotification, ...prev]);
@@ -78,7 +77,7 @@ export const useRealtimeNotifications = () => {
             filter: `user_id=eq.${user.id}`,
           },
           (payload: any) => {
-            logger.info('✏️  Notification updated:', payload);
+            console.info('✏️  Notification updated:', payload);
             const updatedNotification = payload.new as Notification;
             const previousNotification = payload.old as Notification;
 
@@ -105,7 +104,7 @@ export const useRealtimeNotifications = () => {
             filter: `user_id=eq.${user.id}`,
           },
           (payload: any) => {
-            logger.info('🗑️  Notification deleted:', payload);
+            console.info('🗑️  Notification deleted:', payload);
             const deletedNotification = payload.old as Notification;
 
             setNotifications((prev) =>
@@ -119,7 +118,7 @@ export const useRealtimeNotifications = () => {
           }
         )
         .subscribe((status: string) => {
-          logger.info(`📡 Notification subscription status: ${status}`);
+          console.info(`📡 Notification subscription status: ${status}`);
           if (status === 'SUBSCRIBED') {
             setIsSubscribed(true);
             setError(null);
@@ -132,7 +131,7 @@ export const useRealtimeNotifications = () => {
       subscriptionRef.current = subscription;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      logger.error('❌ Failed to subscribe to notifications:', errorMessage);
+      console.error('❌ Failed to subscribe to notifications:', errorMessage);
       setError(errorMessage);
       setIsSubscribed(false);
     }
@@ -148,9 +147,9 @@ export const useRealtimeNotifications = () => {
         await supabase.removeChannel(subscriptionRef.current);
         subscriptionRef.current = null;
         setIsSubscribed(false);
-        logger.info('🔌 Unsubscribed from notifications');
+        console.info('🔌 Unsubscribed from notifications');
       } catch (err) {
-        logger.error('Error unsubscribing:', err);
+        console.error('Error unsubscribing:', err);
       }
     }
   }, []);
@@ -179,10 +178,10 @@ export const useRealtimeNotifications = () => {
         .eq('id', notificationId);
 
       if (error) {
-        logger.error('Failed to mark notification as read:', error);
+        console.error('Failed to mark notification as read:', error);
       }
     } catch (err) {
-      logger.error('Error marking notification as read:', err);
+      console.error('Error marking notification as read:', err);
     }
   }, []);
 
@@ -203,12 +202,12 @@ export const useRealtimeNotifications = () => {
         .eq('is_read', false);
 
       if (error) {
-        logger.error('Failed to mark all as read:', error);
+        console.error('Failed to mark all as read:', error);
       } else {
         setUnreadCount(0);
       }
     } catch (err) {
-      logger.error('Error marking all as read:', err);
+      console.error('Error marking all as read:', err);
     }
   }, []);
 
@@ -225,10 +224,10 @@ export const useRealtimeNotifications = () => {
         .eq('id', notificationId);
 
       if (error) {
-        logger.error('Failed to delete notification:', error);
+        console.error('Failed to delete notification:', error);
       }
     } catch (err) {
-      logger.error('Error deleting notification:', err);
+      console.error('Error deleting notification:', err);
     }
   }, []);
 
@@ -281,7 +280,7 @@ function showNotificationToast(notification: Notification): void {
         });
       }
     } catch (err) {
-      logger.warn('Failed to show notification toast:', err);
+      console.warn('Failed to show notification toast:', err);
     }
   }
 }

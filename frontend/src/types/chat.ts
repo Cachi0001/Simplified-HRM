@@ -5,8 +5,13 @@ export interface ChatMessage {
   message: string;
   timestamp: string;
   read_at?: string | null;
+  created_at: string;
+  delivered_at?: string | null;
+  sent_at?: string | null;
+  edited_at?: string | null;
   senderName?: string;
   senderAvatar?: string;
+  updated_at?: string | null;
 }
 
 export interface GroupChat {

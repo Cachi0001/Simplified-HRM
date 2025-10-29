@@ -11,6 +11,7 @@ import HRDashboard from './src/pages/HRDashboard';
 import AttendanceReportPage from './src/pages/AttendanceReportPage';
 import TasksPage from './src/pages/TasksPage';
 import UserSettingsPage from './src/pages/UserSettingsPage';
+import ChatPage from './src/pages/ChatPage';
 import { LeaveRequestsPage } from './src/pages/LeaveRequestsPage';
 import { PurchaseRequestsPage } from './src/pages/PurchaseRequestsPage';
 import Header from './src/components/layout/Header';
@@ -18,6 +19,7 @@ import Footer from './src/components/layout/Footer';
 import { ToastProvider } from './src/components/ui/Toast';
 import { ProtectedRoute } from './src/components/auth/ProtectedRoute';
 import ApiConnectionTest from './src/components/ApiConnectionTest';
+import { FloatingChatWidget } from './src/components/chat/FloatingChatWidget';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -37,11 +39,13 @@ function AppContent() {
                          location.pathname.startsWith('/tasks') ||
                          location.pathname.startsWith('/settings') ||
                          location.pathname.startsWith('/leave-requests') ||
-                         location.pathname.startsWith('/purchase-requests');
+                         location.pathname.startsWith('/purchase-requests') ||
+                         location.pathname.startsWith('/chat');
 
   return (
     <div className="flex flex-col min-h-screen bg-primary">
       {!isDashboardPage && <Header />}
+      <FloatingChatWidget />
       <main className="flex-grow">
         <Routes>
           <Route path="/" element={<HomePage />} />
@@ -86,6 +90,11 @@ function AppContent() {
           <Route path="/purchase-requests" element={
             <ProtectedRoute>
               <PurchaseRequestsPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/chat" element={
+            <ProtectedRoute>
+              <ChatPage />
             </ProtectedRoute>
           } />
           <Route path="/api-test" element={<ApiConnectionTest />} />

@@ -1,5 +1,4 @@
 import React from 'react';
-import { Badge } from '@/components/ui/Badge';
 
 interface ChatBadgeProps {
   count: number;
@@ -9,22 +8,19 @@ interface ChatBadgeProps {
 /**
  * ChatBadge Component
  * Displays unread message count on the chat icon
- * - Red circular badge with count
+ * - Red circular badge with white text
  * - Only visible when count > 0
- * - Smooth fade animation
+ * - Smooth fade-in animation
+ * - Compact design for navbar integration
  */
 export function ChatBadge({ count, className = '' }: ChatBadgeProps) {
   if (count <= 0) return null;
 
   return (
-    <div className={`absolute -top-2 -right-2 animate-fade-in ${className}`}>
-      <Badge
-        variant="destructive"
-        size="sm"
-        className="min-w-6 h-6 flex items-center justify-center rounded-full bg-red-500 text-white text-xs font-bold"
-      >
-        {count > 99 ? '99+' : count}
-      </Badge>
+    <div
+      className={`absolute -top-1.5 -right-1.5 min-w-5 h-5 rounded-full bg-red-600 text-white text-xs font-bold flex items-center justify-center shadow-lg animate-fade-in pointer-events-none ${className}`}
+    >
+      {count > 99 ? '99+' : count}
     </div>
   );
 }

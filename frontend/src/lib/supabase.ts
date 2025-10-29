@@ -1,14 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
-import logger from '../utils/logger';
 
 // Get Supabase URL and anon key from environment
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  logger.error('❌ Missing Supabase environment variables');
-  logger.error('   VITE_SUPABASE_URL:', supabaseUrl ? '✅' : '❌');
-  logger.error('   VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? '✅' : '❌');
+  console.error('❌ Missing Supabase environment variables');
+  console.error('   VITE_SUPABASE_URL:', supabaseUrl ? '✅' : '❌');
+  console.error('   VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? '✅' : '❌');
 }
 
 /**
@@ -39,10 +38,10 @@ export async function checkSupabaseConnection(): Promise<boolean> {
       throw error;
     }
 
-    logger.info('✅ Supabase connected');
+    console.info('✅ Supabase connected');
     return true;
   } catch (error) {
-    logger.error('❌ Supabase connection failed:', error);
+    console.error('❌ Supabase connection failed:', error);
     return false;
   }
 }
@@ -55,13 +54,13 @@ export async function initializeRealtimeSubscriptions(): Promise<void> {
     const { data: { session }, error: authError } = await supabase.auth.getSession();
 
     if (authError || !session) {
-      logger.warn('⚠️  No active session, realtime subscriptions require authentication');
+      console.warn('⚠️  No active session, realtime subscriptions require authentication');
       return;
     }
 
-    logger.info('✅ Realtime subscriptions initialized for authenticated user');
+    console.info('✅ Realtime subscriptions initialized for authenticated user');
   } catch (error) {
-    logger.error('❌ Failed to initialize realtime subscriptions:', error);
+    console.error('❌ Failed to initialize realtime subscriptions:', error);
   }
 }
 

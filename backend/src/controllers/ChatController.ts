@@ -187,7 +187,7 @@ export class ChatController {
 
       res.status(200).json({
         status: 'success',
-        data: { unreadCount }
+        data: { unreadCount } // maintain naming consistency
       });
     } catch (error) {
       logger.error('❌ [ChatController] Get chat unread count error', {
@@ -222,7 +222,7 @@ export class ChatController {
 
       res.status(200).json({
         status: 'success',
-        data: { totalUnreadCount }
+        data: { unreadCount: totalUnreadCount }
       });
     } catch (error) {
       logger.error('❌ [ChatController] Get total unread count error', {

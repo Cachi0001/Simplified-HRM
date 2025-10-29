@@ -5,13 +5,14 @@ import {
   CheckSquare,
   Clock,
   Calendar,
-  BarChart3,
+  ShoppingCart,
+  MessageCircle,
   Settings,
   LogOut,
   User
 } from 'lucide-react';
-import { Button } from '../ui/Button';
 import { authService } from '../../services/authService';
+import { useChatUnreadCount } from '../../hooks/useChatUnreadCount';
 
 interface BottomNavbarProps {
   darkMode?: boolean;
@@ -21,10 +22,10 @@ export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [localDarkMode, setLocalDarkMode] = useState(() => {
-    // Load dark mode preference from localStorage
     const saved = localStorage.getItem('darkMode');
     return saved ? JSON.parse(saved) : false;
   });
+  const { totalUnreadCount, refreshUnreadCounts } = useChatUnreadCount();
   const profileRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
@@ -39,10 +40,11 @@ export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
     try {
       const user = authService.getCurrentUserFromStorage();
       setCurrentUser(user);
+      refreshUnreadCounts();
     } catch (err) {
       console.error('Error getting current user in BottomNavbar:', err);
     }
-  }, []);
+  }, [refreshUnreadCounts]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -61,26 +63,24 @@ export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
     };
   }, [isProfileOpen]);
 
+  const dashboardPath =
+    currentUser?.role === 'employee'
+      ? '/employee-dashboard'
+      : currentUser?.role === 'hr'
+      ? '/hr-dashboard'
+      : '/dashboard';
+
   const navItems = [
-    { icon: LayoutDashboard, label: 'Dashboard', path: currentUser?.role === 'employee' ? '/employee-dashboard' : '/dashboard', active: location.pathname === (currentUser?.role === 'employee' ? '/employee-dashboard' : '/dashboard') },
-    { icon: CheckSquare, label: 'Tasks', path: '/tasks', active: location.pathname === '/tasks' },
-    { icon: Clock, label: 'Attendance', path: '/attendance-report', active: location.pathname === '/attendance-report' },
-    { icon: Calendar, label: 'Leave', path: '/leave', active: location.pathname === '/leave' },
-    { icon: BarChart3, label: 'Reports', path: '/reports', active: location.pathname === '/reports' },
+    { icon: LayoutDashboard, label: 'Dashboard', path: dashboardPath },
+    { icon: CheckSquare, label: 'Tasks', path: '/tasks' },
+    { icon: Clock, label: 'Attendance', path: '/attendance-report' },
+    { icon: Calendar, label: 'Leave', path: '/leave-requests' },
+    { icon: ShoppingCart, label: 'Purchases', path: '/purchase-requests' },
+    { icon: MessageCircle, label: 'Chat', path: '/chat', showBadge: true },
   ];
 
   const handleNavigation = (path: string) => {
-    // Handle placeholder functionality for unimplemented features
-    switch (path) {
-      case '/leave':
-        alert('Leave management is coming soon!.');
-        return;
-      case '/reports':
-        alert('Reports feature is coming soon!.');
-        return;
-      default:
-        navigate(path);
-    }
+    navigate(path);
   };
 
   const handleLogout = () => {
@@ -95,20 +95,29 @@ export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
       {/* Bottom Navigation Bar */}
       <nav className={`${localDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-t fixed bottom-0 left-0 right-0 z-40`}>
         <div className="flex justify-around items-center py-2 px-4">
-          {navItems.map((item) => (
-            <button
-              key={item.path}
-              onClick={() => handleNavigation(item.path)}
-              className={`flex flex-col items-center justify-center p-2 rounded-lg transition-colors ${
-                item.active
-                  ? (localDarkMode ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-600')
-                  : (localDarkMode ? 'text-gray-400 hover:text-white hover:bg-gray-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50')
-              }`}
-            >
-              <item.icon className="h-5 w-5 mb-1" />
-              <span className="text-xs font-medium">{item.label}</span>
-            </button>
-          ))}
+          {navItems.map((item) => {
+            const isActive = location.pathname === item.path;
+            return (
+              <button
+                key={item.path}
+                onClick={() => handleNavigation(item.path)}
+                className={`relative flex flex-col items-center justify-center p-2 rounded-lg transition-colors ${
+                  isActive
+                    ? (localDarkMode ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-600')
+                    : (localDarkMode ? 'text-gray-400 hover:text-white hover:bg-gray-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50')
+                }`}
+              >
+                <item.icon className="h-5 w-5 mb-1" />
+                <span className="sr-only">{item.label}</span>
+                {item.showBadge && totalUnreadCount > 0 && (
+                  <span className="absolute -top-1.5 right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white bg-red-600 rounded-full animate-pulse">
+                    {totalUnreadCount > 99 ? '99+' : totalUnreadCount}
+                  </span>
+                )}
+                <span className="text-xs font-medium">{item.label}</span>
+              </button>
+            );
+          })}
 
           {/* Profile Button */}
           <div className="relative" ref={profileRef}>
@@ -129,7 +138,7 @@ export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
                   <button
                     onClick={() => {
                       setIsProfileOpen(false);
-                      // Handle settings - for now just close dropdown
+                      navigate('/settings');
                     }}
                     className={`w-full text-left px-3 py-2 rounded ${localDarkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'} flex items-center`}
                   >

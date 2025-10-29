@@ -1,11 +1,14 @@
-// Supabase-compatible ChatMessage interface
 export interface IChatMessage {
   id: string;
-  chat_id: string; 
-  sender_id: string; 
+  chat_id: string;
+  sender_id: string;
   message: string;
   timestamp: string | Date;
-  read_at?: string | Date | null; // When the message was read
+  created_at: string | Date;
+  sent_at?: string | Date | null;
+  delivered_at?: string | Date | null;
+  read_at?: string | Date | null;
+  edited_at?: string | Date | null;
 }
 
 export interface CreateChatMessageRequest {
@@ -25,14 +28,17 @@ export interface ChatMessageQuery {
   offset?: number;
 }
 
-// Response interface (camelCase for frontend)
 export interface ChatMessageResponse {
   id: string;
   chatId: string;
   senderId: string;
   message: string;
   timestamp: string;
+  createdAt: string;
+  sentAt?: string | null;
+  deliveredAt?: string | null;
   readAt?: string | null;
+  editedAt?: string | null;
 }
 
 // Unread count interface

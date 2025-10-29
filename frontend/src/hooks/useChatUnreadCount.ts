@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { apiClient } from '@/services/apiClient';
+import api from '@/lib/api';
 
 export interface UnreadCount {
   chat_id: string;
@@ -27,7 +27,7 @@ export function useChatUnreadCount(): UseChatUnreadCountReturn {
   const getTotalUnreadCount = useCallback(async () => {
     try {
       setError(null);
-      const response = await apiClient.get('/chat/unread-count/total');
+      const response = await api.get('/chat/unread-count/total');
       
       if (response.data?.data?.unreadCount !== undefined) {
         setTotalUnreadCount(response.data.data.unreadCount);
@@ -42,7 +42,7 @@ export function useChatUnreadCount(): UseChatUnreadCountReturn {
   const getChatUnreadCount = useCallback(async (chatId: string): Promise<number> => {
     try {
       setError(null);
-      const response = await apiClient.get(`/chat/${chatId}/unread-count`);
+      const response = await api.get(`/chat/${chatId}/unread-count`);
       return response.data?.data?.unreadCount || 0;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to get chat unread count';
@@ -56,7 +56,7 @@ export function useChatUnreadCount(): UseChatUnreadCountReturn {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await apiClient.get('/chat/unread-counts');
+      const response = await api.get('/chat/unread-counts');
       
       if (response.data?.data?.unreadCounts) {
         setUnreadCounts(response.data.data.unreadCounts);
@@ -80,7 +80,7 @@ export function useChatUnreadCount(): UseChatUnreadCountReturn {
   const markChatAsRead = useCallback(async (chatId: string) => {
     try {
       setError(null);
-      await apiClient.patch(`/chat/${chatId}/read`, {});
+      await api.patch(`/chat/${chatId}/read`, {});
       
       // Update local state
       setUnreadCounts(prev =>

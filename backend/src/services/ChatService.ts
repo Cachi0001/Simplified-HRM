@@ -21,14 +21,20 @@ export class ChatService {
     try {
       logger.info('ChatService: Sending message', { chatId, senderId, messageLength: message.length });
 
+      const now = new Date().toISOString();
+
       const { data, error } = await this.supabase
         .from('chat_messages')
         .insert({
           chat_id: chatId,
           sender_id: senderId,
           message,
-          timestamp: new Date().toISOString(),
-          read_at: null
+          timestamp: now,
+          created_at: now,
+          sent_at: now,
+          read_at: null,
+          delivered_at: null,
+          edited_at: null
         })
         .select()
         .single();
@@ -53,9 +59,11 @@ export class ChatService {
     try {
       logger.info('ChatService: Marking message as read', { messageId, userId });
 
+      const now = new Date().toISOString();
+
       const { error } = await this.supabase
         .from('chat_messages')
-        .update({ read_at: new Date().toISOString() })
+        .update({ read_at: now, delivered_at: now })
         .eq('id', messageId)
         .select()
         .single();
@@ -80,9 +88,11 @@ export class ChatService {
       logger.info('ChatService: Marking chat as read', { chatId, userId });
 
       // Update all unread messages in this chat from this user's perspective
+      const now = new Date().toISOString();
+
       const { error: updateError } = await this.supabase
         .from('chat_messages')
-        .update({ read_at: new Date().toISOString() })
+        .update({ read_at: now, delivered_at: now })
         .eq('chat_id', chatId)
         .is('read_at', null);
 
@@ -296,7 +306,7 @@ export class ChatService {
         .from('chat_messages')
         .select()
         .eq('chat_id', chatId)
-        .order('timestamp', { ascending: false })
+        .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);
 
       if (error) {
@@ -391,7 +401,7 @@ export class ChatService {
   /**
    * Get unread counts for all chats of a user
    */
-  async getAllUnreadCounts(userId: string): Promise<Record<string, number>> {
+  async getAllUnreadCounts(userId: string): Promise<Array<{ chat_id: string; unread_count: number }>> {
     try {
       logger.info('ChatService: Getting all unread counts', { userId });
 
@@ -406,12 +416,12 @@ export class ChatService {
         throw error;
       }
 
-      const unreadCounts: Record<string, number> = {};
-      data?.forEach(entry => {
-        unreadCounts[entry.chat_id] = entry.unread_count;
-      });
+      const unreadCounts = data?.map(entry => ({
+        chat_id: entry.chat_id,
+        unread_count: entry.unread_count,
+      })) || [];
 
-      logger.info('ChatService: All unread counts retrieved', { chatCount: Object.keys(unreadCounts).length });
+      logger.info('ChatService: All unread counts retrieved', { chatCount: unreadCounts.length });
       return unreadCounts;
     } catch (error) {
       logger.error('ChatService: Get all unread counts failed', { error: (error as Error).message });

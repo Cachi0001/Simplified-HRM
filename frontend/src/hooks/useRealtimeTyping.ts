@@ -1,5 +1,4 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
-import logger from '../utils/logger';
 
 export interface TypingUser {
   userId: string;
@@ -30,7 +29,7 @@ export const useRealtimeTyping = (chatId: string | null) => {
     try {
       const { supabase } = await import('../lib/supabase');
 
-      logger.info(`🎯 Subscribing to typing indicators: ${chatId}`);
+      console.info(`🎯 Subscribing to typing indicators: ${chatId}`);
 
       const subscription = supabase
         .channel(`typing:${chatId}`)
@@ -44,7 +43,7 @@ export const useRealtimeTyping = (chatId: string | null) => {
           },
           (payload: any) => {
             const { user_id, started_at, expires_at } = payload.new;
-            logger.info(`✍️  User typing: ${user_id}`);
+            console.info(`✍️  User typing: ${user_id}`);
 
             setTypingUsers((prev) => {
               const updated = new Map(prev);
@@ -70,7 +69,7 @@ export const useRealtimeTyping = (chatId: string | null) => {
           },
           (payload: any) => {
             const { user_id, expires_at } = payload.new;
-            logger.info(`✍️  Typing update: ${user_id}`);
+            console.info(`✍️  Typing update: ${user_id}`);
 
             // Reschedule expiry
             scheduleTypingExpiry(user_id, new Date(expires_at));
@@ -86,7 +85,7 @@ export const useRealtimeTyping = (chatId: string | null) => {
           },
           (payload: any) => {
             const { user_id } = payload.old;
-            logger.info(`⛔ User stopped typing: ${user_id}`);
+            console.info(`⛔ User stopped typing: ${user_id}`);
 
             setTypingUsers((prev) => {
               const updated = new Map(prev);
@@ -103,7 +102,7 @@ export const useRealtimeTyping = (chatId: string | null) => {
           }
         )
         .subscribe((status: string) => {
-          logger.info(`📡 Typing subscription status: ${status}`);
+          console.info(`📡 Typing subscription status: ${status}`);
           if (status === 'SUBSCRIBED') {
             setIsSubscribed(true);
             setError(null);
@@ -116,7 +115,7 @@ export const useRealtimeTyping = (chatId: string | null) => {
       subscriptionRef.current = subscription;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      logger.error('❌ Failed to subscribe to typing:', errorMessage);
+      console.error('❌ Failed to subscribe to typing:', errorMessage);
       setError(errorMessage);
       setIsSubscribed(false);
     }
@@ -147,7 +146,7 @@ export const useRealtimeTyping = (chatId: string | null) => {
 
     // Schedule removal with buffer (add 500ms to be safe)
     const timer = setTimeout(() => {
-      logger.info(`⏰ Typing indicator expired for: ${userId}`);
+      console.info(`⏰ Typing indicator expired for: ${userId}`);
       setTypingUsers((prev) => {
         const updated = new Map(prev);
         updated.delete(userId);
@@ -169,9 +168,9 @@ export const useRealtimeTyping = (chatId: string | null) => {
         await supabase.removeChannel(subscriptionRef.current);
         subscriptionRef.current = null;
         setIsSubscribed(false);
-        logger.info('🔌 Unsubscribed from typing realtime');
+        console.info('🔌 Unsubscribed from typing realtime');
       } catch (err) {
-        logger.error('Error unsubscribing:', err);
+        console.error('Error unsubscribing:', err);
       }
     }
 
