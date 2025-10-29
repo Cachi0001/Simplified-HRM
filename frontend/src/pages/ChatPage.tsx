@@ -238,29 +238,29 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] bg-gray-50 dark:bg-gray-900">
-      {/* Chats List */}
-      <div className="w-full sm:w-80 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col">
-        {/* Header */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-3">
+    <div className="fixed inset-0 bottom-16 bg-gray-50 dark:bg-gray-900 flex overflow-hidden">
+      {/* Chats List - Fixed width sidebar */}
+      <div className="w-full sm:w-80 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col overflow-hidden">
+        {/* Header - Fixed height */}
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-3 flex-shrink-0 h-20">
           <button
             onClick={() => navigate(-1)}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors flex-shrink-0"
           >
             <ChevronLeft className="h-5 w-5 text-gray-600 dark:text-gray-400" />
           </button>
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2 truncate">
             Chats
             {totalUnreadCount > 0 && (
-              <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-semibold text-white bg-red-600 rounded-full">
+              <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-semibold text-white bg-red-600 rounded-full flex-shrink-0">
                 {totalUnreadCount > 99 ? '99+' : totalUnreadCount}
               </span>
             )}
           </h1>
         </div>
 
-        {/* Chat List */}
-        <div className="flex-1 overflow-y-auto">
+        {/* Chat List - Scrollable */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden">
           {isLoadingChats ? (
             <div className="flex items-center justify-center h-full">
               <Loader className="h-6 w-6 animate-spin text-blue-600" />
@@ -283,7 +283,7 @@ export default function ChatPage() {
                         : 'hover:bg-gray-100 dark:hover:bg-gray-700/50'
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start justify-between gap-2 min-w-0">
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-gray-900 dark:text-white truncate">
                           {chat.name}
@@ -306,12 +306,12 @@ export default function ChatPage() {
         </div>
       </div>
 
-      {/* Messages Area */}
-      <div className="hidden sm:flex flex-1 flex-col bg-white dark:bg-gray-800">
+      {/* Messages Area - Flexible width and height */}
+      <div className="hidden sm:flex flex-1 flex-col bg-white dark:bg-gray-800 overflow-hidden">
         {selectedChatId ? (
           <>
-            {/* Messages Container */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {/* Messages Container - Scrollable */}
+            <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-4">
               {isLoadingMessages ? (
                 <div className="flex items-center justify-center h-full">
                   <Loader className="h-6 w-6 animate-spin text-blue-600" />
@@ -339,10 +339,10 @@ export default function ChatPage() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Message Input */}
+            {/* Message Input - Fixed at bottom */}
             <form
               onSubmit={handleSendMessage}
-              className="p-4 border-t border-gray-200 dark:border-gray-700"
+              className="p-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0"
             >
               <div className="flex items-center gap-2">
                 <input
@@ -356,7 +356,7 @@ export default function ChatPage() {
                 <button
                   type="submit"
                   disabled={!messageText.trim()}
-                  className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
+                  className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors flex-shrink-0"
                 >
                   <Send className="h-5 w-5" />
                 </button>

@@ -190,8 +190,10 @@ export default function UserSettingsPage({ darkMode: initialDarkMode = false }: 
       }
 
       setIsSaving(true);
+      console.log('[UserSettings] Saving profile with data:', formData);
 
-      const response = await employeeService.updateEmployee(currentUser.id, {
+      // Use updateMyProfile for current user
+      const response = await employeeService.updateMyProfile({
         fullName: formData.fullName,
         email: formData.email,
         phone: formData.phone,
@@ -201,10 +203,22 @@ export default function UserSettingsPage({ darkMode: initialDarkMode = false }: 
         dateOfBirth: formData.dateOfBirth,
       });
 
+      console.log('[UserSettings] Profile updated successfully:', response);
+
+      // Update localStorage with new user info
+      const updatedUser = {
+        ...currentUser,
+        fullName: formData.fullName,
+        email: formData.email
+      };
+      localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+      setCurrentUser(updatedUser);
+
       addToast('success', 'Profile updated successfully!');
-      setCurrentUser(prev => ({ ...prev, fullName: formData.fullName }));
     } catch (error: any) {
-      addToast('error', error.message || 'Failed to update profile');
+      console.error('[UserSettings] Error saving profile:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to update profile';
+      addToast('error', errorMessage);
     } finally {
       setIsSaving(false);
     }

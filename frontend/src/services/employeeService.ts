@@ -12,10 +12,12 @@ export interface CreateEmployeeRequest {
 
 export interface UpdateEmployeeRequest {
   fullName?: string;
+  email?: string;
   department?: string;
   position?: string;
   phone?: string;
   address?: string;
+  dateOfBirth?: string;
   status?: 'active' | 'inactive';
 }
 

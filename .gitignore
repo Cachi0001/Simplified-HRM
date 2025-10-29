@@ -80,6 +80,7 @@ dist
 .cache/
 MODELS_SUMMARY.md
 
+database
 
 # Storybook build outputs
 .out

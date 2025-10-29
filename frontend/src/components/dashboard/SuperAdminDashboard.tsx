@@ -30,16 +30,29 @@ interface ApprovalHistoryByEmployee {
   [employeeId: string]: ApprovalHistory[];
 }
 
+interface DashboardStats {
+  totalEmployees: number;
+  admins: number;
+  hrStaff: number;
+  approvalRatio?: string;
+}
+
 export const SuperAdminDashboard: React.FC = () => {
   const [pendingEmployees, setPendingEmployees] = useState<PendingEmployee[]>([]);
   const [approvalHistory, setApprovalHistory] = useState<ApprovalHistoryByEmployee>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [selectedRole, setSelectedRole] = useState<{ [key: string]: string }>({});
   const [approving, setApproving] = useState<{ [key: string]: boolean }>({});
   const [rejecting, setRejecting] = useState<{ [key: string]: boolean }>({});
   const [expandedEmployee, setExpandedEmployee] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState<{ [key: string]: string }>({});
+  const [stats, setStats] = useState<DashboardStats>({
+    totalEmployees: 0,
+    admins: 0,
+    hrStaff: 0,
+  });
 
   useEffect(() => {
     loadPendingApprovals();
@@ -56,16 +69,33 @@ export const SuperAdminDashboard: React.FC = () => {
       const response = await apiClient.get('/api/employees/pending');
       
       if (response.data?.employees) {
-        setPendingEmployees(response.data.employees);
+        const employees = response.data.employees;
+        setPendingEmployees(employees);
+        
+        // Calculate stats
+        const statsResponse = await apiClient.get('/api/employees/stats').catch(() => null);
+        if (statsResponse?.data) {
+          setStats({
+            totalEmployees: statsResponse.data.total || 0,
+            admins: employees.filter((emp: any) => emp.current_role === 'admin').length,
+            hrStaff: employees.filter((emp: any) => emp.current_role === 'hr').length,
+            approvalRatio: `${employees.length} pending`
+          });
+        }
+        
         // Initialize selected roles with current role as default
         const initialRoles: { [key: string]: string } = {};
-        response.data.employees.forEach((emp: PendingEmployee) => {
+        employees.forEach((emp: PendingEmployee) => {
           initialRoles[emp.id] = emp.current_role || 'employee';
         });
         setSelectedRole(initialRoles);
       }
       
       setError(null);
+      // Clear success message after 3 seconds
+      if (successMessage) {
+        setTimeout(() => setSuccessMessage(null), 3000);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load pending approvals';
       logger.error('[SuperAdminDashboard] Error loading approvals:', message);
@@ -98,6 +128,7 @@ export const SuperAdminDashboard: React.FC = () => {
       setApproving(prev => ({ ...prev, [employeeId]: true }));
       
       const role = selectedRole[employeeId] || 'employee';
+      const employee = pendingEmployees.find(emp => emp.id === employeeId);
       
       logger.info('[SuperAdminDashboard] Approving employee:', { employeeId, role });
       
@@ -111,6 +142,8 @@ export const SuperAdminDashboard: React.FC = () => {
 
       if (response.data?.status === 'success') {
         logger.info('[SuperAdminDashboard] Employee approved successfully');
+        setSuccessMessage(`✓ ${employee?.employee_name} approved with ${role} role`);
+        setError(null);
         // Remove from pending list
         setPendingEmployees(prev => prev.filter(emp => emp.id !== employeeId));
         // Reload to see updated data
@@ -120,6 +153,7 @@ export const SuperAdminDashboard: React.FC = () => {
       const message = err instanceof Error ? err.message : 'Failed to approve employee';
       logger.error('[SuperAdminDashboard] Error approving:', message);
       setError(message);
+      setSuccessMessage(null);
     } finally {
       setApproving(prev => ({ ...prev, [employeeId]: false }));
     }
@@ -134,6 +168,8 @@ export const SuperAdminDashboard: React.FC = () => {
 
       setRejecting(prev => ({ ...prev, [employeeId]: true }));
       
+      const employee = pendingEmployees.find(emp => emp.id === employeeId);
+      
       logger.info('[SuperAdminDashboard] Rejecting employee:', employeeId);
       
       const response = await apiClient.post(
@@ -145,6 +181,8 @@ export const SuperAdminDashboard: React.FC = () => {
 
       if (response.data?.status === 'success') {
         logger.info('[SuperAdminDashboard] Employee rejected successfully');
+        setSuccessMessage(`✓ ${employee?.employee_name} rejected`);
+        setError(null);
         setPendingEmployees(prev => prev.filter(emp => emp.id !== employeeId));
         setRejectReason(prev => ({ ...prev, [employeeId]: '' }));
         await loadPendingApprovals();
@@ -153,6 +191,7 @@ export const SuperAdminDashboard: React.FC = () => {
       const message = err instanceof Error ? err.message : 'Failed to reject employee';
       logger.error('[SuperAdminDashboard] Error rejecting:', message);
       setError(message);
+      setSuccessMessage(null);
     } finally {
       setRejecting(prev => ({ ...prev, [employeeId]: false }));
     }
@@ -195,7 +234,7 @@ export const SuperAdminDashboard: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm opacity-90">Total Employees</p>
-                <p className="text-3xl font-bold">0</p>
+                <p className="text-3xl font-bold">{stats.totalEmployees}</p>
               </div>
               <CheckCircle size={32} className="opacity-50" />
             </div>
@@ -205,7 +244,7 @@ export const SuperAdminDashboard: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm opacity-90">Admins</p>
-                <p className="text-3xl font-bold">0</p>
+                <p className="text-3xl font-bold">{stats.admins}</p>
               </div>
               <AlertCircle size={32} className="opacity-50" />
             </div>
@@ -215,12 +254,23 @@ export const SuperAdminDashboard: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm opacity-90">HR Staff</p>
-                <p className="text-3xl font-bold">0</p>
+                <p className="text-3xl font-bold">{stats.hrStaff}</p>
               </div>
               <AlertCircle size={32} className="opacity-50" />
             </div>
           </div>
         </div>
+
+        {/* Success Message */}
+        {successMessage && (
+          <div className="bg-green-900 border border-green-700 rounded-lg p-4 mb-6 text-green-100 flex items-start gap-3">
+            <CheckCircle size={20} className="flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold">Success</p>
+              <p className="text-sm">{successMessage}</p>
+            </div>
+          </div>
+        )}
 
         {/* Error Message */}
         {error && (

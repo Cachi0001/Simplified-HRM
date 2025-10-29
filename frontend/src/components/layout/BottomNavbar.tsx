@@ -6,7 +6,7 @@ import {
   Clock,
   Calendar,
   ShoppingCart,
-  MessageCircle,
+  Menu,
   Settings,
   LogOut,
   User
@@ -27,6 +27,9 @@ export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
   });
   const { totalUnreadCount, refreshUnreadCounts } = useChatUnreadCount();
   const profileRef = useRef<HTMLDivElement>(null);
+  const hamburgerRef = useRef<HTMLButtonElement>(null);
+  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -76,7 +79,6 @@ export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
     { icon: Clock, label: 'Attendance', path: '/attendance-report' },
     { icon: Calendar, label: 'Leave', path: '/leave-requests' },
     { icon: ShoppingCart, label: 'Purchases', path: '/purchase-requests' },
-    { icon: MessageCircle, label: 'Chat', path: '/chat', showBadge: true },
   ];
 
   const handleNavigation = (path: string) => {
@@ -88,6 +90,33 @@ export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     navigate('/auth');
+  };
+
+  // Hamburger menu drag detection
+  const handleHamburgerMouseDown = (e: React.MouseEvent) => {
+    dragStartRef.current = { x: e.clientX, y: e.clientY };
+    setIsDragging(false);
+  };
+
+  const handleHamburgerMouseMove = (e: React.MouseEvent) => {
+    if (!dragStartRef.current) return;
+    
+    const moveX = Math.abs(e.clientX - dragStartRef.current.x);
+    const moveY = Math.abs(e.clientY - dragStartRef.current.y);
+    
+    // If moved more than 5px, consider it a drag
+    if (moveX > 5 || moveY > 5) {
+      setIsDragging(true);
+    }
+  };
+
+  const handleHamburgerMouseUp = (e: React.MouseEvent) => {
+    // Only open chat if not dragging
+    if (!isDragging && hamburgerRef.current) {
+      navigate('/chat');
+    }
+    dragStartRef.current = null;
+    setIsDragging(false);
   };
 
   return (
@@ -118,6 +147,36 @@ export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
               </button>
             );
           })}
+
+          {/* Hamburger Menu - Chat Access with Drag Detection */}
+          <button
+            ref={hamburgerRef}
+            onMouseDown={handleHamburgerMouseDown}
+            onMouseMove={handleHamburgerMouseMove}
+            onMouseUp={handleHamburgerMouseUp}
+            onMouseLeave={() => {
+              if (dragStartRef.current) {
+                dragStartRef.current = null;
+                setIsDragging(false);
+              }
+            }}
+            className={`relative flex flex-col items-center justify-center p-2 rounded-lg transition-colors cursor-grab ${
+              isDragging ? 'cursor-grabbing' : 'cursor-grab'
+            } ${
+              location.pathname === '/chat'
+                ? (localDarkMode ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-600')
+                : (localDarkMode ? 'text-gray-400 hover:text-white hover:bg-gray-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50')
+            }`}
+            title="Click to open chat (or drag to move)"
+          >
+            <Menu className="h-5 w-5 mb-1" />
+            {totalUnreadCount > 0 && (
+              <span className="absolute -top-1.5 right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white bg-red-600 rounded-full animate-pulse">
+                {totalUnreadCount > 99 ? '99+' : totalUnreadCount}
+              </span>
+            )}
+            <span className="text-xs font-medium">Chat</span>
+          </button>
 
           {/* Profile Button */}
           <div className="relative" ref={profileRef}>
