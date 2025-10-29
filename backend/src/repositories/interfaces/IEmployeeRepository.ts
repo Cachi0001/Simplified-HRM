@@ -13,4 +13,7 @@ export interface IEmployeeRepository {
   getEmployeeStats(): Promise<{ total: number; active: number; pending: number; rejected: number }>;
   assignDepartment(id: string, department: string): Promise<any>;
   updateEmailVerification(userId: string, verified: boolean): Promise<void>;
+  approveEmployeeWithRole(employeeId: string, role: string, approverId: string, approverName: string, reason?: string): Promise<any>;
+  updateRole(employeeId: string, newRole: string, updatedById: string, updatedByName: string, reason?: string): Promise<any>;
+  getApprovalHistory(employeeId?: string): Promise<any[]>;
 }

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle, XCircle, Clock, AlertCircle, RefreshCw, Eye, EyeOff } from 'lucide-react';
-import apiClient from '../../utils/apiClient';
-import logger from '../../utils/logger';
+import apiClient from '@/lib/api';
+
+const logger = console;
 
 interface PendingEmployee {
   id: string;
@@ -66,14 +67,14 @@ export const SuperAdminDashboard: React.FC = () => {
       setLoading(true);
       logger.info('[SuperAdminDashboard] Loading pending approvals');
       
-      const response = await apiClient.get('/api/employees/pending');
+      const response = await apiClient.get('/employees/pending');
       
       if (response.data?.employees) {
         const employees = response.data.employees;
         setPendingEmployees(employees);
         
         // Calculate stats
-        const statsResponse = await apiClient.get('/api/employees/stats').catch(() => null);
+        const statsResponse = await apiClient.get('/employees/stats').catch(() => null);
         if (statsResponse?.data) {
           setStats({
             totalEmployees: statsResponse.data.total || 0,
@@ -109,7 +110,7 @@ export const SuperAdminDashboard: React.FC = () => {
     try {
       logger.info('[SuperAdminDashboard] Loading approval history for:', employeeId);
       
-      const response = await apiClient.get(`/api/employees/approvals/history?employeeId=${employeeId}`);
+      const response = await apiClient.get(`/employees/approvals/history?employeeId=${employeeId}`);
       
       if (response.data?.data) {
         setApprovalHistory(prev => ({
@@ -133,7 +134,7 @@ export const SuperAdminDashboard: React.FC = () => {
       logger.info('[SuperAdminDashboard] Approving employee:', { employeeId, role });
       
       const response = await apiClient.post(
-        `/api/employees/${employeeId}/approve-with-role`,
+        `/employees/${employeeId}/approve-with-role`,
         { 
           role,
           reason: 'Approved by Super-Admin'
@@ -173,7 +174,7 @@ export const SuperAdminDashboard: React.FC = () => {
       logger.info('[SuperAdminDashboard] Rejecting employee:', employeeId);
       
       const response = await apiClient.post(
-        `/api/employees/${employeeId}/reject`,
+        `/employees/${employeeId}/reject`,
         { 
           reason: rejectReason[employeeId]
         }

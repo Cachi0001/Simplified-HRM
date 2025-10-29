@@ -9,7 +9,9 @@ import {
   Menu,
   Settings,
   LogOut,
-  User
+  User,
+  MessageCircle,
+  X
 } from 'lucide-react';
 import { authService } from '../../services/authService';
 import { useChatUnreadCount } from '../../hooks/useChatUnreadCount';
@@ -18,18 +20,23 @@ interface BottomNavbarProps {
   darkMode?: boolean;
 }
 
+interface NavItem {
+  icon: React.ComponentType<{ className: string }>;
+  label: string;
+  path: string;
+  showBadge?: boolean;
+  action?: () => void;
+}
+
 export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [localDarkMode, setLocalDarkMode] = useState(() => {
     const saved = localStorage.getItem('darkMode');
     return saved ? JSON.parse(saved) : false;
   });
   const { totalUnreadCount, refreshUnreadCounts } = useChatUnreadCount();
-  const profileRef = useRef<HTMLDivElement>(null);
-  const hamburgerRef = useRef<HTMLButtonElement>(null);
-  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -52,19 +59,16 @@ export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
   // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
-        setIsProfileOpen(false);
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
       }
     }
 
-    if (isProfileOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
+    document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isProfileOpen]);
+  }, []);
 
   const dashboardPath =
     currentUser?.role === 'employee'
@@ -73,17 +77,13 @@ export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
       ? '/hr-dashboard'
       : '/dashboard';
 
-  const navItems = [
+  // Main navbar items (5 max)
+  const navItems: NavItem[] = [
     { icon: LayoutDashboard, label: 'Dashboard', path: dashboardPath },
     { icon: CheckSquare, label: 'Tasks', path: '/tasks' },
     { icon: Clock, label: 'Attendance', path: '/attendance-report' },
     { icon: Calendar, label: 'Leave', path: '/leave-requests' },
-    { icon: ShoppingCart, label: 'Purchases', path: '/purchase-requests' },
   ];
-
-  const handleNavigation = (path: string) => {
-    navigate(path);
-  };
 
   const handleLogout = () => {
     localStorage.removeItem('user');
@@ -92,31 +92,22 @@ export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
     navigate('/auth');
   };
 
-  // Hamburger menu drag detection
-  const handleHamburgerMouseDown = (e: React.MouseEvent) => {
-    dragStartRef.current = { x: e.clientX, y: e.clientY };
-    setIsDragging(false);
-  };
+  // Hidden menu items (shown in hamburger dropdown)
+  const menuItems: NavItem[] = [
+    { icon: ShoppingCart, label: 'Purchases', path: '/purchase-requests' },
+    { icon: MessageCircle, label: 'Chat', path: '/chat', showBadge: true },
+    { icon: User, label: 'Profile', path: '/settings' },
+    { icon: Settings, label: 'Settings', path: '/settings' },
+    { icon: LogOut, label: 'Logout', path: '/auth', action: handleLogout },
+  ];
 
-  const handleHamburgerMouseMove = (e: React.MouseEvent) => {
-    if (!dragStartRef.current) return;
-    
-    const moveX = Math.abs(e.clientX - dragStartRef.current.x);
-    const moveY = Math.abs(e.clientY - dragStartRef.current.y);
-    
-    // If moved more than 5px, consider it a drag
-    if (moveX > 5 || moveY > 5) {
-      setIsDragging(true);
+  const handleNavigation = (item: NavItem) => {
+    if (item.action) {
+      item.action();
+    } else {
+      navigate(item.path);
     }
-  };
-
-  const handleHamburgerMouseUp = (e: React.MouseEvent) => {
-    // Only open chat if not dragging
-    if (!isDragging && hamburgerRef.current) {
-      navigate('/chat');
-    }
-    dragStartRef.current = null;
-    setIsDragging(false);
+    setIsMenuOpen(false);
   };
 
   return (
@@ -129,7 +120,7 @@ export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
             return (
               <button
                 key={item.path}
-                onClick={() => handleNavigation(item.path)}
+                onClick={() => handleNavigation(item)}
                 className={`relative flex flex-col items-center justify-center p-2 rounded-lg transition-colors ${
                   isActive
                     ? (localDarkMode ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-600')
@@ -138,82 +129,56 @@ export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
               >
                 <item.icon className="h-5 w-5 mb-1" />
                 <span className="sr-only">{item.label}</span>
-                {item.showBadge && totalUnreadCount > 0 && (
-                  <span className="absolute -top-1.5 right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white bg-red-600 rounded-full animate-pulse">
-                    {totalUnreadCount > 99 ? '99+' : totalUnreadCount}
-                  </span>
-                )}
                 <span className="text-xs font-medium">{item.label}</span>
               </button>
             );
           })}
 
-          {/* Hamburger Menu - Chat Access with Drag Detection */}
-          <button
-            ref={hamburgerRef}
-            onMouseDown={handleHamburgerMouseDown}
-            onMouseMove={handleHamburgerMouseMove}
-            onMouseUp={handleHamburgerMouseUp}
-            onMouseLeave={() => {
-              if (dragStartRef.current) {
-                dragStartRef.current = null;
-                setIsDragging(false);
-              }
-            }}
-            className={`relative flex flex-col items-center justify-center p-2 rounded-lg transition-colors cursor-grab ${
-              isDragging ? 'cursor-grabbing' : 'cursor-grab'
-            } ${
-              location.pathname === '/chat'
-                ? (localDarkMode ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-600')
-                : (localDarkMode ? 'text-gray-400 hover:text-white hover:bg-gray-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50')
-            }`}
-            title="Click to open chat (or drag to move)"
-          >
-            <Menu className="h-5 w-5 mb-1" />
-            {totalUnreadCount > 0 && (
-              <span className="absolute -top-1.5 right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white bg-red-600 rounded-full animate-pulse">
-                {totalUnreadCount > 99 ? '99+' : totalUnreadCount}
-              </span>
-            )}
-            <span className="text-xs font-medium">Chat</span>
-          </button>
-
-          {/* Profile Button */}
-          <div className="relative" ref={profileRef}>
+          {/* Hamburger Menu - Shows hidden navigation items */}
+          <div className="relative" ref={menuRef}>
             <button
-              onClick={() => setIsProfileOpen(!isProfileOpen)}
-              className={`flex flex-col items-center justify-center p-2 rounded-lg transition-colors ${
-                localDarkMode ? 'text-gray-400 hover:text-white hover:bg-gray-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className={`relative flex flex-col items-center justify-center p-2 rounded-lg transition-colors ${
+                isMenuOpen
+                  ? (localDarkMode ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-600')
+                  : (localDarkMode ? 'text-gray-400 hover:text-white hover:bg-gray-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50')
               }`}
+              title="More options"
             >
-              <User className="h-5 w-5 mb-1" />
-              <span className="text-xs font-medium">Profile</span>
+              <Menu className="h-5 w-5 mb-1" />
+              {totalUnreadCount > 0 && (
+                <span className="absolute -top-1.5 right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white bg-red-600 rounded-full animate-pulse">
+                  {totalUnreadCount > 99 ? '99+' : totalUnreadCount}
+                </span>
+              )}
+              <span className="text-xs font-medium">More</span>
             </button>
 
-            {/* Profile Dropdown */}
-            {isProfileOpen && (
+            {/* Hamburger Menu Dropdown */}
+            {isMenuOpen && (
               <div className={`absolute bottom-full right-0 mb-2 w-48 ${localDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border rounded-lg shadow-lg z-50`}>
                 <div className="p-2">
-                  <button
-                    onClick={() => {
-                      setIsProfileOpen(false);
-                      navigate('/settings');
-                    }}
-                    className={`w-full text-left px-3 py-2 rounded ${localDarkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'} flex items-center`}
-                  >
-                    <Settings className="h-4 w-4 mr-2" />
-                    Settings
-                  </button>
-                  <button
-                    onClick={() => {
-                      setIsProfileOpen(false);
-                      handleLogout();
-                    }}
-                    className={`w-full text-left px-3 py-2 rounded ${localDarkMode ? 'text-red-400 hover:bg-gray-700' : 'text-red-600 hover:bg-gray-100'} flex items-center`}
-                  >
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Logout
-                  </button>
+                  {menuItems.map((item) => (
+                    <button
+                      key={item.label}
+                      onClick={() => handleNavigation(item)}
+                      className={`w-full text-left px-3 py-2 rounded flex items-center gap-2 transition-colors ${
+                        location.pathname === item.path
+                          ? (localDarkMode ? 'bg-blue-600/20 text-blue-400' : 'bg-blue-50 text-blue-600')
+                          : (localDarkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100')
+                      }`}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      <div className="flex-1 flex items-center justify-between">
+                        <span>{item.label}</span>
+                        {item.showBadge && totalUnreadCount > 0 && (
+                          <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-semibold text-white bg-red-600 rounded-full">
+                            {totalUnreadCount > 99 ? '99+' : totalUnreadCount}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  ))}
                 </div>
               </div>
             )}

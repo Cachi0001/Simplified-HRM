@@ -12,6 +12,9 @@ interface Chat {
   unreadCount: number;
   avatar?: string;
   type: 'dm' | 'group' | 'announcement';
+  fullName?: string;
+  email?: string;
+  role?: string;
 }
 
 interface Message {
@@ -44,6 +47,8 @@ export function FloatingChatWidget() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isTyping, setIsTyping] = useState(false);
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const dragRef = useRef(null);
   const fullscreenRef = useRef(null);
 
@@ -88,6 +93,34 @@ export function FloatingChatWidget() {
     return () => window.removeEventListener('keydown', handleEscKey);
   }, [isFullscreen]);
 
+  // Typing indicator logic
+  useEffect(() => {
+    let typingTimeout: NodeJS.Timeout;
+    if (isTyping && selectedChat) {
+      api.post(`/chat/${selectedChat.id}/typing`);
+      typingTimeout = setTimeout(() => {
+        setIsTyping(false);
+      }, 2000);
+    }
+    return () => clearTimeout(typingTimeout);
+  }, [messageText, selectedChat]);
+
+  // Listen for typing events
+  useEffect(() => {
+    if (selectedChat) {
+      // Replace with your actual real-time subscription logic (e.g., Supabase)
+      const channel = `typing-${selectedChat.id}`;
+      const handleTyping = (user: string) => {
+        setTypingUsers(prev => [...prev, user]);
+        setTimeout(() => {
+          setTypingUsers(prev => prev.filter(u => u !== user));
+        }, 3000);
+      };
+      // Example: document.addEventListener(channel, (e) => handleTyping(e.detail.user));
+      // return () => document.removeEventListener(channel, (e) => handleTyping(e.detail.user));
+    }
+  }, [selectedChat]);
+
   // Role-based chat filtering
   const shouldShowChatInHistory = (chat: Chat, userRole: string): boolean => {
     // Super-admin sees all conversations
@@ -121,7 +154,10 @@ export function FloatingChatWidget() {
           lastMessage: chat.lastMessage,
           unreadCount: chat.unreadCount || 0,
           avatar: chat.avatar,
-          type: chat.type || 'dm'
+          type: chat.type || 'dm',
+          fullName: chat.fullName,
+          email: chat.email,
+          role: chat.role
         }));
 
         // Apply role-based filtering for history tab
@@ -176,7 +212,9 @@ export function FloatingChatWidget() {
   };
 
   const filteredChats = chats.filter(chat =>
-    chat.name.toLowerCase().includes(searchQuery.toLowerCase())
+    (chat.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (chat.fullName && chat.fullName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (chat.email && chat.email.toLowerCase().includes(searchQuery.toLowerCase())))
   );
 
   const bgColor = darkMode ? 'bg-gray-900' : 'bg-white';
@@ -198,6 +236,19 @@ export function FloatingChatWidget() {
     };
   };
 
+  const getRoleBadgeClass = (role: string) => {
+    switch (role.toLowerCase()) {
+      case 'hr':
+        return 'bg-blue-500 text-white';
+      case 'super-admin':
+        return 'bg-purple-600 text-white';
+      case 'admin':
+        return 'bg-red-500 text-white';
+      default:
+        return 'bg-gray-500 text-white';
+    }
+  };
+
   return (
     <>
       {isFullscreen && (
@@ -216,7 +267,6 @@ export function FloatingChatWidget() {
         <div
           ref={dragRef}
           className={`fixed z-50 ${isFullscreen ? 'inset-0 cursor-default' : 'cursor-move'}`}
-          style={isFullscreen ? { bottom: 'auto', right: 'auto', left: 0, top: 0 } : { bottom: 'auto', right: 'auto' }}
         >
         {!isOpen ? (
           // Chat Bubble Button
@@ -239,8 +289,7 @@ export function FloatingChatWidget() {
           // Chat Modal
           <div
             ref={fullscreenRef}
-            className={`${bgColor} ${textColor} ${isFullscreen ? 'w-full h-full rounded-none' : 'w-80 h-96 rounded-lg'} shadow-2xl flex flex-col border ${borderColor}`}
-            style={isFullscreen ? { maxHeight: '100vh', minHeight: '100vh' } : { maxHeight: '80vh', minHeight: '300px' }}
+            className={`${bgColor} ${textColor} ${isFullscreen ? 'w-full h-full rounded-none' : 'w-96 h-[600px] rounded-lg'} shadow-2xl flex flex-col border ${borderColor}`}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -335,30 +384,32 @@ export function FloatingChatWidget() {
                   ) : filteredChats.length > 0 ? (
                     <div>
                       {filteredChats.map(chat => (
-                        <button
+                        <div
                           key={chat.id}
                           onClick={() => setSelectedChat(chat)}
-                          className={`w-full p-3 border-b ${borderColor} hover:${darkMode ? 'bg-gray-800' : 'bg-gray-50'} transition-colors text-left flex items-center justify-between`}
+                          className={`w-full p-3 border-b ${borderColor} hover:${darkMode ? 'bg-gray-800' : 'bg-gray-50'} transition-colors text-left flex items-center space-x-3 cursor-pointer`}
                         >
+                          <img src={chat.avatar || '/default-avatar.png'} alt={chat.fullName || chat.name} className="w-10 h-10 rounded-full" />
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium truncate">{chat.name}</p>
-                            {chat.lastMessage && (
-                              <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} truncate`}>
-                                {chat.lastMessage}
-                              </p>
-                            )}
+                            <div className="flex justify-between items-center">
+                               <p className="font-bold text-sm truncate">{chat.fullName || chat.name}</p>
+                               {chat.unreadCount > 0 && (
+                                <span className="ml-2 bg-purple-600 text-white text-xs font-bold rounded-full px-2 py-1">
+                                  {chat.unreadCount}
+                                </span>
+                              )}
+                            </div>
+                            {chat.role && chat.role.toLowerCase() !== 'employee' ? (
+                              <span className={`text-xs px-2 py-1 rounded-full ${getRoleBadgeClass(chat.role)}`}>{chat.role}</span>
+                            ) : <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} truncate`}>{chat.email}</p>}
                           </div>
-                          {chat.unreadCount > 0 && (
-                            <span className="ml-2 bg-purple-600 text-white text-xs font-bold rounded-full px-2 py-1">
-                              {chat.unreadCount}
-                            </span>
-                          )}
-                        </button>
+                        </div>
                       ))}
                     </div>
                   ) : (
-                    <div className={`flex items-center justify-center h-full ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                      <p>No chats found</p>
+                    <div className={`flex flex-col items-center justify-center h-full ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                      <p>No messages yet. Start a conversation.</p>
+                      <button className="mt-2 px-3 py-1 bg-purple-600 text-white rounded-md text-sm">+</button>
                     </div>
                   )}
                 </div>
@@ -373,8 +424,12 @@ export function FloatingChatWidget() {
                   >
                     ←
                   </button>
+                  <img src={selectedChat.avatar || '/default-avatar.png'} alt={selectedChat.fullName || selectedChat.name} className="w-8 h-8 rounded-full mr-2" />
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold truncate">{selectedChat.name}</p>
+                    <p className="font-semibold truncate">{selectedChat.fullName || selectedChat.name}</p>
+                    {selectedChat.role && selectedChat.role.toLowerCase() !== 'employee' && (
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${getRoleBadgeClass(selectedChat.role)}`}>{selectedChat.role}</span>
+                    )}
                   </div>
                 </div>
 
@@ -388,24 +443,28 @@ export function FloatingChatWidget() {
                     messages.map(msg => (
                       <div
                         key={msg.id}
-                        className={`flex ${msg.sender_id === currentUser?.id ? 'justify-end' : 'justify-start'}`}
+                        className={`flex flex-col ${msg.sender_id === currentUser?.id ? 'items-end' : 'items-start'}`}
                       >
                         <div
                           className={`max-w-xs px-3 py-2 rounded-lg text-sm ${
                             msg.sender_id === currentUser?.id
-                              ? 'bg-purple-600 text-white'
-                              : darkMode
-                              ? 'bg-gray-800 text-gray-100'
-                              : 'bg-gray-200 text-gray-900'
+                              ? 'bg-green-500 text-white rounded-br-none'
+                              : `${darkMode ? 'bg-gray-700' : 'bg-gray-200'} rounded-bl-none`
                           }`}
                         >
                           {msg.message}
                         </div>
+                        <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} mt-1`}>{new Date(msg.timestamp).toLocaleTimeString()}</p>
                       </div>
                     ))
                   ) : (
-                    <div className={`flex items-center justify-center h-full ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                      <p>No messages yet</p>
+                    <div className={`flex flex-col items-center justify-center h-full ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                       <p>No messages yet. Start a conversation.</p>
+                    </div>
+                  )}
+                  {typingUsers.length > 0 && (
+                    <div className="text-xs text-gray-500">
+                      {typingUsers.join(', ')} {typingUsers.length > 1 ? 'are' : 'is'} typing...
                     </div>
                   )}
                 </div>
@@ -415,15 +474,18 @@ export function FloatingChatWidget() {
                   <input
                     type="text"
                     value={messageText}
-                    onChange={(e) => setMessageText(e.target.value)}
+                    onChange={(e) => {
+                      setMessageText(e.target.value);
+                      setIsTyping(true);
+                    }}
                     onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
                     placeholder="Type a message..."
-                    className={`flex-1 px-3 py-2 rounded text-sm outline-none ${inputBg} ${textColor} placeholder-gray-500`}
+                    className={`flex-1 px-3 py-2 rounded-full text-sm outline-none ${inputBg} ${textColor} placeholder-gray-500`}
                   />
                   <button
                     onClick={handleSendMessage}
                     disabled={!messageText.trim()}
-                    className="p-2 rounded bg-purple-600 hover:bg-purple-700 disabled:bg-gray-500 text-white transition-colors"
+                    className="p-2 rounded-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-500 text-white transition-colors"
                   >
                     <Send className="w-4 h-4" />
                   </button>

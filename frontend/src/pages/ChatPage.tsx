@@ -238,9 +238,9 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="fixed inset-0 bottom-16 bg-gray-50 dark:bg-gray-900 flex overflow-hidden">
+    <div className="fixed inset-0 bg-gray-50 dark:bg-gray-900 flex overflow-hidden" style={{ top: 0, bottom: '64px' }}>
       {/* Chats List - Fixed width sidebar */}
-      <div className="w-full sm:w-80 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col overflow-hidden">
+      <div className="w-full sm:w-80 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col overflow-hidden h-full">
         {/* Header - Fixed height */}
         <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-3 flex-shrink-0 h-20">
           <button
@@ -307,7 +307,7 @@ export default function ChatPage() {
       </div>
 
       {/* Messages Area - Flexible width and height */}
-      <div className="hidden sm:flex flex-1 flex-col bg-white dark:bg-gray-800 overflow-hidden">
+      <div className="hidden sm:flex flex-1 flex-col bg-white dark:bg-gray-800 overflow-hidden h-full">
         {selectedChatId ? (
           <>
             {/* Messages Container - Scrollable */}

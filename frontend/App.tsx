@@ -8,6 +8,7 @@ import ResetPasswordCard from './src/components/auth/ResetPasswordCard';
 import AdminDashboard from './src/pages/AdminDashboard';
 import EmployeeDashboard from './src/pages/EmployeeDashboard';
 import HRDashboard from './src/pages/HRDashboard';
+import SuperAdminDashboardPage from './src/pages/SuperAdminDashboardPage';
 import AttendanceReportPage from './src/pages/AttendanceReportPage';
 import TasksPage from './src/pages/TasksPage';
 import UserSettingsPage from './src/pages/UserSettingsPage';
@@ -35,6 +36,7 @@ function AppContent() {
   const isDashboardPage = location.pathname.startsWith('/dashboard') ||
                          location.pathname.startsWith('/employee-dashboard') ||
                          location.pathname.startsWith('/hr-dashboard') ||
+                         location.pathname.startsWith('/super-admin-dashboard') ||
                          location.pathname.startsWith('/attendance-report') ||
                          location.pathname.startsWith('/tasks') ||
                          location.pathname.startsWith('/settings') ||
@@ -65,6 +67,11 @@ function AppContent() {
           <Route path="/hr-dashboard" element={
             <ProtectedRoute>
               <HRDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/super-admin-dashboard" element={
+            <ProtectedRoute>
+              <SuperAdminDashboardPage />
             </ProtectedRoute>
           } />
           <Route path="/tasks" element={

@@ -59,19 +59,26 @@ export function useChatUnreadCount(): UseChatUnreadCountReturn {
       const response = await api.get('/chat/unread-counts');
       
       if (response.data?.data?.unreadCounts) {
-        setUnreadCounts(response.data.data.unreadCounts);
+        // Ensure unreadCounts is an array
+        const counts = Array.isArray(response.data.data.unreadCounts) 
+          ? response.data.data.unreadCounts 
+          : [];
         
-        // Calculate total
-        const total = response.data.data.unreadCounts.reduce(
-          (sum: number, uc: UnreadCount) => sum + (uc.unread_count || 0),
-          0
-        );
+        setUnreadCounts(counts);
+        
+        // Calculate total - only if we have a valid array
+        const total = Array.isArray(counts) 
+          ? counts.reduce(
+              (sum: number, uc: UnreadCount) => sum + (uc.unread_count || 0),
+              0
+            )
+          : 0;
         setTotalUnreadCount(total);
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to get unread counts';
       setError(errorMessage);
-      console.error(errorMessage);
+      console.error('Failed to get unread counts:', errorMessage, err);
     } finally {
       setIsLoading(false);
     }
@@ -83,16 +90,18 @@ export function useChatUnreadCount(): UseChatUnreadCountReturn {
       await api.patch(`/chat/${chatId}/read`, {});
       
       // Update local state
-      setUnreadCounts(prev =>
-        prev.map(uc =>
+      setUnreadCounts(prev => {
+        if (!Array.isArray(prev)) return [];
+        return prev.map(uc =>
           uc.chat_id === chatId
             ? { ...uc, unread_count: 0 }
             : uc
-        )
-      );
+        );
+      });
       
-      // Recalculate total
-      const total = unreadCounts.reduce(
+      // Recalculate total - ensure we have a valid array
+      const validCounts = Array.isArray(unreadCounts) ? unreadCounts : [];
+      const total = validCounts.reduce(
         (sum, uc) => sum + (uc.chat_id === chatId ? 0 : uc.unread_count),
         0
       );
@@ -100,6 +109,7 @@ export function useChatUnreadCount(): UseChatUnreadCountReturn {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to mark chat as read';
       setError(errorMessage);
+      console.error('Failed to mark chat as read:', errorMessage, err);
       throw err;
     }
   }, [unreadCounts]);

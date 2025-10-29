@@ -78,6 +78,26 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
             window.location.href = '/employee-dashboard';
           }
         }, 1000);
+      } else if (user.role === 'super-admin') {
+        addToast('success', 'Login successful! Redirecting to super admin dashboard...');
+        setTimeout(() => {
+          try {
+            navigate('/super-admin-dashboard', { replace: true });
+          } catch (error) {
+            console.error('Navigation error:', error);
+            window.location.href = '/super-admin-dashboard';
+          }
+        }, 1000);
+      } else if (user.role === 'hr') {
+        addToast('success', 'Login successful! Redirecting to HR dashboard...');
+        setTimeout(() => {
+          try {
+            navigate('/hr-dashboard', { replace: true });
+          } catch (error) {
+            console.error('Navigation error:', error);
+            window.location.href = '/hr-dashboard';
+          }
+        }, 1000);
       } else {
         addToast('success', 'Login successful! Redirecting...');
         setTimeout(() => {
