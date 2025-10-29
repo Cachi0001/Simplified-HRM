@@ -245,6 +245,129 @@ export class EmployeeController {
     }
   }
 
+  async approveEmployeeWithRole(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { role, reason } = req.body;
+      const approverId = req.user?.id;
+      const approverName = req.user?.fullName;
+      const approverRole = req.user?.role;
+
+      if (!role) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Role is required'
+        });
+        return;
+      }
+
+      if (!['admin', 'employee', 'hr', 'super-admin'].includes(role)) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Invalid role. Must be admin, employee, hr, or super-admin'
+        });
+        return;
+      }
+
+      logger.info('EmployeeController: Approve employee with role', { 
+        employeeId: id, 
+        role, 
+        approverId,
+        approverRole 
+      });
+
+      const result = await this.employeeService.approveEmployeeWithRole(
+        id,
+        role,
+        approverId,
+        approverName,
+        reason
+      );
+
+      res.status(200).json({
+        status: 'success',
+        message: 'Employee approved and role assigned successfully',
+        data: result
+      });
+    } catch (error) {
+      logger.error('EmployeeController: Approve employee with role error', { error: (error as Error).message });
+      res.status(400).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
+
+  async updateRole(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { role, reason } = req.body;
+      const updatedById = req.user?.id;
+      const updatedByName = req.user?.fullName;
+
+      if (!role) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Role is required'
+        });
+        return;
+      }
+
+      if (!['admin', 'employee', 'hr', 'super-admin'].includes(role)) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Invalid role. Must be admin, employee, hr, or super-admin'
+        });
+        return;
+      }
+
+      logger.info('EmployeeController: Update employee role', { 
+        employeeId: id, 
+        newRole: role, 
+        updatedById
+      });
+
+      const result = await this.employeeService.updateRole(
+        id,
+        role,
+        updatedById,
+        updatedByName,
+        reason
+      );
+
+      res.status(200).json({
+        status: 'success',
+        message: 'Employee role updated successfully',
+        data: result
+      });
+    } catch (error) {
+      logger.error('EmployeeController: Update role error', { error: (error as Error).message });
+      res.status(400).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
+
+  async getApprovalHistory(req: Request, res: Response): Promise<void> {
+    try {
+      const employeeId = req.query.employeeId as string | undefined;
+
+      const history = await this.employeeService.getApprovalHistory(employeeId);
+
+      res.status(200).json({
+        status: 'success',
+        data: history
+      });
+    } catch (error) {
+      logger.error('EmployeeController: Get approval history error', { error: (error as Error).message });
+      res.status(400).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
+
   async assignDepartment(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;

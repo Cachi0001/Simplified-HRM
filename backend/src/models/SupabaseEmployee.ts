@@ -4,7 +4,7 @@ export interface IEmployee {
   userId: string;
   email: string;
   fullName: string;
-  role: 'admin' | 'employee' | 'hr';
+  role: 'admin' | 'employee' | 'hr' | 'super-admin';
   department?: string;
   position?: string;
   phone?: string;
@@ -28,7 +28,7 @@ export interface IEmployee {
 export interface CreateEmployeeRequest {
   email: string;
   fullName: string;
-  role: 'admin' | 'employee' | 'hr';
+  role: 'admin' | 'employee' | 'hr' | 'super-admin';
   department?: string;
   position?: string;
   phone?: string;
@@ -47,7 +47,7 @@ export interface UpdateEmployeeRequest {
   dateOfBirth?: Date;
   hireDate?: Date;
   profilePicture?: string;
-  role?: 'admin' | 'employee' | 'hr';
+  role?: 'admin' | 'employee' | 'hr' | 'super-admin';
   status?: 'active' | 'rejected' | 'pending';
   profileUpdatedAt?: Date;
   performanceScore?: number;
@@ -59,5 +59,13 @@ export interface EmployeeQuery {
   search?: string;
   department?: string;
   status?: 'active' | 'rejected' | 'pending';
-  role?: 'admin' | 'employee' | 'hr';
+  role?: 'admin' | 'employee' | 'hr' | 'super-admin';
+}
+
+// Employee Approval Request
+export interface EmployeeApprovalRequest {
+  employee_id: string;
+  new_role: 'admin' | 'employee' | 'hr' | 'super-admin';
+  approved_by_id?: string;
+  reason?: string;
 }

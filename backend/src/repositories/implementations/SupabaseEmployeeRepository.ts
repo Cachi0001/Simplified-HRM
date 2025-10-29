@@ -393,4 +393,117 @@ export class SupabaseEmployeeRepository {
       throw error;
     }
   }
+
+  async approveEmployeeWithRole(
+    employeeId: string,
+    newRole: string,
+    approvedById: string,
+    approvedByName: string,
+    reason?: string
+  ): Promise<any> {
+    try {
+      logger.info('🔄 [SupabaseEmployeeRepository] Calling approve_employee_with_role function', {
+        employeeId,
+        newRole,
+        approvedById
+      });
+
+      const { data, error } = await this.supabase.rpc(
+        'approve_employee_with_role',
+        {
+          p_employee_id: employeeId,
+          p_new_role: newRole,
+          p_approved_by_id: approvedById,
+          p_approved_by_name: approvedByName,
+          p_reason: reason || null
+        }
+      );
+
+      if (error) {
+        logger.error('❌ [SupabaseEmployeeRepository] Approve with role failed:', error);
+        throw new Error(`Failed to approve employee with role: ${error.message}`);
+      }
+
+      logger.info('✅ [SupabaseEmployeeRepository] Employee approved with role successfully', {
+        employeeId,
+        newRole,
+        result: data
+      });
+
+      return data;
+    } catch (error) {
+      logger.error('❌ [SupabaseEmployeeRepository] Approve with role failed:', error);
+      throw error;
+    }
+  }
+
+  async updateRole(
+    employeeId: string,
+    newRole: string,
+    updatedById: string,
+    updatedByName: string,
+    reason?: string
+  ): Promise<any> {
+    try {
+      logger.info('🔄 [SupabaseEmployeeRepository] Calling update_employee_role function', {
+        employeeId,
+        newRole,
+        updatedById
+      });
+
+      const { data, error } = await this.supabase.rpc(
+        'update_employee_role',
+        {
+          p_employee_id: employeeId,
+          p_new_role: newRole,
+          p_updated_by_id: updatedById,
+          p_updated_by_name: updatedByName,
+          p_reason: reason || null
+        }
+      );
+
+      if (error) {
+        logger.error('❌ [SupabaseEmployeeRepository] Update role failed:', error);
+        throw new Error(`Failed to update employee role: ${error.message}`);
+      }
+
+      logger.info('✅ [SupabaseEmployeeRepository] Employee role updated successfully', {
+        employeeId,
+        newRole,
+        result: data
+      });
+
+      return data;
+    } catch (error) {
+      logger.error('❌ [SupabaseEmployeeRepository] Update role failed:', error);
+      throw error;
+    }
+  }
+
+  async getApprovalHistory(employeeId?: string): Promise<any[]> {
+    try {
+      let query = this.supabase.from('approval_history').select('*');
+
+      if (employeeId) {
+        query = query.eq('employee_id', employeeId);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
+
+      if (error) {
+        logger.error('❌ [SupabaseEmployeeRepository] Get approval history failed:', error);
+        throw new Error(`Failed to get approval history: ${error.message}`);
+      }
+
+      logger.info('✅ [SupabaseEmployeeRepository] Approval history retrieved', {
+        count: data?.length || 0,
+        employeeId
+      });
+
+      return data || [];
+    } catch (error) {
+      logger.error('❌ [SupabaseEmployeeRepository] Get approval history failed:', error);
+      throw error;
+    }
+  }
 }

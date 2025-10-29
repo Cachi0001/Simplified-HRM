@@ -331,4 +331,97 @@ export class EmployeeService {
       throw error;
     }
   }
+
+  async approveEmployeeWithRole(
+    employeeId: string,
+    role: string,
+    approverId: string,
+    approverName: string,
+    reason?: string
+  ): Promise<any> {
+    try {
+      logger.info('EmployeeService: Approving employee with role', { 
+        employeeId, 
+        role, 
+        approverId 
+      });
+
+      const result = await this.employeeRepository.approveEmployeeWithRole(
+        employeeId,
+        role,
+        approverId,
+        approverName,
+        reason
+      );
+
+      logger.info('EmployeeService: Employee approved with role successfully', { 
+        employeeId, 
+        role 
+      });
+
+      return result;
+    } catch (error) {
+      logger.error('EmployeeService: Approve employee with role failed', { 
+        error: (error as Error).message,
+        employeeId 
+      });
+      throw error;
+    }
+  }
+
+  async updateRole(
+    employeeId: string,
+    newRole: string,
+    updatedById: string,
+    updatedByName: string,
+    reason?: string
+  ): Promise<any> {
+    try {
+      logger.info('EmployeeService: Updating employee role', { 
+        employeeId, 
+        newRole, 
+        updatedById 
+      });
+
+      const result = await this.employeeRepository.updateRole(
+        employeeId,
+        newRole,
+        updatedById,
+        updatedByName,
+        reason
+      );
+
+      logger.info('EmployeeService: Employee role updated successfully', { 
+        employeeId, 
+        newRole 
+      });
+
+      return result;
+    } catch (error) {
+      logger.error('EmployeeService: Update role failed', { 
+        error: (error as Error).message,
+        employeeId 
+      });
+      throw error;
+    }
+  }
+
+  async getApprovalHistory(employeeId?: string): Promise<any[]> {
+    try {
+      logger.info('EmployeeService: Getting approval history', { employeeId });
+
+      const history = await this.employeeRepository.getApprovalHistory(employeeId);
+
+      logger.info('EmployeeService: Approval history retrieved successfully', { 
+        count: history?.length || 0 
+      });
+
+      return history || [];
+    } catch (error) {
+      logger.error('EmployeeService: Get approval history failed', { 
+        error: (error as Error).message 
+      });
+      throw error;
+    }
+  }
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Draggable from 'react-draggable';
-import { MessageCircle, X, Send, Search, Moon, Sun } from 'lucide-react';
+import { MessageCircle, X, Send, Search, Moon, Sun, Maximize2, Minimize2 } from 'lucide-react';
 import { useChatUnreadCount } from '@/hooks/useChatUnreadCount';
 import { authService } from '@/services/authService';
 import api from '@/lib/api';
@@ -31,6 +31,7 @@ const WIDGET_DEFAULT_POS = { x: 20, y: 20 };
 export function FloatingChatWidget() {
   const { totalUnreadCount, getAllUnreadCounts } = useChatUnreadCount();
   const [isOpen, setIsOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('chatWidgetDarkMode');
     return saved ? JSON.parse(saved) : false;
@@ -44,6 +45,7 @@ export function FloatingChatWidget() {
   const [isLoading, setIsLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const dragRef = useRef(null);
+  const fullscreenRef = useRef(null);
 
   // Load current user
   useEffect(() => {
@@ -60,12 +62,12 @@ export function FloatingChatWidget() {
     localStorage.setItem('chatWidgetDarkMode', JSON.stringify(darkMode));
   }, [darkMode]);
 
-  // Load chats when tab changes
+  // Load chats when tab changes or user role changes
   useEffect(() => {
     if (isOpen) {
       loadChats();
     }
-  }, [activeTab, isOpen]);
+  }, [activeTab, isOpen, currentUser?.role]);
 
   // Load messages when chat is selected
   useEffect(() => {
@@ -74,15 +76,46 @@ export function FloatingChatWidget() {
     }
   }, [selectedChat]);
 
+  // Handle ESC key for fullscreen exit
+  useEffect(() => {
+    const handleEscKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleEscKey);
+    return () => window.removeEventListener('keydown', handleEscKey);
+  }, [isFullscreen]);
+
+  // Role-based chat filtering
+  const shouldShowChatInHistory = (chat: Chat, userRole: string): boolean => {
+    // Super-admin sees all conversations
+    if (userRole === 'super-admin') return true;
+    
+    // Admin/HR can see all except super-admin's personal conversations
+    if (userRole === 'admin' || userRole === 'hr') {
+      // Only exclude chats that are explicitly marked as super-admin personal
+      return !chat.name?.includes('super-admin-personal');
+    }
+    
+    // Employees only see their own conversations (backend should already filter)
+    if (userRole === 'employee') return true;
+    
+    return true;
+  };
+
   const loadChats = async () => {
     try {
       setIsLoading(true);
       const response = await api.get('/chat/list', {
-        params: { type: activeTab === 'announcements' ? 'announcement' : activeTab }
+        params: { 
+          type: activeTab === 'announcements' ? 'announcement' : (activeTab === 'history' ? 'history' : activeTab)
+        }
       });
 
       if (response.data?.data?.chats) {
-        const formattedChats: Chat[] = response.data.data.chats.map((chat: any) => ({
+        let formattedChats: Chat[] = response.data.data.chats.map((chat: any) => ({
           id: chat.id,
           name: chat.name,
           lastMessage: chat.lastMessage,
@@ -90,6 +123,14 @@ export function FloatingChatWidget() {
           avatar: chat.avatar,
           type: chat.type || 'dm'
         }));
+
+        // Apply role-based filtering for history tab
+        if (activeTab === 'history' && currentUser?.role) {
+          formattedChats = formattedChats.filter(chat => 
+            shouldShowChatInHistory(chat, currentUser.role)
+          );
+        }
+
         setChats(formattedChats);
       }
     } catch (err) {
@@ -146,17 +187,37 @@ export function FloatingChatWidget() {
   // Don't render on auth pages
   if (!currentUser) return null;
 
+  // Calculate draggable bounds to keep bubble visible
+  const calculateBounds = () => {
+    if (typeof window === 'undefined') return 'parent';
+    return {
+      left: 0,
+      top: 0,
+      right: window.innerWidth - 56, // 56px = button width
+      bottom: window.innerHeight - 56 // 56px = button height
+    };
+  };
+
   return (
-    <Draggable
-      defaultPosition={WIDGET_DEFAULT_POS}
-      bounds="parent"
-      nodeRef={dragRef}
-    >
-      <div
-        ref={dragRef}
-        className="fixed z-50 cursor-move"
-        style={{ bottom: 'auto', right: 'auto' }}
+    <>
+      {isFullscreen && (
+        // Fullscreen backdrop
+        <div 
+          className="fixed inset-0 bg-black/50 z-40"
+          onClick={() => setIsFullscreen(false)}
+        />
+      )}
+      <Draggable
+        defaultPosition={WIDGET_DEFAULT_POS}
+        bounds={isFullscreen ? false : calculateBounds()}
+        nodeRef={dragRef}
+        disabled={isFullscreen}
       >
+        <div
+          ref={dragRef}
+          className={`fixed z-50 ${isFullscreen ? 'inset-0 cursor-default' : 'cursor-move'}`}
+          style={isFullscreen ? { bottom: 'auto', right: 'auto', left: 0, top: 0 } : { bottom: 'auto', right: 'auto' }}
+        >
         {!isOpen ? (
           // Chat Bubble Button
           <button
@@ -177,20 +238,21 @@ export function FloatingChatWidget() {
         ) : (
           // Chat Modal
           <div
-            className={`${bgColor} ${textColor} rounded-lg shadow-2xl w-80 h-96 flex flex-col border ${borderColor}`}
-            style={{ maxHeight: '80vh', minHeight: '300px' }}
+            ref={fullscreenRef}
+            className={`${bgColor} ${textColor} ${isFullscreen ? 'w-full h-full rounded-none' : 'w-80 h-96 rounded-lg'} shadow-2xl flex flex-col border ${borderColor}`}
+            style={isFullscreen ? { maxHeight: '100vh', minHeight: '100vh' } : { maxHeight: '80vh', minHeight: '300px' }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className={`${darkMode ? 'bg-gray-800' : 'bg-gray-100'} p-4 border-b ${borderColor} flex items-center justify-between rounded-t-lg`}>
+            <div className={`${darkMode ? 'bg-gray-800' : 'bg-gray-100'} p-4 border-b ${borderColor} flex items-center justify-between ${isFullscreen ? '' : 'rounded-t-lg'}`}>
               <div className="flex items-center space-x-2">
                 <MessageCircle className="w-5 h-5" />
-                <h3 className="font-semibold">Chat</h3>
+                <h3 className="font-semibold">{isFullscreen ? 'Chat - Full Screen' : 'Chat'}</h3>
               </div>
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() => setDarkMode(!darkMode)}
-                  className={`p-1 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}
+                  className={`p-2 rounded ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'}`}
                   title="Toggle dark mode"
                 >
                   {darkMode ? (
@@ -200,11 +262,23 @@ export function FloatingChatWidget() {
                   )}
                 </button>
                 <button
+                  onClick={() => setIsFullscreen(!isFullscreen)}
+                  className={`p-2 rounded ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'}`}
+                  title={isFullscreen ? 'Exit fullscreen (ESC)' : 'Enter fullscreen'}
+                >
+                  {isFullscreen ? (
+                    <Minimize2 className="w-4 h-4" />
+                  ) : (
+                    <Maximize2 className="w-4 h-4" />
+                  )}
+                </button>
+                <button
                   onClick={() => {
                     setIsOpen(false);
                     setSelectedChat(null);
+                    setIsFullscreen(false);
                   }}
-                  className={`p-1 rounded ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'}`}
+                  className={`p-2 rounded ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'}`}
                   title="Close chat"
                 >
                   <X className="w-5 h-5" />
@@ -358,7 +432,8 @@ export function FloatingChatWidget() {
             )}
           </div>
         )}
-      </div>
-    </Draggable>
+        </div>
+      </Draggable>
+    </>
   );
 }
