@@ -3,7 +3,7 @@ import { Plus, Trash2, Edit2, Clock, CheckCircle, XCircle, AlertCircle } from 'l
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { useToast } from '../components/ui/Toast';
-import axios from 'axios';
+import api from '../lib/api';
 
 interface LeaveRequest {
   _id: string;
@@ -44,12 +44,8 @@ export function LeaveRequestsPage() {
   const fetchLeaveRequests = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/leave-requests', {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-        },
-      });
-      setLeaveRequests(response.data);
+      const response = await api.get('/leave-requests');
+      setLeaveRequests(response.data.data || response.data);
     } catch (error: any) {
       console.error('Error fetching leave requests:', error);
       addToast('error', 'Failed to fetch leave requests');
@@ -72,12 +68,9 @@ export function LeaveRequestsPage() {
     }
 
     try {
-      const response = await axios.post('/api/leave-requests', formData, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-        },
-      });
-      setLeaveRequests([response.data, ...leaveRequests]);
+      const response = await api.post('/leave-requests', formData);
+      const newRequest = response.data.data || response.data;
+      setLeaveRequests([newRequest, ...leaveRequests]);
       setFormData({ start_date: '', end_date: '', reason: '' });
       setIsCreating(false);
       addToast('success', 'Leave request created successfully');
@@ -93,11 +86,7 @@ export function LeaveRequestsPage() {
     }
 
     try {
-      await axios.delete(`/api/leave-requests/${id}`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-        },
-      });
+      await api.delete(`/leave-requests/${id}`);
       setLeaveRequests(leaveRequests.filter(req => req._id !== id));
       addToast('success', 'Leave request deleted successfully');
     } catch (error: any) {

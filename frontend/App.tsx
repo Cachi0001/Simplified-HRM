@@ -15,6 +15,7 @@ import UserSettingsPage from './src/pages/UserSettingsPage';
 import ChatPage from './src/pages/ChatPage';
 import { LeaveRequestsPage } from './src/pages/LeaveRequestsPage';
 import { PurchaseRequestsPage } from './src/pages/PurchaseRequestsPage';
+import { NotificationsPage } from './src/pages/NotificationsPage';
 import Header from './src/components/layout/Header';
 import Footer from './src/components/layout/Footer';
 import { ToastProvider } from './src/components/ui/Toast';
@@ -42,6 +43,7 @@ function AppContent() {
                          location.pathname.startsWith('/settings') ||
                          location.pathname.startsWith('/leave-requests') ||
                          location.pathname.startsWith('/purchase-requests') ||
+                         location.pathname.startsWith('/notifications') ||
                          location.pathname.startsWith('/chat');
 
   return (
@@ -102,6 +104,11 @@ function AppContent() {
           <Route path="/chat" element={
             <ProtectedRoute>
               <ChatPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/notifications" element={
+            <ProtectedRoute>
+              <NotificationsPage />
             </ProtectedRoute>
           } />
           <Route path="/api-test" element={<ApiConnectionTest />} />

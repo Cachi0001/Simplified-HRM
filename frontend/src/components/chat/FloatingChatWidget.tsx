@@ -223,8 +223,14 @@ export function FloatingChatWidget() {
   const borderColor = darkMode ? 'border-gray-700' : 'border-gray-200';
   const inputBg = darkMode ? 'bg-gray-800' : 'bg-gray-100';
 
+  // Don't render if user is not authenticated or on auth pages
+  if (!currentUser || !authService.isAuthenticated()) return null;
+  
   // Don't render on auth pages
-  if (!currentUser) return null;
+  const isAuthPage = window.location.pathname.includes('/auth') || 
+                     window.location.pathname.includes('/confirm') || 
+                     window.location.pathname.includes('/reset-password');
+  if (isAuthPage) return null;
 
   // Calculate draggable bounds to keep bubble visible
   const calculateBounds = () => {
