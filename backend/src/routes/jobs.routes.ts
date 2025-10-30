@@ -1,6 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { authenticateToken } from '../middleware/auth.middleware';
-import { requireRole } from '../middleware/role.middleware';
+import { authenticateToken, requireRole } from '../middleware/auth.middleware';
 import JobScheduler from '../services/JobScheduler';
 import logger from '../utils/logger';
 
