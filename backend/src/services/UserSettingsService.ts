@@ -99,7 +99,7 @@ export class UserSettingsService {
     /**
      * Update user settings
      */
-    async updateUserSettings(userId: string, preferences: any): Promise<UserSettings> {
+    async updateUserSettings(userId: string, preferences: UserSettings['preferences']): Promise<UserSettings> {
         try {
             logger.info('UserSettingsService: Updating user settings', { userId });
 
@@ -140,7 +140,7 @@ export class UserSettingsService {
     /**
      * Update specific setting category
      */
-    async updateSettingCategory(userId: string, category: string, updates: any): Promise<UserSettings> {
+    async updateSettingCategory(userId: string, category: keyof UserSettings['preferences'], updates: any): Promise<UserSettings> {
         try {
             const currentSettings = await this.getUserSettings(userId);
             const newPreferences = { ...currentSettings.preferences };
@@ -179,13 +179,14 @@ export class UserSettingsService {
                 const newPreferences = { ...currentSettings.preferences };
                 
                 categories.forEach(category => {
-                    if (category === 'notifications') {
+                    const categoryKey = category as keyof UserSettings['preferences'];
+                    if (categoryKey === 'notifications') {
                         newPreferences.notifications = defaultSettings.preferences.notifications;
-                    } else if (category === 'privacy') {
+                    } else if (categoryKey === 'privacy') {
                         newPreferences.privacy = defaultSettings.preferences.privacy;
-                    } else if (category === 'appearance') {
+                    } else if (categoryKey === 'appearance') {
                         newPreferences.appearance = defaultSettings.preferences.appearance;
-                    } else if (category === 'workflow') {
+                    } else if (categoryKey === 'workflow') {
                         newPreferences.workflow = defaultSettings.preferences.workflow;
                     }
                 });
@@ -289,7 +290,7 @@ export class UserSettingsService {
     /**
      * Update category sync status
      */
-    async updateCategorySyncStatus(userId: string, category: string, status: 'synced' | 'pending' | 'error'): Promise<void> {
+    async updateCategorySyncStatus(userId: string, category: keyof UserSettings['preferences'], status: 'synced' | 'pending' | 'error'): Promise<void> {
         try {
             // For now, update the overall sync status
             // In a more complex implementation, you might track category-specific sync status
@@ -343,7 +344,7 @@ export class UserSettingsService {
             let value: any = settings.preferences;
             for (const part of pathParts) {
                 if (value && typeof value === 'object' && part in value) {
-                    value = value[part];
+                    value = (value as any)[part];
                 } else {
                     value = undefined;
                     break;
