@@ -1,6 +1,13 @@
 import nodemailer from 'nodemailer';
 import logger from '../utils/logger';
 
+export interface EmailOptions {
+  to: string;
+  subject: string;
+  html?: string;
+  text?: string;
+}
+
 export class EmailService {
   private transporter: nodemailer.Transporter;
 
@@ -29,6 +36,43 @@ export class EmailService {
         logger.info('Email transporter verified successfully');
       }
     });
+  }
+
+  /**
+   * Generic method to send emails
+   */
+  async sendEmail(options: EmailOptions): Promise<void> {
+    try {
+      if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+        throw new Error('SMTP credentials not configured');
+      }
+
+      const mailOptions = {
+        from: `"Go3net HR Management System" <${process.env.FROM_EMAIL}>`,
+        to: options.to,
+        subject: options.subject,
+        html: options.html,
+        text: options.text
+      };
+
+      logger.info('📧 Sending email', {
+        to: options.to,
+        subject: options.subject
+      });
+
+      const result = await this.transporter.sendMail(mailOptions);
+      logger.info('✅ Email sent successfully', {
+        messageId: result.messageId,
+        to: options.to
+      });
+    } catch (error) {
+      logger.error('❌ Failed to send email', {
+        error: (error as Error).message,
+        to: options.to,
+        subject: options.subject
+      });
+      throw error;
+    }
   }
 
   async sendApprovalNotification(email: string, fullName: string, adminEmail?: string): Promise<void> {

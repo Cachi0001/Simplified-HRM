@@ -35,6 +35,7 @@ import purchaseRoutes from './routes/purchase.routes';
 import chatRoutes from './routes/chat.routes';
 import typingRoutes from './routes/typing.routes';
 import announcementRoutes from './routes/announcement.routes';
+import departmentRoutes from './routes/department.routes';
 import supabaseConfig from './config/supabase';
 
 const app = express();
@@ -201,6 +202,7 @@ app.use('/api/purchase', purchaseRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/typing', typingRoutes);
 app.use('/api/announcements', announcementRoutes);
+app.use('/api/departments', departmentRoutes);
 
 // Health check endpoint
 app.get('/api/health', async (req: Request, res: Response) => {
