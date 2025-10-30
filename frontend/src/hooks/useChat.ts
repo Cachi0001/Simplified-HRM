@@ -1,6 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import api from '@/lib/api';
 import type { ChatMessage } from '../types/chat';
+import { useRealtimeChat } from './useRealtimeChat';
 
 const toIsoString = (value: string | Date | null | undefined): string | null => {
   if (!value) {
@@ -37,38 +38,95 @@ export interface UseChatReturn {
   messages: ChatMessage[];
   isLoading: boolean;
   error: string | null;
+  isConnected: boolean;
   sendMessage: (chatId: string, message: string) => Promise<void>;
   markMessageAsRead: (messageId: string) => Promise<void>;
   markChatAsRead: (chatId: string) => Promise<void>;
   getChatHistory: (chatId: string, page?: number, limit?: number) => Promise<void>;
   getReadReceipt: (messageId: string) => Promise<any>;
   getChatParticipants: (chatId: string) => Promise<any[]>;
+  refreshMessages: () => Promise<void>;
+  clearMessages: () => void;
 }
 
-export function useChat(userId?: string): UseChatReturn {
+export function useChat(chatId?: string, userId?: string): UseChatReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Use realtime chat hook for live updates
+  const { 
+    realtimeMessages, 
+    isSubscribed, 
+    error: realtimeError,
+    clearRealtimeMessages 
+  } = useRealtimeChat(chatId || null);
+
+  // Merge realtime messages with local messages
+  useEffect(() => {
+    if (realtimeMessages.length > 0) {
+      setMessages(prev => {
+        const existingIds = new Set(prev.map(m => m.id));
+        const newMessages = realtimeMessages.filter(m => !existingIds.has(m.id));
+        return [...prev, ...newMessages].sort((a, b) => 
+          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+        );
+      });
+    }
+  }, [realtimeMessages]);
+
+  // Handle realtime errors
+  useEffect(() => {
+    if (realtimeError) {
+      setError(realtimeError);
+    }
+  }, [realtimeError]);
 
   const sendMessage = useCallback(
-    async (chatId: string, message: string) => {
+    async (targetChatId: string, message: string) => {
       try {
         setError(null);
+        
+        // Optimistically add message to UI
+        const optimisticMessage: ChatMessage = {
+          id: `temp-${Date.now()}`,
+          chat_id: targetChatId,
+          sender_id: userId || '',
+          message,
+          timestamp: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          sent_at: null,
+          delivered_at: null,
+          read_at: null,
+          edited_at: null,
+          senderName: 'You',
+          senderAvatar: null,
+          updated_at: null
+        };
+        
+        setMessages(prev => [...prev, optimisticMessage]);
+        
         const response = await api.post('/chat/send', {
-          chatId,
+          chatId: targetChatId,
           message
         });
         
+        // Replace optimistic message with real one
         if (response.data?.data?.message) {
-          setMessages(prev => [...prev, normalizeChatMessage(response.data.data.message)]);
+          const realMessage = normalizeChatMessage(response.data.data.message);
+          setMessages(prev => 
+            prev.map(m => m.id === optimisticMessage.id ? realMessage : m)
+          );
         }
       } catch (err) {
+        // Remove optimistic message on error
+        setMessages(prev => prev.filter(m => !m.id.startsWith('temp-')));
         const errorMessage = err instanceof Error ? err.message : 'Failed to send message';
         setError(errorMessage);
         throw err;
       }
     },
-    []
+    [userId]
   );
 
   const markMessageAsRead = useCallback(async (messageId: string) => {
@@ -154,15 +212,29 @@ export function useChat(userId?: string): UseChatReturn {
     }
   }, []);
 
+  const refreshMessages = useCallback(async () => {
+    if (chatId) {
+      await getChatHistory(chatId);
+    }
+  }, [chatId, getChatHistory]);
+
+  const clearMessages = useCallback(() => {
+    setMessages([]);
+    clearRealtimeMessages();
+  }, [clearRealtimeMessages]);
+
   return {
     messages,
     isLoading,
     error,
+    isConnected: isSubscribed,
     sendMessage,
     markMessageAsRead,
     markChatAsRead,
     getChatHistory,
     getReadReceipt,
-    getChatParticipants
+    getChatParticipants,
+    refreshMessages,
+    clearMessages
   };
 }

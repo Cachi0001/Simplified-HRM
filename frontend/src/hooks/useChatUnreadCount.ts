@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import api from '@/lib/api';
 
 export interface UnreadCount {
@@ -11,11 +11,16 @@ export interface UseChatUnreadCountReturn {
   unreadCounts: UnreadCount[];
   isLoading: boolean;
   error: string | null;
+  isRealTimeConnected: boolean;
   getTotalUnreadCount: () => Promise<void>;
   getChatUnreadCount: (chatId: string) => Promise<number>;
   getAllUnreadCounts: () => Promise<void>;
   markChatAsRead: (chatId: string) => Promise<void>;
   refreshUnreadCounts: () => Promise<void>;
+  incrementUnreadCount: (chatId: string) => void;
+  decrementUnreadCount: (chatId: string, amount?: number) => void;
+  subscribeToRealtimeUpdates: () => Promise<void>;
+  unsubscribeFromRealtimeUpdates: () => Promise<void>;
 }
 
 export function useChatUnreadCount(): UseChatUnreadCountReturn {
@@ -23,6 +28,8 @@ export function useChatUnreadCount(): UseChatUnreadCountReturn {
   const [unreadCounts, setUnreadCounts] = useState<UnreadCount[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isRealTimeConnected, setIsRealTimeConnected] = useState(false);
+  const subscriptionRef = useRef<any>(null);
 
   const getTotalUnreadCount = useCallback(async () => {
     try {
@@ -118,20 +125,145 @@ export function useChatUnreadCount(): UseChatUnreadCountReturn {
     await getAllUnreadCounts();
   }, [getAllUnreadCounts]);
 
-  // Initial fetch on mount
+  const incrementUnreadCount = useCallback((chatId: string) => {
+    setUnreadCounts(prev => {
+      const existingIndex = prev.findIndex(uc => uc.chat_id === chatId);
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          unread_count: updated[existingIndex].unread_count + 1
+        };
+        return updated;
+      } else {
+        return [...prev, { chat_id: chatId, unread_count: 1 }];
+      }
+    });
+    
+    setTotalUnreadCount(prev => prev + 1);
+  }, []);
+
+  const decrementUnreadCount = useCallback((chatId: string, amount = 1) => {
+    setUnreadCounts(prev => {
+      const updated = prev.map(uc => {
+        if (uc.chat_id === chatId) {
+          const newCount = Math.max(0, uc.unread_count - amount);
+          return { ...uc, unread_count: newCount };
+        }
+        return uc;
+      });
+      return updated;
+    });
+    
+    setTotalUnreadCount(prev => Math.max(0, prev - amount));
+  }, []);
+
+  const subscribeToRealtimeUpdates = useCallback(async () => {
+    try {
+      const { supabase } = await import('../lib/supabase');
+      
+      console.info('🔗 Subscribing to unread count updates');
+      
+      const subscription = supabase
+        .channel('unread_counts')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'chat_messages',
+          },
+          (payload: any) => {
+            console.info('📨 New message - updating unread count:', payload);
+            incrementUnreadCount(payload.new.chat_id);
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'chat_unread_counts',
+          },
+          (payload: any) => {
+            console.info('📊 Unread count updated:', payload);
+            const { chat_id, unread_count } = payload.new;
+            setUnreadCounts(prev => {
+              const existingIndex = prev.findIndex(uc => uc.chat_id === chat_id);
+              if (existingIndex >= 0) {
+                const updated = [...prev];
+                updated[existingIndex] = { chat_id, unread_count };
+                return updated;
+              } else {
+                return [...prev, { chat_id, unread_count }];
+              }
+            });
+            
+            // Recalculate total
+            setTotalUnreadCount(prev => {
+              const currentCounts = unreadCounts.filter(uc => uc.chat_id !== chat_id);
+              return currentCounts.reduce((sum, uc) => sum + uc.unread_count, 0) + unread_count;
+            });
+          }
+        )
+        .subscribe(async (status: string) => {
+          console.info(`📡 Unread count subscription status: ${status}`);
+          if (status === 'SUBSCRIBED') {
+            setIsRealTimeConnected(true);
+            setError(null);
+          } else if (status === 'CHANNEL_ERROR') {
+            setError('Failed to subscribe to unread count updates');
+            setIsRealTimeConnected(false);
+          }
+        });
+
+      subscriptionRef.current = subscription;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      console.error('❌ Failed to subscribe to unread counts:', errorMessage);
+      setError(errorMessage);
+      setIsRealTimeConnected(false);
+    }
+  }, [incrementUnreadCount, unreadCounts]);
+
+  const unsubscribeFromRealtimeUpdates = useCallback(async () => {
+    if (subscriptionRef.current) {
+      try {
+        const { supabase } = await import('../lib/supabase');
+        await supabase.removeChannel(subscriptionRef.current);
+        subscriptionRef.current = null;
+        setIsRealTimeConnected(false);
+        console.info('🔌 Unsubscribed from unread count updates');
+      } catch (err) {
+        console.error('Error unsubscribing from unread counts:', err);
+      }
+    }
+  }, []);
+
+  // Initial fetch and realtime subscription on mount
   useEffect(() => {
     getAllUnreadCounts();
-  }, [getAllUnreadCounts]);
+    subscribeToRealtimeUpdates();
+
+    return () => {
+      unsubscribeFromRealtimeUpdates();
+    };
+  }, [getAllUnreadCounts, subscribeToRealtimeUpdates, unsubscribeFromRealtimeUpdates]);
 
   return {
     totalUnreadCount,
     unreadCounts,
     isLoading,
     error,
+    isRealTimeConnected,
     getTotalUnreadCount,
     getChatUnreadCount,
     getAllUnreadCounts,
     markChatAsRead,
-    refreshUnreadCounts
+    refreshUnreadCounts,
+    incrementUnreadCount,
+    decrementUnreadCount,
+    subscribeToRealtimeUpdates,
+    unsubscribeFromRealtimeUpdates
   };
 }
