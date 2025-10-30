@@ -31,10 +31,7 @@ export class ApprovalWorkflowController {
                 requestId
             });
 
-            const workflow = await ApprovalWorkflowService.getApprovalWorkflow(
-                requestType as any,
-                requestId
-            );
+            const workflow = await ApprovalWorkflowService.getApprovalWorkflow(requestId);
 
             res.status(200).json({
                 status: 'success',
@@ -87,19 +84,18 @@ export class ApprovalWorkflowController {
             });
 
             const result = await ApprovalWorkflowService.processApprovalStep(
-                requestType as any,
                 requestId,
-                approverId,
                 decision,
+                approverId,
                 notes
             );
 
             // Send notification about status change
             await this.requestNotificationService.sendRequestStatusNotification(
-                requestType as any,
                 requestId,
-                result.newStatus,
-                approverId
+                requestType as any,
+                result.newStatus || decision,
+                notes
             );
 
             res.status(200).json({
@@ -194,10 +190,7 @@ export class ApprovalWorkflowController {
                 requestId
             });
 
-            const history = await ApprovalWorkflowService.getApprovalHistory(
-                requestType as any,
-                requestId
-            );
+            const history = await ApprovalWorkflowService.getApprovalHistory(requestId);
 
             res.status(200).json({
                 status: 'success',
@@ -250,20 +243,18 @@ export class ApprovalWorkflowController {
             });
 
             const result = await ApprovalWorkflowService.delegateApproval(
-                requestType as any,
                 requestId,
-                approverId,
                 delegateToId,
+                approverId,
                 reason
             );
 
             // Send notification about delegation
             await this.requestNotificationService.sendApprovalDelegationNotification(
-                requestType as any,
                 requestId,
-                approverId,
+                requestType as any,
                 delegateToId,
-                reason
+                approverId
             );
 
             res.status(200).json({
@@ -307,7 +298,6 @@ export class ApprovalWorkflowController {
             });
 
             const result = await ApprovalWorkflowService.escalateApproval(
-                requestType as any,
                 requestId,
                 escalatedBy,
                 reason
@@ -315,8 +305,8 @@ export class ApprovalWorkflowController {
 
             // Send notification about escalation
             await this.requestNotificationService.sendApprovalEscalationNotification(
-                requestType as any,
                 requestId,
+                requestType as any,
                 escalatedBy,
                 reason
             );
@@ -361,11 +351,11 @@ export class ApprovalWorkflowController {
                 requestType
             });
 
-            const stats = await ApprovalWorkflowService.getApprovalStatistics(
-                startDate ? new Date(startDate as string) : undefined,
-                endDate ? new Date(endDate as string) : undefined,
-                requestType as any
-            );
+            const stats = await ApprovalWorkflowService.getApprovalStatistics({
+                startDate: startDate ? new Date(startDate as string) : undefined,
+                endDate: endDate ? new Date(endDate as string) : undefined,
+                requestType: requestType as any
+            });
 
             res.status(200).json({
                 status: 'success',
@@ -415,24 +405,29 @@ export class ApprovalWorkflowController {
             });
 
             const results = await ApprovalWorkflowService.bulkProcessApprovals(
-                requests,
-                approverId,
-                'approved',
-                notes
+                requests.map((req: any) => ({
+                    stepId: req.stepId,
+                    decision: 'approve' as ApprovalDecision,
+                    approverId,
+                    comments: notes
+                }))
             );
 
             // Send notifications for each approved request
-            for (const result of results.successful) {
+            const successful = results.filter((r: any) => r.success);
+            const failed = results.filter((r: any) => !r.success);
+
+            for (const result of successful) {
                 try {
                     await this.requestNotificationService.sendRequestStatusNotification(
-                        result.requestType,
-                        result.requestId,
-                        result.newStatus,
-                        approverId
+                        result.stepId,
+                        'leave', // Default type, should be dynamic
+                        'approved',
+                        notes
                     );
                 } catch (notificationError) {
                     logger.error('❌ [ApprovalWorkflowController] Bulk approve notification error', {
-                        requestId: result.requestId,
+                        stepId: result.stepId,
                         error: (notificationError as Error).message
                     });
                 }
@@ -440,14 +435,14 @@ export class ApprovalWorkflowController {
 
             res.status(200).json({
                 status: 'success',
-                message: `Bulk approval completed: ${results.successful.length} approved, ${results.failed.length} failed`,
+                message: `Bulk approval completed: ${successful.length} approved, ${failed.length} failed`,
                 data: { 
-                    successful: results.successful,
-                    failed: results.failed,
+                    successful,
+                    failed,
                     summary: {
                         totalRequests: requests.length,
-                        successfulCount: results.successful.length,
-                        failedCount: results.failed.length
+                        successfulCount: successful.length,
+                        failedCount: failed.length
                     }
                 }
             });

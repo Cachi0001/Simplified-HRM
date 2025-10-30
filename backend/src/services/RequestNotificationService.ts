@@ -5,7 +5,7 @@ import { NotificationService } from './NotificationService';
 import { EmailService } from './EmailService';
 import EmailTemplateService from './EmailTemplateService';
 
-export type RequestType = 'leave' | 'purchase' | 'expense' | 'travel' | 'overtime';
+export type RequestType = 'leave' | 'purchase' | 'expense' | 'travel' | 'overtime' | 'profile_update' | 'settings_change' | 'task_assignment';
 export type NotificationEvent = 
     | 'request_submitted' 
     | 'approval_required' 
@@ -792,6 +792,222 @@ export class RequestNotificationService {
                 return `Changes have been requested for your ${requestData.requestType} request.`;
             default:
                 return `Your ${requestData.requestType} request status has been updated.`;
+        }
+    }
+    /**
+     * Send request status notification
+     */
+    async sendRequestStatusNotification(requestId: string, requestType: RequestType, status: string, comments?: string): Promise<void> {
+        try {
+            const requestData = await this.getRequestData(requestId, requestType);
+            if (!requestData) return;
+
+            await this.notificationService.createNotification({
+                userId: requestData.employeeId,
+                type: this.mapRequestTypeToNotificationType(requestType),
+                title: `${this.capitalizeRequestType(requestType)} Request ${status}`,
+                message: `Your ${requestType} request has been ${status}.${comments ? ` Comments: ${comments}` : ''}`,
+                relatedId: requestId,
+                actionUrl: this.getRequestUrl(requestType)
+            });
+        } catch (error) {
+            logger.error('RequestNotificationService: Failed to send request status notification', {
+                error: (error as Error).message,
+                requestId
+            });
+        }
+    }
+
+    /**
+     * Send request reminder
+     */
+    async sendRequestReminder(requestId: string, requestType: RequestType, approverId: string): Promise<void> {
+        try {
+            const requestData = await this.getRequestData(requestId, requestType);
+            if (!requestData) return;
+
+            await this.notificationService.createNotification({
+                userId: approverId,
+                type: this.mapRequestTypeToNotificationType(requestType),
+                title: `Pending ${this.capitalizeRequestType(requestType)} Request`,
+                message: `You have a pending ${requestType} request from ${requestData.employeeName} that requires your attention.`,
+                relatedId: requestId,
+                actionUrl: this.getRequestUrl(requestType)
+            });
+        } catch (error) {
+            logger.error('RequestNotificationService: Failed to send request reminder', {
+                error: (error as Error).message,
+                requestId
+            });
+        }
+    }
+
+    /**
+     * Send approval delegation notification
+     */
+    async sendApprovalDelegationNotification(requestId: string, requestType: RequestType, delegatedTo: string, delegatedBy: string): Promise<void> {
+        try {
+            const requestData = await this.getRequestData(requestId, requestType);
+            if (!requestData) return;
+
+            await this.notificationService.createNotification({
+                userId: delegatedTo,
+                type: this.mapRequestTypeToNotificationType(requestType),
+                title: `Delegated ${this.capitalizeRequestType(requestType)} Request`,
+                message: `A ${requestType} request has been delegated to you by ${delegatedBy}.`,
+                relatedId: requestId,
+                actionUrl: this.getRequestUrl(requestType)
+            });
+        } catch (error) {
+            logger.error('RequestNotificationService: Failed to send approval delegation notification', {
+                error: (error as Error).message,
+                requestId
+            });
+        }
+    }
+
+    /**
+     * Send approval escalation notification
+     */
+    async sendApprovalEscalationNotification(requestId: string, requestType: RequestType, escalatedTo: string, reason?: string): Promise<void> {
+        try {
+            const requestData = await this.getRequestData(requestId, requestType);
+            if (!requestData) return;
+
+            await this.notificationService.createNotification({
+                userId: escalatedTo,
+                type: this.mapRequestTypeToNotificationType(requestType),
+                title: `Escalated ${this.capitalizeRequestType(requestType)} Request`,
+                message: `A ${requestType} request has been escalated to you.${reason ? ` Reason: ${reason}` : ''}`,
+                relatedId: requestId,
+                actionUrl: this.getRequestUrl(requestType)
+            });
+        } catch (error) {
+            logger.error('RequestNotificationService: Failed to send approval escalation notification', {
+                error: (error as Error).message,
+                requestId
+            });
+        }
+    }
+
+    /**
+     * Send bulk notifications
+     */
+    async sendBulkNotifications(notifications: Array<{ userId: string; type: string; title: string; message: string }>): Promise<any[]> {
+        try {
+            const results = [];
+            for (const notification of notifications) {
+                try {
+                    await this.notificationService.createNotification({
+                        userId: notification.userId,
+                        type: notification.type as any,
+                        title: notification.title,
+                        message: notification.message
+                    });
+                    results.push({ success: true, userId: notification.userId });
+                } catch (error) {
+                    results.push({ success: false, userId: notification.userId, error: (error as Error).message });
+                }
+            }
+            return results;
+        } catch (error) {
+            logger.error('RequestNotificationService: Failed to send bulk notifications', {
+                error: (error as Error).message
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Get notification history
+     */
+    async getNotificationHistory(userId: string, filters?: any): Promise<any[]> {
+        try {
+            let query = this.supabase
+                .from('notifications')
+                .select('*')
+                .eq('user_id', userId)
+                .order('created_at', { ascending: false });
+
+            if (filters?.limit) {
+                query = query.limit(filters.limit);
+            }
+
+            const { data: notifications, error } = await query;
+            if (error) throw error;
+
+            return notifications || [];
+        } catch (error) {
+            logger.error('RequestNotificationService: Failed to get notification history', {
+                error: (error as Error).message,
+                userId
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Set notification preferences
+     */
+    async setNotificationPreferences(userId: string, preferences: any): Promise<void> {
+        try {
+            const { error } = await this.supabase
+                .from('user_notification_preferences')
+                .upsert({
+                    user_id: userId,
+                    preferences,
+                    updated_at: new Date().toISOString()
+                });
+
+            if (error) throw error;
+        } catch (error) {
+            logger.error('RequestNotificationService: Failed to set notification preferences', {
+                error: (error as Error).message,
+                userId
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Get notification preferences
+     */
+    async getNotificationPreferences(userId: string): Promise<any> {
+        try {
+            const { data: preferences, error } = await this.supabase
+                .from('user_notification_preferences')
+                .select('*')
+                .eq('user_id', userId)
+                .single();
+
+            if (error && error.code !== 'PGRST116') throw error;
+            return preferences?.preferences || {};
+        } catch (error) {
+            logger.error('RequestNotificationService: Failed to get notification preferences', {
+                error: (error as Error).message,
+                userId
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Send test notification
+     */
+    async sendTestNotification(userId: string, type: string): Promise<void> {
+        try {
+            await this.notificationService.createNotification({
+                userId,
+                type: type as any,
+                title: 'Test Notification',
+                message: 'This is a test notification to verify your notification settings.',
+            });
+        } catch (error) {
+            logger.error('RequestNotificationService: Failed to send test notification', {
+                error: (error as Error).message,
+                userId
+            });
+            throw error;
         }
     }
 }

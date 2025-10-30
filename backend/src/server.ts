@@ -39,6 +39,10 @@ import departmentRoutes from './routes/department.routes';
 import approvalRoutes from './routes/approval.routes';
 import requestNotificationRoutes from './routes/request-notifications.routes';
 import performanceRoutes from './routes/performance.routes';
+import settingsRoutes from './routes/settings.routes';
+import profileRoutes from './routes/profile.routes';
+import checkoutMonitoringRoutes from './routes/checkout-monitoring.routes';
+import CheckoutMonitoringService from './services/CheckoutMonitoringService';
 import supabaseConfig from './config/supabase';
 
 const app = express();
@@ -210,6 +214,9 @@ app.use('/api/departments', departmentRoutes);
 app.use('/api/approval-workflow', approvalRoutes);
 app.use('/api/request-notifications', requestNotificationRoutes);
 app.use('/api/performance', performanceRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/profile', profileRoutes);
+app.use('/api/checkout-monitoring', checkoutMonitoringRoutes);
 
 // Health check endpoint
 app.get('/api/health', async (req: Request, res: Response) => {
@@ -428,6 +435,13 @@ export default app;
 if (require.main === module) {
   (async () => {
     await initializeDatabase();
+    // Initialize services
+    logger.info('🔄 Initializing services...');
+    
+    // Initialize checkout monitoring service (this will set up CRON jobs)
+    CheckoutMonitoringService;
+    logger.info('✅ Checkout monitoring service initialized');
+    
     app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
       console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);

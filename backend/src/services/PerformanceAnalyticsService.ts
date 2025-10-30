@@ -932,6 +932,171 @@ export class PerformanceAnalyticsService {
 
         return count;
     }
+    /**
+     * Generate employee performance report
+     */
+    async generateEmployeePerformanceReport(employeeId: string, periodDays: number): Promise<any> {
+        try {
+            const endDate = new Date();
+            const startDate = new Date();
+            startDate.setDate(endDate.getDate() - periodDays);
+
+            const performance = await this.calculateEmployeePerformance(employeeId, startDate, endDate);
+            
+            return {
+                employeeId,
+                period: { startDate, endDate },
+                performance,
+                generatedAt: new Date()
+            };
+        } catch (error) {
+            logger.error('PerformanceAnalyticsService: Failed to generate employee performance report', {
+                error: (error as Error).message,
+                employeeId
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Get employee performance metrics
+     */
+    async getEmployeePerformanceMetrics(employeeId: string, startDate: Date, endDate: Date): Promise<any> {
+        try {
+            return await this.calculateEmployeePerformance(employeeId, startDate, endDate);
+        } catch (error) {
+            logger.error('PerformanceAnalyticsService: Failed to get employee performance metrics', {
+                error: (error as Error).message,
+                employeeId
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Store performance metric
+     */
+    async storePerformanceMetric(employeeId: string, metricType: string, value: number): Promise<void> {
+        try {
+            const { error } = await this.supabase
+                .from('performance_metrics')
+                .insert({
+                    employee_id: employeeId,
+                    metric_type: metricType,
+                    value,
+                    recorded_at: new Date().toISOString()
+                });
+
+            if (error) throw error;
+        } catch (error) {
+            logger.error('PerformanceAnalyticsService: Failed to store performance metric', {
+                error: (error as Error).message,
+                employeeId,
+                metricType
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Update employee performance score
+     */
+    async updateEmployeePerformanceScore(employeeId: string, score: number): Promise<void> {
+        try {
+            const { error } = await this.supabase
+                .from('employees')
+                .update({
+                    performance_score: score,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', employeeId);
+
+            if (error) throw error;
+        } catch (error) {
+            logger.error('PerformanceAnalyticsService: Failed to update employee performance score', {
+                error: (error as Error).message,
+                employeeId
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Get top performers
+     */
+    async getTopPerformers(limit: number, periodDays: number): Promise<any[]> {
+        try {
+            const { data: employees, error } = await this.supabase
+                .from('employees')
+                .select('id, full_name, performance_score')
+                .order('performance_score', { ascending: false })
+                .limit(limit);
+
+            if (error) throw error;
+            return employees || [];
+        } catch (error) {
+            logger.error('PerformanceAnalyticsService: Failed to get top performers', {
+                error: (error as Error).message
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Get department performance summary
+     */
+    async getDepartmentPerformanceSummary(departmentId: string): Promise<any> {
+        try {
+            const endDate = new Date();
+            const startDate = new Date();
+            startDate.setDate(endDate.getDate() - 30); // Last 30 days
+
+            return await this.calculateDepartmentPerformance(departmentId, startDate, endDate);
+        } catch (error) {
+            logger.error('PerformanceAnalyticsService: Failed to get department performance summary', {
+                error: (error as Error).message,
+                departmentId
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Run daily performance calculation
+     */
+    async runDailyPerformanceCalculation(): Promise<void> {
+        try {
+            logger.info('PerformanceAnalyticsService: Running daily performance calculation');
+
+            const { data: employees, error } = await this.supabase
+                .from('employees')
+                .select('id');
+
+            if (error) throw error;
+
+            const endDate = new Date();
+            const startDate = new Date();
+            startDate.setDate(endDate.getDate() - 7); // Last 7 days
+
+            for (const employee of employees || []) {
+                try {
+                    await this.calculateEmployeePerformance(employee.id, startDate, endDate);
+                } catch (error) {
+                    logger.error('PerformanceAnalyticsService: Failed to calculate performance for employee', {
+                        error: (error as Error).message,
+                        employeeId: employee.id
+                    });
+                }
+            }
+
+            logger.info('PerformanceAnalyticsService: Daily performance calculation completed');
+        } catch (error) {
+            logger.error('PerformanceAnalyticsService: Failed to run daily performance calculation', {
+                error: (error as Error).message
+            });
+            throw error;
+        }
+    }
 }
 
 export default new PerformanceAnalyticsService();

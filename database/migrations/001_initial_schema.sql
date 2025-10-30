@@ -55,7 +55,6 @@ CREATE TABLE public.group_chats (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 7. Create the public.chat_messages table
 CREATE TABLE public.chat_messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     chat_id UUID,

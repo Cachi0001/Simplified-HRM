@@ -8,7 +8,6 @@
 ALTER TABLE public.chat_messages
 ADD COLUMN IF NOT EXISTS read_at TIMESTAMPTZ DEFAULT NULL;
 
--- Create index for read_at queries
 CREATE INDEX IF NOT EXISTS idx_chat_messages_read_at ON public.chat_messages(read_at);
 
 -- 2. Create chat_unread_count table for tracking unread messages per user per chat

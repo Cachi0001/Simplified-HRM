@@ -163,6 +163,36 @@ export class NotificationService {
   }
 
   /**
+   * Update user notification preferences
+   */
+  async updateUserPreferences(userId: string, preferences: any): Promise<void> {
+    try {
+      logger.info('NotificationService: Updating user preferences', { userId });
+
+      // Store user notification preferences
+      const { error } = await this.supabase
+        .from('user_notification_preferences')
+        .upsert({
+          user_id: userId,
+          preferences,
+          updated_at: new Date().toISOString()
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      logger.info('NotificationService: User preferences updated', { userId });
+    } catch (error) {
+      logger.error('NotificationService: Failed to update user preferences', {
+        error: (error as Error).message,
+        userId
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Delete a notification
    */
   async deleteNotification(notificationId: string, userId: string): Promise<void> {

@@ -1,10 +1,10 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import supabase from '../config/supabase';
 import logger from '../utils/logger';
-import { NotificationService } from './NotificationService';
-import { RequestNotificationService } from './RequestNotificationService';
+import NotificationService from './NotificationService';
+import RequestNotificationService from './RequestNotificationService';
 
-export type RequestType = 'leave' | 'purchase' | 'expense' | 'travel' | 'overtime';
+export type RequestType = 'leave' | 'purchase' | 'expense' | 'travel' | 'overtime' | 'profile_update' | 'settings_change' | 'task_assignment';
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
 export type ApprovalAction = 'approve' | 'reject' | 'request_changes' | 'escalate';
 
@@ -16,6 +16,15 @@ export interface ApprovalRule {
     approvalOrder: number;
     isActive: boolean;
     description?: string;
+}
+
+export interface ApprovalStatistics {
+    totalRequests: number;
+    pendingRequests: number;
+    approvedRequests: number;
+    rejectedRequests: number;
+    averageApprovalTime: number;
+    requestsByType: Record<RequestType, number>;
 }
 
 export interface ApprovalStep {
@@ -50,6 +59,9 @@ export interface ApprovalRequest {
     employeeId: string;
     data: any;
     metadata?: any;
+    status?: ApprovalStatus;
+    createdAt?: Date;
+    updatedAt?: Date;
 }
 
 export interface ApprovalDecision {
@@ -61,13 +73,48 @@ export interface ApprovalDecision {
 
 export class ApprovalWorkflowService {
     private supabase: SupabaseClient;
-    private notificationService: NotificationService;
-    private requestNotificationService: RequestNotificationService;
+    private notificationService: typeof NotificationService;
+    private requestNotificationService: typeof RequestNotificationService;
 
     constructor() {
         this.supabase = supabase.getClient();
-        this.notificationService = new NotificationService();
-        this.requestNotificationService = new RequestNotificationService();
+        this.notificationService = NotificationService;
+        this.requestNotificationService = RequestNotificationService;
+    }
+
+    /**
+     * Create approval request
+     */
+    async createApprovalRequest(
+        requestType: RequestType,
+        requestData: any
+    ): Promise<ApprovalWorkflow> {
+        try {
+            logger.info('ApprovalWorkflowService: Creating approval request', {
+                requestType,
+                requestedBy: requestData.requestedBy
+            });
+
+            // Create the approval request
+            const request: ApprovalRequest = {
+                id: requestData.requestId || this.generateRequestId(),
+                type: requestType,
+                employeeId: requestData.requestedBy,
+                data: requestData,
+                status: 'pending',
+                createdAt: new Date(),
+                updatedAt: new Date()
+            };
+
+            // Initialize the workflow
+            return await this.initializeWorkflow(request);
+        } catch (error) {
+            logger.error('ApprovalWorkflowService: Failed to create approval request', {
+                error: (error as Error).message,
+                requestType
+            });
+            throw error;
+        }
     }
 
     /**
@@ -739,7 +786,7 @@ export class ApprovalWorkflowService {
     /**
      * Escalate approval to another user
      */
-    private async escalateApproval(stepId: string, escalateTo: string, comments?: string): Promise<void> {
+    async escalateApproval(stepId: string, escalateTo: string, comments?: string): Promise<void> {
         try {
             // Create new approval step for escalated approver
             const { data: originalStep } = await this.supabase
@@ -785,6 +832,13 @@ export class ApprovalWorkflowService {
     }
 
     /**
+     * Generate unique request ID
+     */
+    private generateRequestId(): string {
+        return `REQ_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
+
+    /**
      * Request changes from requester
      */
     private async requestChanges(workflowId: string, comments?: string): Promise<void> {
@@ -801,6 +855,204 @@ export class ApprovalWorkflowService {
             logger.error('ApprovalWorkflowService: Failed to request changes', {
                 error: (error as Error).message,
                 workflowId
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Get approval workflow by ID
+     */
+    async getApprovalWorkflow(workflowId: string): Promise<ApprovalWorkflow | null> {
+        try {
+            const { data: workflow, error } = await this.supabase
+                .from('approval_workflows')
+                .select('*')
+                .eq('id', workflowId)
+                .single();
+
+            if (error) throw error;
+            return workflow;
+        } catch (error) {
+            logger.error('ApprovalWorkflowService: Failed to get approval workflow', {
+                error: (error as Error).message,
+                workflowId
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Process approval step
+     */
+    async processApprovalStep(stepId: string, decision: ApprovalDecision, approverId: string, comments?: string): Promise<any> {
+        try {
+            // Find the workflow for this step
+            const { data: step, error: stepError } = await this.supabase
+                .from('approval_steps')
+                .select('workflow_id')
+                .eq('id', stepId)
+                .single();
+
+            if (stepError || !step) {
+                throw new Error('Approval step not found');
+            }
+
+            return await this.processApprovalDecision(step.workflow_id, stepId, {
+                action: decision as unknown as ApprovalAction,
+                approverId,
+                comments
+            });
+        } catch (error) {
+            logger.error('ApprovalWorkflowService: Failed to process approval step', {
+                error: (error as Error).message,
+                stepId
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Get approval history
+     */
+    async getApprovalHistory(requestId: string): Promise<any[]> {
+        try {
+            const { data: history, error } = await this.supabase
+                .from('approval_workflows')
+                .select('*')
+                .eq('request_id', requestId)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            return history || [];
+        } catch (error) {
+            logger.error('ApprovalWorkflowService: Failed to get approval history', {
+                error: (error as Error).message,
+                requestId
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Delegate approval
+     */
+    async delegateApproval(stepId: string, delegateTo: string, delegatedBy: string, reason?: string): Promise<any> {
+        try {
+            // Update the current step to delegate to another user
+            const { error } = await this.supabase
+                .from('approval_steps')
+                .update({
+                    approver_id: delegateTo,
+                    comments: `Delegated by ${delegatedBy}. Reason: ${reason || 'No reason provided'}`,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', stepId);
+
+            if (error) throw error;
+
+            return { success: true, message: 'Approval delegated successfully' };
+        } catch (error) {
+            logger.error('ApprovalWorkflowService: Failed to delegate approval', {
+                error: (error as Error).message,
+                stepId
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Get approval statistics
+     */
+    async getApprovalStatistics(filters?: any): Promise<ApprovalStatistics> {
+        try {
+            const { data: workflows, error } = await this.supabase
+                .from('approval_workflows')
+                .select('*');
+
+            if (error) throw error;
+
+            const stats: ApprovalStatistics = {
+                totalRequests: workflows?.length || 0,
+                pendingRequests: workflows?.filter(w => w.status === 'pending').length || 0,
+                approvedRequests: workflows?.filter(w => w.status === 'approved').length || 0,
+                rejectedRequests: workflows?.filter(w => w.status === 'rejected').length || 0,
+                averageApprovalTime: 0,
+                requestsByType: {} as Record<RequestType, number>
+            };
+
+            return stats;
+        } catch (error) {
+            logger.error('ApprovalWorkflowService: Failed to get approval statistics', {
+                error: (error as Error).message
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Bulk process approvals
+     */
+    async bulkProcessApprovals(approvals: Array<{ stepId: string; decision: ApprovalDecision; approverId: string; comments?: string }>): Promise<any[]> {
+        try {
+            const results = [];
+            for (const approval of approvals) {
+                try {
+                    const result = await this.processApprovalStep(approval.stepId, approval.decision, approval.approverId, approval.comments);
+                    results.push({ stepId: approval.stepId, success: true, result });
+                } catch (error) {
+                    results.push({ stepId: approval.stepId, success: false, error: (error as Error).message });
+                }
+            }
+            return results;
+        } catch (error) {
+            logger.error('ApprovalWorkflowService: Failed to bulk process approvals', {
+                error: (error as Error).message
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Set workflow configuration
+     */
+    async setWorkflowConfiguration(requestType: RequestType, config: any): Promise<void> {
+        try {
+            const { error } = await this.supabase
+                .from('approval_rules')
+                .upsert({
+                    request_type: requestType,
+                    configuration: config,
+                    updated_at: new Date().toISOString()
+                });
+
+            if (error) throw error;
+        } catch (error) {
+            logger.error('ApprovalWorkflowService: Failed to set workflow configuration', {
+                error: (error as Error).message,
+                requestType
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Get workflow configuration
+     */
+    async getWorkflowConfiguration(requestType: RequestType): Promise<any> {
+        try {
+            const { data: config, error } = await this.supabase
+                .from('approval_rules')
+                .select('*')
+                .eq('request_type', requestType)
+                .single();
+
+            if (error && error.code !== 'PGRST116') throw error;
+            return config?.configuration || {};
+        } catch (error) {
+            logger.error('ApprovalWorkflowService: Failed to get workflow configuration', {
+                error: (error as Error).message,
+                requestType
             });
             throw error;
         }

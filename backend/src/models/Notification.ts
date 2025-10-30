@@ -46,7 +46,7 @@ export interface PushNotificationPayload {
 }
 
 // Database notification types
-export type DatabaseNotificationType = 'chat' | 'leave' | 'purchase' | 'task' | 'birthday' | 'checkout' | 'announcement';
+export type DatabaseNotificationType = 'chat' | 'leave' | 'purchase' | 'task' | 'birthday' | 'checkout' | 'announcement' | 'checkout_reminder' | 'missed_checkout' | 'late_checkout' | 'daily_summary' | 'system_error' | 'department_broadcast' | 'update' | 'urgent' | 'alert' | 'reminder' | 'profile_update' | 'security_update';
 
 export interface DatabaseNotification {
   id: string;
@@ -68,4 +68,6 @@ export interface CreateNotificationRequest {
   message: string;
   relatedId?: string;
   actionUrl?: string;
+  priority?: 'low' | 'medium' | 'high' | 'urgent';
+  metadata?: Record<string, any>;
 }

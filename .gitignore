@@ -10,6 +10,8 @@ yarn-error.log*
 .env.production.local
 *.env.local
 .kiro
+database
+\database
 
 .zencoder
 .env.development
@@ -141,3 +143,5 @@ Vercel_Deployment.md
 .augment/rules/byterover-rules.md
 database-schema.sql
 TODO.md
+
+database

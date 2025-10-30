@@ -1,424 +1,407 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import supabase from '../config/supabase';
 import logger from '../utils/logger';
-import { NotificationService } from './NotificationService';
-import { EmailService } from './EmailService';
+import NotificationService from './NotificationService';
+import cron from 'node-cron';
 
-export interface CheckoutReminderResult {
-    totalEmployees: number;
-    employeesNeedingReminder: number;
-    notificationsSent: number;
-    emailsSent: number;
-    errors: string[];
+export interface CheckoutRecord {
+    employeeId: string;
+    employeeName: string;
+    department: string;
+    lastCheckout?: Date;
+    expectedCheckoutTime: string;
+    status: 'checked_out' | 'missed_checkout' | 'late_checkout';
+}
+
+export interface CheckoutNotification {
+    employeeId: string;
+    managerId?: string;
+    hrId?: string;
+    type: 'missed_checkout' | 'late_checkout' | 'reminder';
+    message: string;
+    timestamp: Date;
 }
 
 export class CheckoutMonitoringService {
     private supabase: SupabaseClient;
-    private notificationService: NotificationService;
-    private emailService: EmailService;
+    private notificationService: typeof NotificationService;
+    private isJobRunning: boolean = false;
 
     constructor() {
         this.supabase = supabase.getClient();
-        this.notificationService = new NotificationService();
-        this.emailService = new EmailService();
+        this.notificationService = NotificationService;
+        this.initializeCronJobs();
     }
 
     /**
-     * Get checkout reminder time from settings
+     * Initialize CRON jobs
      */
-    async getCheckoutReminderTime(): Promise<string> {
-        try {
-            const { data, error } = await this.supabase
-                .from('system_settings')
-                .select('setting_value')
-                .eq('setting_key', 'checkout_reminder_time')
-                .single();
+    private initializeCronJobs(): void {
+        // Daily checkout monitoring at 6:30 PM (30 minutes after expected checkout)
+        cron.schedule('30 18 * * 1-5', async () => {
+            await this.runDailyCheckoutMonitoring();
+        }, {
+            timezone: 'UTC'
+        });
 
-            if (error) {
-                logger.warn('CheckoutMonitoringService: Using default checkout reminder time');
-                return '18:00:00';
-            }
+        // Reminder notifications at 5:45 PM (15 minutes before checkout)
+        cron.schedule('45 17 * * 1-5', async () => {
+            await this.sendCheckoutReminders();
+        }, {
+            timezone: 'UTC'
+        });
 
-            return data.setting_value || '18:00:00';
-        } catch (error) {
-            logger.error('CheckoutMonitoringService: Failed to get checkout reminder time', { 
-                error: (error as Error).message 
-            });
-            return '18:00:00';
+        logger.info('CheckoutMonitoringService: CRON jobs initialized');
+    }
+
+    /**
+     * Run daily checkout monitoring
+     */
+    async runDailyCheckoutMonitoring(): Promise<void> {
+        if (this.isJobRunning) {
+            logger.warn('CheckoutMonitoringService: Job already running, skipping');
+            return;
         }
-    }
 
-    /**
-     * Get onsite required days from settings
-     */
-    async getOnsiteRequiredDays(): Promise<string[]> {
+        this.isJobRunning = true;
+
         try {
-            const { data, error } = await this.supabase
-                .from('system_settings')
-                .select('setting_value')
-                .eq('setting_key', 'onsite_required_days')
-                .single();
+            logger.info('CheckoutMonitoringService: Starting daily checkout monitoring');
 
-            if (error) {
-                logger.warn('CheckoutMonitoringService: Using default onsite required days');
-                return ['monday', 'tuesday', 'wednesday', 'thursday'];
-            }
+            const today = new Date();
+            const todayStr = today.toISOString().split('T')[0];
 
-            return data.setting_value as string[] || ['monday', 'tuesday', 'wednesday', 'thursday'];
-        } catch (error) {
-            logger.error('CheckoutMonitoringService: Failed to get onsite required days', { 
-                error: (error as Error).message 
-            });
-            return ['monday', 'tuesday', 'wednesday', 'thursday'];
-        }
-    }
-
-    /**
-     * Check if today is an onsite required day
-     */
-    async isOnsiteRequiredDay(date: Date = new Date()): Promise<boolean> {
-        const onsiteRequiredDays = await this.getOnsiteRequiredDays();
-        const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-        const todayName = dayNames[date.getDay()];
-        
-        return onsiteRequiredDays.includes(todayName);
-    }
-
-    /**
-     * Get employees who checked in today but haven't checked out
-     */
-    async getEmployeesNeedingCheckoutReminder(date: Date = new Date()): Promise<any[]> {
-        try {
-            const today = date.toISOString().split('T')[0];
-
-            logger.info('CheckoutMonitoringService: Getting employees needing checkout reminder', { 
-                date: today 
-            });
-
-            const { data: attendanceRecords, error } = await this.supabase
-                .from('attendance')
+            // Get all active employees
+            const { data: employees, error: employeesError } = await this.supabase
+                .from('employees')
                 .select(`
                     id,
-                    employee_id,
-                    check_in_time,
-                    check_out_time,
-                    checkout_reminder_sent,
-                    employee:employees!attendance_employee_id_fkey(
-                        id,
-                        full_name,
-                        email,
-                        user_id
-                    )
+                    full_name,
+                    department:departments(name),
+                    manager_id
                 `)
-                .eq('date', today)
-                .eq('status', 'checked_in')
-                .is('check_out_time', null)
-                .eq('checkout_reminder_sent', false);
+                .eq('status', 'active');
+
+            if (employeesError) {
+                throw employeesError;
+            }
+
+            const checkoutRecords: CheckoutRecord[] = [];
+            const notifications: CheckoutNotification[] = [];
+
+            for (const employee of employees || []) {
+                // Check if employee has checked out today
+                const { data: attendance, error: attendanceError } = await this.supabase
+                    .from('attendance_records')
+                    .select('checkout_time')
+                    .eq('employee_id', employee.id)
+                    .eq('date', todayStr)
+                    .single();
+
+                if (attendanceError && attendanceError.code !== 'PGRST116') {
+                    logger.error('CheckoutMonitoringService: Error fetching attendance', {
+                        error: attendanceError.message,
+                        employeeId: employee.id
+                    });
+                    continue;
+                }
+
+                const expectedCheckoutTime = '18:00'; // 6 PM
+                const hasCheckedOut = attendance?.checkout_time !== null;
+
+                let status: 'checked_out' | 'missed_checkout' | 'late_checkout' = 'missed_checkout';
+
+                if (hasCheckedOut) {
+                    const checkoutTime = new Date(`${todayStr}T${attendance?.checkout_time}`);
+                    const expectedTime = new Date(`${todayStr}T${expectedCheckoutTime}`);
+
+                    if (checkoutTime <= expectedTime) {
+                        status = 'checked_out';
+                    } else {
+                        status = 'late_checkout';
+                    }
+                }
+
+                const record: CheckoutRecord = {
+                    employeeId: employee.id,
+                    employeeName: employee.full_name,
+                    department: Array.isArray(employee.department) ? (employee.department[0] as any)?.name || 'Unknown' : (employee.department as any)?.name || 'Unknown',
+                    lastCheckout: hasCheckedOut && attendance?.checkout_time ? new Date(`${todayStr}T${attendance.checkout_time}`) : undefined,
+                    expectedCheckoutTime,
+                    status
+                };
+
+                checkoutRecords.push(record);
+
+                // Create notifications for missed or late checkouts
+                if (status === 'missed_checkout' || status === 'late_checkout') {
+                    await this.createCheckoutNotifications(employee, status);
+                }
+            }
+
+            // Store monitoring results
+            await this.storeMonitoringResults(checkoutRecords);
+
+            // Generate summary report
+            await this.generateDailySummaryReport(checkoutRecords);
+
+            logger.info('CheckoutMonitoringService: Daily monitoring completed', {
+                totalEmployees: employees?.length || 0,
+                missedCheckouts: checkoutRecords.filter(r => r.status === 'missed_checkout').length,
+                lateCheckouts: checkoutRecords.filter(r => r.status === 'late_checkout').length
+            });
+
+        } catch (error) {
+            logger.error('CheckoutMonitoringService: Daily monitoring failed', {
+                error: (error as Error).message
+            });
+
+            // Send error notification to system administrators
+            await this.notifySystemError(error as Error);
+        } finally {
+            this.isJobRunning = false;
+        }
+    }
+
+    /**
+     * Send checkout reminders
+     */
+    async sendCheckoutReminders(): Promise<void> {
+        try {
+            logger.info('CheckoutMonitoringService: Sending checkout reminders');
+
+            const today = new Date();
+            const todayStr = today.toISOString().split('T')[0];
+
+            // Get employees who haven't checked out yet
+            const { data: employees, error } = await this.supabase
+                .from('employees')
+                .select(`
+                    id,
+                    full_name,
+                    email
+                `)
+                .eq('status', 'active');
 
             if (error) {
-                logger.error('CheckoutMonitoringService: Failed to get attendance records', { 
-                    error: error.message 
-                });
                 throw error;
             }
 
-            const employeesNeedingReminder = attendanceRecords || [];
+            for (const employee of employees || []) {
+                // Check if employee has checked out today
+                const { data: attendance } = await this.supabase
+                    .from('attendance_records')
+                    .select('checkout_time')
+                    .eq('employee_id', employee.id)
+                    .eq('date', todayStr)
+                    .single();
 
-            logger.info('CheckoutMonitoringService: Found employees needing checkout reminder', { 
-                count: employeesNeedingReminder.length 
-            });
-
-            return employeesNeedingReminder;
-        } catch (error) {
-            logger.error('CheckoutMonitoringService: Failed to get employees needing checkout reminder', { 
-                error: (error as Error).message 
-            });
-            throw error;
-        }
-    }
-
-    /**
-     * Send checkout reminder to an employee
-     */
-    async sendCheckoutReminder(employee: any, attendanceId: string): Promise<{ notificationSent: boolean; emailSent: boolean }> {
-        try {
-            logger.info('CheckoutMonitoringService: Sending checkout reminder', { 
-                employeeId: employee.id,
-                employeeName: employee.full_name,
-                attendanceId
-            });
-
-            let notificationSent = false;
-            let emailSent = false;
-
-            // Send system notification
-            try {
-                await this.notificationService.createNotification({
-                    userId: employee.user_id,
-                    type: 'checkout',
-                    title: 'Checkout Reminder',
-                    message: 'Don\'t forget to check out before leaving the office. Please complete your checkout to record your work hours accurately.',
-                    relatedId: attendanceId,
-                    actionUrl: '/attendance'
-                });
-                notificationSent = true;
-                logger.info('CheckoutMonitoringService: System notification sent', { employeeId: employee.id });
-            } catch (notificationError) {
-                logger.error('CheckoutMonitoringService: Failed to send system notification', { 
-                    employeeId: employee.id,
-                    error: (notificationError as Error).message 
-                });
-            }
-
-            // Send email notification
-            try {
-                await this.emailService.sendEmail({
-                    to: employee.email,
-                    subject: 'Checkout Reminder - Don\'t Forget to Check Out',
-                    html: `
-                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                            <h2 style="color: #333;">Checkout Reminder</h2>
-                            <p>Hello ${employee.full_name},</p>
-                            <p>This is a friendly reminder that you haven't checked out yet today.</p>
-                            <p><strong>Please remember to check out before leaving the office.</strong></p>
-                            <p>Checking out helps us:</p>
-                            <ul>
-                                <li>Track your work hours accurately</li>
-                                <li>Ensure proper attendance records</li>
-                                <li>Maintain security protocols</li>
-                            </ul>
-                            <p>You can check out using the attendance system in your dashboard.</p>
-                            <p>If you have already left the office, please check out as soon as possible.</p>
-                            <br>
-                            <p>Best regards,<br>HR Team</p>
-                        </div>
-                    `
-                });
-                emailSent = true;
-                logger.info('CheckoutMonitoringService: Email notification sent', { employeeId: employee.id });
-            } catch (emailError) {
-                logger.error('CheckoutMonitoringService: Failed to send email notification', { 
-                    employeeId: employee.id,
-                    error: (emailError as Error).message 
-                });
-            }
-
-            // Mark reminder as sent in attendance record
-            try {
-                await this.supabase
-                    .from('attendance')
-                    .update({ checkout_reminder_sent: true })
-                    .eq('id', attendanceId);
-                
-                logger.info('CheckoutMonitoringService: Marked reminder as sent', { attendanceId });
-            } catch (updateError) {
-                logger.error('CheckoutMonitoringService: Failed to mark reminder as sent', { 
-                    attendanceId,
-                    error: (updateError as Error).message 
-                });
-            }
-
-            return { notificationSent, emailSent };
-        } catch (error) {
-            logger.error('CheckoutMonitoringService: Failed to send checkout reminder', { 
-                employeeId: employee.id,
-                error: (error as Error).message 
-            });
-            return { notificationSent: false, emailSent: false };
-        }
-    }
-
-    /**
-     * Run daily checkout monitoring job
-     */
-    async runDailyCheckoutMonitoring(date: Date = new Date()): Promise<CheckoutReminderResult> {
-        try {
-            logger.info('CheckoutMonitoringService: Starting daily checkout monitoring', { 
-                date: date.toISOString() 
-            });
-
-            // Log job start
-            const jobStartTime = new Date();
-            await this.logCronJob('daily_checkout_monitoring', 'started', jobStartTime);
-
-            // Check if today is an onsite required day
-            const isOnsiteDay = await this.isOnsiteRequiredDay(date);
-            
-            if (!isOnsiteDay) {
-                logger.info('CheckoutMonitoringService: Skipping checkout monitoring - not an onsite required day');
-                
-                await this.logCronJob('daily_checkout_monitoring', 'completed', jobStartTime, new Date(), 0, {
-                    reason: 'Not an onsite required day',
-                    date: date.toISOString().split('T')[0]
-                });
-
-                return {
-                    totalEmployees: 0,
-                    employeesNeedingReminder: 0,
-                    notificationsSent: 0,
-                    emailsSent: 0,
-                    errors: []
-                };
-            }
-
-            // Get employees needing checkout reminders
-            const employeesNeedingReminder = await this.getEmployeesNeedingCheckoutReminder(date);
-            
-            let notificationsSent = 0;
-            let emailsSent = 0;
-            const errors: string[] = [];
-
-            // Send reminders to each employee
-            for (const attendanceRecord of employeesNeedingReminder) {
-                try {
-                    const result = await this.sendCheckoutReminder(
-                        attendanceRecord.employee, 
-                        attendanceRecord.id
-                    );
-                    
-                    if (result.notificationSent) notificationsSent++;
-                    if (result.emailSent) emailsSent++;
-                } catch (error) {
-                    const errorMessage = `Failed to send reminder to ${attendanceRecord.employee.full_name}: ${(error as Error).message}`;
-                    errors.push(errorMessage);
-                    logger.error('CheckoutMonitoringService: Individual reminder failed', { 
-                        employeeId: attendanceRecord.employee.id,
-                        error: errorMessage 
+                // Send reminder if not checked out
+                if (!attendance?.checkout_time) {
+                    await this.notificationService.createNotification({
+                        userId: employee.id,
+                        title: 'Checkout Reminder',
+                        message: 'Don\'t forget to check out at the end of your workday (6:00 PM)',
+                        type: 'checkout_reminder',
+                        priority: 'medium'
                     });
                 }
             }
 
-            const result: CheckoutReminderResult = {
-                totalEmployees: employeesNeedingReminder.length,
-                employeesNeedingReminder: employeesNeedingReminder.length,
-                notificationsSent,
-                emailsSent,
-                errors
-            };
-
-            // Log job completion
-            await this.logCronJob(
-                'daily_checkout_monitoring', 
-                errors.length > 0 ? 'completed' : 'completed', 
-                jobStartTime, 
-                new Date(), 
-                employeesNeedingReminder.length,
-                {
-                    result,
-                    date: date.toISOString().split('T')[0]
-                }
-            );
-
-            logger.info('CheckoutMonitoringService: Daily checkout monitoring completed', { result });
-
-            return result;
+            logger.info('CheckoutMonitoringService: Checkout reminders sent');
         } catch (error) {
-            logger.error('CheckoutMonitoringService: Daily checkout monitoring failed', { 
-                error: (error as Error).message 
+            logger.error('CheckoutMonitoringService: Failed to send reminders', {
+                error: (error as Error).message
             });
-
-            // Log job failure
-            await this.logCronJob(
-                'daily_checkout_monitoring', 
-                'failed', 
-                new Date(), 
-                new Date(), 
-                0,
-                { error: (error as Error).message }
-            );
-
-            throw error;
         }
     }
 
     /**
-     * Check if it's time to run checkout monitoring
+     * Create checkout notifications
      */
-    async shouldRunCheckoutMonitoring(currentTime: Date = new Date()): Promise<boolean> {
+    private async createCheckoutNotifications(employee: any, status: 'missed_checkout' | 'late_checkout'): Promise<void> {
         try {
-            const reminderTime = await this.getCheckoutReminderTime();
-            const isOnsiteDay = await this.isOnsiteRequiredDay(currentTime);
-            
-            if (!isOnsiteDay) {
-                return false;
+            const message = status === 'missed_checkout'
+                ? `${employee.full_name} has missed their checkout time today`
+                : `${employee.full_name} checked out late today`;
+
+            // Notify the employee
+            await this.notificationService.createNotification({
+                userId: employee.id,
+                title: status === 'missed_checkout' ? 'Missed Checkout' : 'Late Checkout',
+                message: status === 'missed_checkout'
+                    ? 'You missed your checkout time today. Please ensure to check out on time.'
+                    : 'You checked out late today. Please try to check out on time.',
+                type: status,
+                priority: 'high'
+            });
+
+            // Notify manager if exists
+            if (employee.manager_id) {
+                await this.notificationService.createNotification({
+                    userId: employee.manager_id,
+                    title: `Employee ${status === 'missed_checkout' ? 'Missed' : 'Late'} Checkout`,
+                    message,
+                    type: status,
+                    priority: 'medium',
+                    relatedId: employee.id
+                });
             }
 
-            const [reminderHour, reminderMinute] = reminderTime.split(':').map(Number);
-            const currentHour = currentTime.getHours();
-            const currentMinute = currentTime.getMinutes();
-
-            // Check if current time matches reminder time (within 1 minute window)
-            const isReminderTime = (
-                currentHour === reminderHour && 
-                Math.abs(currentMinute - reminderMinute) <= 1
-            );
-
-            // Check if job already ran today
-            const today = currentTime.toISOString().split('T')[0];
-            const { data: existingJob } = await this.supabase
-                .from('cron_job_logs')
+            // Notify HR department
+            const { data: hrUsers } = await this.supabase
+                .from('employees')
                 .select('id')
-                .eq('job_name', 'daily_checkout_monitoring')
-                .eq('status', 'completed')
-                .gte('start_time', `${today}T00:00:00Z`)
-                .lte('start_time', `${today}T23:59:59Z`)
-                .single();
+                .eq('role', 'hr')
+                .eq('status', 'active');
 
-            const alreadyRanToday = !!existingJob;
+            for (const hrUser of hrUsers || []) {
+                await this.notificationService.createNotification({
+                    userId: hrUser.id,
+                    title: `Employee ${status === 'missed_checkout' ? 'Missed' : 'Late'} Checkout`,
+                    message: `${message} - Department: ${employee.department?.name || 'Unknown'}`,
+                    type: status,
+                    priority: 'medium',
+                    relatedId: employee.id
+                });
+            }
 
-            logger.info('CheckoutMonitoringService: Checking if should run', {
-                currentTime: currentTime.toISOString(),
-                reminderTime,
-                isOnsiteDay,
-                isReminderTime,
-                alreadyRanToday
-            });
-
-            return isReminderTime && !alreadyRanToday;
         } catch (error) {
-            logger.error('CheckoutMonitoringService: Failed to check if should run', { 
-                error: (error as Error).message 
+            logger.error('CheckoutMonitoringService: Failed to create notifications', {
+                error: (error as Error).message,
+                employeeId: employee.id
             });
-            return false;
         }
     }
 
     /**
-     * Log CRON job execution
+     * Store monitoring results
      */
-    private async logCronJob(
-        jobName: string,
-        status: 'started' | 'completed' | 'failed',
-        startTime: Date,
-        endTime?: Date,
-        recordsProcessed?: number,
-        metadata?: any
-    ): Promise<void> {
+    private async storeMonitoringResults(records: CheckoutRecord[]): Promise<void> {
         try {
-            const duration = endTime ? Math.round((endTime.getTime() - startTime.getTime()) / 1000) : null;
+            const monitoringData = records.map(record => ({
+                employee_id: record.employeeId,
+                date: new Date().toISOString().split('T')[0],
+                expected_checkout_time: record.expectedCheckoutTime,
+                actual_checkout_time: record.lastCheckout?.toTimeString().split(' ')[0],
+                status: record.status,
+                created_at: new Date().toISOString()
+            }));
 
-            await this.supabase
-                .from('cron_job_logs')
+            const { error } = await this.supabase
+                .from('checkout_monitoring_logs')
+                .insert(monitoringData);
+
+            if (error) {
+                throw error;
+            }
+
+            logger.info('CheckoutMonitoringService: Monitoring results stored', {
+                recordCount: records.length
+            });
+        } catch (error) {
+            logger.error('CheckoutMonitoringService: Failed to store results', {
+                error: (error as Error).message
+            });
+        }
+    }
+
+    /**
+     * Generate daily summary report
+     */
+    private async generateDailySummaryReport(records: CheckoutRecord[]): Promise<void> {
+        try {
+            const summary = {
+                date: new Date().toISOString().split('T')[0],
+                totalEmployees: records.length,
+                checkedOut: records.filter(r => r.status === 'checked_out').length,
+                missedCheckouts: records.filter(r => r.status === 'missed_checkout').length,
+                lateCheckouts: records.filter(r => r.status === 'late_checkout').length,
+                complianceRate: Math.round((records.filter(r => r.status === 'checked_out').length / records.length) * 100)
+            };
+
+            // Store summary in database
+            const { error } = await this.supabase
+                .from('daily_checkout_summaries')
                 .insert({
-                    job_name: jobName,
-                    status,
-                    start_time: startTime.toISOString(),
-                    end_time: endTime?.toISOString(),
-                    duration_seconds: duration,
-                    records_processed: recordsProcessed || 0,
-                    metadata: metadata || {},
+                    date: summary.date,
+                    total_employees: summary.totalEmployees,
+                    checked_out_count: summary.checkedOut,
+                    missed_checkout_count: summary.missedCheckouts,
+                    late_checkout_count: summary.lateCheckouts,
+                    compliance_rate: summary.complianceRate,
                     created_at: new Date().toISOString()
                 });
 
-            logger.info('CheckoutMonitoringService: CRON job logged', { 
-                jobName, 
-                status, 
-                duration,
-                recordsProcessed 
-            });
+            if (error) {
+                throw error;
+            }
+
+            // Send summary to managers and HR
+            await this.sendSummaryNotifications(summary);
+
+            logger.info('CheckoutMonitoringService: Daily summary generated', summary);
         } catch (error) {
-            logger.error('CheckoutMonitoringService: Failed to log CRON job', { 
-                error: (error as Error).message 
+            logger.error('CheckoutMonitoringService: Failed to generate summary', {
+                error: (error as Error).message
+            });
+        }
+    }
+
+    /**
+     * Send summary notifications
+     */
+    private async sendSummaryNotifications(summary: any): Promise<void> {
+        try {
+            const message = `Daily Checkout Summary: ${summary.checkedOut}/${summary.totalEmployees} employees checked out on time (${summary.complianceRate}% compliance)`;
+
+            // Notify HR and managers
+            const { data: recipients } = await this.supabase
+                .from('employees')
+                .select('id')
+                .in('role', ['hr', 'manager'])
+                .eq('status', 'active');
+
+            for (const recipient of recipients || []) {
+                await this.notificationService.createNotification({
+                    userId: recipient.id,
+                    title: 'Daily Checkout Summary',
+                    message,
+                    type: 'daily_summary',
+                    priority: 'low'
+                });
+            }
+        } catch (error) {
+            logger.error('CheckoutMonitoringService: Failed to send summary notifications', {
+                error: (error as Error).message
+            });
+        }
+    }
+
+    /**
+     * Notify system error
+     */
+    private async notifySystemError(error: Error): Promise<void> {
+        try {
+            // Notify system administrators
+            const { data: admins } = await this.supabase
+                .from('employees')
+                .select('id')
+                .eq('role', 'admin')
+                .eq('status', 'active');
+
+            for (const admin of admins || []) {
+                await this.notificationService.createNotification({
+                    userId: admin.id,
+                    title: 'Checkout Monitoring Error',
+                    message: `Checkout monitoring job failed: ${error.message}`,
+                    type: 'system_error',
+                    priority: 'high'
+                });
+            }
+        } catch (notificationError) {
+            logger.error('CheckoutMonitoringService: Failed to send error notifications', {
+                error: (notificationError as Error).message
             });
         }
     }
@@ -426,71 +409,55 @@ export class CheckoutMonitoringService {
     /**
      * Get checkout monitoring statistics
      */
-    async getCheckoutMonitoringStats(startDate?: Date, endDate?: Date): Promise<any> {
+    async getCheckoutStatistics(startDate?: Date, endDate?: Date): Promise<any> {
         try {
-            const start = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+            const start = startDate || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // Last 7 days
             const end = endDate || new Date();
 
-            // Get CRON job logs
-            const { data: jobLogs, error: jobError } = await this.supabase
-                .from('cron_job_logs')
+            const { data: summaries, error } = await this.supabase
+                .from('daily_checkout_summaries')
                 .select('*')
-                .eq('job_name', 'daily_checkout_monitoring')
-                .gte('start_time', start.toISOString())
-                .lte('start_time', end.toISOString())
-                .order('start_time', { ascending: false });
-
-            if (jobError) throw jobError;
-
-            // Get attendance records for the period
-            const { data: attendanceRecords, error: attendanceError } = await this.supabase
-                .from('attendance')
-                .select('date, checkout_reminder_sent, check_out_time')
                 .gte('date', start.toISOString().split('T')[0])
-                .lte('date', end.toISOString().split('T')[0]);
+                .lte('date', end.toISOString().split('T')[0])
+                .order('date', { ascending: false });
 
-            if (attendanceError) throw attendanceError;
+            if (error) {
+                throw error;
+            }
 
-            const totalJobs = jobLogs?.length || 0;
-            const successfulJobs = jobLogs?.filter(job => job.status === 'completed').length || 0;
-            const failedJobs = jobLogs?.filter(job => job.status === 'failed').length || 0;
-
-            const totalReminders = jobLogs?.reduce((sum, job) => {
-                return sum + (job.records_processed || 0);
-            }, 0) || 0;
-
-            const totalAttendanceRecords = attendanceRecords?.length || 0;
-            const recordsWithReminders = attendanceRecords?.filter(record => record.checkout_reminder_sent).length || 0;
-            const recordsWithoutCheckout = attendanceRecords?.filter(record => !record.check_out_time).length || 0;
-
-            return {
-                period: {
-                    start: start.toISOString().split('T')[0],
-                    end: end.toISOString().split('T')[0]
-                },
-                jobs: {
-                    total: totalJobs,
-                    successful: successfulJobs,
-                    failed: failedJobs,
-                    successRate: totalJobs > 0 ? Math.round((successfulJobs / totalJobs) * 100) : 0
-                },
-                reminders: {
-                    totalSent: totalReminders,
-                    averagePerDay: totalJobs > 0 ? Math.round(totalReminders / totalJobs) : 0
-                },
-                attendance: {
-                    totalRecords: totalAttendanceRecords,
-                    recordsWithReminders: recordsWithReminders,
-                    recordsWithoutCheckout: recordsWithoutCheckout,
-                    reminderRate: totalAttendanceRecords > 0 ? Math.round((recordsWithReminders / totalAttendanceRecords) * 100) : 0
-                }
+            const stats = {
+                totalDays: summaries?.length || 0,
+                averageComplianceRate: summaries?.reduce((sum, s) => sum + s.compliance_rate, 0) / (summaries?.length || 1),
+                totalMissedCheckouts: summaries?.reduce((sum, s) => sum + s.missed_checkout_count, 0) || 0,
+                totalLateCheckouts: summaries?.reduce((sum, s) => sum + s.late_checkout_count, 0) || 0,
+                dailySummaries: summaries
             };
+
+            return stats;
         } catch (error) {
-            logger.error('CheckoutMonitoringService: Failed to get checkout monitoring stats', { 
-                error: (error as Error).message 
+            logger.error('CheckoutMonitoringService: Failed to get statistics', {
+                error: (error as Error).message
             });
             throw error;
         }
+    }
+
+    /**
+     * Manual trigger for checkout monitoring (for testing)
+     */
+    async triggerManualMonitoring(): Promise<void> {
+        logger.info('CheckoutMonitoringService: Manual monitoring triggered');
+        await this.runDailyCheckoutMonitoring();
+    }
+
+    /**
+     * Get job status
+     */
+    getJobStatus(): { isRunning: boolean; lastRun?: Date } {
+        return {
+            isRunning: this.isJobRunning,
+            lastRun: new Date() // In a real implementation, you'd track this
+        };
     }
 }
 
