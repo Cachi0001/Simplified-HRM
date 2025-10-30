@@ -42,7 +42,9 @@ import performanceRoutes from './routes/performance.routes';
 import settingsRoutes from './routes/settings.routes';
 import profileRoutes from './routes/profile.routes';
 import checkoutMonitoringRoutes from './routes/checkout-monitoring.routes';
+import jobsRoutes from './routes/jobs.routes';
 import CheckoutMonitoringService from './services/CheckoutMonitoringService';
+import JobScheduler from './services/JobScheduler';
 import supabaseConfig from './config/supabase';
 
 const app = express();
@@ -217,6 +219,7 @@ app.use('/api/performance', performanceRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/checkout-monitoring', checkoutMonitoringRoutes);
+app.use('/api/jobs', jobsRoutes);
 
 // Health check endpoint
 app.get('/api/health', async (req: Request, res: Response) => {
@@ -441,6 +444,10 @@ if (require.main === module) {
     // Initialize checkout monitoring service (this will set up CRON jobs)
     CheckoutMonitoringService;
     logger.info('✅ Checkout monitoring service initialized');
+    
+    // Initialize job scheduler (this will set up all CRON jobs)
+    JobScheduler;
+    logger.info('✅ Job scheduler initialized with all CRON jobs');
     
     app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
