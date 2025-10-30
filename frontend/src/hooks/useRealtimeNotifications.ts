@@ -14,22 +14,43 @@ export interface Notification {
   updated_at: string;
 }
 
+export interface UseRealtimeNotificationsReturn {
+  notifications: Notification[];
+  unreadCount: number;
+  isSubscribed: boolean;
+  error: string | null;
+  connectionStatus: 'connecting' | 'connected' | 'disconnected' | 'error';
+  markAsRead: (notificationId: string) => Promise<void>;
+  markAllAsRead: () => Promise<void>;
+  deleteNotification: (notificationId: string) => Promise<void>;
+  getNotificationsByType: (type: Notification['type']) => Notification[];
+  getUnreadNotifications: () => Notification[];
+  subscribeToNotifications: () => Promise<void>;
+  unsubscribeFromNotifications: () => Promise<void>;
+  reconnect: () => Promise<void>;
+}
+
 /**
  * Hook for real-time notifications via Supabase Realtime
- * Handles new notifications and status updates
+ * Handles new notifications and status updates with enhanced connection management
  */
-export const useRealtimeNotifications = () => {
+export const useRealtimeNotifications = (): UseRealtimeNotificationsReturn => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('disconnected');
   const subscriptionRef = useRef<any>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectAttempts = useRef(0);
+  const maxReconnectAttempts = 5;
 
   /**
    * Subscribe to notification changes for current user
    */
   const subscribeToNotifications = useCallback(async () => {
     try {
+      setConnectionStatus('connecting');
       const { supabase } = await import('../lib/supabase');
 
       // Get current user
@@ -38,6 +59,8 @@ export const useRealtimeNotifications = () => {
       if (userError || !user) {
         console.warn('No authenticated user, cannot subscribe to notifications');
         setIsSubscribed(false);
+        setConnectionStatus('error');
+        setError('No authenticated user');
         return;
       }
 
@@ -57,7 +80,11 @@ export const useRealtimeNotifications = () => {
             console.info('📬 New notification:', payload);
             const newNotification = payload.new as Notification;
             
-            setNotifications((prev) => [newNotification, ...prev]);
+            setNotifications((prev) => {
+              // Avoid duplicates
+              const exists = prev.some(n => n.id === newNotification.id);
+              return exists ? prev : [newNotification, ...prev];
+            });
             
             // Increment unread count
             if (!newNotification.is_read) {
@@ -121,10 +148,27 @@ export const useRealtimeNotifications = () => {
           console.info(`📡 Notification subscription status: ${status}`);
           if (status === 'SUBSCRIBED') {
             setIsSubscribed(true);
+            setConnectionStatus('connected');
             setError(null);
+            reconnectAttempts.current = 0; // Reset on successful connection
           } else if (status === 'CHANNEL_ERROR') {
             setError('Failed to subscribe to notifications');
             setIsSubscribed(false);
+            setConnectionStatus('error');
+            
+            // Attempt to reconnect
+            if (reconnectAttempts.current < maxReconnectAttempts) {
+              reconnectAttempts.current++;
+              const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000);
+              console.info(`🔄 Attempting to reconnect notifications in ${delay}ms (attempt ${reconnectAttempts.current})`);
+              
+              reconnectTimeoutRef.current = setTimeout(() => {
+                subscribeToNotifications();
+              }, delay);
+            }
+          } else if (status === 'CLOSED') {
+            setIsSubscribed(false);
+            setConnectionStatus('disconnected');
           }
         });
 
@@ -134,25 +178,176 @@ export const useRealtimeNotifications = () => {
       console.error('❌ Failed to subscribe to notifications:', errorMessage);
       setError(errorMessage);
       setIsSubscribed(false);
+      setConnectionStatus('error');
     }
   }, []);
+  const subscribeToNotifications = useCallback(async () => {
+    try {
+      setConnectionStatus('connecting');
+');
+
+      // Get current user
+      
+      
+      if (userError || !user) {
+        console.warn('No authen);
+        setIsSu
+       
+r');
+        return;
+      }
+
+      console.info(`🔔 Subscribing to notifi
+
+      const subscription = supabase
+        .ch)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            ublic',
+            table: 'notificats',
+            filter: `user_id=eq.${user.id}`,
+          },
+          (pany) => {
+            console.info('📬 New notification:', payload);
+            tion;
+            
+            setNotifications((prev) => {
+              // Avoid duplicates
+             
+];
+            });
+            
+           count
+         
+            ;
+            }
+
+            // Show toast no
+            showNotificationT;
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+',
+            filter: `user_id=eq.${userid}`,
+          },
+          (payload: any) => {
+            con);
+            con;
+tion;
+
+            setNotifications((prev) =>
+              prev.map((notif) =>
+                notif.id === updatedNotification.id ? updatedNotification : notif
+              )
+            )
+
+         nged
+            ad) {
+              setUnreadCount(;
+           d) {
+              setUnreadCount+ 1);
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'DELETE',
+ublic',
+            table: 'notifications',
+            filter: `user_id=eq.${user.id}`,
+          },
+y) => {
+            console.info('🗑️  Not;
+            const deletedNotification = payload;
+
+            sv) =>
+           
+         );
+
+            // Update unread count
+            if (!deletedNotification.is_read) {
+              setUnreadCount((prev;
+            }
+          }
+        )
+        .subscribe((status: string){
+          ctus}`);
+          i
+true);
+            setConnectionStatus('connected');
+            setErro);
+            reconnectAttempts.current = 0; // Reset on successful connection
+          } else if (status === 'CHANNEL_ERROR') {
+            setError('Failed ');
+            setIsSubscribed(false);
+     );
+           
+t
+     {
+              reconnectAttempts.cur
+     00);
+              console.info(`🔄 Attempting to reconnect notificat)`);
+              
+           > {
+                subscribeToNotifications();
+              }, delay);
+            }
+          } else if (status ===SED') {
+            setIsSubscribed(false);
+            setConnec
+          }
+        });
+
+      sub
+ {
+     ;
+      console.error('❌ Failed t
+     age);
+      setIsSubscrib
+      setConnectionStatus('error');
+}
+  }, []);    d(false);eorMesstError(err seage);ss', errorMetions: notificaribe toscsubo wn error' : 'Unknosagees? err.mnceof Error = err instaMessage onst error c catch (err)    }n;ptioscriubnt = sef.curreriptionRsccted');onneatus('disctionSt 'CLOt(() =Timeouurrent = setimeoutRef.ceconnectT   rt}s.currenctAttemptneempt ${recony}ms (attn ${delaions i300ent), empts.currnnectAtteco2, rath.pow(min(1000 * My = Math. delaonst c        rent++;ts) tempReconnectAtnt < max.currenectAttemptscon  if (re     reconnecAttempt to //              
 
   /**
    * Unsubscribe from notifications
    */
   const unsubscribeFromNotifications = useCallback(async () => {
+    // Clear reconnect timeout
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+
     if (subscriptionRef.current) {
       try {
         const { supabase } = await import('../lib/supabase');
         await supabase.removeChannel(subscriptionRef.current);
         subscriptionRef.current = null;
         setIsSubscribed(false);
+        setConnectionStatus('disconnected');
         console.info('🔌 Unsubscribed from notifications');
       } catch (err) {
         console.error('Error unsubscribing:', err);
       }
     }
   }, []);
+
+  /**
+   * Manual reconnect
+   */
+  const reconnect = useCallback(async () => {
+    console.info('🔄 Manual reconnect requested for notifications');
+    await unsubscribeFromNotifications();
+    reconnectAttempts.current = 0;
+    await subscribeToNotifications();
+  }, [unsubscribeFromNotifications, subscribeToNotifications]);
 
   /**
    * Effect: Subscribe on mount
@@ -164,6 +359,15 @@ export const useRealtimeNotifications = () => {
       unsubscribeFromNotifications();
     };
   }, [subscribeToNotifications, unsubscribeFromNotifications]);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+    };
+  }, []);
 
   /**
    * Mark notification as read

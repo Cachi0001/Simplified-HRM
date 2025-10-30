@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import ApprovalWorkflowService from '../services/ApprovalWorkflowService';
+import ApprovalWorkflowService, { ApprovalAction, ApprovalDecision } from '../services/ApprovalWorkflowService';
 import { RequestNotificationService } from '../services/RequestNotificationService';
 import logger from '../utils/logger';
 
@@ -407,7 +407,11 @@ export class ApprovalWorkflowController {
             const results = await ApprovalWorkflowService.bulkProcessApprovals(
                 requests.map((req: any) => ({
                     stepId: req.stepId,
-                    decision: 'approve' as ApprovalDecision,
+                    decision: {
+                        approverId,
+                        action: 'approve' as ApprovalAction,
+                        comments: notes
+                    } as ApprovalDecision,
                     approverId,
                     comments: notes
                 }))
