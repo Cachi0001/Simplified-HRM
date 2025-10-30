@@ -231,7 +231,6 @@ export class DepartmentNotificationService {
                 recipients: { all: true },
                 channels: { inApp: true, email: true },
                 metadata: {
-                    taskId,
                     actionRequired: true,
                     deadline: dueDate,
                     category: 'task_assignment'
@@ -296,10 +295,7 @@ export class DepartmentNotificationService {
                 },
                 channels: { inApp: true, email: true },
                 metadata: {
-                    alertType,
-                    metric: details.metric,
-                    currentValue: details.currentValue,
-                    threshold: details.threshold,
+                    actionRequired: true,
                     category: 'performance_alert'
                 }
             };

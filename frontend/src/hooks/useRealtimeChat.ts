@@ -99,13 +99,13 @@ export const useRealtimeChat = (chatId: string | null): UseRealtimeChatReturn =>
             setError('Failed to subscribe to chat updates');
             setIsSubscribed(false);
             setConnectionStatus('error');
-            
+
             // Attempt to reconnect
             if (reconnectAttempts.current < maxReconnectAttempts) {
               reconnectAttempts.current++;
               const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000);
               console.info(`🔄 Attempting to reconnect in ${delay}ms (attempt ${reconnectAttempts.current})`);
-              
+
               reconnectTimeoutRef.current = setTimeout(() => {
                 subscribeToChat();
               }, delay);
