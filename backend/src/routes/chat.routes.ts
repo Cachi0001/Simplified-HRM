@@ -37,6 +37,23 @@ router.get('/message/:messageId/read-receipt', (req, res) => chatController.getM
 router.get('/:chatId/participants', (req, res) => chatController.getChatParticipants(req, res));
 
 /**
+ * Group Chat Management
+ */
+router.get('/groups', (req, res) => chatController.getGroups(req, res));
+router.post('/groups', (req, res) => chatController.createGroup(req, res));
+router.get('/groups/:groupId', (req, res) => chatController.getGroup(req, res));
+router.put('/groups/:groupId', (req, res) => chatController.updateGroup(req, res));
+router.delete('/groups/:groupId', (req, res) => chatController.deleteGroup(req, res));
+router.post('/groups/:groupId/members', (req, res) => chatController.addGroupMember(req, res));
+router.delete('/groups/:groupId/members/:memberId', (req, res) => chatController.removeGroupMember(req, res));
+router.get('/groups/:groupId/members', (req, res) => chatController.getGroupMembers(req, res));
+
+/**
+ * Chat History
+ */
+router.get('/history', (req, res) => chatController.getChatHistoryForUser(req, res));
+
+/**
  * Typing Indicators (Redis-based)
  */
 router.post('/:chatId/typing/start', (req, res) => chatController.startTyping(req, res));

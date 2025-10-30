@@ -575,4 +575,423 @@ export class ChatController {
       });
     }
   }
+
+  /**
+   * Create or get DM chat between two users
+   * POST /api/chat/dm
+   */
+  async createOrGetDMChat(req: Request, res: Response): Promise<void> {
+    try {
+      const { recipientId } = req.body;
+      const userId = req.user?.id;
+
+      if (!recipientId || !userId) {
+        res.status(400).json({
+          status: 'error',
+          message: 'recipientId and userId are required'
+        });
+        return;
+      }
+
+      logger.info('💬 [ChatController] Create or get DM chat', {
+        userId,
+        recipientId
+      });
+
+      const chat = await this.chatService.createOrGetDMChat(userId, recipientId);
+
+      res.status(200).json({
+        status: 'success',
+        data: { chat }
+      });
+    } catch (error) {
+      logger.error('❌ [ChatController] Create or get DM chat error', {
+        error: (error as Error).message
+      });
+      res.status(500).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
+
+  /**
+   * Create a group chat
+   * POST /api/chat/groups
+   */
+  async createGroupChat(req: Request, res: Response): Promise<void> {
+    try {
+      const { name, description, memberIds } = req.body;
+      const creatorId = req.user?.id;
+
+      if (!creatorId) {
+        res.status(401).json({
+          status: 'error',
+          message: 'User not authenticated'
+        });
+        return;
+      }
+
+      if (!name || !memberIds || !Array.isArray(memberIds)) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Group name and member IDs are required'
+        });
+        return;
+      }
+
+      logger.info('👥 [ChatController] Creating group chat', {
+        name,
+        creatorId,
+        memberCount: memberIds.length
+      });
+
+      const group = await this.chatService.createGroupChat(creatorId, name, description, memberIds);
+
+      res.status(201).json({
+        status: 'success',
+        message: 'Group chat created successfully',
+        data: group
+      });
+    } catch (error) {
+      logger.error('❌ [ChatController] Create group chat error', {
+        error: (error as Error).message,
+        creatorId: req.user?.id
+      });
+      res.status(500).json({
+        status: 'error',
+        message: 'Failed to create group chat'
+      });
+    }
+  }
+
+  /**
+   * Get user's chats (both DMs and groups)
+   * GET /api/chat/chats
+   */
+  async getUserChats(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.id;
+
+      if (!userId) {
+        res.status(401).json({
+          status: 'error',
+          message: 'User not authenticated'
+        });
+        return;
+      }
+
+      logger.info('💬 [ChatController] Getting user chats', { userId });
+
+      const chats = await this.chatService.getUserChats(userId);
+
+      res.status(200).json({
+        status: 'success',
+        data: chats
+      });
+    } catch (error) {
+      logger.error('❌ [ChatController] Get user chats error', {
+        error: (error as Error).message,
+        userId: req.user?.id
+      });
+      res.status(500).json({
+        status: 'error',
+        message: 'Failed to get user chats'
+      });
+    }
+  }
+
+  /**
+   * Group Chat Management
+   */
+  async getGroups(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        res.status(401).json({
+          status: 'error',
+          message: 'User not authenticated'
+        });
+        return;
+      }
+
+      logger.info('👥 [ChatController] Get groups', { userId });
+      const groups = await this.chatService.getUserGroups(userId);
+      
+      res.status(200).json({
+        status: 'success',
+        data: groups
+      });
+    } catch (error) {
+      logger.error('❌ [ChatController] Get groups error', {
+        error: (error as Error).message,
+        userId: req.user?.id
+      });
+      res.status(500).json({
+        status: 'error',
+        message: 'Failed to get groups'
+      });
+    }
+  }
+
+  async createGroup(req: Request, res: Response): Promise<void> {
+    try {
+      const { name, description, is_private } = req.body;
+      const userId = req.user?.id;
+
+      if (!name || !userId) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Group name and user ID are required'
+        });
+        return;
+      }
+
+      logger.info('👥 [ChatController] Create group', { name, userId });
+      const group = await this.chatService.createGroup(userId, name, description, is_private);
+      
+      res.status(201).json({
+        status: 'success',
+        message: 'Group created successfully',
+        data: group
+      });
+    } catch (error) {
+      logger.error('❌ [ChatController] Create group error', {
+        error: (error as Error).message,
+        body: req.body
+      });
+      res.status(400).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
+
+  async getGroup(req: Request, res: Response): Promise<void> {
+    try {
+      const { groupId } = req.params;
+      const userId = req.user?.id;
+
+      if (!groupId || !userId) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Group ID and user ID are required'
+        });
+        return;
+      }
+
+      logger.info('👥 [ChatController] Get group', { groupId, userId });
+      const group = await this.chatService.getGroup(groupId, userId);
+      
+      res.status(200).json({
+        status: 'success',
+        data: group
+      });
+    } catch (error) {
+      logger.error('❌ [ChatController] Get group error', {
+        error: (error as Error).message,
+        groupId: req.params.groupId
+      });
+      res.status(404).json({
+        status: 'error',
+        message: 'Group not found or access denied'
+      });
+    }
+  }
+
+  async updateGroup(req: Request, res: Response): Promise<void> {
+    try {
+      const { groupId } = req.params;
+      const { name, description, is_private } = req.body;
+      const userId = req.user?.id;
+
+      if (!groupId || !userId) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Group ID and user ID are required'
+        });
+        return;
+      }
+
+      logger.info('👥 [ChatController] Update group', { groupId, userId });
+      const group = await this.chatService.updateGroup(groupId, userId, { name, description, is_private });
+      
+      res.status(200).json({
+        status: 'success',
+        message: 'Group updated successfully',
+        data: group
+      });
+    } catch (error) {
+      logger.error('❌ [ChatController] Update group error', {
+        error: (error as Error).message,
+        groupId: req.params.groupId
+      });
+      res.status(400).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
+
+  async deleteGroup(req: Request, res: Response): Promise<void> {
+    try {
+      const { groupId } = req.params;
+      const userId = req.user?.id;
+
+      if (!groupId || !userId) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Group ID and user ID are required'
+        });
+        return;
+      }
+
+      logger.info('👥 [ChatController] Delete group', { groupId, userId });
+      await this.chatService.deleteGroup(groupId, userId);
+      
+      res.status(200).json({
+        status: 'success',
+        message: 'Group deleted successfully'
+      });
+    } catch (error) {
+      logger.error('❌ [ChatController] Delete group error', {
+        error: (error as Error).message,
+        groupId: req.params.groupId
+      });
+      res.status(400).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
+
+  async addGroupMember(req: Request, res: Response): Promise<void> {
+    try {
+      const { groupId } = req.params;
+      const { employeeId, role } = req.body;
+      const userId = req.user?.id;
+
+      if (!groupId || !employeeId || !userId) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Group ID, employee ID, and user ID are required'
+        });
+        return;
+      }
+
+      logger.info('👥 [ChatController] Add group member', { groupId, employeeId, userId });
+      const member = await this.chatService.addGroupMember(groupId, userId, employeeId, role);
+      
+      res.status(201).json({
+        status: 'success',
+        message: 'Member added successfully',
+        data: member
+      });
+    } catch (error) {
+      logger.error('❌ [ChatController] Add group member error', {
+        error: (error as Error).message,
+        groupId: req.params.groupId,
+        body: req.body
+      });
+      res.status(400).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
+
+  async removeGroupMember(req: Request, res: Response): Promise<void> {
+    try {
+      const { groupId, memberId } = req.params;
+      const userId = req.user?.id;
+
+      if (!groupId || !memberId || !userId) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Group ID, member ID, and user ID are required'
+        });
+        return;
+      }
+
+      logger.info('👥 [ChatController] Remove group member', { groupId, memberId, userId });
+      await this.chatService.removeGroupMember(groupId, userId, memberId);
+      
+      res.status(200).json({
+        status: 'success',
+        message: 'Member removed successfully'
+      });
+    } catch (error) {
+      logger.error('❌ [ChatController] Remove group member error', {
+        error: (error as Error).message,
+        groupId: req.params.groupId,
+        memberId: req.params.memberId
+      });
+      res.status(400).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
+
+  async getGroupMembers(req: Request, res: Response): Promise<void> {
+    try {
+      const { groupId } = req.params;
+      const userId = req.user?.id;
+
+      if (!groupId || !userId) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Group ID and user ID are required'
+        });
+        return;
+      }
+
+      logger.info('👥 [ChatController] Get group members', { groupId, userId });
+      const members = await this.chatService.getGroupMembers(groupId, userId);
+      
+      res.status(200).json({
+        status: 'success',
+        data: members
+      });
+    } catch (error) {
+      logger.error('❌ [ChatController] Get group members error', {
+        error: (error as Error).message,
+        groupId: req.params.groupId
+      });
+      res.status(400).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
+
+  async getChatHistoryForUser(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        res.status(401).json({
+          status: 'error',
+          message: 'User not authenticated'
+        });
+        return;
+      }
+
+      logger.info('📜 [ChatController] Get chat history for user', { userId });
+      const history = await this.chatService.getChatHistoryForUser(userId);
+      
+      res.status(200).json({
+        status: 'success',
+        data: history
+      });
+    } catch (error) {
+      logger.error('❌ [ChatController] Get chat history error', {
+        error: (error as Error).message,
+        userId: req.user?.id
+      });
+      res.status(500).json({
+        status: 'error',
+        message: 'Failed to get chat history'
+      });
+    }
+  }
 }

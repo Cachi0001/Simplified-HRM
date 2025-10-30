@@ -156,8 +156,10 @@ export function FloatingChatWidget() {
         const response = await api.get('/employees');
         console.log('API Response:', response.data);
         
-        if (response.data?.data) {
-          const users = response.data.data.filter((user: any) => user.id !== currentUser?.id);
+        // Handle both API response formats: { data: [...] } or { employees: [...] }
+        const employees = response.data?.data || response.data?.employees || [];
+        if (employees.length > 0) {
+          const users = employees.filter((user: any) => user.id !== currentUser?.id);
           console.log('Filtered users:', users);
           
           const formattedChats: Chat[] = users.map((user: any) => ({
@@ -174,7 +176,7 @@ export function FloatingChatWidget() {
           console.log('Formatted chats:', formattedChats);
           setChats(formattedChats);
         } else {
-          console.log('No data in response');
+          console.log('No employees in response:', response.data);
           setChats([]);
         }
       } else if (activeTab === 'announcements') {
@@ -199,6 +201,59 @@ export function FloatingChatWidget() {
           }
         } catch (err) {
           console.log('No announcements endpoint yet');
+          setChats([]);
+        }
+      } else if (activeTab === 'groups') {
+        // Load group chats
+        try {
+          const response = await api.get('/chat/groups');
+          if (response.data?.data) {
+            const formattedGroups: Chat[] = response.data.data.map((group: any) => ({
+              id: group.id,
+              name: group.name,
+              lastMessage: group.last_message || 'No messages yet',
+              unreadCount: group.unread_count || 0,
+              avatar: group.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(group.name)}&background=random`,
+              type: 'group' as const,
+              fullName: group.name,
+              email: `${group.member_count || 0} members`,
+              role: 'group'
+            }));
+            setChats(formattedGroups);
+          } else {
+            setChats([]);
+          }
+        } catch (err) {
+          console.log('Groups not available yet');
+          setChats([]);
+        }
+      } else if (activeTab === 'history') {
+        // Load chat history based on user role
+        try {
+          const response = await api.get('/chat/history');
+          if (response.data?.data) {
+            const allChats = response.data.data;
+            // Filter chats based on user role
+            const filteredChats = allChats.filter((chat: any) => 
+              shouldShowChatInHistory(chat, currentUser?.role || 'employee')
+            );
+            const formattedHistory: Chat[] = filteredChats.map((chat: any) => ({
+              id: chat.id,
+              name: chat.name || 'Unknown Chat',
+              lastMessage: chat.last_message || 'No messages',
+              unreadCount: 0,
+              avatar: chat.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(chat.name || 'Chat')}&background=random`,
+              type: chat.type || 'dm',
+              fullName: chat.name,
+              email: chat.participants || '',
+              role: chat.type
+            }));
+            setChats(formattedHistory);
+          } else {
+            setChats([]);
+          }
+        } catch (err) {
+          console.log('No chat history available');
           setChats([]);
         }
       } else {
@@ -276,6 +331,29 @@ export function FloatingChatWidget() {
     } catch (err) {
       console.error('Failed to create announcement:', err);
       alert('Failed to create announcement. Please try again.');
+    }
+  };
+
+  const createGroup = async (name: string, description?: string) => {
+    try {
+      const response = await api.post('/chat/groups', { 
+        name, 
+        description: description || '',
+        is_private: false 
+      });
+      
+      if (response.data?.success) {
+        alert(`Group "${name}" created successfully!`);
+        // Reload groups if we're on that tab
+        if (activeTab === 'groups') {
+          loadChats();
+        }
+      } else {
+        throw new Error('Failed to create group');
+      }
+    } catch (err) {
+      console.error('Failed to create group:', err);
+      alert('Failed to create group. Please try again.');
     }
   };
 
@@ -564,7 +642,11 @@ export function FloatingChatWidget() {
                       {activeTab === 'groups' && (
                         <button 
                           onClick={() => {
-                            alert('Group creation feature coming soon!');
+                            const groupName = prompt('Group Name:');
+                            if (groupName) {
+                              const description = prompt('Group Description (optional):');
+                              createGroup(groupName, description || undefined);
+                            }
                           }}
                           className="mt-3 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
                         >

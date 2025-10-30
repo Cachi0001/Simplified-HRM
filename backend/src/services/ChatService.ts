@@ -407,7 +407,7 @@ export class ChatService {
       const { data, error } = await this.supabase
         .from('chat_unread_count')
         .select('chat_id, unread_count')
-        .eq('user_id', userId)
+        .eq('employee_id', userId)
         .gt('unread_count', 0);
 
       if (error) {
@@ -424,6 +424,613 @@ export class ChatService {
       return unreadCounts;
     } catch (error) {
       logger.error('ChatService: Get all unread counts failed', { error: (error as Error).message });
+      throw error;
+    }
+  }
+
+  /**
+   * Create or get a DM chat between two users
+   */
+  async createOrGetDMChat(userId: string, recipientId: string): Promise<any> {
+    try {
+      logger.info('ChatService: Creating or getting DM chat', { userId, recipientId });
+
+      // Check if DM chat already exists between these users
+      const { data: existingChat, error: searchError } = await this.supabase
+        .from('chats')
+        .select(`
+          *,
+          chat_participants!inner(employee_id)
+        `)
+        .eq('type', 'dm')
+        .eq('chat_participants.employee_id', userId);
+
+      if (searchError) {
+        logger.error('ChatService: Failed to search for existing DM', { error: searchError.message });
+        throw searchError;
+      }
+
+      // Find chat where both users are participants
+      const dmChat = existingChat?.find(chat => {
+        const participantIds = chat.chat_participants.map((p: any) => p.employee_id);
+        return participantIds.includes(recipientId) && participantIds.length === 2;
+      });
+
+      if (dmChat) {
+        logger.info('ChatService: Found existing DM chat', { chatId: dmChat.id });
+        return dmChat;
+      }
+
+      // Create new DM chat
+      const { data: newChat, error: createError } = await this.supabase
+        .from('chats')
+        .insert({
+          type: 'dm',
+          created_by: userId,
+          name: null, // DMs don't have names
+          description: null
+        })
+        .select()
+        .single();
+
+      if (createError) {
+        logger.error('ChatService: Failed to create DM chat', { error: createError.message });
+        throw createError;
+      }
+
+      // Add both users as participants
+      const { error: participantsError } = await this.supabase
+        .from('chat_participants')
+        .insert([
+          { chat_id: newChat.id, employee_id: userId, role: 'member' },
+          { chat_id: newChat.id, employee_id: recipientId, role: 'member' }
+        ]);
+
+      if (participantsError) {
+        logger.error('ChatService: Failed to add DM participants', { error: participantsError.message });
+        throw participantsError;
+      }
+
+      logger.info('ChatService: Created new DM chat', { chatId: newChat.id });
+      return newChat;
+    } catch (error) {
+      logger.error('ChatService: Create or get DM chat failed', { error: (error as Error).message });
+      throw error;
+    }
+  }
+
+  /**
+   * Create a group chat
+   */
+  async createGroupChat(creatorId: string, name: string, description?: string, memberIds?: string[]): Promise<any> {
+    try {
+      logger.info('ChatService: Creating group chat', { creatorId, name, memberCount: memberIds?.length || 0 });
+
+      // Create the group chat
+      const { data: newGroup, error: createError } = await this.supabase
+        .from('chats')
+        .insert({
+          type: 'group',
+          name,
+          description,
+          created_by: creatorId
+        })
+        .select()
+        .single();
+
+      if (createError) {
+        logger.error('ChatService: Failed to create group chat', { error: createError.message });
+        throw createError;
+      }
+
+      // Add creator as admin
+      const participants = [
+        { chat_id: newGroup.id, employee_id: creatorId, role: 'admin' }
+      ];
+
+      // Add other members
+      if (memberIds && memberIds.length > 0) {
+        const memberParticipants = memberIds
+          .filter(id => id !== creatorId) // Don't add creator twice
+          .map(id => ({ chat_id: newGroup.id, employee_id: id, role: 'member' }));
+        participants.push(...memberParticipants);
+      }
+
+      const { error: participantsError } = await this.supabase
+        .from('chat_participants')
+        .insert(participants);
+
+      if (participantsError) {
+        logger.error('ChatService: Failed to add group participants', { error: participantsError.message });
+        throw participantsError;
+      }
+
+      logger.info('ChatService: Created group chat successfully', { groupId: newGroup.id });
+      return newGroup;
+    } catch (error) {
+      logger.error('ChatService: Create group chat failed', { error: (error as Error).message });
+      throw error;
+    }
+  }
+
+  /**
+   * Get user's chats (both DMs and groups)
+   */
+  async getUserChats(userId: string): Promise<any[]> {
+    try {
+      logger.info('ChatService: Getting user chats', { userId });
+
+      const { data: chats, error } = await this.supabase
+        .from('chats')
+        .select(`
+          *,
+          chat_participants!inner(employee_id, role, joined_at),
+          chat_messages(content, created_at, sender_id)
+        `)
+        .eq('chat_participants.employee_id', userId)
+        .is('chat_participants.left_at', null)
+        .order('last_message_at', { ascending: false });
+
+      if (error) {
+        logger.error('ChatService: Failed to get user chats', { error: error.message });
+        throw error;
+      }
+
+      // Process chats to add additional info
+      const processedChats = chats?.map(chat => {
+        // Get last message
+        const lastMessage = chat.chat_messages?.[0];
+        
+        // For DMs, get the other participant's info
+        if (chat.type === 'dm') {
+          const otherParticipant = chat.chat_participants.find((p: any) => p.employee_id !== userId);
+          return {
+            ...chat,
+            lastMessage: lastMessage?.content || '',
+            lastMessageAt: lastMessage?.created_at || chat.created_at,
+            otherParticipantId: otherParticipant?.employee_id
+          };
+        }
+
+        return {
+          ...chat,
+          lastMessage: lastMessage?.content || '',
+          lastMessageAt: lastMessage?.created_at || chat.created_at
+        };
+      }) || [];
+
+      logger.info('ChatService: User chats retrieved', { chatCount: processedChats.length });
+      return processedChats;
+    } catch (error) {
+      logger.error('ChatService: Get user chats failed', { error: (error as Error).message });
+      throw error;
+    }
+  }
+
+  /**
+   * Group Chat Management
+   */
+  async getUserGroups(userId: string): Promise<any[]> {
+    try {
+      logger.info('ChatService: Getting user groups', { userId });
+      
+      const { data: groups, error } = await supabaseConfig.getClient()
+        .from('group_chats')
+        .select(`
+          *,
+          group_chat_members!inner(role),
+          group_chat_members(count)
+        `)
+        .eq('group_chat_members.employee_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw new Error(`Failed to get user groups: ${error.message}`);
+      }
+
+      const processedGroups = groups?.map(group => ({
+        id: group.id,
+        name: group.name,
+        description: group.description,
+        avatar: group.avatar,
+        is_private: group.is_private,
+        created_by: group.created_by,
+        member_count: group.group_chat_members?.length || 0,
+        user_role: group.group_chat_members?.[0]?.role || 'member',
+        created_at: group.created_at,
+        updated_at: group.updated_at
+      })) || [];
+
+      logger.info('ChatService: User groups retrieved', { groupCount: processedGroups.length });
+      return processedGroups;
+    } catch (error) {
+      logger.error('ChatService: Get user groups failed', { error: (error as Error).message });
+      throw error;
+    }
+  }
+
+  async createGroup(createdBy: string, name: string, description?: string, isPrivate: boolean = false): Promise<any> {
+    try {
+      logger.info('ChatService: Creating group', { name, createdBy });
+      
+      const { data: group, error: groupError } = await supabaseConfig.getClient()
+        .from('group_chats')
+        .insert({
+          name,
+          description: description || '',
+          created_by: createdBy,
+          is_private: isPrivate
+        })
+        .select()
+        .single();
+
+      if (groupError) {
+        throw new Error(`Failed to create group: ${groupError.message}`);
+      }
+
+      // Add creator as admin member
+      const { error: memberError } = await supabaseConfig.getClient()
+        .from('group_chat_members')
+        .insert({
+          group_id: group.id,
+          employee_id: createdBy,
+          role: 'admin'
+        });
+
+      if (memberError) {
+        // Clean up the group if member addition fails
+        await supabaseConfig.getClient()
+          .from('group_chats')
+          .delete()
+          .eq('id', group.id);
+        throw new Error(`Failed to add creator as member: ${memberError.message}`);
+      }
+
+      logger.info('ChatService: Group created successfully', { groupId: group.id });
+      return group;
+    } catch (error) {
+      logger.error('ChatService: Create group failed', { error: (error as Error).message });
+      throw error;
+    }
+  }
+
+  async getGroup(groupId: string, userId: string): Promise<any> {
+    try {
+      logger.info('ChatService: Getting group', { groupId, userId });
+      
+      // Check if user is a member of the group
+      const { data: membership, error: memberError } = await supabaseConfig.getClient()
+        .from('group_chat_members')
+        .select('role')
+        .eq('group_id', groupId)
+        .eq('employee_id', userId)
+        .single();
+
+      if (memberError || !membership) {
+        throw new Error('Group not found or access denied');
+      }
+
+      const { data: group, error } = await supabaseConfig.getClient()
+        .from('group_chats')
+        .select(`
+          *,
+          group_chat_members(count)
+        `)
+        .eq('id', groupId)
+        .single();
+
+      if (error) {
+        throw new Error(`Failed to get group: ${error.message}`);
+      }
+
+      const processedGroup = {
+        ...group,
+        member_count: group.group_chat_members?.length || 0,
+        user_role: membership.role
+      };
+
+      logger.info('ChatService: Group retrieved', { groupId });
+      return processedGroup;
+    } catch (error) {
+      logger.error('ChatService: Get group failed', { error: (error as Error).message });
+      throw error;
+    }
+  }
+
+  async updateGroup(groupId: string, userId: string, updates: { name?: string; description?: string; is_private?: boolean }): Promise<any> {
+    try {
+      logger.info('ChatService: Updating group', { groupId, userId });
+      
+      // Check if user is admin or creator
+      const { data: membership, error: memberError } = await supabaseConfig.getClient()
+        .from('group_chat_members')
+        .select('role')
+        .eq('group_id', groupId)
+        .eq('employee_id', userId)
+        .single();
+
+      if (memberError || !membership || membership.role !== 'admin') {
+        const { data: group } = await supabaseConfig.getClient()
+          .from('group_chats')
+          .select('created_by')
+          .eq('id', groupId)
+          .single();
+        
+        if (!group || group.created_by !== userId) {
+          throw new Error('Only group admins can update the group');
+        }
+      }
+
+      const { data: updatedGroup, error } = await supabaseConfig.getClient()
+        .from('group_chats')
+        .update(updates)
+        .eq('id', groupId)
+        .select()
+        .single();
+
+      if (error) {
+        throw new Error(`Failed to update group: ${error.message}`);
+      }
+
+      logger.info('ChatService: Group updated successfully', { groupId });
+      return updatedGroup;
+    } catch (error) {
+      logger.error('ChatService: Update group failed', { error: (error as Error).message });
+      throw error;
+    }
+  }
+
+  async deleteGroup(groupId: string, userId: string): Promise<void> {
+    try {
+      logger.info('ChatService: Deleting group', { groupId, userId });
+      
+      // Check if user is the creator
+      const { data: group, error: groupError } = await supabaseConfig.getClient()
+        .from('group_chats')
+        .select('created_by')
+        .eq('id', groupId)
+        .single();
+
+      if (groupError || !group || group.created_by !== userId) {
+        throw new Error('Only the group creator can delete the group');
+      }
+
+      const { error } = await supabaseConfig.getClient()
+        .from('group_chats')
+        .delete()
+        .eq('id', groupId);
+
+      if (error) {
+        throw new Error(`Failed to delete group: ${error.message}`);
+      }
+
+      logger.info('ChatService: Group deleted successfully', { groupId });
+    } catch (error) {
+      logger.error('ChatService: Delete group failed', { error: (error as Error).message });
+      throw error;
+    }
+  }
+
+  async addGroupMember(groupId: string, userId: string, employeeId: string, role: string = 'member'): Promise<any> {
+    try {
+      logger.info('ChatService: Adding group member', { groupId, userId, employeeId });
+      
+      // Check if user is admin or creator
+      const { data: membership, error: memberError } = await supabaseConfig.getClient()
+        .from('group_chat_members')
+        .select('role')
+        .eq('group_id', groupId)
+        .eq('employee_id', userId)
+        .single();
+
+      if (memberError || !membership || membership.role !== 'admin') {
+        const { data: group } = await supabaseConfig.getClient()
+          .from('group_chats')
+          .select('created_by')
+          .eq('id', groupId)
+          .single();
+        
+        if (!group || group.created_by !== userId) {
+          throw new Error('Only group admins can add members');
+        }
+      }
+
+      const { data: newMember, error } = await supabaseConfig.getClient()
+        .from('group_chat_members')
+        .insert({
+          group_id: groupId,
+          employee_id: employeeId,
+          role: role
+        })
+        .select()
+        .single();
+
+      if (error) {
+        throw new Error(`Failed to add member: ${error.message}`);
+      }
+
+      logger.info('ChatService: Member added successfully', { groupId, employeeId });
+      return newMember;
+    } catch (error) {
+      logger.error('ChatService: Add group member failed', { error: (error as Error).message });
+      throw error;
+    }
+  }
+
+  async removeGroupMember(groupId: string, userId: string, memberId: string): Promise<void> {
+    try {
+      logger.info('ChatService: Removing group member', { groupId, userId, memberId });
+      
+      // Check if user is admin or creator, or removing themselves
+      if (userId !== memberId) {
+        const { data: membership, error: memberError } = await supabaseConfig.getClient()
+          .from('group_chat_members')
+          .select('role')
+          .eq('group_id', groupId)
+          .eq('employee_id', userId)
+          .single();
+
+        if (memberError || !membership || membership.role !== 'admin') {
+          const { data: group } = await supabaseConfig.getClient()
+            .from('group_chats')
+            .select('created_by')
+            .eq('id', groupId)
+            .single();
+          
+          if (!group || group.created_by !== userId) {
+            throw new Error('Only group admins can remove members');
+          }
+        }
+      }
+
+      const { error } = await supabaseConfig.getClient()
+        .from('group_chat_members')
+        .delete()
+        .eq('group_id', groupId)
+        .eq('employee_id', memberId);
+
+      if (error) {
+        throw new Error(`Failed to remove member: ${error.message}`);
+      }
+
+      logger.info('ChatService: Member removed successfully', { groupId, memberId });
+    } catch (error) {
+      logger.error('ChatService: Remove group member failed', { error: (error as Error).message });
+      throw error;
+    }
+  }
+
+  async getGroupMembers(groupId: string, userId: string): Promise<any[]> {
+    try {
+      logger.info('ChatService: Getting group members', { groupId, userId });
+      
+      // Check if user is a member of the group
+      const { data: membership, error: memberError } = await supabaseConfig.getClient()
+        .from('group_chat_members')
+        .select('role')
+        .eq('group_id', groupId)
+        .eq('employee_id', userId)
+        .single();
+
+      if (memberError || !membership) {
+        throw new Error('Group not found or access denied');
+      }
+
+      const { data: members, error } = await supabaseConfig.getClient()
+        .from('group_chat_members')
+        .select(`
+          *,
+          employees(id, full_name, email, avatar, role)
+        `)
+        .eq('group_id', groupId)
+        .order('joined_at', { ascending: true });
+
+      if (error) {
+        throw new Error(`Failed to get group members: ${error.message}`);
+      }
+
+      const processedMembers = members?.map(member => ({
+        id: member.id,
+        employee_id: member.employee_id,
+        role: member.role,
+        joined_at: member.joined_at,
+        employee: member.employees
+      })) || [];
+
+      logger.info('ChatService: Group members retrieved', { memberCount: processedMembers.length });
+      return processedMembers;
+    } catch (error) {
+      logger.error('ChatService: Get group members failed', { error: (error as Error).message });
+      throw error;
+    }
+  }
+
+  async getChatHistoryForUser(userId: string): Promise<any[]> {
+    try {
+      logger.info('ChatService: Getting chat history for user', { userId });
+      
+      // Get DM chats
+      const { data: dmChats, error: dmError } = await supabaseConfig.getClient()
+        .from('chat_participants')
+        .select(`
+          chat_id,
+          chat_messages(
+            content,
+            created_at,
+            sender_id,
+            employees(full_name)
+          )
+        `)
+        .eq('employee_id', userId)
+        .order('created_at', { ascending: false });
+
+      // Get group chats
+      const { data: groupChats, error: groupError } = await supabaseConfig.getClient()
+        .from('group_chat_members')
+        .select(`
+          group_chats(
+            id,
+            name,
+            description,
+            avatar
+          ),
+          chat_messages(
+            content,
+            created_at,
+            sender_id,
+            employees(full_name)
+          )
+        `)
+        .eq('employee_id', userId);
+
+      if (dmError && groupError) {
+        throw new Error('Failed to get chat history');
+      }
+
+      const allChats: any[] = [];
+
+      // Process DM chats
+      if (dmChats) {
+        dmChats.forEach(dm => {
+          if (dm.chat_messages && dm.chat_messages.length > 0) {
+            const lastMessage = dm.chat_messages[0];
+            allChats.push({
+              id: dm.chat_id,
+              name: `DM with ${lastMessage.employees?.full_name || 'Unknown'}`,
+              type: 'dm',
+              last_message: lastMessage.content,
+              last_message_at: lastMessage.created_at,
+              participants: lastMessage.employees?.full_name || 'Unknown'
+            });
+          }
+        });
+      }
+
+      // Process group chats
+      if (groupChats) {
+        groupChats.forEach(group => {
+          if (group.group_chats && group.chat_messages && group.chat_messages.length > 0) {
+            const lastMessage = group.chat_messages[0];
+            allChats.push({
+              id: group.group_chats.id,
+              name: group.group_chats.name,
+              type: 'group',
+              last_message: lastMessage.content,
+              last_message_at: lastMessage.created_at,
+              participants: `Group: ${group.group_chats.name}`,
+              avatar: group.group_chats.avatar
+            });
+          }
+        });
+      }
+
+      // Sort by last message time
+      allChats.sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime());
+
+      logger.info('ChatService: Chat history retrieved', { chatCount: allChats.length });
+      return allChats;
+    } catch (error) {
+      logger.error('ChatService: Get chat history failed', { error: (error as Error).message });
       throw error;
     }
   }
