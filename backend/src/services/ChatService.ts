@@ -994,13 +994,14 @@ export class ChatService {
         dmChats.forEach(dm => {
           if (dm.chat_messages && dm.chat_messages.length > 0) {
             const lastMessage = dm.chat_messages[0];
+            const employee = Array.isArray(lastMessage.employees) ? lastMessage.employees[0] : lastMessage.employees;
             allChats.push({
               id: dm.chat_id,
-              name: `DM with ${lastMessage.employees?.full_name || 'Unknown'}`,
+              name: `DM with ${employee?.full_name || 'Unknown'}`,
               type: 'dm',
               last_message: lastMessage.content,
               last_message_at: lastMessage.created_at,
-              participants: lastMessage.employees?.full_name || 'Unknown'
+              participants: employee?.full_name || 'Unknown'
             });
           }
         });
@@ -1011,14 +1012,15 @@ export class ChatService {
         groupChats.forEach(group => {
           if (group.group_chats && group.chat_messages && group.chat_messages.length > 0) {
             const lastMessage = group.chat_messages[0];
+            const groupChat = Array.isArray(group.group_chats) ? group.group_chats[0] : group.group_chats;
             allChats.push({
-              id: group.group_chats.id,
-              name: group.group_chats.name,
+              id: groupChat?.id,
+              name: groupChat?.name,
               type: 'group',
               last_message: lastMessage.content,
               last_message_at: lastMessage.created_at,
-              participants: `Group: ${group.group_chats.name}`,
-              avatar: group.group_chats.avatar
+              participants: `Group: ${groupChat?.name}`,
+              avatar: groupChat?.avatar
             });
           }
         });

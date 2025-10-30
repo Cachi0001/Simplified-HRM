@@ -274,7 +274,9 @@ export function FloatingChatWidget() {
     try {
       setIsLoading(true);
       // Create a chat ID for DM between current user and selected user
-      const chatId = `dm_${Math.min(currentUser.id, selectedChat.id)}_${Math.max(currentUser.id, selectedChat.id)}`;
+      const chatId = currentUser.id < selectedChat.id 
+        ? `dm_${currentUser.id}_${selectedChat.id}`
+        : `dm_${selectedChat.id}_${currentUser.id}`;
       
       const response = await api.get(`/chat/${chatId}/history`, {
         params: { limit: 50 }
@@ -300,7 +302,9 @@ export function FloatingChatWidget() {
 
     try {
       // Create a chat ID for DM between current user and selected user
-      const chatId = `dm_${Math.min(currentUser.id, selectedChat.id)}_${Math.max(currentUser.id, selectedChat.id)}`;
+      const chatId = currentUser.id < selectedChat.id 
+        ? `dm_${currentUser.id}_${selectedChat.id}`
+        : `dm_${selectedChat.id}_${currentUser.id}`;
       
       await api.post('/chat/send', {
         chatId: chatId,
