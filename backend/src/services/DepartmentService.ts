@@ -489,6 +489,130 @@ export class DepartmentService {
             throw error;
         }
     }
+
+    /**
+     * Bulk assign tasks to department
+     */
+    async bulkAssignTasksToDepartment(
+        departmentId: string,
+        options: {
+            task_ids: string[];
+            assignment_type: 'distribute' | 'assign_all';
+            assigned_by: string;
+            due_date?: string;
+            priority?: string;
+            notes?: string;
+        }
+    ): Promise<{
+        successful: Array<{ taskId: string; assignedTo?: string }>;
+        failed: Array<{ taskId: string; error: string }>;
+    }> {
+        try {
+            logger.info('DepartmentService: Bulk assigning tasks to department', {
+                departmentId,
+                taskCount: options.task_ids.length,
+                assignmentType: options.assignment_type
+            });
+
+            // Get department members
+            const members = await this.getDepartmentMembers(departmentId);
+            
+            if (members.length === 0) {
+                throw new Error('No members found in department');
+            }
+
+            const successful: Array<{ taskId: string; assignedTo?: string }> = [];
+            const failed: Array<{ taskId: string; error: string }> = [];
+
+            // Process each task
+            for (let i = 0; i < options.task_ids.length; i++) {
+                const taskId = options.task_ids[i];
+                
+                try {
+                    if (options.assignment_type === 'distribute') {
+                        // Distribute tasks evenly among department members
+                        const assigneeIndex = i % members.length;
+                        const assignee = members[assigneeIndex];
+
+                        const { error: updateError } = await this.supabase
+                            .from('tasks')
+                            .update({
+                                assigned_to: assignee.user_id,
+                                department_id: departmentId,
+                                due_date: options.due_date,
+                                priority: options.priority,
+                                notes: options.notes,
+                                updated_at: new Date().toISOString()
+                            })
+                            .eq('id', taskId);
+
+                        if (updateError) {
+                            failed.push({ taskId, error: updateError.message });
+                        } else {
+                            successful.push({ taskId, assignedTo: assignee.user_id });
+                        }
+                    } else {
+                        // Assign all tasks to all department members (create multiple assignments)
+                        for (const member of members) {
+                            try {
+                                // Create a copy of the task for each member
+                                const { data: originalTask, error: fetchError } = await this.supabase
+                                    .from('tasks')
+                                    .select('*')
+                                    .eq('id', taskId)
+                                    .single();
+
+                                if (fetchError || !originalTask) {
+                                    failed.push({ taskId, error: `Failed to fetch original task: ${fetchError?.message}` });
+                                    continue;
+                                }
+
+                                // Create new task assignment for each member
+                                const { error: insertError } = await this.supabase
+                                    .from('tasks')
+                                    .insert({
+                                        title: originalTask.title,
+                                        description: originalTask.description,
+                                        assigned_to: member.user_id,
+                                        department_id: departmentId,
+                                        due_date: options.due_date || originalTask.due_date,
+                                        priority: options.priority || originalTask.priority,
+                                        status: 'pending',
+                                        notes: options.notes,
+                                        created_by: options.assigned_by,
+                                        created_at: new Date().toISOString()
+                                    });
+
+                                if (insertError) {
+                                    failed.push({ taskId: `${taskId}-${member.user_id}`, error: insertError.message });
+                                } else {
+                                    successful.push({ taskId: `${taskId}-${member.user_id}`, assignedTo: member.user_id });
+                                }
+                            } catch (memberError) {
+                                failed.push({ 
+                                    taskId: `${taskId}-${member.user_id}`, 
+                                    error: (memberError as Error).message 
+                                });
+                            }
+                        }
+                    }
+                } catch (taskError) {
+                    failed.push({ taskId, error: (taskError as Error).message });
+                }
+            }
+
+            logger.info('DepartmentService: Bulk task assignment completed', {
+                departmentId,
+                successful: successful.length,
+                failed: failed.length
+            });
+
+            return { successful, failed };
+        } catch (error) {
+            logger.error('DepartmentService: Bulk assign tasks failed', { error: (error as Error).message });
+            throw error;
+        }
+    }
 }
 
 export default new DepartmentService();

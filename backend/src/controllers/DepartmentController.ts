@@ -1,9 +1,14 @@
 import { Request, Response } from 'express';
 import { DepartmentService } from '../services/DepartmentService';
+import DepartmentNotificationService from '../services/DepartmentNotificationService';
 import logger from '../utils/logger';
 
 export class DepartmentController {
-    constructor(private departmentService: DepartmentService) {}
+    private departmentNotificationService: typeof DepartmentNotificationService;
+
+    constructor(private departmentService: DepartmentService) {
+        this.departmentNotificationService = DepartmentNotificationService;
+    }
 
     /**
      * Create a new department
@@ -563,6 +568,456 @@ export class DepartmentController {
             });
         } catch (error) {
             logger.error('❌ [DepartmentController] Get my departments error', {
+                error: (error as Error).message
+            });
+            res.status(400).json({
+                status: 'error',
+                message: (error as Error).message
+            });
+        }
+    }
+
+    /**
+     * Bulk assign tasks to department
+     * POST /api/departments/:id/bulk-assign-tasks
+     */
+    async bulkAssignTasksToDepartment(req: Request, res: Response): Promise<void> {
+        try {
+            const { id } = req.params;
+            const { task_ids, assignment_type, due_date, priority, notes } = req.body;
+            const assignedBy = req.user?.employeeId || req.user?.id;
+            const userRole = req.user?.role;
+
+            if (!id || !task_ids || !Array.isArray(task_ids) || task_ids.length === 0) {
+                res.status(400).json({
+                    status: 'error',
+                    message: 'Department ID and task IDs array are required'
+                });
+                return;
+            }
+
+            // Check if user has permission to assign tasks
+            if (!['super-admin', 'admin', 'hr', 'manager'].includes(userRole)) {
+                res.status(403).json({
+                    status: 'error',
+                    message: 'Insufficient permissions to assign tasks to departments'
+                });
+                return;
+            }
+
+            logger.info('📦 [DepartmentController] Bulk assign tasks to department', {
+                departmentId: id,
+                taskCount: task_ids.length,
+                assignedBy,
+                assignmentType: assignment_type || 'distribute'
+            });
+
+            const result = await this.departmentService.bulkAssignTasksToDepartment(id, {
+                task_ids,
+                assignment_type: assignment_type || 'distribute', // 'distribute' or 'assign_all'
+                assigned_by: assignedBy,
+                due_date,
+                priority,
+                notes
+            });
+
+            // Send notification about bulk task assignment
+            await this.departmentNotificationService.notifyDepartmentTaskAssignment(
+                id,
+                task_ids.join(','),
+                `${task_ids.length} tasks bulk assigned`,
+                assignedBy,
+                due_date ? new Date(due_date) : undefined,
+                priority
+            );
+
+            res.status(200).json({
+                status: 'success',
+                message: `${result.successful.length} tasks assigned successfully, ${result.failed.length} failed`,
+                data: {
+                    successful: result.successful,
+                    failed: result.failed,
+                    summary: {
+                        totalTasks: task_ids.length,
+                        successfulCount: result.successful.length,
+                        failedCount: result.failed.length
+                    }
+                }
+            });
+        } catch (error) {
+            logger.error('❌ [DepartmentController] Bulk assign tasks error', {
+                error: (error as Error).message
+            });
+            res.status(400).json({
+                status: 'error',
+                message: (error as Error).message
+            });
+        }
+    }
+
+    /**
+     * Send notification to department
+     * POST /api/departments/:id/notify
+     */
+    async sendDepartmentNotification(req: Request, res: Response): Promise<void> {
+        try {
+            const { id } = req.params;
+            const { 
+                title, 
+                message, 
+                type, 
+                priority, 
+                recipients, 
+                channels, 
+                scheduledFor, 
+                expiresAt,
+                metadata 
+            } = req.body;
+            const createdBy = req.user?.employeeId || req.user?.id;
+            const userRole = req.user?.role;
+
+            if (!id || !title || !message || !createdBy) {
+                res.status(400).json({
+                    status: 'error',
+                    message: 'Department ID, title, message, and creator ID are required'
+                });
+                return;
+            }
+
+            // Check if user has permission to send department notifications
+            if (!['super-admin', 'admin', 'hr', 'manager'].includes(userRole)) {
+                res.status(403).json({
+                    status: 'error',
+                    message: 'Insufficient permissions to send department notifications'
+                });
+                return;
+            }
+
+            logger.info('📢 [DepartmentController] Send department notification', {
+                departmentId: id,
+                title,
+                type: type || 'announcement',
+                createdBy
+            });
+
+            const notification = await this.departmentNotificationService.sendDepartmentNotification({
+                departmentId: id,
+                title,
+                message,
+                type: type || 'announcement',
+                priority: priority || 'medium',
+                createdBy,
+                recipients: recipients || { all: true },
+                channels: channels || { inApp: true, email: false },
+                scheduledFor: scheduledFor ? new Date(scheduledFor) : undefined,
+                expiresAt: expiresAt ? new Date(expiresAt) : undefined,
+                metadata
+            });
+
+            res.status(201).json({
+                status: 'success',
+                message: 'Department notification sent successfully',
+                data: { notification }
+            });
+        } catch (error) {
+            logger.error('❌ [DepartmentController] Send department notification error', {
+                error: (error as Error).message
+            });
+            res.status(400).json({
+                status: 'error',
+                message: (error as Error).message
+            });
+        }
+    }
+
+    /**
+     * Broadcast message to department
+     * POST /api/departments/:id/broadcast
+     */
+    async broadcastToDepartment(req: Request, res: Response): Promise<void> {
+        try {
+            const { id } = req.params;
+            const { title, content, broadcastType, requiresAcknowledgment } = req.body;
+            const createdBy = req.user?.employeeId || req.user?.id;
+            const userRole = req.user?.role;
+
+            if (!id || !title || !content || !createdBy) {
+                res.status(400).json({
+                    status: 'error',
+                    message: 'Department ID, title, content, and creator ID are required'
+                });
+                return;
+            }
+
+            // Check if user has permission to broadcast to department
+            if (!['super-admin', 'admin', 'hr', 'manager'].includes(userRole)) {
+                res.status(403).json({
+                    status: 'error',
+                    message: 'Insufficient permissions to broadcast to department'
+                });
+                return;
+            }
+
+            logger.info('📡 [DepartmentController] Broadcast to department', {
+                departmentId: id,
+                title,
+                broadcastType: broadcastType || 'general',
+                createdBy
+            });
+
+            const broadcast = await this.departmentNotificationService.broadcastToDepartment({
+                departmentId: id,
+                title,
+                content,
+                broadcastType: broadcastType || 'general',
+                createdBy,
+                requiresAcknowledgment: requiresAcknowledgment || false
+            });
+
+            res.status(201).json({
+                status: 'success',
+                message: 'Department broadcast sent successfully',
+                data: { broadcast }
+            });
+        } catch (error) {
+            logger.error('❌ [DepartmentController] Broadcast to department error', {
+                error: (error as Error).message
+            });
+            res.status(400).json({
+                status: 'error',
+                message: (error as Error).message
+            });
+        }
+    }
+
+    /**
+     * Get department notification history
+     * GET /api/departments/:id/notifications
+     */
+    async getDepartmentNotifications(req: Request, res: Response): Promise<void> {
+        try {
+            const { id } = req.params;
+            const { limit } = req.query;
+
+            if (!id) {
+                res.status(400).json({
+                    status: 'error',
+                    message: 'Department ID is required'
+                });
+                return;
+            }
+
+            logger.info('📜 [DepartmentController] Get department notifications', {
+                departmentId: id,
+                limit: limit || 50
+            });
+
+            const notifications = await this.departmentNotificationService.getDepartmentNotificationHistory(
+                id,
+                limit ? parseInt(limit as string) : 50
+            );
+
+            res.status(200).json({
+                status: 'success',
+                data: { notifications, count: notifications.length }
+            });
+        } catch (error) {
+            logger.error('❌ [DepartmentController] Get department notifications error', {
+                error: (error as Error).message
+            });
+            res.status(400).json({
+                status: 'error',
+                message: (error as Error).message
+            });
+        }
+    }
+
+    /**
+     * Send performance alert to department
+     * POST /api/departments/:id/performance-alert
+     */
+    async sendPerformanceAlert(req: Request, res: Response): Promise<void> {
+        try {
+            const { id } = req.params;
+            const { alertType, metric, currentValue, threshold, affectedEmployees } = req.body;
+            const createdBy = req.user?.employeeId || req.user?.id;
+            const userRole = req.user?.role;
+
+            if (!id || !alertType || !metric || currentValue === undefined || threshold === undefined) {
+                res.status(400).json({
+                    status: 'error',
+                    message: 'Department ID, alert type, metric, current value, and threshold are required'
+                });
+                return;
+            }
+
+            // Check if user has permission to send performance alerts
+            if (!['super-admin', 'admin', 'hr'].includes(userRole)) {
+                res.status(403).json({
+                    status: 'error',
+                    message: 'Insufficient permissions to send performance alerts'
+                });
+                return;
+            }
+
+            logger.info('⚠️ [DepartmentController] Send performance alert', {
+                departmentId: id,
+                alertType,
+                metric,
+                currentValue,
+                threshold
+            });
+
+            await this.departmentNotificationService.notifyDepartmentPerformanceAlert(
+                id,
+                alertType,
+                { metric, currentValue, threshold, affectedEmployees },
+                createdBy
+            );
+
+            res.status(200).json({
+                status: 'success',
+                message: 'Performance alert sent successfully'
+            });
+        } catch (error) {
+            logger.error('❌ [DepartmentController] Send performance alert error', {
+                error: (error as Error).message
+            });
+            res.status(400).json({
+                status: 'error',
+                message: (error as Error).message
+            });
+        }
+    }
+
+    /**
+     * Schedule recurring department notification
+     * POST /api/departments/:id/schedule-notification
+     */
+    async scheduleRecurringNotification(req: Request, res: Response): Promise<void> {
+        try {
+            const { id } = req.params;
+            const { notification, schedule } = req.body;
+            const createdBy = req.user?.employeeId || req.user?.id;
+            const userRole = req.user?.role;
+
+            if (!id || !notification || !schedule) {
+                res.status(400).json({
+                    status: 'error',
+                    message: 'Department ID, notification, and schedule are required'
+                });
+                return;
+            }
+
+            // Check if user has permission to schedule notifications
+            if (!['super-admin', 'admin', 'hr'].includes(userRole)) {
+                res.status(403).json({
+                    status: 'error',
+                    message: 'Insufficient permissions to schedule department notifications'
+                });
+                return;
+            }
+
+            logger.info('⏰ [DepartmentController] Schedule recurring notification', {
+                departmentId: id,
+                frequency: schedule.frequency,
+                createdBy
+            });
+
+            const scheduleId = await this.departmentNotificationService.scheduleRecurringNotification(
+                {
+                    ...notification,
+                    departmentId: id,
+                    createdBy
+                },
+                schedule
+            );
+
+            res.status(201).json({
+                status: 'success',
+                message: 'Recurring notification scheduled successfully',
+                data: { scheduleId }
+            });
+        } catch (error) {
+            logger.error('❌ [DepartmentController] Schedule recurring notification error', {
+                error: (error as Error).message
+            });
+            res.status(400).json({
+                status: 'error',
+                message: (error as Error).message
+            });
+        }
+    }
+
+    /**
+     * Mark broadcast as read
+     * POST /api/departments/broadcasts/:broadcastId/read
+     */
+    async markBroadcastAsRead(req: Request, res: Response): Promise<void> {
+        try {
+            const { broadcastId } = req.params;
+            const employeeId = req.user?.employeeId || req.user?.id;
+
+            if (!broadcastId || !employeeId) {
+                res.status(400).json({
+                    status: 'error',
+                    message: 'Broadcast ID and employee ID are required'
+                });
+                return;
+            }
+
+            logger.info('✅ [DepartmentController] Mark broadcast as read', {
+                broadcastId,
+                employeeId
+            });
+
+            await this.departmentNotificationService.markBroadcastAsRead(broadcastId, employeeId);
+
+            res.status(200).json({
+                status: 'success',
+                message: 'Broadcast marked as read successfully'
+            });
+        } catch (error) {
+            logger.error('❌ [DepartmentController] Mark broadcast as read error', {
+                error: (error as Error).message
+            });
+            res.status(400).json({
+                status: 'error',
+                message: (error as Error).message
+            });
+        }
+    }
+
+    /**
+     * Acknowledge broadcast
+     * POST /api/departments/broadcasts/:broadcastId/acknowledge
+     */
+    async acknowledgeBroadcast(req: Request, res: Response): Promise<void> {
+        try {
+            const { broadcastId } = req.params;
+            const employeeId = req.user?.employeeId || req.user?.id;
+
+            if (!broadcastId || !employeeId) {
+                res.status(400).json({
+                    status: 'error',
+                    message: 'Broadcast ID and employee ID are required'
+                });
+                return;
+            }
+
+            logger.info('✅ [DepartmentController] Acknowledge broadcast', {
+                broadcastId,
+                employeeId
+            });
+
+            await this.departmentNotificationService.acknowledgeBroadcast(broadcastId, employeeId);
+
+            res.status(200).json({
+                status: 'success',
+                message: 'Broadcast acknowledged successfully'
+            });
+        } catch (error) {
+            logger.error('❌ [DepartmentController] Acknowledge broadcast error', {
                 error: (error as Error).message
             });
             res.status(400).json({

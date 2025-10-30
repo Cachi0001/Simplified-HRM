@@ -34,6 +34,22 @@ router.put('/:id/members/:userId/role', (req, res) => departmentController.updat
  * Department Task Assignment
  */
 router.post('/:id/assign-task', (req, res) => departmentController.assignTaskToDepartment(req, res));
+router.post('/:id/bulk-assign-tasks', (req, res) => departmentController.bulkAssignTasksToDepartment(req, res));
+
+/**
+ * Department Notifications and Broadcasting
+ */
+router.post('/:id/notify', (req, res) => departmentController.sendDepartmentNotification(req, res));
+router.post('/:id/broadcast', (req, res) => departmentController.broadcastToDepartment(req, res));
+router.get('/:id/notifications', (req, res) => departmentController.getDepartmentNotifications(req, res));
+router.post('/:id/performance-alert', (req, res) => departmentController.sendPerformanceAlert(req, res));
+router.post('/:id/schedule-notification', (req, res) => departmentController.scheduleRecurringNotification(req, res));
+
+/**
+ * Broadcast Management
+ */
+router.post('/broadcasts/:broadcastId/read', (req, res) => departmentController.markBroadcastAsRead(req, res));
+router.post('/broadcasts/:broadcastId/acknowledge', (req, res) => departmentController.acknowledgeBroadcast(req, res));
 
 /**
  * Department Statistics
