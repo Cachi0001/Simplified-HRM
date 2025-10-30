@@ -39,6 +39,22 @@ export class AnnouncementController {
 
       const supabase = supabaseConfig.getClient();
 
+      // First, verify the user exists in employees table
+      const { data: employee, error: employeeError } = await supabase
+        .from('employees')
+        .select('id, full_name, email')
+        .eq('id', userId)
+        .single();
+
+      if (employeeError || !employee) {
+        logger.error('User not found in employees table', { userId, error: employeeError });
+        res.status(400).json({
+          status: 'error',
+          message: 'User not found in employees table. Please contact administrator.'
+        });
+        return;
+      }
+
       // Insert announcement
       const { data: announcement, error: insertError } = await supabase
         .from('announcements')
@@ -55,16 +71,8 @@ export class AnnouncementController {
         throw insertError;
       }
 
-      // Get author details
-      const { data: author, error: authorError } = await supabase
-        .from('employees')
-        .select('full_name, email')
-        .eq('id', userId)
-        .single();
-
-      if (authorError) {
-        logger.warn('Could not fetch author details', { error: authorError });
-      }
+      // Use the employee data we already fetched
+      const author = employee;
 
       // Send notifications to all users (this would typically be done via a job queue)
       try {

@@ -24,6 +24,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 import express, { Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
+import jwt from 'jsonwebtoken';
 import logger from './utils/logger';
 import authRoutes from './routes/auth.routes';
 import employeeRoutes from './routes/employee.routes';
@@ -220,6 +221,42 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/checkout-monitoring', checkoutMonitoringRoutes);
 app.use('/api/jobs', jobsRoutes);
+
+// Debug endpoint to check current user
+app.get('/api/debug/user', async (req: Request, res: Response) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.split(' ')[1];
+    
+    if (!token) {
+      return res.status(401).json({ error: 'No token provided' });
+    }
+
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      return res.status(500).json({ error: 'JWT_SECRET not configured' });
+    }
+
+    const decoded = jwt.verify(token, secret) as any;
+    
+    // Check if user exists in employees table
+    const supabase = supabaseConfig.getClient();
+    const { data: employee, error } = await supabase
+      .from('employees')
+      .select('id, email, full_name, role, active')
+      .eq('id', decoded.sub)
+      .single();
+
+    res.json({
+      jwt_payload: decoded,
+      employee_found: !error,
+      employee_data: employee,
+      error: error?.message
+    });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
 
 // Health check endpoint
 app.get('/api/health', async (req: Request, res: Response) => {

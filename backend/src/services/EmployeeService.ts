@@ -94,6 +94,25 @@ export class EmployeeService {
     }
   }
 
+  async getEmployeesForChat(currentUserId: string): Promise<any[]> {
+    try {
+      logger.info('EmployeeService: Getting employees for chat', { currentUserId });
+
+      const employees = await this.employeeRepository.getEmployeesForChat(currentUserId);
+      return employees.map(emp => ({
+        id: emp.id,
+        email: emp.email,
+        fullName: emp.full_name,
+        role: emp.role,
+        department: emp.department,
+        profilePicture: emp.profile_picture
+      }));
+    } catch (error) {
+      logger.error('EmployeeService: Get employees for chat failed', { error: (error as Error).message });
+      throw error;
+    }
+  }
+
   async getEmployeeById(id: string, currentUserRole: string, currentUserId?: string): Promise<IEmployee | null> {
     try {
       const employee = await this.employeeRepository.findById(id);

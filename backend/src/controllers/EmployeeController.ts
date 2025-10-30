@@ -47,7 +47,10 @@ export class EmployeeController {
 
       res.status(200).json({
         status: 'success',
-        data: result
+        data: result.employees,
+        total: result.total,
+        page: result.page,
+        limit: result.limit
       });
     } catch (error) {
       logger.error('EmployeeController: Get all employees error', { error: (error as Error).message });
@@ -218,6 +221,34 @@ export class EmployeeController {
       });
     } catch (error) {
       logger.error('EmployeeController: Search employees error', { error: (error as Error).message });
+      res.status(400).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
+
+  async getEmployeesForChat(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.id;
+
+      if (!userId) {
+        res.status(401).json({
+          status: 'error',
+          message: 'User not authenticated'
+        });
+        return;
+      }
+
+      const employees = await this.employeeService.getEmployeesForChat(userId);
+
+      res.status(200).json({
+        status: 'success',
+        data: employees,
+        total: employees.length
+      });
+    } catch (error) {
+      logger.error('EmployeeController: Get employees for chat error', { error: (error as Error).message });
       res.status(400).json({
         status: 'error',
         message: (error as Error).message

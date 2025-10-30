@@ -21,20 +21,13 @@ export class ChatService {
     try {
       logger.info('ChatService: Sending message', { chatId, senderId, messageLength: message.length });
 
-      const now = new Date().toISOString();
-
       const { data, error } = await this.supabase
         .from('chat_messages')
         .insert({
           chat_id: chatId,
           sender_id: senderId,
-          message,
-          timestamp: now,
-          created_at: now,
-          sent_at: now,
-          read_at: null,
-          delivered_at: null,
-          edited_at: null
+          message: message,
+          chat_type: 'dm'
         })
         .select()
         .single();
@@ -407,12 +400,13 @@ export class ChatService {
       const { data, error } = await this.supabase
         .from('chat_unread_count')
         .select('chat_id, unread_count')
-        .eq('employee_id', userId)
+        .eq('user_id', userId)
         .gt('unread_count', 0);
 
       if (error) {
         logger.error('ChatService: Failed to get all unread counts', { error: error.message });
-        throw error;
+        // Return empty array instead of throwing to prevent breaking the UI
+        return [];
       }
 
       const unreadCounts = data?.map(entry => ({
@@ -424,7 +418,8 @@ export class ChatService {
       return unreadCounts;
     } catch (error) {
       logger.error('ChatService: Get all unread counts failed', { error: (error as Error).message });
-      throw error;
+      // Return empty array instead of throwing to prevent breaking the UI
+      return [];
     }
   }
 
@@ -565,7 +560,7 @@ export class ChatService {
         .select(`
           *,
           chat_participants!inner(employee_id, role, joined_at),
-          chat_messages(content, created_at, sender_id)
+          chat_messages(message, created_at, sender_id)
         `)
         .eq('chat_participants.employee_id', userId)
         .is('chat_participants.left_at', null)
@@ -586,7 +581,7 @@ export class ChatService {
           const otherParticipant = chat.chat_participants.find((p: any) => p.employee_id !== userId);
           return {
             ...chat,
-            lastMessage: lastMessage?.content || '',
+            lastMessage: lastMessage?.message || '',
             lastMessageAt: lastMessage?.created_at || chat.created_at,
             otherParticipantId: otherParticipant?.employee_id
           };
@@ -594,7 +589,7 @@ export class ChatService {
 
         return {
           ...chat,
-          lastMessage: lastMessage?.content || '',
+          lastMessage: lastMessage?.message || '',
           lastMessageAt: lastMessage?.created_at || chat.created_at
         };
       }) || [];
@@ -618,8 +613,7 @@ export class ChatService {
         .from('group_chats')
         .select(`
           *,
-          group_chat_members!inner(role),
-          group_chat_members(count)
+          group_chat_members!inner(role)
         `)
         .eq('group_chat_members.employee_id', userId)
         .order('created_at', { ascending: false });
@@ -628,18 +622,26 @@ export class ChatService {
         throw new Error(`Failed to get user groups: ${error.message}`);
       }
 
-      const processedGroups = groups?.map(group => ({
-        id: group.id,
-        name: group.name,
-        description: group.description,
-        avatar: group.avatar,
-        is_private: group.is_private,
-        created_by: group.created_by,
-        member_count: group.group_chat_members?.length || 0,
-        user_role: group.group_chat_members?.[0]?.role || 'member',
-        created_at: group.created_at,
-        updated_at: group.updated_at
-      })) || [];
+      // Get member counts for each group
+      const processedGroups = await Promise.all(groups?.map(async (group) => {
+        const { count } = await supabaseConfig.getClient()
+          .from('group_chat_members')
+          .select('*', { count: 'exact', head: true })
+          .eq('group_id', group.id);
+
+        return {
+          id: group.id,
+          name: group.name,
+          description: group.description,
+          avatar: group.avatar,
+          is_private: group.is_private,
+          created_by: group.created_by,
+          member_count: count || 0,
+          user_role: group.group_chat_members?.[0]?.role || 'member',
+          created_at: group.created_at,
+          updated_at: group.updated_at
+        };
+      }) || []);
 
       logger.info('ChatService: User groups retrieved', { groupCount: processedGroups.length });
       return processedGroups;
@@ -955,7 +957,7 @@ export class ChatService {
         .select(`
           chat_id,
           chat_messages(
-            content,
+            message,
             created_at,
             sender_id,
             employees(full_name)
@@ -975,7 +977,7 @@ export class ChatService {
             avatar
           ),
           chat_messages(
-            content,
+            message,
             created_at,
             sender_id,
             employees(full_name)
@@ -999,7 +1001,7 @@ export class ChatService {
               id: dm.chat_id,
               name: `DM with ${employee?.full_name || 'Unknown'}`,
               type: 'dm',
-              last_message: lastMessage.content,
+              last_message: lastMessage.message,
               last_message_at: lastMessage.created_at,
               participants: employee?.full_name || 'Unknown'
             });
@@ -1017,7 +1019,7 @@ export class ChatService {
               id: groupChat?.id,
               name: groupChat?.name,
               type: 'group',
-              last_message: lastMessage.content,
+              last_message: lastMessage.message,
               last_message_at: lastMessage.created_at,
               participants: `Group: ${groupChat?.name}`,
               avatar: groupChat?.avatar

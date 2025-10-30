@@ -720,7 +720,8 @@ export class ChatController {
       
       res.status(200).json({
         status: 'success',
-        data: groups
+        data: groups,
+        count: groups.length
       });
     } catch (error) {
       logger.error('❌ [ChatController] Get groups error', {

@@ -16,8 +16,9 @@ const employeeController = new EmployeeController(employeeService);
 
 router.use(authenticateToken);
 
-// Static routes before dynamic routes
+// Static routes before dynamic routes - ORDER MATTERS!
 router.get('/search', (req, res) => employeeController.searchEmployees(req, res));
+router.get('/for-chat', (req, res) => employeeController.getEmployeesForChat(req, res));
 router.get('/me', (req, res) => employeeController.getMyProfile(req, res));
 router.put('/me', (req, res) => employeeController.updateMyProfile(req, res));
 router.get('/pending', requireRole(['admin', 'hr', 'super-admin']), (req, res) => employeeController.getPendingApprovals(req, res));

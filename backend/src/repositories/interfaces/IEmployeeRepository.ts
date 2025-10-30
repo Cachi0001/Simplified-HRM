@@ -8,6 +8,7 @@ export interface IEmployeeRepository {
   update(id: string, employeeData: UpdateEmployeeRequest): Promise<any>;
   delete(id: string): Promise<void>;
   search(query: string): Promise<any[]>;
+  getEmployeesForChat(currentUserId: string): Promise<any[]>;
   getPendingApprovals(): Promise<any[]>;
   approve(id: string): Promise<any>;
   getEmployeeStats(): Promise<{ total: number; active: number; pending: number; rejected: number }>;

@@ -281,6 +281,27 @@ export class SupabaseEmployeeRepository {
     }
   }
 
+  async getEmployeesForChat(currentUserId: string): Promise<any[]> {
+    try {
+      const { data, error } = await this.supabase
+        .from('employees')
+        .select('id, email, full_name, role, department, profile_picture')
+        .eq('status', 'active')
+        .neq('id', currentUserId)
+        .order('full_name');
+
+      if (error) {
+        logger.error('❌ [SupabaseEmployeeRepository] Get employees for chat failed:', error);
+        throw error;
+      }
+
+      return data || [];
+    } catch (error) {
+      logger.error('❌ [SupabaseEmployeeRepository] Get employees for chat failed:', error);
+      throw error;
+    }
+  }
+
   async getPendingApprovals(): Promise<any[]> {
     try {
       const { data, error } = await this.supabase
