@@ -156,7 +156,7 @@ export function FloatingChatWidget() {
         if (response.data?.data) {
           const users = response.data.data.filter((user: any) => user.id !== currentUser?.id);
           const formattedChats: Chat[] = users.map((user: any) => ({
-            id: `dm-${user.id}`,
+            id: user.id, // Use actual user ID for DM chat
             name: user.full_name || user.email,
             lastMessage: '',
             unreadCount: 0,
@@ -169,35 +169,8 @@ export function FloatingChatWidget() {
           setChats(formattedChats);
         }
       } else {
-        // Load chats/groups/announcements/history
-        const response = await api.get('/chat/list', {
-          params: { 
-            type: activeTab === 'announcements' ? 'announcement' : (activeTab === 'history' ? 'history' : activeTab)
-          }
-        });
-
-        if (response.data?.data?.chats) {
-          let formattedChats: Chat[] = response.data.data.chats.map((chat: any) => ({
-            id: chat.id,
-            name: chat.name,
-            lastMessage: chat.lastMessage,
-            unreadCount: chat.unreadCount || 0,
-            avatar: chat.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(chat.name)}&background=random`,
-            type: chat.type || 'group',
-            fullName: chat.fullName,
-            email: chat.email,
-            role: chat.role
-          }));
-
-          // Apply role-based filtering for history tab
-          if (activeTab === 'history' && currentUser?.role) {
-            formattedChats = formattedChats.filter(chat => 
-              shouldShowChatInHistory(chat, currentUser.role)
-            );
-          }
-
-          setChats(formattedChats);
-        }
+        // For now, just show empty for other tabs
+        setChats([]);
       }
     } catch (err) {
       console.error('Failed to load chats:', err);
@@ -212,15 +185,23 @@ export function FloatingChatWidget() {
 
     try {
       setIsLoading(true);
-      const response = await api.get(`/chat/${selectedChat.id}/history`, {
+      // Create a chat ID for DM between current user and selected user
+      const chatId = `dm_${Math.min(currentUser.id, selectedChat.id)}_${Math.max(currentUser.id, selectedChat.id)}`;
+      
+      const response = await api.get(`/chat/${chatId}/history`, {
         params: { limit: 50 }
       });
 
       if (response.data?.data?.messages) {
         setMessages(response.data.data.messages);
+      } else {
+        // No messages yet, start with empty array
+        setMessages([]);
       }
     } catch (err) {
       console.error('Failed to load messages:', err);
+      // Start with empty messages if chat doesn't exist yet
+      setMessages([]);
     } finally {
       setIsLoading(false);
     }
@@ -230,8 +211,11 @@ export function FloatingChatWidget() {
     if (!messageText.trim() || !selectedChat) return;
 
     try {
+      // Create a chat ID for DM between current user and selected user
+      const chatId = `dm_${Math.min(currentUser.id, selectedChat.id)}_${Math.max(currentUser.id, selectedChat.id)}`;
+      
       await api.post('/chat/send', {
-        chatId: selectedChat.id,
+        chatId: chatId,
         message: messageText
       });
       setMessageText('');
@@ -239,6 +223,8 @@ export function FloatingChatWidget() {
       getAllUnreadCounts();
     } catch (err) {
       console.error('Failed to send message:', err);
+      // Add user feedback for errors
+      alert('Failed to send message. Please try again.');
     }
   };
 
@@ -297,6 +283,15 @@ export function FloatingChatWidget() {
   };
 
   const onDragStop = () => {
+    // Small delay to allow click events to process
+    setTimeout(() => {
+      setIsDragging(false);
+    }, 100);
+  };
+
+  const handleChatButtonClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     if (!isDragging) {
       setIsOpen(true);
     }
@@ -315,7 +310,7 @@ export function FloatingChatWidget() {
         defaultPosition={WIDGET_DEFAULT_POS}
         bounds={isFullscreen ? false : calculateBounds()}
         nodeRef={dragRef}
-        disabled={isFullscreen}
+        disabled={isFullscreen || isOpen}
         onStart={onDragStart}
         onDrag={onDrag}
         onStop={onDragStop}
@@ -327,11 +322,12 @@ export function FloatingChatWidget() {
         {!isOpen ? (
           // Chat Bubble Button
           <div
-            className="relative w-14 h-14 rounded-full shadow-lg transition-all duration-300 hover:scale-110 flex items-center justify-center"
+            className="relative w-14 h-14 rounded-full shadow-lg transition-all duration-300 hover:scale-110 flex items-center justify-center cursor-pointer"
             style={{
               background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             }}
             title="Open Chat"
+            onClick={handleChatButtonClick}
           >
             <MessageCircle className="w-6 h-6 text-white" />
             {totalUnreadCount > 0 && (
@@ -441,7 +437,13 @@ export function FloatingChatWidget() {
                       {filteredChats.map(chat => (
                         <div
                           key={chat.id}
-                          onClick={() => setSelectedChat(chat)}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (!isDragging) {
+                              setSelectedChat(chat);
+                            }
+                          }}
                           className={`w-full p-3 border-b ${borderColor} hover:${darkMode ? 'bg-gray-800' : 'bg-gray-50'} transition-colors text-left flex items-center space-x-3 cursor-pointer`}
                         >
                           <div className="relative">
@@ -497,21 +499,15 @@ export function FloatingChatWidget() {
                          activeTab === 'announcements' ? 'No announcements available.' :
                          'No chat history available.'}
                       </p>
-                      {(activeTab === 'groups' || activeTab === 'dms') && (
+                      {activeTab === 'groups' && (
                         <button 
                           onClick={() => {
-                            if (activeTab === 'groups') {
-                              // TODO: Implement group creation modal
-                              console.log('Create group functionality');
-                            } else {
-                              // For DMs, just show instruction
-                              console.log('Select a user from the list above');
-                            }
+                            alert('Group creation feature coming soon!');
                           }}
                           className="mt-3 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
                         >
                           <span className="text-lg">+</span>
-                          {activeTab === 'groups' ? 'Create Group' : 'Start Chat'}
+                          Create Group
                         </button>
                       )}
                     </div>

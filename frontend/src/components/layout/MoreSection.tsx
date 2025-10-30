@@ -12,11 +12,10 @@ import {
   FileText,
   Clock,
   X,
-  ChevronRight,
-  MessageCircle
+  ChevronRight
 } from 'lucide-react';
 import { authService } from '../../services/authService';
-import { useChatUnreadCount } from '../../hooks/useChatUnreadCount';
+
 import { useNotificationCount } from '../../hooks/useNotificationCount';
 
 interface MoreSectionProps {
@@ -38,7 +37,7 @@ interface MenuItem {
 
 export function MoreSection({ darkMode = false, isOpen, onClose }: MoreSectionProps) {
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const { totalUnreadCount } = useChatUnreadCount();
+
   const { unreadCount: notificationCount } = useNotificationCount();
   const menuRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
@@ -89,14 +88,6 @@ export function MoreSection({ darkMode = false, isOpen, onClose }: MoreSectionPr
   // Define all menu items with role-based access
   const allMenuItems: MenuItem[] = [
     // Requests Section
-    {
-      icon: MessageCircle,
-      label: 'Chat',
-      path: '/chat',
-      badge: totalUnreadCount,
-      description: 'Messages and conversations',
-      category: 'requests'
-    },
     {
       icon: Calendar,
       label: 'Leave Requests',
