@@ -142,10 +142,10 @@ export default function SuperAdminDashboardPage() {
             <Logo className="h-8 w-auto" />
             <div>
               <h1 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                Super-Admin Dashboard
+                Go3net Super-Admin Dashboard
               </h1>
               <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                Welcome, {currentUser.fullName}
+                Welcome back, {currentUser.fullName}
               </p>
             </div>
           </div>

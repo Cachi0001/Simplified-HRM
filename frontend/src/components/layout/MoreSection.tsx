@@ -12,7 +12,8 @@ import {
   FileText,
   Clock,
   X,
-  ChevronRight
+  ChevronRight,
+  MessageCircle
 } from 'lucide-react';
 import { authService } from '../../services/authService';
 import { useChatUnreadCount } from '../../hooks/useChatUnreadCount';
@@ -88,6 +89,14 @@ export function MoreSection({ darkMode = false, isOpen, onClose }: MoreSectionPr
   // Define all menu items with role-based access
   const allMenuItems: MenuItem[] = [
     // Requests Section
+    {
+      icon: MessageCircle,
+      label: 'Chat',
+      path: '/chat',
+      badge: totalUnreadCount,
+      description: 'Messages and conversations',
+      category: 'requests'
+    },
     {
       icon: Calendar,
       label: 'Leave Requests',

@@ -67,7 +67,7 @@ export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
   const navItems: NavItem[] = [
     { icon: LayoutDashboard, label: 'Dashboard', path: dashboardPath },
     { icon: CheckSquare, label: 'Tasks', path: '/tasks' },
-    { icon: MessageCircle, label: 'Chat', path: '/chat', showBadge: true },
+    { icon: Calendar, label: 'Leave', path: '/leave-requests' },
     { icon: Clock, label: 'Attendance', path: '/attendance-report' },
   ];
 
@@ -92,14 +92,7 @@ export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
                     : (localDarkMode ? 'text-gray-400 hover:text-white hover:bg-gray-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50')
                 }`}
               >
-                <div className="relative">
-                  <item.icon className="h-5 w-5 mb-1" />
-                  {item.showBadge && totalUnreadCount > 0 && (
-                    <span className="absolute -top-2 -right-2 inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white bg-red-600 rounded-full animate-pulse">
-                      {totalUnreadCount > 99 ? '99+' : totalUnreadCount}
-                    </span>
-                  )}
-                </div>
+                <item.icon className="h-5 w-5 mb-1" />
                 <span className="sr-only">{item.label}</span>
                 <span className="text-xs font-medium">{item.label}</span>
               </button>

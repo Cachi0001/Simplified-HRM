@@ -122,56 +122,86 @@ export function FloatingChatWidget() {
     }
   }, [selectedChat]);
 
-  // Role-based chat filtering
+  // Role-based chat filtering for history
   const shouldShowChatInHistory = (chat: Chat, userRole: string): boolean => {
-    // Super-admin sees all conversations
-    if (userRole === 'super-admin') return true;
-    
-    // Admin/HR can see all except super-admin's personal conversations
-    if (userRole === 'admin' || userRole === 'hr') {
-      // Only exclude chats that are explicitly marked as super-admin personal
-      return !chat.name?.includes('super-admin-personal');
+    switch (userRole) {
+      case 'super-admin':
+        // Super-admin sees all conversations
+        return true;
+      
+      case 'admin':
+        // Admin sees all except super-admin personal conversations
+        return !chat.name?.includes('super-admin') && chat.role !== 'super-admin';
+      
+      case 'hr':
+        // HR sees all except admin and super-admin conversations
+        return !['admin', 'super-admin'].includes(chat.role || '');
+      
+      case 'employee':
+        // Employees only see their own conversations
+        return chat.id.includes(currentUser?.id) || chat.name === currentUser?.full_name;
+      
+      default:
+        return false;
     }
-    
-    // Employees only see their own conversations (backend should already filter)
-    if (userRole === 'employee') return true;
-    
-    return true;
   };
 
   const loadChats = async () => {
     try {
       setIsLoading(true);
-      const response = await api.get('/chat/list', {
-        params: { 
-          type: activeTab === 'announcements' ? 'announcement' : (activeTab === 'history' ? 'history' : activeTab)
+      
+      if (activeTab === 'dms') {
+        // Load all users for DMs
+        const response = await api.get('/employees');
+        if (response.data?.data) {
+          const users = response.data.data.filter((user: any) => user.id !== currentUser?.id);
+          const formattedChats: Chat[] = users.map((user: any) => ({
+            id: `dm-${user.id}`,
+            name: user.full_name || user.email,
+            lastMessage: '',
+            unreadCount: 0,
+            avatar: user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.full_name || user.email)}&background=random`,
+            type: 'dm' as const,
+            fullName: user.full_name,
+            email: user.email,
+            role: user.role
+          }));
+          setChats(formattedChats);
         }
-      });
+      } else {
+        // Load chats/groups/announcements/history
+        const response = await api.get('/chat/list', {
+          params: { 
+            type: activeTab === 'announcements' ? 'announcement' : (activeTab === 'history' ? 'history' : activeTab)
+          }
+        });
 
-      if (response.data?.data?.chats) {
-        let formattedChats: Chat[] = response.data.data.chats.map((chat: any) => ({
-          id: chat.id,
-          name: chat.name,
-          lastMessage: chat.lastMessage,
-          unreadCount: chat.unreadCount || 0,
-          avatar: chat.avatar,
-          type: chat.type || 'dm',
-          fullName: chat.fullName,
-          email: chat.email,
-          role: chat.role
-        }));
+        if (response.data?.data?.chats) {
+          let formattedChats: Chat[] = response.data.data.chats.map((chat: any) => ({
+            id: chat.id,
+            name: chat.name,
+            lastMessage: chat.lastMessage,
+            unreadCount: chat.unreadCount || 0,
+            avatar: chat.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(chat.name)}&background=random`,
+            type: chat.type || 'group',
+            fullName: chat.fullName,
+            email: chat.email,
+            role: chat.role
+          }));
 
-        // Apply role-based filtering for history tab
-        if (activeTab === 'history' && currentUser?.role) {
-          formattedChats = formattedChats.filter(chat => 
-            shouldShowChatInHistory(chat, currentUser.role)
-          );
+          // Apply role-based filtering for history tab
+          if (activeTab === 'history' && currentUser?.role) {
+            formattedChats = formattedChats.filter(chat => 
+              shouldShowChatInHistory(chat, currentUser.role)
+            );
+          }
+
+          setChats(formattedChats);
         }
-
-        setChats(formattedChats);
       }
     } catch (err) {
       console.error('Failed to load chats:', err);
+      setChats([]);
     } finally {
       setIsLoading(false);
     }
@@ -244,15 +274,17 @@ export function FloatingChatWidget() {
   };
 
   const getRoleBadgeClass = (role: string) => {
-    switch (role.toLowerCase()) {
-      case 'hr':
-        return 'bg-blue-500 text-white';
+    switch (role?.toLowerCase()) {
       case 'super-admin':
-        return 'bg-purple-600 text-white';
+        return 'bg-purple-600 text-white text-xs px-2 py-1 rounded-full font-semibold';
       case 'admin':
-        return 'bg-red-500 text-white';
+        return 'bg-red-500 text-white text-xs px-2 py-1 rounded-full font-semibold';
+      case 'hr':
+        return 'bg-blue-500 text-white text-xs px-2 py-1 rounded-full font-semibold';
+      case 'employee':
+        return 'bg-green-500 text-white text-xs px-2 py-1 rounded-full font-semibold';
       default:
-        return 'bg-gray-500 text-white';
+        return 'bg-gray-500 text-white text-xs px-2 py-1 rounded-full font-semibold';
     }
   };
 
@@ -412,27 +444,76 @@ export function FloatingChatWidget() {
                           onClick={() => setSelectedChat(chat)}
                           className={`w-full p-3 border-b ${borderColor} hover:${darkMode ? 'bg-gray-800' : 'bg-gray-50'} transition-colors text-left flex items-center space-x-3 cursor-pointer`}
                         >
-                          <img src={chat.avatar || '/default-avatar.png'} alt={chat.fullName || chat.name} className="w-10 h-10 rounded-full" />
+                          <div className="relative">
+                            <img 
+                              src={chat.avatar} 
+                              alt={chat.fullName || chat.name} 
+                              className="w-12 h-12 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600" 
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(chat.fullName || chat.name)}&background=random&color=fff`;
+                              }}
+                            />
+                            {/* Online status indicator */}
+                            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></div>
+                          </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex justify-between items-center">
-                               <p className="font-bold text-sm truncate">{chat.fullName || chat.name}</p>
-                               {chat.unreadCount > 0 && (
-                                <span className="ml-2 bg-purple-600 text-white text-xs font-bold rounded-full px-2 py-1">
-                                  {chat.unreadCount}
+                            <div className="flex justify-between items-start">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-sm truncate">{chat.fullName || chat.name}</p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  {chat.role && (
+                                    <span className={getRoleBadgeClass(chat.role)}>
+                                      {chat.role.toUpperCase()}
+                                    </span>
+                                  )}
+                                  {activeTab === 'dms' && (
+                                    <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} truncate`}>
+                                      {chat.email}
+                                    </p>
+                                  )}
+                                </div>
+                                {chat.lastMessage && (
+                                  <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} truncate mt-1`}>
+                                    {chat.lastMessage}
+                                  </p>
+                                )}
+                              </div>
+                              {chat.unreadCount > 0 && (
+                                <span className="ml-2 bg-red-500 text-white text-xs font-bold rounded-full px-2 py-1 min-w-[20px] text-center">
+                                  {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
                                 </span>
                               )}
                             </div>
-                            {chat.role && chat.role.toLowerCase() !== 'employee' ? (
-                              <span className={`text-xs px-2 py-1 rounded-full ${getRoleBadgeClass(chat.role)}`}>{chat.role}</span>
-                            ) : <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} truncate`}>{chat.email}</p>}
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : (
                     <div className={`flex flex-col items-center justify-center h-full ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                      <p>No messages yet. Start a conversation.</p>
-                      <button className="mt-2 px-3 py-1 bg-purple-600 text-white rounded-md text-sm">+</button>
+                      <p className="text-center px-4">
+                        {activeTab === 'dms' ? 'Select a user to start chatting' :
+                         activeTab === 'groups' ? 'No groups yet. Create one to get started.' :
+                         activeTab === 'announcements' ? 'No announcements available.' :
+                         'No chat history available.'}
+                      </p>
+                      {(activeTab === 'groups' || activeTab === 'dms') && (
+                        <button 
+                          onClick={() => {
+                            if (activeTab === 'groups') {
+                              // TODO: Implement group creation modal
+                              console.log('Create group functionality');
+                            } else {
+                              // For DMs, just show instruction
+                              console.log('Select a user from the list above');
+                            }
+                          }}
+                          className="mt-3 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                        >
+                          <span className="text-lg">+</span>
+                          {activeTab === 'groups' ? 'Create Group' : 'Start Chat'}
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
