@@ -335,12 +335,15 @@ export class DepartmentReportingService {
         templateId?: string
     ): Promise<string> {
         // Use ReportGenerationService to generate formatted content
-        return await this.reportService.generateReport({
-            reportType: reportType as any,
-            data,
-            format: 'html',
-            templateId
-        });
+        const report = await this.reportService.generateReport(
+            reportType as any,
+            new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
+            new Date(),
+            { data, templateId },
+            'system',
+            'html'
+        );
+        return report.content;
     }
 
     /**

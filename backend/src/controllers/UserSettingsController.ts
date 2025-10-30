@@ -182,7 +182,7 @@ export class UserSettingsController {
      */
     async updateSettingCategory(req: Request, res: Response): Promise<void> {
         try {
-            const { category } = req.params;
+            const { category } = req.params as { category: keyof UserSettings['preferences'] };
             const userId = req.user?.employeeId || req.user?.id;
             const updates = req.body;
 
@@ -612,7 +612,7 @@ export class UserSettingsController {
         }
     }
 
-    private async syncCategoryRealTime(userId: string, category: string, updates: any): Promise<void> {
+    private async syncCategoryRealTime(userId: string, category: keyof UserSettings['preferences'], updates: any): Promise<void> {
         try {
             // Broadcast category-specific update
             logger.info('🔄 [UserSettingsController] Broadcasting category update', { 
