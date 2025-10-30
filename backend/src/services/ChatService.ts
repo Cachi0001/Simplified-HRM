@@ -87,7 +87,6 @@ export class ChatService {
     try {
       logger.info('ChatService: Marking chat as read', { chatId, userId });
 
-      // Update all unread messages in this chat from this user's perspective
       const now = new Date().toISOString();
 
       const { error: updateError } = await this.supabase

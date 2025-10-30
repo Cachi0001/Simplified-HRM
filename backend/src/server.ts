@@ -36,6 +36,8 @@ import chatRoutes from './routes/chat.routes';
 import typingRoutes from './routes/typing.routes';
 import announcementRoutes from './routes/announcement.routes';
 import departmentRoutes from './routes/department.routes';
+import approvalRoutes from './routes/approval.routes';
+import requestNotificationRoutes from './routes/request-notifications.routes';
 import supabaseConfig from './config/supabase';
 
 const app = express();
@@ -114,7 +116,7 @@ app.use(helmet({
       imgSrc: ["'self'", "data:", "https:"],
     },
   },
-  crossOriginEmbedderPolicy: false, // CORS configuration - MUST come first before any other middleware
+  crossOriginEmbedderPolicy: false,
 }));
 
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -125,6 +127,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     'https://go3nethrm.vercel.app',
     'https://go3nethrm.com',
     'https://www.go3nethrm.com',
+    'https://www.go3nethr.com',
     'http://localhost:5173',
     'http://localhost:3000',
     'http://127.0.0.1:5173',
@@ -203,6 +206,8 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/typing', typingRoutes);
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/departments', departmentRoutes);
+app.use('/api/approval-workflow', approvalRoutes);
+app.use('/api/request-notifications', requestNotificationRoutes);
 
 // Health check endpoint
 app.get('/api/health', async (req: Request, res: Response) => {
@@ -257,7 +262,7 @@ app.get('/api/cors-test', (req: Request, res: Response) => {
   const referer = req.headers.referer || 'No referer';
   const userAgent = req.headers['user-agent'] || 'No user-agent';
   const host = req.headers.host || 'No host';
-  
+
   console.log('CORS test requested', {
     ip: req.ip,
     origin,
@@ -272,7 +277,7 @@ app.get('/api/cors-test', (req: Request, res: Response) => {
     userAgent,
     host
   });
-  
+
   // Log environment variables for debugging
   const corsConfig = {
     frontendUrl: process.env.FRONTEND_URL,
@@ -281,20 +286,20 @@ app.get('/api/cors-test', (req: Request, res: Response) => {
     nodeEnv: process.env.NODE_ENV,
     additionalOrigins: process.env.ADDITIONAL_CORS_ORIGINS
   };
-  
+
   // Get all request headers for debugging
   const headers = { ...req.headers };
-  
+
   // Remove sensitive information
   delete headers.authorization;
   delete headers.cookie;
-  
+
   console.log('CORS configuration', { corsConfig });
   console.log('Request headers', { headers });
-  
+
   logger.debug('CORS configuration', { corsConfig });
   logger.debug('Request headers', { headers });
-  
+
   res.status(200).json({
     status: 'ok',
     message: 'CORS test successful',
