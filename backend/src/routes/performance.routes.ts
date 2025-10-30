@@ -35,4 +35,22 @@ router.get('/department/:id/summary', (req, res) => performanceController.getDep
 router.get('/top-performers', (req, res) => performanceController.getTopPerformers(req, res));
 router.post('/calculate-all', (req, res) => performanceController.calculateAllEmployeesPerformance(req, res));
 
+/**
+ * Analytics Dashboard Routes
+ */
+router.get('/dashboard', (req, res) => performanceController.getAnalyticsDashboard(req, res));
+router.get('/insights', (req, res) => performanceController.getPerformanceInsights(req, res));
+router.get('/trends', (req, res) => performanceController.getPerformanceTrends(req, res));
+
+/**
+ * Performance Report Generation
+ */
+router.post('/reports/generate', (req, res) => performanceController.generatePerformanceReport(req, res));
+
+/**
+ * Real-time Performance Updates
+ */
+router.get('/real-time/updates', (req, res) => performanceController.getRealTimePerformanceUpdates(req, res));
+router.post('/real-time/update', (req, res) => performanceController.updatePerformanceMetrics(req, res));
+
 export default router;

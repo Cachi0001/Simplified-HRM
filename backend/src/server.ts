@@ -38,6 +38,7 @@ import announcementRoutes from './routes/announcement.routes';
 import departmentRoutes from './routes/department.routes';
 import approvalRoutes from './routes/approval.routes';
 import requestNotificationRoutes from './routes/request-notifications.routes';
+import performanceRoutes from './routes/performance.routes';
 import supabaseConfig from './config/supabase';
 
 const app = express();
@@ -208,6 +209,7 @@ app.use('/api/announcements', announcementRoutes);
 app.use('/api/departments', departmentRoutes);
 app.use('/api/approval-workflow', approvalRoutes);
 app.use('/api/request-notifications', requestNotificationRoutes);
+app.use('/api/performance', performanceRoutes);
 
 // Health check endpoint
 app.get('/api/health', async (req: Request, res: Response) => {
