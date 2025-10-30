@@ -181,139 +181,6 @@ export const useRealtimeNotifications = (): UseRealtimeNotificationsReturn => {
       setConnectionStatus('error');
     }
   }, []);
-  const subscribeToNotifications = useCallback(async () => {
-    try {
-      setConnectionStatus('connecting');
-');
-
-      // Get current user
-      
-      
-      if (userError || !user) {
-        console.warn('No authen);
-        setIsSu
-       
-r');
-        return;
-      }
-
-      console.info(`🔔 Subscribing to notifi
-
-      const subscription = supabase
-        .ch)
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            ublic',
-            table: 'notificats',
-            filter: `user_id=eq.${user.id}`,
-          },
-          (pany) => {
-            console.info('📬 New notification:', payload);
-            tion;
-            
-            setNotifications((prev) => {
-              // Avoid duplicates
-             
-];
-            });
-            
-           count
-         
-            ;
-            }
-
-            // Show toast no
-            showNotificationT;
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-',
-            filter: `user_id=eq.${userid}`,
-          },
-          (payload: any) => {
-            con);
-            con;
-tion;
-
-            setNotifications((prev) =>
-              prev.map((notif) =>
-                notif.id === updatedNotification.id ? updatedNotification : notif
-              )
-            )
-
-         nged
-            ad) {
-              setUnreadCount(;
-           d) {
-              setUnreadCount+ 1);
-            }
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: 'DELETE',
-ublic',
-            table: 'notifications',
-            filter: `user_id=eq.${user.id}`,
-          },
-y) => {
-            console.info('🗑️  Not;
-            const deletedNotification = payload;
-
-            sv) =>
-           
-         );
-
-            // Update unread count
-            if (!deletedNotification.is_read) {
-              setUnreadCount((prev;
-            }
-          }
-        )
-        .subscribe((status: string){
-          ctus}`);
-          i
-true);
-            setConnectionStatus('connected');
-            setErro);
-            reconnectAttempts.current = 0; // Reset on successful connection
-          } else if (status === 'CHANNEL_ERROR') {
-            setError('Failed ');
-            setIsSubscribed(false);
-     );
-           
-t
-     {
-              reconnectAttempts.cur
-     00);
-              console.info(`🔄 Attempting to reconnect notificat)`);
-              
-           > {
-                subscribeToNotifications();
-              }, delay);
-            }
-          } else if (status ===SED') {
-            setIsSubscribed(false);
-            setConnec
-          }
-        });
-
-      sub
- {
-     ;
-      console.error('❌ Failed t
-     age);
-      setIsSubscrib
-      setConnectionStatus('error');
-}
-  }, []);    d(false);eorMesstError(err seage);ss', errorMetions: notificaribe toscsubo wn error' : 'Unknosagees? err.mnceof Error = err instaMessage onst error c catch (err)    }n;ptioscriubnt = sef.curreriptionRsccted');onneatus('disctionSt 'CLOt(() =Timeouurrent = setimeoutRef.ceconnectT   rt}s.currenctAttemptneempt ${recony}ms (attn ${delaions i300ent), empts.currnnectAtteco2, rath.pow(min(1000 * My = Math. delaonst c        rent++;ts) tempReconnectAtnt < max.currenectAttemptscon  if (re     reconnecAttempt to //              
 
   /**
    * Unsubscribe from notifications
@@ -456,6 +323,7 @@ t
     unreadCount,
     isSubscribed,
     error,
+    connectionStatus,
     markAsRead,
     markAllAsRead,
     deleteNotification,
@@ -463,6 +331,7 @@ t
     getUnreadNotifications,
     subscribeToNotifications,
     unsubscribeFromNotifications,
+    reconnect,
   };
 };
 
