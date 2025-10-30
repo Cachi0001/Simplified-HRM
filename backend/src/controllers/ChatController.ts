@@ -1,8 +1,11 @@
 import { Request, Response } from 'express';
 import { ChatService } from '../services/ChatService';
+import { getTypingService } from '../services/TypingService';
 import logger from '../utils/logger';
 
 export class ChatController {
+  private typingService = getTypingService();
+  
   constructor(private chatService: ChatService) {}
 
   async sendMessage(req: Request, res: Response): Promise<void> {
@@ -334,6 +337,239 @@ export class ChatController {
         error: (error as Error).message
       });
       res.status(400).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
+
+  /**
+   * Set user as typing in a chat
+   * POST /api/chat/:chatId/typing/start
+   */
+  async startTyping(req: Request, res: Response): Promise<void> {
+    try {
+      const { chatId } = req.params;
+      const userId = req.user?.id;
+
+      if (!chatId || !userId) {
+        res.status(400).json({
+          status: 'error',
+          message: 'chatId and userId are required'
+        });
+        return;
+      }
+
+      logger.info('⌨️ [ChatController] Start typing', { chatId, userId });
+
+      const success = await this.typingService.setTyping(chatId, userId);
+
+      if (!success) {
+        res.status(503).json({
+          status: 'error',
+          message: 'Typing service unavailable'
+        });
+        return;
+      }
+
+      res.status(200).json({
+        status: 'success',
+        message: 'Typing indicator set'
+      });
+    } catch (error) {
+      logger.error('❌ [ChatController] Start typing error', {
+        error: (error as Error).message
+      });
+      res.status(500).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
+
+  /**
+   * Stop user typing in a chat
+   * POST /api/chat/:chatId/typing/stop
+   */
+  async stopTyping(req: Request, res: Response): Promise<void> {
+    try {
+      const { chatId } = req.params;
+      const userId = req.user?.id;
+
+      if (!chatId || !userId) {
+        res.status(400).json({
+          status: 'error',
+          message: 'chatId and userId are required'
+        });
+        return;
+      }
+
+      logger.info('⌨️ [ChatController] Stop typing', { chatId, userId });
+
+      const success = await this.typingService.unsetTyping(chatId, userId);
+
+      if (!success) {
+        res.status(503).json({
+          status: 'error',
+          message: 'Typing service unavailable'
+        });
+        return;
+      }
+
+      res.status(200).json({
+        status: 'success',
+        message: 'Typing indicator removed'
+      });
+    } catch (error) {
+      logger.error('❌ [ChatController] Stop typing error', {
+        error: (error as Error).message
+      });
+      res.status(500).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
+
+  /**
+   * Get users currently typing in a chat
+   * GET /api/chat/:chatId/typing
+   */
+  async getTypingUsers(req: Request, res: Response): Promise<void> {
+    try {
+      const { chatId } = req.params;
+
+      if (!chatId) {
+        res.status(400).json({
+          status: 'error',
+          message: 'chatId is required'
+        });
+        return;
+      }
+
+      logger.info('⌨️ [ChatController] Get typing users', { chatId });
+
+      const typingUserIds = await this.typingService.getTypingUsers(chatId);
+
+      // Get user details for typing users
+      const typingUsers = [];
+      if (typingUserIds.length > 0) {
+        // You might want to fetch user details from the database here
+        // For now, just return the user IDs
+        for (const userId of typingUserIds) {
+          typingUsers.push({ userId, isTyping: true });
+        }
+      }
+
+      res.status(200).json({
+        status: 'success',
+        data: { 
+          typingUsers,
+          count: typingUsers.length,
+          userIds: typingUserIds
+        }
+      });
+    } catch (error) {
+      logger.error('❌ [ChatController] Get typing users error', {
+        error: (error as Error).message
+      });
+      res.status(500).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
+
+  /**
+   * Check if a specific user is typing
+   * GET /api/chat/:chatId/typing/:userId
+   */
+  async isUserTyping(req: Request, res: Response): Promise<void> {
+    try {
+      const { chatId, userId } = req.params;
+
+      if (!chatId || !userId) {
+        res.status(400).json({
+          status: 'error',
+          message: 'chatId and userId are required'
+        });
+        return;
+      }
+
+      logger.info('⌨️ [ChatController] Check if user is typing', { chatId, userId });
+
+      const isTyping = await this.typingService.isUserTyping(chatId, userId);
+
+      res.status(200).json({
+        status: 'success',
+        data: { isTyping, userId, chatId }
+      });
+    } catch (error) {
+      logger.error('❌ [ChatController] Check if user is typing error', {
+        error: (error as Error).message
+      });
+      res.status(500).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
+
+  /**
+   * Clear all typing indicators for a chat
+   * DELETE /api/chat/:chatId/typing
+   */
+  async clearChatTyping(req: Request, res: Response): Promise<void> {
+    try {
+      const { chatId } = req.params;
+
+      if (!chatId) {
+        res.status(400).json({
+          status: 'error',
+          message: 'chatId is required'
+        });
+        return;
+      }
+
+      logger.info('⌨️ [ChatController] Clear chat typing indicators', { chatId });
+
+      const clearedCount = await this.typingService.clearChatTypingIndicators(chatId);
+
+      res.status(200).json({
+        status: 'success',
+        message: 'Chat typing indicators cleared',
+        data: { clearedCount }
+      });
+    } catch (error) {
+      logger.error('❌ [ChatController] Clear chat typing error', {
+        error: (error as Error).message
+      });
+      res.status(500).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
+
+  /**
+   * Get typing service stats
+   * GET /api/chat/typing/stats
+   */
+  async getTypingStats(req: Request, res: Response): Promise<void> {
+    try {
+      logger.info('📊 [ChatController] Get typing stats');
+
+      const stats = await this.typingService.getTypingStats();
+
+      res.status(200).json({
+        status: 'success',
+        data: { stats }
+      });
+    } catch (error) {
+      logger.error('❌ [ChatController] Get typing stats error', {
+        error: (error as Error).message
+      });
+      res.status(500).json({
         status: 'error',
         message: (error as Error).message
       });

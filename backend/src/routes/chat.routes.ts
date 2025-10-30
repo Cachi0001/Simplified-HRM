@@ -36,4 +36,14 @@ router.get('/:chatId/unread-count', (req, res) => chatController.getChatUnreadCo
 router.get('/message/:messageId/read-receipt', (req, res) => chatController.getMessageReadReceipt(req, res));
 router.get('/:chatId/participants', (req, res) => chatController.getChatParticipants(req, res));
 
+/**
+ * Typing Indicators (Redis-based)
+ */
+router.post('/:chatId/typing/start', (req, res) => chatController.startTyping(req, res));
+router.post('/:chatId/typing/stop', (req, res) => chatController.stopTyping(req, res));
+router.get('/:chatId/typing', (req, res) => chatController.getTypingUsers(req, res));
+router.get('/:chatId/typing/:userId', (req, res) => chatController.isUserTyping(req, res));
+router.delete('/:chatId/typing', (req, res) => chatController.clearChatTyping(req, res));
+router.get('/typing/stats', (req, res) => chatController.getTypingStats(req, res));
+
 export default router;
