@@ -3,6 +3,7 @@ import supabase from '../config/supabase';
 import logger from '../utils/logger';
 import { NotificationService } from './NotificationService';
 import { EmailService } from './EmailService';
+import EmailTemplateService from './EmailTemplateService';
 
 export type RequestType = 'leave' | 'purchase' | 'expense' | 'travel' | 'overtime';
 export type NotificationEvent = 
@@ -487,35 +488,39 @@ export class RequestNotificationService {
      * Send approval request email to approver
      */
     private async sendApprovalRequestEmail(requestData: RequestNotificationData, approver: any): Promise<void> {
-        const requestDetails = this.formatRequestDetails(requestData);
+        const requestDetailsCard = this.generateRequestDetailsCard(requestData);
         
+        const emailContent = `
+            <p>A new ${requestData.requestType} request requires your approval:</p>
+            
+            <div style="background-color: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #dee2e6;">
+                <h3 style="margin: 0 0 15px 0; color: #17a2b8; font-size: 18px;">👤 Employee Information</h3>
+                <p><strong>Employee:</strong> ${requestData.employeeName}</p>
+                <p><strong>Request Type:</strong> ${this.capitalizeRequestType(requestData.requestType)}</p>
+                <p><strong>Submitted:</strong> ${new Date().toLocaleDateString()}</p>
+            </div>
+            
+            ${requestDetailsCard}
+            
+            <p>Please review and approve or reject this request in the admin dashboard.</p>
+        `;
+
+        const html = EmailTemplateService.generateEmailTemplate({
+            recipientName: approver.full_name,
+            title: '📋 Approval Required',
+            subtitle: `${this.capitalizeRequestType(requestData.requestType)} Request from ${requestData.employeeName}`,
+            content: emailContent,
+            actionButton: {
+                text: 'Review Request',
+                url: `${process.env.FRONTEND_URL}/admin/${requestData.requestType}-requests`,
+                color: 'primary'
+            }
+        });
+
         await this.emailService.sendEmail({
             to: approver.email,
             subject: `Approval Required - ${this.capitalizeRequestType(requestData.requestType)} Request from ${requestData.employeeName}`,
-            html: `
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h2 style="color: #17a2b8;">Approval Required</h2>
-                    <p>Hello ${approver.full_name},</p>
-                    <p>A new ${requestData.requestType} request requires your approval:</p>
-                    
-                    <div style="background-color: #f8f9fa; border-radius: 5px; padding: 20px; margin: 20px 0;">
-                        <h3 style="margin-top: 0; color: #495057;">Request Details</h3>
-                        <p><strong>Employee:</strong> ${requestData.employeeName}</p>
-                        <p><strong>Request Type:</strong> ${this.capitalizeRequestType(requestData.requestType)}</p>
-                        ${requestDetails}
-                    </div>
-                    
-                    <p>Please review and approve or reject this request in the admin dashboard.</p>
-                    <div style="text-align: center; margin: 30px 0;">
-                        <a href="${process.env.FRONTEND_URL}/admin/${requestData.requestType}-requests" 
-                           style="background-color: #17a2b8; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">
-                            Review Request
-                        </a>
-                    </div>
-                    
-                    <p>Best regards,<br>HR Management System</p>
-                </div>
-            `
+            html
         });
     }
 
@@ -529,42 +534,37 @@ export class RequestNotificationService {
         comments?: string
     ): Promise<void> {
         const isApproved = decision === 'approved';
-        const statusColor = isApproved ? '#28a745' : '#dc3545';
-        const statusIcon = isApproved ? '✅' : '❌';
+        const decisionCard = EmailTemplateService.generateApprovalDecisionCard(decision, approverName, comments);
         
+        const emailContent = `
+            <p>Your ${requestData.requestType} request has been <strong>${decision}</strong> by ${approverName}.</p>
+            
+            ${decisionCard}
+            
+            ${isApproved ? 
+                '<p>Your request has been approved. You will be notified of any next steps if required.</p>' :
+                '<p>If you have questions about this decision, please contact your supervisor or HR department.</p>'
+            }
+            
+            <p>You can view your request details in your dashboard.</p>
+        `;
+
+        const html = EmailTemplateService.generateEmailTemplate({
+            recipientName: requestData.employeeName,
+            title: `${isApproved ? '✅' : '❌'} Request ${isApproved ? 'Approved' : 'Rejected'}`,
+            subtitle: `${this.capitalizeRequestType(requestData.requestType)} Request Decision`,
+            content: emailContent,
+            actionButton: {
+                text: 'View Request',
+                url: `${process.env.FRONTEND_URL}/${requestData.requestType}-requests`,
+                color: isApproved ? 'success' : 'primary'
+            }
+        });
+
         await this.emailService.sendEmail({
             to: requestData.employeeEmail,
             subject: `${this.capitalizeRequestType(requestData.requestType)} Request ${isApproved ? 'Approved' : 'Rejected'}`,
-            html: `
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h2 style="color: ${statusColor};">${statusIcon} Request ${isApproved ? 'Approved' : 'Rejected'}</h2>
-                    <p>Hello ${requestData.employeeName},</p>
-                    <p>Your ${requestData.requestType} request has been <strong>${decision}</strong> by ${approverName}.</p>
-                    
-                    <div style="background-color: ${isApproved ? '#d4edda' : '#f8d7da'}; border-radius: 5px; padding: 20px; margin: 20px 0;">
-                        <h3 style="margin-top: 0; color: ${isApproved ? '#155724' : '#721c24'};">Decision Details</h3>
-                        <p><strong>Status:</strong> ${isApproved ? 'Approved' : 'Rejected'}</p>
-                        <p><strong>Reviewed by:</strong> ${approverName}</p>
-                        <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
-                        ${comments ? `<p><strong>Comments:</strong> ${comments}</p>` : ''}
-                    </div>
-                    
-                    ${isApproved ? 
-                        '<p>Your request has been approved. You will be notified of any next steps if required.</p>' :
-                        '<p>If you have questions about this decision, please contact your supervisor or HR department.</p>'
-                    }
-                    
-                    <p>You can view your request details in your dashboard.</p>
-                    <div style="text-align: center; margin: 30px 0;">
-                        <a href="${process.env.FRONTEND_URL}/${requestData.requestType}-requests" 
-                           style="background-color: #17a2b8; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">
-                            View Request
-                        </a>
-                    </div>
-                    
-                    <p>Best regards,<br>HR Management System</p>
-                </div>
-            `
+            html
         });
     }
 
@@ -572,59 +572,61 @@ export class RequestNotificationService {
      * Generate change request email HTML
      */
     private generateChangeRequestEmailHtml(requestData: RequestNotificationData, comments?: string): string {
-        return `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2 style="color: #ffc107;">⚠️ Changes Requested</h2>
-                <p>Hello ${requestData.employeeName},</p>
-                <p>Changes have been requested for your ${requestData.requestType} request.</p>
-                
-                <div style="background-color: #fff3cd; border-radius: 5px; padding: 20px; margin: 20px 0;">
-                    <h3 style="margin-top: 0; color: #856404;">Requested Changes</h3>
-                    ${comments ? `<p><strong>Comments:</strong> ${comments}</p>` : '<p>Please review and update your request as needed.</p>'}
-                </div>
-                
-                <p>Please make the necessary changes and resubmit your request.</p>
-                <div style="text-align: center; margin: 30px 0;">
-                    <a href="${process.env.FRONTEND_URL}/${requestData.requestType}-requests" 
-                       style="background-color: #ffc107; color: #212529; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">
-                        Update Request
-                    </a>
-                </div>
-                
-                <p>Best regards,<br>HR Management System</p>
-            </div>
+        const changeCard = EmailTemplateService.generateNotificationCard({
+            title: 'Requested Changes',
+            type: 'warning',
+            icon: '⚠️',
+            content: comments ? 
+                `<p><strong>Comments:</strong> ${comments}</p>` : 
+                '<p>Please review and update your request as needed.</p>'
+        });
+
+        const emailContent = `
+            <p>Changes have been requested for your ${requestData.requestType} request.</p>
+            
+            ${changeCard}
+            
+            <p>Please make the necessary changes and resubmit your request.</p>
         `;
+
+        return EmailTemplateService.generateEmailTemplate({
+            recipientName: requestData.employeeName,
+            title: '⚠️ Changes Requested',
+            subtitle: `${this.capitalizeRequestType(requestData.requestType)} Request Update Required`,
+            content: emailContent,
+            actionButton: {
+                text: 'Update Request',
+                url: `${process.env.FRONTEND_URL}/${requestData.requestType}-requests`,
+                color: 'warning'
+            }
+        });
     }
 
     /**
      * Generate daily summary email HTML
      */
     private generateDailySummaryEmailHtml(summary: any, approverName: string): string {
-        return `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2 style="color: #17a2b8;">📋 Daily Pending Requests Summary</h2>
-                <p>Hello ${approverName},</p>
-                <p>Here's your daily summary of pending requests requiring approval:</p>
-                
-                <div style="background-color: #f8f9fa; border-radius: 5px; padding: 20px; margin: 20px 0;">
-                    <h3 style="margin-top: 0; color: #495057;">Summary</h3>
-                    <p><strong>Total Pending:</strong> ${summary.totalPending}</p>
-                    ${Object.entries(summary.byType).map(([type, count]) => 
-                        `<p><strong>${this.capitalizeRequestType(type)}:</strong> ${count}</p>`
-                    ).join('')}
-                </div>
-                
-                <p>Please review these requests at your earliest convenience.</p>
-                <div style="text-align: center; margin: 30px 0;">
-                    <a href="${process.env.FRONTEND_URL}/admin/requests" 
-                       style="background-color: #17a2b8; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">
-                        Review Requests
-                    </a>
-                </div>
-                
-                <p>Best regards,<br>HR Management System</p>
-            </div>
+        const summaryCard = EmailTemplateService.generateDailySummaryCard(summary);
+        
+        const emailContent = `
+            <p>Here's your daily summary of pending requests requiring approval:</p>
+            
+            ${summaryCard}
+            
+            <p>Please review these requests at your earliest convenience.</p>
         `;
+
+        return EmailTemplateService.generateEmailTemplate({
+            recipientName: approverName,
+            title: '📋 Daily Pending Requests Summary',
+            subtitle: `${new Date().toLocaleDateString()} - Approval Dashboard`,
+            content: emailContent,
+            actionButton: {
+                text: 'Review Requests',
+                url: `${process.env.FRONTEND_URL}/admin/requests`,
+                color: 'primary'
+            }
+        });
     }
 
     /**
@@ -719,31 +721,22 @@ export class RequestNotificationService {
     }
 
     /**
-     * Format request details for email
+     * Generate request details card based on request type
      */
-    private formatRequestDetails(requestData: RequestNotificationData): string {
+    private generateRequestDetailsCard(requestData: RequestNotificationData): string {
         const data = requestData.requestData;
         
         switch (requestData.requestType) {
             case 'leave':
-                return `
-                    <p><strong>Leave Type:</strong> ${data.type}</p>
-                    <p><strong>Start Date:</strong> ${data.start_date}</p>
-                    <p><strong>End Date:</strong> ${data.end_date}</p>
-                    <p><strong>Days:</strong> ${data.days_requested}</p>
-                    ${data.reason ? `<p><strong>Reason:</strong> ${data.reason}</p>` : ''}
-                `;
+                return EmailTemplateService.generateLeaveRequestCard(data);
             case 'purchase':
-                return `
-                    <p><strong>Item:</strong> ${data.item_name}</p>
-                    <p><strong>Quantity:</strong> ${data.quantity}</p>
-                    <p><strong>Unit Price:</strong> $${data.unit_price}</p>
-                    <p><strong>Total Amount:</strong> $${data.total_amount}</p>
-                    <p><strong>Urgency:</strong> ${data.urgency}</p>
-                    ${data.justification ? `<p><strong>Justification:</strong> ${data.justification}</p>` : ''}
-                `;
+                return EmailTemplateService.generatePurchaseRequestCard(data);
             default:
-                return '<p>Request details available in the system.</p>';
+                return EmailTemplateService.generateNotificationCard({
+                    title: 'Request Details',
+                    type: 'info',
+                    content: '<p>Request details are available in the system.</p>'
+                });
         }
     }
 

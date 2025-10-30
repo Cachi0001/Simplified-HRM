@@ -3,6 +3,7 @@ import supabase from '../config/supabase';
 import logger from '../utils/logger';
 import { NotificationService } from './NotificationService';
 import { EmailService } from './EmailService';
+import EmailTemplateService from './EmailTemplateService';
 
 export interface AttendanceNotificationSettings {
     enableLateArrivalNotifications: boolean;
@@ -123,25 +124,47 @@ export class AttendanceNotificationService {
                 });
 
                 // Send email to employee
+                const attendanceCard = EmailTemplateService.generateAttendanceCard({
+                    date: arrivalTime,
+                    checkInTime: arrivalTime,
+                    isLate: true,
+                    minutesLate
+                });
+
+                const reminderCard = EmailTemplateService.generateNotificationCard({
+                    title: 'Punctuality Reminder',
+                    type: 'warning',
+                    icon: '⏰',
+                    content: '<p><strong>Reminder:</strong> Regular punctuality is important for maintaining good attendance records and team productivity.</p>'
+                });
+
+                const emailContent = `
+                    <p>This is to inform you that you arrived <strong>${minutesLate} minutes late</strong> today.</p>
+                    
+                    ${attendanceCard}
+                    
+                    ${reminderCard}
+                    
+                    <p>Please make an effort to arrive on time for future work days.</p>
+                    <p>If you have any concerns about your schedule or need assistance with punctuality, please speak with your supervisor or HR.</p>
+                `;
+
+                const html = EmailTemplateService.generateEmailTemplate({
+                    recipientName: employee.full_name,
+                    title: '⏰ Late Arrival Notice',
+                    subtitle: 'Attendance Reminder',
+                    content: emailContent,
+                    actionButton: {
+                        text: 'View Attendance',
+                        url: `${process.env.FRONTEND_URL}/attendance`,
+                        color: 'warning'
+                    }
+                });
+
                 await this.emailService.sendEmail({
                     to: employee.email,
                     subject: 'Late Arrival Notice - Attendance Reminder',
-                    html: `
-                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                            <h2 style="color: #ff6b35;">Late Arrival Notice</h2>
-                            <p>Hello ${employee.full_name},</p>
-                            <p>This is to inform you that you arrived <strong>${minutesLate} minutes late</strong> today at <strong>${arrivalTime.toLocaleTimeString()}</strong>.</p>
-                            <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; padding: 15px; margin: 20px 0;">
-                                <p style="margin: 0; color: #856404;">
-                                    <strong>Reminder:</strong> Regular punctuality is important for maintaining good attendance records and team productivity.
-                                </p>
-                            </div>
-                            <p>Please make an effort to arrive on time for future work days.</p>
-                            <p>If you have any concerns about your schedule or need assistance with punctuality, please speak with your supervisor or HR.</p>
-                            <br>
-                            <p>Best regards,<br>HR Team</p>
-                        </div>
-                    `
+                    html
                 });
 
                 logger.info('AttendanceNotificationService: Late arrival notification sent to employee', {
@@ -219,30 +242,55 @@ export class AttendanceNotificationService {
                 });
 
                 // Send email to employee
+                const absenceCard = EmailTemplateService.generateNotificationCard({
+                    title: 'Absence Record',
+                    type: 'danger',
+                    icon: '❌',
+                    content: `
+                        <p><strong>Date:</strong> ${dateStr}</p>
+                        <p><strong>Status:</strong> Marked as Absent</p>
+                    `
+                });
+
+                const importantCard = EmailTemplateService.generateNotificationCard({
+                    title: 'Important Notice',
+                    type: 'warning',
+                    icon: '⚠️',
+                    content: '<p><strong>Important:</strong> If you believe this absence record is incorrect, please contact HR immediately to have it reviewed and corrected.</p>'
+                });
+
+                const emailContent = `
+                    <p>This is to inform you that you were marked as <strong>absent</strong> on <strong>${dateStr}</strong>.</p>
+                    
+                    ${absenceCard}
+                    
+                    ${importantCard}
+                    
+                    <p><strong>Possible reasons for this absence record:</strong></p>
+                    <ul>
+                        <li>You did not check in to the attendance system</li>
+                        <li>You were not present at the workplace</li>
+                        <li>Technical issues with the attendance system</li>
+                    </ul>
+                    <p>Please ensure you check in properly each work day to maintain accurate attendance records.</p>
+                `;
+
+                const html = EmailTemplateService.generateEmailTemplate({
+                    recipientName: employee.full_name,
+                    title: '❌ Absence Notice',
+                    subtitle: 'Attendance Record Update',
+                    content: emailContent,
+                    actionButton: {
+                        text: 'Contact HR',
+                        url: `${process.env.FRONTEND_URL}/contact-hr`,
+                        color: 'danger'
+                    }
+                });
+
                 await this.emailService.sendEmail({
                     to: employee.email,
                     subject: 'Absence Notice - Attendance Record',
-                    html: `
-                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                            <h2 style="color: #dc3545;">Absence Notice</h2>
-                            <p>Hello ${employee.full_name},</p>
-                            <p>This is to inform you that you were marked as <strong>absent</strong> on <strong>${dateStr}</strong>.</p>
-                            <div style="background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 5px; padding: 15px; margin: 20px 0;">
-                                <p style="margin: 0; color: #721c24;">
-                                    <strong>Important:</strong> If you believe this absence record is incorrect, please contact HR immediately to have it reviewed and corrected.
-                                </p>
-                            </div>
-                            <p>Possible reasons for this absence record:</p>
-                            <ul>
-                                <li>You did not check in to the attendance system</li>
-                                <li>You were not present at the workplace</li>
-                                <li>Technical issues with the attendance system</li>
-                            </ul>
-                            <p>Please ensure you check in properly each work day to maintain accurate attendance records.</p>
-                            <br>
-                            <p>Best regards,<br>HR Team</p>
-                        </div>
-                    `
+                    html
                 });
 
                 logger.info('AttendanceNotificationService: Absence notification sent to employee', {
@@ -317,27 +365,46 @@ export class AttendanceNotificationService {
             });
 
             // Send email to employee
+            const reminderCard = EmailTemplateService.generateNotificationCard({
+                title: 'Checkout Benefits',
+                type: 'info',
+                icon: 'ℹ️',
+                content: `
+                    <p>Checking out helps us:</p>
+                    <ul>
+                        <li>Track your work hours accurately</li>
+                        <li>Ensure proper attendance records</li>
+                        <li>Maintain security protocols</li>
+                    </ul>
+                `
+            });
+
+            const emailContent = `
+                <p>This is a friendly reminder that you haven't checked out yet today.</p>
+                <p><strong>Please remember to check out before leaving the office.</strong></p>
+                
+                ${reminderCard}
+                
+                <p>You can check out using the attendance system in your dashboard.</p>
+                <p>If you have already left the office, please check out as soon as possible.</p>
+            `;
+
+            const html = EmailTemplateService.generateEmailTemplate({
+                recipientName: employee.full_name,
+                title: '🕐 Checkout Reminder',
+                subtitle: 'Don\'t Forget to Check Out',
+                content: emailContent,
+                actionButton: {
+                    text: 'Check Out Now',
+                    url: `${process.env.FRONTEND_URL}/attendance`,
+                    color: 'primary'
+                }
+            });
+
             await this.emailService.sendEmail({
                 to: employee.email,
                 subject: 'Checkout Reminder - Don\'t Forget to Check Out',
-                html: `
-                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                        <h2 style="color: #17a2b8;">Checkout Reminder</h2>
-                        <p>Hello ${employee.full_name},</p>
-                        <p>This is a friendly reminder that you haven't checked out yet today.</p>
-                        <p><strong>Please remember to check out before leaving the office.</strong></p>
-                        <p>Checking out helps us:</p>
-                        <ul>
-                            <li>Track your work hours accurately</li>
-                            <li>Ensure proper attendance records</li>
-                            <li>Maintain security protocols</li>
-                        </ul>
-                        <p>You can check out using the attendance system in your dashboard.</p>
-                        <p>If you have already left the office, please check out as soon as possible.</p>
-                        <br>
-                        <p>Best regards,<br>HR Team</p>
-                    </div>
-                `
+                html
             });
 
             logger.info('AttendanceNotificationService: Checkout reminder sent', {
