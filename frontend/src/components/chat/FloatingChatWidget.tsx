@@ -49,6 +49,7 @@ export function FloatingChatWidget() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
   const dragRef = useRef(null);
   const fullscreenRef = useRef(null);
 
@@ -249,6 +250,20 @@ export function FloatingChatWidget() {
     }
   };
 
+  const onDragStart = () => {
+    setIsDragging(false);
+  };
+
+  const onDrag = () => {
+    setIsDragging(true);
+  };
+
+  const onDragStop = () => {
+    if (!isDragging) {
+      setIsOpen(true);
+    }
+  };
+
   return (
     <>
       {isFullscreen && (
@@ -263,6 +278,9 @@ export function FloatingChatWidget() {
         bounds={isFullscreen ? false : calculateBounds()}
         nodeRef={dragRef}
         disabled={isFullscreen}
+        onStart={onDragStart}
+        onDrag={onDrag}
+        onStop={onDragStop}
       >
         <div
           ref={dragRef}
@@ -270,8 +288,7 @@ export function FloatingChatWidget() {
         >
         {!isOpen ? (
           // Chat Bubble Button
-          <button
-            onClick={() => setIsOpen(true)}
+          <div
             className="relative w-14 h-14 rounded-full shadow-lg transition-all duration-300 hover:scale-110 flex items-center justify-center"
             style={{
               background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -284,7 +301,7 @@ export function FloatingChatWidget() {
                 {totalUnreadCount > 99 ? '99+' : totalUnreadCount}
               </span>
             )}
-          </button>
+          </div>
         ) : (
           // Chat Modal
           <div

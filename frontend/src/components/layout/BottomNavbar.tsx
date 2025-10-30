@@ -95,7 +95,6 @@ export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
   // Hidden menu items (shown in hamburger dropdown)
   const menuItems: NavItem[] = [
     { icon: ShoppingCart, label: 'Purchases', path: '/purchase-requests' },
-    { icon: MessageCircle, label: 'Chat', path: '/chat', showBadge: true },
     { icon: User, label: 'Profile', path: '/settings' },
     { icon: Settings, label: 'Settings', path: '/settings' },
     { icon: LogOut, label: 'Logout', path: '/auth', action: handleLogout },
