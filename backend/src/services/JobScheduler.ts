@@ -1,4 +1,4 @@
-import cron from 'node-cron';
+import * as cron from 'node-cron';
 import logger from '../utils/logger';
 import PerformanceMetricsJob from './PerformanceMetricsJob';
 import CheckoutMonitoringService from './CheckoutMonitoringService';
@@ -54,7 +54,7 @@ export class JobScheduler {
             schedule: '0 18 * * 1-5', // Monday to Friday at 18:00
             task: async () => {
                 logger.info('JobScheduler: Starting checkout monitoring');
-                await CheckoutMonitoringService.checkMissedCheckouts();
+                await CheckoutMonitoringService.runDailyCheckoutMonitoring();
                 logger.info('JobScheduler: Checkout monitoring completed');
             },
             enabled: true
@@ -137,7 +137,6 @@ export class JobScheduler {
                     });
                 }
             }, {
-                scheduled: true,
                 timezone: process.env.TZ || 'UTC'
             });
 
