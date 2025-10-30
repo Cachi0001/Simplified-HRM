@@ -6,7 +6,6 @@ import {
   User,
   Settings,
   LogOut,
-  Bell,
   Users,
   BarChart3,
   FileText,
@@ -16,7 +15,7 @@ import {
 } from 'lucide-react';
 import { authService } from '../../services/authService';
 
-import { useNotificationCount } from '../../hooks/useNotificationCount';
+
 
 interface MoreSectionProps {
   darkMode?: boolean;
@@ -38,7 +37,7 @@ interface MenuItem {
 export function MoreSection({ darkMode = false, isOpen, onClose }: MoreSectionProps) {
   const [currentUser, setCurrentUser] = useState<any>(null);
 
-  const { unreadCount: notificationCount } = useNotificationCount();
+
   const menuRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
@@ -102,14 +101,7 @@ export function MoreSection({ darkMode = false, isOpen, onClose }: MoreSectionPr
       description: 'Submit and track purchase requests',
       category: 'requests'
     },
-    {
-      icon: Bell,
-      label: 'Notifications',
-      path: '/notifications',
-      badge: notificationCount,
-      description: 'View all notifications',
-      category: 'requests'
-    },
+
 
     // Management Section (Admin/HR only)
     {

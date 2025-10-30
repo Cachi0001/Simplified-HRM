@@ -152,9 +152,14 @@ export function FloatingChatWidget() {
       
       if (activeTab === 'dms') {
         // Load all users for DMs
+        console.log('Loading users for DMs...');
         const response = await api.get('/employees');
+        console.log('API Response:', response.data);
+        
         if (response.data?.data) {
           const users = response.data.data.filter((user: any) => user.id !== currentUser?.id);
+          console.log('Filtered users:', users);
+          
           const formattedChats: Chat[] = users.map((user: any) => ({
             id: user.id, // Use actual user ID for DM chat
             name: user.full_name || user.email,
@@ -166,10 +171,38 @@ export function FloatingChatWidget() {
             email: user.email,
             role: user.role
           }));
+          console.log('Formatted chats:', formattedChats);
           setChats(formattedChats);
+        } else {
+          console.log('No data in response');
+          setChats([]);
+        }
+      } else if (activeTab === 'announcements') {
+        // Load announcements
+        try {
+          const response = await api.get('/announcements');
+          if (response.data?.data) {
+            const formattedAnnouncements: Chat[] = response.data.data.map((announcement: any) => ({
+              id: announcement.id,
+              name: announcement.title,
+              lastMessage: announcement.content?.substring(0, 100) + '...',
+              unreadCount: 0,
+              avatar: `https://ui-avatars.com/api/?name=📢&background=4f46e5&color=fff`,
+              type: 'announcement' as const,
+              fullName: announcement.title,
+              email: `By: ${announcement.author_name}`,
+              role: 'announcement'
+            }));
+            setChats(formattedAnnouncements);
+          } else {
+            setChats([]);
+          }
+        } catch (err) {
+          console.log('No announcements endpoint yet');
+          setChats([]);
         }
       } else {
-        // For now, just show empty for other tabs
+        // For other tabs, show empty for now
         setChats([]);
       }
     } catch (err) {
@@ -225,6 +258,24 @@ export function FloatingChatWidget() {
       console.error('Failed to send message:', err);
       // Add user feedback for errors
       alert('Failed to send message. Please try again.');
+    }
+  };
+
+  const createAnnouncement = async (title: string, content: string) => {
+    try {
+      await api.post('/announcements', {
+        title,
+        content,
+        priority: 'normal'
+      });
+      alert('Announcement created successfully! All users will be notified.');
+      // Reload announcements if we're on that tab
+      if (activeTab === 'announcements') {
+        loadChats();
+      }
+    } catch (err) {
+      console.error('Failed to create announcement:', err);
+      alert('Failed to create announcement. Please try again.');
     }
   };
 
@@ -299,6 +350,17 @@ export function FloatingChatWidget() {
 
   return (
     <>
+      {/* Background overlay when chat is open */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/20 z-40"
+          onClick={() => {
+            setIsOpen(false);
+            setSelectedChat(null);
+            setIsFullscreen(false);
+          }}
+        />
+      )}
       {isFullscreen && (
         // Fullscreen backdrop
         <div 
@@ -317,7 +379,7 @@ export function FloatingChatWidget() {
       >
         <div
           ref={dragRef}
-          className={`fixed z-50 ${isFullscreen ? 'inset-0 cursor-default' : 'cursor-move'}`}
+          className={`fixed z-50 ${isFullscreen ? 'inset-0 flex items-center justify-center cursor-default' : 'cursor-move'}`}
         >
         {!isOpen ? (
           // Chat Bubble Button
@@ -340,7 +402,7 @@ export function FloatingChatWidget() {
           // Chat Modal
           <div
             ref={fullscreenRef}
-            className={`${bgColor} ${textColor} ${isFullscreen ? 'w-full h-full rounded-none' : 'w-96 h-[600px] rounded-lg'} shadow-2xl flex flex-col border ${borderColor}`}
+            className={`${bgColor} ${textColor} ${isFullscreen ? 'w-[90vw] max-w-4xl h-[90vh] rounded-lg' : 'w-96 h-[600px] rounded-lg'} shadow-2xl flex flex-col border ${borderColor}`}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -508,6 +570,23 @@ export function FloatingChatWidget() {
                         >
                           <span className="text-lg">+</span>
                           Create Group
+                        </button>
+                      )}
+                      {activeTab === 'announcements' && ['super-admin', 'admin', 'hr'].includes(currentUser?.role) && (
+                        <button 
+                          onClick={() => {
+                            const title = prompt('Announcement Title:');
+                            if (title) {
+                              const content = prompt('Announcement Content:');
+                              if (content) {
+                                createAnnouncement(title, content);
+                              }
+                            }
+                          }}
+                          className="mt-3 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                        >
+                          <span className="text-lg">📢</span>
+                          Create Announcement
                         </button>
                       )}
                     </div>
