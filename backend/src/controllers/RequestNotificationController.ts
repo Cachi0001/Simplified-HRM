@@ -33,8 +33,8 @@ export class RequestNotificationController {
             });
 
             await this.requestNotificationService.sendRequestStatusNotification(
-                requestType,
                 requestId,
+                requestType,
                 newStatus,
                 changedBy
             );
@@ -77,8 +77,8 @@ export class RequestNotificationController {
             });
 
             await this.requestNotificationService.sendRequestReminder(
-                requestType,
                 requestId,
+                requestType,
                 reminderType
             );
 
@@ -121,11 +121,10 @@ export class RequestNotificationController {
             });
 
             await this.requestNotificationService.sendApprovalDelegationNotification(
-                requestType,
                 requestId,
-                fromApproverId,
+                requestType as any,
                 toApproverId,
-                reason
+                fromApproverId
             );
 
             res.status(200).json({
@@ -166,8 +165,8 @@ export class RequestNotificationController {
             });
 
             await this.requestNotificationService.sendApprovalEscalationNotification(
-                requestType,
                 requestId,
+                requestType,
                 escalatedBy,
                 reason
             );
@@ -208,14 +207,19 @@ export class RequestNotificationController {
             });
 
             const results = await this.requestNotificationService.sendBulkNotifications(notifications);
+            
+            // Count successful and failed notifications
+            const successful = results.filter(r => r.success).length;
+            const failed = results.filter(r => !r.success).length;
 
             res.status(200).json({
                 status: 'success',
-                message: `Bulk notifications completed: ${results.successful} sent, ${results.failed} failed`,
+                message: `Bulk notifications completed: ${successful} sent, ${failed} failed`,
                 data: { 
-                    successful: results.successful,
-                    failed: results.failed,
-                    total: notifications.length
+                    successful,
+                    failed,
+                    total: notifications.length,
+                    results
                 }
             });
         } catch (error) {
@@ -297,7 +301,6 @@ export class RequestNotificationController {
 
             await this.requestNotificationService.setNotificationPreferences(
                 userId,
-                requestType,
                 preferences
             );
 
@@ -339,8 +342,7 @@ export class RequestNotificationController {
             });
 
             const preferences = await this.requestNotificationService.getNotificationPreferences(
-                userId,
-                requestType
+                userId
             );
 
             res.status(200).json({
@@ -390,9 +392,8 @@ export class RequestNotificationController {
             });
 
             await this.requestNotificationService.sendTestNotification(
-                notificationType,
                 recipient,
-                testData
+                notificationType
             );
 
             res.status(200).json({
