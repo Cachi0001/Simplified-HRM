@@ -161,9 +161,14 @@ export function useChatUnreadCount(): UseChatUnreadCountReturn {
   const subscribeToRealtimeUpdates = useCallback(async () => {
     try {
       const { supabase } = await import('../lib/supabase');
-      
-      console.info('🔗 Subscribing to unread count updates');
-      
+      if (subscriptionRef.current) {
+        // Already subscribed
+        return;
+      }
+
+      // Less noisy log
+      // console.debug('Subscribing to unread count updates');
+
       const subscription = supabase
         .channel('unread_counts')
         .on(
@@ -174,7 +179,7 @@ export function useChatUnreadCount(): UseChatUnreadCountReturn {
             table: 'chat_messages',
           },
           (payload: any) => {
-            console.info('📨 New message - updating unread count:', payload);
+            // console.debug('New message - updating unread count');
             incrementUnreadCount(payload.new.chat_id);
           }
         )
@@ -186,45 +191,47 @@ export function useChatUnreadCount(): UseChatUnreadCountReturn {
             table: 'chat_unread_counts',
           },
           (payload: any) => {
-            console.info('📊 Unread count updated:', payload);
+            // console.debug('Unread count updated');
             const { chat_id, unread_count } = payload.new;
             setUnreadCounts(prev => {
               const existingIndex = prev.findIndex(uc => uc.chat_id === chat_id);
-              if (existingIndex >= 0) {
-                const updated = [...prev];
-                updated[existingIndex] = { chat_id, unread_count };
-                return updated;
-              } else {
-                return [...prev, { chat_id, unread_count }];
-              }
-            });
-            
-            // Recalculate total
-            setTotalUnreadCount(prev => {
-              const currentCounts = unreadCounts.filter(uc => uc.chat_id !== chat_id);
-              return currentCounts.reduce((sum, uc) => sum + uc.unread_count, 0) + unread_count;
+              const updated = existingIndex >= 0
+                ? (() => { const copy = [...prev]; copy[existingIndex] = { chat_id, unread_count }; return copy; })()
+                : [...prev, { chat_id, unread_count }];
+              // Also update total based on updated array
+              const total = updated.reduce((sum, uc) => sum + (uc.unread_count || 0), 0);
+              setTotalUnreadCount(total);
+              return updated;
             });
           }
         )
         .subscribe(async (status: string) => {
-          console.info(`📡 Unread count subscription status: ${status}`);
+          // console.debug(`Unread count subscription status: ${status}`);
           if (status === 'SUBSCRIBED') {
             setIsRealTimeConnected(true);
             setError(null);
-          } else if (status === 'CHANNEL_ERROR') {
+          } else if (status === 'CHANNEL_ERROR' || status === 'CLOSED') {
             setError('Failed to subscribe to unread count updates');
             setIsRealTimeConnected(false);
+            // Attempt a simple retry with backoff cap
+            setTimeout(() => {
+              // Only retry if not already subscribed
+              if (!subscriptionRef.current) {
+                subscribeToRealtimeUpdates();
+              }
+            }, 2000);
           }
         });
 
       subscriptionRef.current = subscription;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      console.error('❌ Failed to subscribe to unread counts:', errorMessage);
+      // Downgrade to warn to reduce console noise
+      console.warn('Failed to subscribe to unread counts:', errorMessage);
       setError(errorMessage);
       setIsRealTimeConnected(false);
     }
-  }, [incrementUnreadCount, unreadCounts]);
+  }, [incrementUnreadCount]);
 
   const unsubscribeFromRealtimeUpdates = useCallback(async () => {
     if (subscriptionRef.current) {
@@ -240,7 +247,7 @@ export function useChatUnreadCount(): UseChatUnreadCountReturn {
     }
   }, []);
 
-  // Initial fetch and realtime subscription on mount
+  // Initial fetch and realtime subscription on mount (once)
   useEffect(() => {
     getAllUnreadCounts();
     subscribeToRealtimeUpdates();
@@ -248,7 +255,9 @@ export function useChatUnreadCount(): UseChatUnreadCountReturn {
     return () => {
       unsubscribeFromRealtimeUpdates();
     };
-  }, [getAllUnreadCounts, subscribeToRealtimeUpdates, unsubscribeFromRealtimeUpdates]);
+  // Intentionally not depending on subscribe/unsubscribe to avoid re-subscribe loops
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [getAllUnreadCounts]);
 
   return {
     totalUnreadCount,

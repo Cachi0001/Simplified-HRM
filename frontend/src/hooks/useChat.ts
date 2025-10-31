@@ -1,240 +1,382 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
-import type { ChatMessage } from '../types/chat';
-import { useRealtimeChat } from './useRealtimeChat';
 
-const toIsoString = (value: string | Date | null | undefined): string | null => {
-  if (!value) {
-    return null;
-  }
-  return typeof value === 'string' ? value : value.toISOString();
-};
-
-const normalizeChatMessage = (message: any): ChatMessage => {
-  const timestamp =
-    toIsoString(message.timestamp) ||
-    toIsoString(message.sent_at) ||
-    toIsoString(message.created_at) ||
-    new Date().toISOString();
-
-  return {
-    id: message.id,
-    chat_id: message.chat_id,
-    sender_id: message.sender_id,
-    message: message.message,
-    timestamp,
-    created_at: toIsoString(message.created_at) || timestamp,
-    sent_at: toIsoString(message.sent_at),
-    delivered_at: toIsoString(message.delivered_at),
-    read_at: toIsoString(message.read_at),
-    edited_at: toIsoString(message.edited_at),
-    senderName: message.senderName ?? message.sender_name,
-    senderAvatar: message.senderAvatar ?? message.sender_avatar,
-    updated_at: toIsoString(message.updated_at),
-  };
-};
-
-export interface UseChatReturn {
-  messages: ChatMessage[];
-  isLoading: boolean;
-  error: string | null;
-  isConnected: boolean;
-  sendMessage: (chatId: string, message: string) => Promise<void>;
-  markMessageAsRead: (messageId: string) => Promise<void>;
-  markChatAsRead: (chatId: string) => Promise<void>;
-  getChatHistory: (chatId: string, page?: number, limit?: number) => Promise<void>;
-  getReadReceipt: (messageId: string) => Promise<any>;
-  getChatParticipants: (chatId: string) => Promise<any[]>;
-  refreshMessages: () => Promise<void>;
-  clearMessages: () => void;
+export interface Chat {
+  id: string;
+  name: string;
+  type: 'dm' | 'group' | 'announcement';
+  lastMessage?: string;
+  lastMessageTime?: string;
+  unreadCount: number;
+  participants?: string[];
+  avatar?: string;
+  createdBy?: string;
+  createdAt?: string;
 }
 
-export function useChat(chatId?: string, userId?: string): UseChatReturn {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+export interface ChatMessage {
+  id: string;
+  chatId: string;
+  senderId: string;
+  senderName: string;
+  senderAvatar?: string;
+  content: string;
+  timestamp: string;
+  isOwn: boolean;
+  status?: 'sending' | 'sent' | 'delivered' | 'read';
+}
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  avatar?: string;
+  role?: string;
+  status: 'online' | 'offline' | 'away';
+}
+
+export function useChat() {
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [messages, setMessages] = useState<Record<string, ChatMessage[]>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
-  // Use realtime chat hook for live updates
-  const { 
-    realtimeMessages, 
-    isSubscribed, 
-    error: realtimeError,
-    clearRealtimeMessages 
-  } = useRealtimeChat(chatId || null);
 
-  // Merge realtime messages with local messages
-  useEffect(() => {
-    if (realtimeMessages.length > 0) {
-      setMessages(prev => {
-        const existingIds = new Set(prev.map(m => m.id));
-        const newMessages = realtimeMessages.filter(m => !existingIds.has(m.id));
-        return [...prev, ...newMessages].sort((a, b) => 
-          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-        );
-      });
-    }
-  }, [realtimeMessages]);
-
-  // Handle realtime errors
-  useEffect(() => {
-    if (realtimeError) {
-      setError(realtimeError);
-    }
-  }, [realtimeError]);
-
-  const sendMessage = useCallback(
-    async (targetChatId: string, message: string) => {
-      try {
-        setError(null);
-        
-        // Optimistically add message to UI
-        const optimisticMessage: ChatMessage = {
-          id: `temp-${Date.now()}`,
-          chat_id: targetChatId,
-          sender_id: userId || '',
-          message,
-          timestamp: new Date().toISOString(),
-          created_at: new Date().toISOString(),
-          sent_at: null,
-          delivered_at: null,
-          read_at: null,
-          edited_at: null,
-          senderName: 'You',
-          senderAvatar: null,
-          updated_at: null
-        };
-        
-        setMessages(prev => [...prev, optimisticMessage]);
-        
-        const response = await api.post('/chat/send', {
-          chatId: targetChatId,
-          message
-        });
-        
-        // Replace optimistic message with real one
-        if (response.data?.data?.message) {
-          const realMessage = normalizeChatMessage(response.data.data.message);
-          setMessages(prev => 
-            prev.map(m => m.id === optimisticMessage.id ? realMessage : m)
-          );
-        }
-      } catch (err) {
-        // Remove optimistic message on error
-        setMessages(prev => prev.filter(m => !m.id.startsWith('temp-')));
-        const errorMessage = err instanceof Error ? err.message : 'Failed to send message';
-        setError(errorMessage);
-        throw err;
-      }
-    },
-    [userId]
-  );
-
-  const markMessageAsRead = useCallback(async (messageId: string) => {
+  // Load chats
+  const loadChats = useCallback(async () => {
     try {
+      setIsLoading(true);
       setError(null);
-      await api.patch(`/chat/message/${messageId}/read`, {});
-      
-      setMessages(prev =>
-        prev.map(m =>
-          m.id === messageId
-            ? { ...m, read_at: new Date().toISOString(), delivered_at: new Date().toISOString() }
-            : m
-        )
-      );
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to mark message as read';
-      setError(errorMessage);
-      throw err;
+
+      const response = await api.get('/chat/list');
+      if (response.data?.data && Array.isArray(response.data.data)) {
+        const formattedChats = response.data.data.map((chat: any) => ({
+          id: chat.id,
+          name: chat.name || chat.otherParticipantName || 'Unknown Chat',
+          type: chat.type,
+          lastMessage: chat.lastMessage || '',
+          lastMessageTime: formatTime(chat.lastMessageAt || chat.created_at),
+          unreadCount: chat.unreadCount || 0,
+          participants: chat.participants,
+          avatar: chat.avatar,
+          createdBy: chat.created_by,
+          createdAt: chat.created_at
+        }));
+        setChats(formattedChats);
+      } else {
+        // Start with empty chats - no mock data
+        setChats([]);
+      }
+    } catch (error) {
+      console.error('Failed to load chats:', error);
+      setError('Failed to load chats');
+      setChats([]); // Start with empty chats on error
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
+  // Load users
+  const loadUsers = useCallback(async () => {
+    try {
+      console.log('🔄 Loading users for chat...');
+      
+      // Use the specific endpoint for chat users
+      const response = await api.get('/employees/for-chat');
+      
+      console.log('📡 API Response:', response.data);
+
+      if (response.data?.status === 'success') {
+        const employees: any[] = response.data.data || [];
+        
+        console.log('👥 Raw employees data:', employees);
+
+        const formattedUsers = employees.map((emp: any) => ({
+          id: emp.id,
+          name: emp.fullName || emp.full_name || emp.name || emp.email || 'Unknown User',
+          email: emp.email,
+          avatar: emp.profilePicture || emp.profile_picture || emp.avatar,
+          role: emp.role || 'Member',
+          status: 'online' as const
+        }));
+
+        console.log('✅ Formatted users:', formattedUsers);
+        setUsers(formattedUsers);
+        setError(null);
+      } else {
+        console.log('❌ API response not successful:', response.data);
+        setUsers([]);
+        setError('No users found');
+      }
+    } catch (error) {
+      console.error('❌ Failed to load users:', error);
+      setError(`Failed to load users: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setUsers([]);
+    }
+  }, []);
+
+  // Load messages for a chat
+  const loadMessages = useCallback(async (chatId: string) => {
+    try {
+      const response = await api.get(`/chat/${chatId}/history?limit=50`);
+      if (response.data?.status === 'success' && response.data) {
+        const responseData = response.data.data as { messages?: any[] };
+        if (responseData.messages && Array.isArray(responseData.messages)) {
+          const currentUserId = getCurrentUserId();
+          const formattedMessages: ChatMessage[] = responseData.messages.map((msg: any) => ({
+            id: msg.id,
+            chatId: msg.chat_id,
+            senderId: msg.sender_id,
+            senderName: msg.senderName || 'User',
+            senderAvatar: msg.senderAvatar,
+            content: msg.message,
+            timestamp: msg.timestamp,
+            isOwn: msg.sender_id === currentUserId,
+            status: getMessageStatus(msg) as 'sending' | 'sent' | 'delivered' | 'read'
+          }));
+
+          setMessages(prev => ({
+            ...prev,
+            [chatId]: formattedMessages
+          }));
+        } else {
+          // No messages found - start with empty array
+          setMessages(prev => ({
+            ...prev,
+            [chatId]: []
+          }));
+        }
+      } else {
+        // No messages found - start with empty array
+        setMessages(prev => ({
+          ...prev,
+          [chatId]: []
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to load messages:', error);
+      setMessages(prev => ({
+        ...prev,
+        [chatId]: []
+      }));
+    }
+  }, []);
+
+  // Send message
+  const sendMessage = useCallback(async (chatId: string, content: string) => {
+    try {
+      const optimisticMessage: ChatMessage = {
+        id: `temp-${Date.now()}`,
+        chatId,
+        senderId: getCurrentUserId(),
+        senderName: 'You',
+        content,
+        timestamp: new Date().toISOString(),
+        isOwn: true,
+        status: 'sending'
+      };
+
+      // Add optimistic message
+      setMessages(prev => ({
+        ...prev,
+        [chatId]: [...(prev[chatId] || []), optimisticMessage]
+      }));
+
+      const response = await api.post('/chat/send', {
+        chatId,
+        message: content
+      });
+
+      if (response.data?.status === 'success' && response.data) {
+        const responseData = response.data.data as { message?: any };
+        if (responseData.message) {
+          const serverMessage = responseData.message;
+          const realMessage: ChatMessage = {
+            id: serverMessage.id,
+            chatId: serverMessage.chat_id,
+            senderId: serverMessage.sender_id,
+            senderName: 'You',
+            content: serverMessage.message,
+            timestamp: serverMessage.timestamp,
+            isOwn: true,
+            status: 'sent'
+          };
+
+          // Replace optimistic message with real one
+          setMessages(prev => ({
+            ...prev,
+            [chatId]: prev[chatId]?.map(msg =>
+              msg.id === optimisticMessage.id ? realMessage : msg
+            ) || [realMessage]
+          }));
+        }
+      }
+    } catch (error) {
+      console.error('Failed to send message:', error);
+
+      // Update optimistic message to failed state
+      setMessages(prev => ({
+        ...prev,
+        [chatId]: prev[chatId]?.map(msg =>
+          msg.id.startsWith('temp-') ? { ...msg, status: 'failed' as any } : msg
+        ) || []
+      }));
+    }
+  }, []);
+
+  // Create group
+  const createGroup = useCallback(async (name: string, description?: string, memberIds?: string[]) => {
+    try {
+      const response = await api.post('/chat/groups', {
+        name,
+        description,
+        memberIds
+      });
+
+      if (response.data?.status === 'success') {
+        await loadChats(); // Refresh chats
+        return response.data.data;
+      }
+    } catch (error) {
+      console.error('Failed to create group:', error);
+      throw error;
+    }
+  }, [loadChats]);
+
+  // Create or get DM chat
+  const createOrGetDM = useCallback(async (recipientId: string) => {
+    try {
+      const response = await api.post('/chat/dm', {
+        recipientId
+      });
+
+      if (response.data?.status === 'success' && response.data) {
+        const responseData = response.data.data as { chat?: any };
+        if (responseData.chat) {
+          await loadChats(); // Refresh chats
+          return responseData.chat;
+        }
+      }
+    } catch (error) {
+      console.error('Failed to create DM:', error);
+      throw error;
+    }
+  }, [loadChats]);
+
+  // Mark chat as read
   const markChatAsRead = useCallback(async (chatId: string) => {
     try {
-      setError(null);
       await api.patch(`/chat/${chatId}/read`, {});
-      
-      setMessages(prev =>
-        prev.map(m =>
-          m.chat_id === chatId
-            ? { ...m, read_at: new Date().toISOString(), delivered_at: new Date().toISOString() }
-            : m
-        )
-      );
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to mark chat as read';
-      setError(errorMessage);
-      throw err;
+
+      // Update local unread count
+      setChats(prev => prev.map(chat =>
+        chat.id === chatId ? { ...chat, unreadCount: 0 } : chat
+      ));
+    } catch (error) {
+      console.error('Failed to mark chat as read:', error);
     }
   }, []);
 
-  const getChatHistory = useCallback(
-    async (chatId: string, page = 1, limit = 50) => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        const response = await api.get(
-          `/chat/${chatId}/history?page=${page}&limit=${limit}`
-        );
-        
-        if (response.data?.data?.messages) {
-          setMessages(response.data.data.messages.map(normalizeChatMessage));
-        }
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to load chat history';
-        setError(errorMessage);
-        throw err;
-      } finally {
-        setIsLoading(false);
+  // Get total unread count
+  const getTotalUnreadCount = useCallback(() => {
+    return chats.reduce((sum, chat) => sum + chat.unreadCount, 0);
+  }, [chats]);
+
+  // Announcements
+  const createAnnouncement = useCallback(async (title: string, content: string, priority: 'low' | 'normal' | 'high' = 'normal') => {
+    try {
+      const response = await api.post('/announcements', { title, content, priority });
+      if (response.data?.status !== 'success') {
+        throw new Error(response.data?.message || 'Failed to create announcement');
       }
-    },
-    []
-  );
-
-  const getReadReceipt = useCallback(async (messageId: string) => {
-    try {
-      const response = await api.get(`/chat/message/${messageId}/read-receipt`);
-      return response.data?.data;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to get read receipt';
-      console.error(errorMessage);
-      return null;
+      return response.data.data;
+    } catch (error) {
+      console.error('Failed to create announcement:', error);
+      throw error;
     }
   }, []);
 
-  const getChatParticipants = useCallback(async (chatId: string) => {
+  // Helper functions
+  const getCurrentUserId = () => {
     try {
-      const response = await api.get(`/chat/${chatId}/participants`);
-      return response.data?.data?.participants || [];
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to get participants';
-      console.error(errorMessage);
-      return [];
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        const user = JSON.parse(storedUser);
+        return user.id;
+      }
+    } catch (error) {
+      console.error('Failed to get current user ID:', error);
     }
-  }, []);
+    return null;
+  };
 
-  const refreshMessages = useCallback(async () => {
-    if (chatId) {
-      await getChatHistory(chatId);
+  const getCurrentUserEmail = () => {
+    try {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        const user = JSON.parse(storedUser);
+        return user.email as string | null;
+      }
+    } catch (error) {
+      console.error('Failed to get current user email:', error);
     }
-  }, [chatId, getChatHistory]);
+    return null;
+  };
 
-  const clearMessages = useCallback(() => {
-    setMessages([]);
-    clearRealtimeMessages();
-  }, [clearRealtimeMessages]);
+  const getMessageStatus = (message: any): 'sending' | 'sent' | 'delivered' | 'read' => {
+    if (message.read_at) return 'read';
+    if (message.delivered_at) return 'delivered';
+    if (message.sent_at) return 'sent';
+    return 'sending';
+  };
+
+  const formatTime = (timestamp: string) => {
+    try {
+      const date = new Date(timestamp);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays = Math.floor(diffMs / 86400000);
+
+      if (diffMins < 1) return 'Just now';
+      if (diffMins < 60) return `${diffMins}m ago`;
+      if (diffHours < 24) return `${diffHours}h ago`;
+      if (diffDays < 7) return `${diffDays}d ago`;
+      return date.toLocaleDateString();
+    } catch (error) {
+      return 'Unknown';
+    }
+  };
+
+  // Load initial data
+  useEffect(() => {
+    loadChats();
+    loadUsers();
+  }, [loadChats, loadUsers]);
+
+  // Re-try loading users when auth token appears (e.g., after login refresh)
+  useEffect(() => {
+    const token = localStorage.getItem('accessToken');
+    if (token && users.length === 0) {
+      loadUsers();
+    }
+  }, [loadUsers, users.length]);
 
   return {
+    chats,
+    users,
     messages,
     isLoading,
     error,
-    isConnected: isSubscribed,
+    loadChats,
+    loadUsers,
+    loadMessages,
     sendMessage,
-    markMessageAsRead,
+    createGroup,
+    createOrGetDM,
     markChatAsRead,
-    getChatHistory,
-    getReadReceipt,
-    getChatParticipants,
-    refreshMessages,
-    clearMessages
+    getTotalUnreadCount,
+    createAnnouncement
   };
 }

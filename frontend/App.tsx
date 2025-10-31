@@ -22,6 +22,7 @@ import { ToastProvider } from './src/components/ui/Toast';
 import { ProtectedRoute } from './src/components/auth/ProtectedRoute';
 import ApiConnectionTest from './src/components/ApiConnectionTest';
 import { FloatingChatWidget } from './src/components/chat/FloatingChatWidget';
+import { ChatDemo } from './src/components/demo/ChatDemo';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -112,6 +113,7 @@ function AppContent() {
             </ProtectedRoute>
           } />
           <Route path="/api-test" element={<ApiConnectionTest />} />
+          <Route path="/chat-demo" element={<ChatDemo />} />
         </Routes>
       </main>
       {!isDashboardPage && <Footer />}

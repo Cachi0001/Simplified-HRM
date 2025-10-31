@@ -39,14 +39,14 @@ export function ReadReceipt({
       case 'sent':
         return (
           <span className="inline-flex">
-            <Check className="h-3 w-3 text-gray-500" />
+            <Check className="h-3 w-3 text-blue-500" />
           </span>
         );
       case 'delivered':
         return (
           <span className="inline-flex gap-0.5">
-            <Check className="h-3 w-3 text-gray-600" />
-            <Check className="h-3 w-3 text-gray-600 -ml-1" />
+            <Check className="h-3 w-3 text-blue-500" />
+            <Check className="h-3 w-3 text-blue-500 -ml-1" />
           </span>
         );
       case 'read':

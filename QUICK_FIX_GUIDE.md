@@ -1,51 +1,47 @@
-i told you to Read C:\Users\DELL\Saas\Go3net Simplified\database\migrations\fix_chat_issues.sql file for the structure
+| info                     | column_name  | data_type                | is_nullable | column_default            |
+| ------------------------ | ------------ | ------------------------ | ----------- | ------------------------- |
+| chat_messages structure: | id           | uuid                     | NO          | gen_random_uuid()         |
+| chat_messages structure: | chat_id      | character varying        | NO          | null                      |
+| chat_messages structure: | sender_id    | uuid                     | NO          | null                      |
+| chat_messages structure: | message      | text                     | NO          | null                      |
+| chat_messages structure: | chat_type    | character varying        | NO          | 'dm'::character varying   |
+| chat_messages structure: | message_type | character varying        | YES         | 'text'::character varying |
+| chat_messages structure: | timestamp    | timestamp with time zone | YES         | now()                     |
+| chat_messages structure: | read_at      | timestamp with time zone | YES         | null                      |
+| chat_messages structure: | delivered_at | timestamp with time zone | YES         | null                      |
+| chat_messages structure: | sent_at      | timestamp with time zone | YES         | now()                     |
+| chat_messages structure: | edited_at    | timestamp with time zone | YES         | null                      |
+| chat_messages structure: | created_at   | timestamp with time zone | YES         | now()                     |
+| chat_messages structure: | updated_at   | timestamp with time zone | YES         | now()                     |
 
-and you read it made some changes Now I need to update the return type and interface to match the actual database structure. Let me also check what the IChatMessage interface looks like:
+Announcements
+| info                     | column_name | data_type                | is_nullable | column_default              |
+| ------------------------ | ----------- | ------------------------ | ----------- | --------------------------- |
+| announcements structure: | id          | uuid                     | NO          | uuid_generate_v4()          |
+| announcements structure: | title       | character varying        | NO          | null                        |
+| announcements structure: | content     | text                     | NO          | null                        |
+| announcements structure: | author_id   | uuid                     | NO          | null                        |
+| announcements structure: | priority    | character varying        | YES         | 'normal'::character varying |
+| announcements structure: | created_at  | timestamp with time zone | YES         | now()                       |
+| announcements structure: | updated_at  | timestamp with time zone | YES         | now()                       |
 
-Searched workspace
+group_chats
+| info         | column_name | data_type                | is_nullable | column_default     |
+| ------------ | ----------- | ------------------------ | ----------- | ------------------ |
+| group_chats: | id          | uuid                     | NO          | uuid_generate_v4() |
+| group_chats: | name        | character varying        | NO          | null               |
+| group_chats: | description | text                     | YES         | null               |
+| group_chats: | created_by  | uuid                     | NO          | null               |
+| group_chats: | is_private  | boolean                  | YES         | false              |
+| group_chats: | avatar      | text                     | YES         | null               |
+| group_chats: | created_at  | timestamp with time zone | YES         | now()              |
+| group_chats: | updated_at  | timestamp with time zone | YES         | now()              |
 
-Find the IChatMessage interface definition
-
-Read file(s)
-
-SupabaseChatMessage.ts
-
-I can see the interface uses message but the database uses content. Let me update the interface to match the database:
-
-Accepted edits to
-
-SupabaseChatMessage.ts
-
-Now let me also update the CreateChatMessageRequest interface:
-
-Accepted edits to
-
-SupabaseChatMessage.ts
-
-Now I need to update the frontend to display the correct field. Let me check how the frontend is displaying messages:
-
-🚀 API Request [req_1761839251513_w3j2f]: POST http://localhost:3000/api/chat/send 
-Object { baseURL: "http://localhost:3000/api", url: "chat/send", headers: {…}, data: {…} }
-api.ts:136:15
-XHRPOST
-http://localhost:3000/api/chat/send
-[HTTP/1.1 400 Bad Request 650ms]
-
-❌ API Response Error [err_1761839252184_8br20] for request [req_1761839251513_w3j2f]: POST chat/send 
-Object { errorId: "err_1761839252184_8br20", requestId: "req_1761839251513_w3j2f", message: "Request failed with status code 400", status: 400, statusText: "Bad Request", data: {…}, headers: {…}, request: {…} }
-api.ts:260:13
-Failed to send message: 
-Object { message: "Request failed with status code 400", name: "AxiosError", code: "ERR_BAD_REQUEST", config: {…}, request: XMLHttpRequest, response: {…}, status: 400, errorId: "err_1761839252184_8br20", requestId: "req_1761839251513_w3j2f", stack: "", … }
-FloatingChatWidget.tsx:317:15
-Send message data: 
-Object { chatId: "dm_8d5cc645-99e1-4c2a-9f35-fb0205ec5f20_undefined", message: "Hi", currentUser: {…} }
-​
-chatId: "dm_8d5cc645-99e1-4c2a-9f35-fb0205ec5f20_undefined"
-​
-currentUser: Object { _id: "38c01fbd-33f2-4c50-a7e6-c18f1e4bdd80", email: "passioncaleb5@gmail.com", fullName: "CALEB  ONYEAMECHI", … }
-​
-message: "Hi"
-​
-<prototype>: Object { … }
-
-
+group_chat_members
+| info                | column_name | data_type                | is_nullable | column_default              |
+| ------------------- | ----------- | ------------------------ | ----------- | --------------------------- |
+| group_chat_members: | id          | uuid                     | NO          | uuid_generate_v4()          |
+| group_chat_members: | group_id    | uuid                     | NO          | null                        |
+| group_chat_members: | employee_id | uuid                     | NO          | null                        |
+| group_chat_members: | role        | character varying        | YES         | 'member'::character varying |
+| group_chat_members: | joined_at   | timestamp with time zone | YES         | now()                       |

@@ -16,6 +16,12 @@ const chatController = new ChatController(chatService);
 router.use(authenticateToken);
 
 /**
+ * Chat List Management
+ */
+router.get('/list', (req, res) => chatController.getUserChats(req, res));
+router.post('/dm', (req, res) => chatController.createOrGetDMChat(req, res));
+
+/**
  * Message Management
  */
 router.post('/send', (req, res) => chatController.sendMessage(req, res));

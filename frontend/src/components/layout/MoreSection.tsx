@@ -11,7 +11,7 @@ import {
   FileText,
   Clock,
   X,
-  ChevronRight
+  ChevronRight,
 } from 'lucide-react';
 import { authService } from '../../services/authService';
 

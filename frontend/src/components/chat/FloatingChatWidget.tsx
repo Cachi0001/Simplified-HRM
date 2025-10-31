@@ -1,780 +1,509 @@
-import React, { useState, useEffect, useRef } from 'react';
-import Draggable from 'react-draggable';
-import { MessageCircle, X, Send, Search, Moon, Sun, Maximize2, Minimize2 } from 'lucide-react';
-import { useChatUnreadCount } from '@/hooks/useChatUnreadCount';
-import { authService } from '@/services/authService';
-import api from '@/lib/api';
+import { useState, useRef, useEffect } from 'react';
+import {
+  MessageCircle, X, Send, Users, Search, Plus, Settings,
+  ArrowLeft, Bell, History
+} from 'lucide-react';
+import { ChatBadge } from './ChatBadge';
+import { useChat, Chat, User } from '../../hooks/useChat';
 
-interface Chat {
-  id: string;
-  name: string;
-  lastMessage?: string;
-  unreadCount: number;
-  avatar?: string;
-  type: 'dm' | 'group' | 'announcement';
-  fullName?: string;
-  email?: string;
-  role?: string;
-}
-
-interface Message {
-  id: string;
-  chat_id: string;
-  sender_id: string;
-  senderName: string;
-  message: string;
-  timestamp: string;
-  read_at?: string;
+interface FloatingChatWidgetProps {
+  className?: string;
 }
 
 type TabType = 'dms' | 'groups' | 'announcements' | 'history';
 
-const WIDGET_DEFAULT_POS = { x: 20, y: 20 };
+// Extended Chat interface to include additional properties we need
+interface ExtendedChat extends Chat {
+  userData?: User;
+  loading?: boolean;
+  isUser?: boolean;
+}
 
-export function FloatingChatWidget() {
-  const { totalUnreadCount, getAllUnreadCounts } = useChatUnreadCount();
+/**
+ * Fixed Modal Chat Widget with Responsive Design
+ * Features:
+ * - Fixed modal positioning that works at all zoom levels
+ * - Responsive design: full-screen mobile, 80% desktop
+ * - Proper message bubble design with avatars
+ * - Color-coded role badges
+ * - Real-time messaging
+ */
+export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabType>('dms');
+  const [selectedChat, setSelectedChat] = useState<ExtendedChat | null>(null);
+  const [messageInput, setMessageInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('chatWidgetDarkMode');
     return saved ? JSON.parse(saved) : false;
   });
-  const [activeTab, setActiveTab] = useState<TabType>('dms');
-  const [chats, setChats] = useState<Chat[]>([]);
-  const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [messageText, setMessageText] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [currentUser, setCurrentUser] = useState<any>(null);
-  const [isTyping, setIsTyping] = useState(false);
-  const [typingUsers, setTypingUsers] = useState<string[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
-  const dragRef = useRef(null);
-  const fullscreenRef = useRef(null);
 
-  // Load current user
-  useEffect(() => {
-    try {
-      const user = authService.getCurrentUserFromStorage();
-      setCurrentUser(user);
-    } catch (err) {
-      console.error('Error loading user:', err);
-    }
-  }, []);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Use real chat hook
+  const {
+    chats,
+    users,
+    messages,
+    isLoading,
+    error: chatError,
+    loadMessages,
+    loadUsers,
+    sendMessage: sendChatMessage,
+    createOrGetDM,
+    markChatAsRead,
+    getTotalUnreadCount,
+  } = useChat();
 
   // Save dark mode preference
   useEffect(() => {
     localStorage.setItem('chatWidgetDarkMode', JSON.stringify(darkMode));
   }, [darkMode]);
 
-  // Load chats when tab changes or user role changes
-  useEffect(() => {
-    if (isOpen) {
-      loadChats();
-    }
-  }, [activeTab, isOpen, currentUser?.role]);
-
   // Load messages when chat is selected
   useEffect(() => {
     if (selectedChat) {
-      loadMessages();
+      loadMessages(selectedChat.id);
+      markChatAsRead(selectedChat.id);
     }
-  }, [selectedChat]);
+  }, [selectedChat, loadMessages, markChatAsRead]);
 
-  // Handle ESC key for fullscreen exit
+  // Auto-scroll to bottom
   useEffect(() => {
-    const handleEscKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isFullscreen) {
-        setIsFullscreen(false);
-      }
-    };
-
-    window.addEventListener('keydown', handleEscKey);
-    return () => window.removeEventListener('keydown', handleEscKey);
-  }, [isFullscreen]);
-
-  // Typing indicator logic
-  useEffect(() => {
-    let typingTimeout: NodeJS.Timeout;
-    if (isTyping && selectedChat) {
-      const currentUserId = currentUser?.id || currentUser?._id;
-      const chatId = currentUserId < selectedChat.id
-        ? `dm_${currentUserId}_${selectedChat.id}`
-        : `dm_${selectedChat.id}_${currentUserId}`;
-      api.post(`/chat/${chatId}/typing/start`);
-      typingTimeout = setTimeout(() => {
-        setIsTyping(false);
-      }, 2000);
+    if (messagesEndRef.current && selectedChat) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-    return () => clearTimeout(typingTimeout);
-  }, [messageText, selectedChat]);
+  }, [messages, selectedChat]);
 
-  // Listen for typing events
-  useEffect(() => {
-    if (selectedChat) {
-      // Replace with your actual real-time subscription logic (e.g., Supabase)
-      const currentUserId = currentUser?.id || currentUser?._id;
-      const chatId = currentUserId < selectedChat.id
-        ? `dm_${currentUserId}_${selectedChat.id}`
-        : `dm_${selectedChat.id}_${currentUserId}`;
-      const channel = `typing-${chatId}`;
-      const handleTyping = (user: string) => {
-        setTypingUsers(prev => [...prev, user]);
-        setTimeout(() => {
-          setTypingUsers(prev => prev.filter(u => u !== user));
-        }, 3000);
-      };
-      // Example: document.addEventListener(channel, (e) => handleTyping(e.detail.user));
-      // return () => document.removeEventListener(channel, (e) => handleTyping(e.detail.user));
+  const totalUnreadCount = getTotalUnreadCount();
+
+  // Get role badge color
+  const getRoleBadgeColor = (role: string) => {
+    switch (role?.toLowerCase()) {
+      case 'hr': return 'bg-blue-500 text-white';
+      case 'super-admin': return 'bg-purple-500 text-white';
+      case 'admin': return 'bg-red-500 text-white';
+      default: return 'bg-gray-500 text-white';
     }
-  }, [selectedChat]);
+  };
 
-  // Role-based chat filtering for history
-  const shouldShowChatInHistory = (chat: Chat, userRole: string): boolean => {
-    switch (userRole) {
-      case 'super-admin':
-        // Super-admin sees all conversations
+  // For DMs, show available users to chat with
+  const getDisplayItems = (): ExtendedChat[] => {
+    if (activeTab === 'dms') {
+      return users.filter(user => {
+        if (searchQuery && !user.name?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
         return true;
-
-      case 'admin':
-        // Admin sees all except super-admin personal conversations
-        return !chat.name?.includes('super-admin') && chat.role !== 'super-admin';
-
-      case 'hr':
-        // HR sees all except admin and super-admin conversations
-        return !['admin', 'super-admin'].includes(chat.role || '');
-
-      case 'employee':
-        // Employees only see their own conversations
-        const currentUserId = currentUser?.id || currentUser?._id;
-        return chat.id.includes(currentUserId) || chat.name === currentUser?.full_name;
-
-      default:
-        return false;
+      }).map(user => ({
+        id: user.id,
+        name: user.name || user.email || 'Unknown User',
+        type: 'dm' as const,
+        lastMessage: `${user.role || 'Member'} • Click to start chat`,
+        lastMessageTime: user.status || 'Online',
+        unreadCount: 0,
+        isUser: true,
+        userData: user
+      }));
+    } else {
+      return chats.filter(chat => {
+        if (activeTab === 'groups' && chat.type !== 'group') return false;
+        if (activeTab === 'announcements' && chat.type !== 'announcement') return false;
+        if (searchQuery && !chat.name?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+        return true;
+      }).map(chat => ({ ...chat }));
     }
   };
 
-  const loadChats = async () => {
+  const displayItems = getDisplayItems();
+
+  // Debug logging
+  useEffect(() => {
+    console.log('Chat Debug - Users:', users.length, users);
+    console.log('Chat Debug - Display Items:', displayItems.length, displayItems);
+    console.log('Chat Debug - Active Tab:', activeTab);
+    console.log('Chat Debug - Is Loading:', isLoading);
+    console.log('Chat Debug - Error:', chatError);
+  }, [users, displayItems, activeTab, isLoading, chatError]);
+
+  const handleChatSelect = async (item: ExtendedChat) => {
     try {
-      setIsLoading(true);
-
-      if (activeTab === 'dms') {
-        // Load all users for DMs
-        console.log('Loading users for DMs...');
-        const response = await api.get('/employees/for-chat');
-        console.log('API Response:', response.data);
-
-        // Handle the API response format: { data: [...] }
-        const employees = response.data?.data || [];
-        if (employees.length > 0) {
-          const users = employees;
-          console.log('Filtered users:', users);
-
-          const formattedChats: Chat[] = users.map((user: any) => ({
-            id: user.id, // Use actual user ID for DM chat
-            name: user.full_name || user.email,
-            lastMessage: '',
-            unreadCount: 0,
-            avatar: user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.full_name || user.email)}&background=random`,
-            type: 'dm' as const,
-            fullName: user.full_name,
-            email: user.email,
-            role: user.role
-          }));
-          console.log('Formatted chats:', formattedChats);
-          setChats(formattedChats);
-        } else {
-          console.log('No employees in response:', response.data);
-          setChats([]);
-        }
-      } else if (activeTab === 'announcements') {
-        // Load announcements
-        try {
-          const response = await api.get('/announcements');
-          if (response.data?.data) {
-            const formattedAnnouncements: Chat[] = response.data.data.map((announcement: any) => ({
-              id: announcement.id,
-              name: announcement.title,
-              lastMessage: announcement.content?.substring(0, 100) + '...',
-              unreadCount: 0,
-              avatar: `https://ui-avatars.com/api/?name=📢&background=4f46e5&color=fff`,
-              type: 'announcement' as const,
-              fullName: announcement.title,
-              email: `By: ${announcement.author_name}`,
-              role: 'announcement'
-            }));
-            setChats(formattedAnnouncements);
-          } else {
-            setChats([]);
-          }
-        } catch (err) {
-          console.log('No announcements endpoint yet');
-          setChats([]);
-        }
-      } else if (activeTab === 'groups') {
-        // Load group chats
-        try {
-          const response = await api.get('/chat/groups');
-          if (response.data?.data) {
-            const formattedGroups: Chat[] = response.data.data.map((group: any) => ({
-              id: group.id,
-              name: group.name,
-              lastMessage: group.last_message || 'No messages yet',
-              unreadCount: group.unread_count || 0,
-              avatar: group.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(group.name)}&background=random`,
-              type: 'group' as const,
-              fullName: group.name,
-              email: `${group.member_count || 0} members`,
-              role: 'group'
-            }));
-            setChats(formattedGroups);
-          } else {
-            setChats([]);
-          }
-        } catch (err) {
-          console.log('Groups not available yet');
-          setChats([]);
-        }
-      } else if (activeTab === 'history') {
-        // Load chat history based on user role
-        try {
-          const response = await api.get('/chat/history');
-          if (response.data?.data) {
-            const allChats = response.data.data;
-            // Filter chats based on user role
-            const filteredChats = allChats.filter((chat: any) =>
-              shouldShowChatInHistory(chat, currentUser?.role || 'employee')
-            );
-            const formattedHistory: Chat[] = filteredChats.map((chat: any) => ({
-              id: chat.id,
-              name: chat.name || 'Unknown Chat',
-              lastMessage: chat.last_message || 'No messages',
-              unreadCount: 0,
-              avatar: chat.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(chat.name || 'Chat')}&background=random`,
-              type: chat.type || 'dm',
-              fullName: chat.name,
-              email: chat.participants || '',
-              role: chat.type
-            }));
-            setChats(formattedHistory);
-          } else {
-            setChats([]);
-          }
-        } catch (err) {
-          console.log('No chat history available');
-          setChats([]);
-        }
-      } else {
-        // For other tabs, show empty for now
-        setChats([]);
-      }
-    } catch (err) {
-      console.error('Failed to load chats:', err);
-      setChats([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const loadMessages = async () => {
-    if (!selectedChat) return;
-
-    try {
-      setIsLoading(true);
-      // Create a chat ID for DM between current user and selected user
-      const currentUserId = currentUser.id || currentUser._id;
-      const chatId = currentUserId < selectedChat.id
-        ? `dm_${currentUserId}_${selectedChat.id}`
-        : `dm_${selectedChat.id}_${currentUserId}`;
-
-      const response = await api.get(`/chat/${chatId}/history`, {
-        params: { limit: 50 }
+      // Show loading state immediately
+      setSelectedChat({
+        ...item,
+        loading: true
       });
 
-      if (response.data?.data?.messages) {
-        setMessages(response.data.data.messages);
+      if (item.isUser) {
+        // Create or get DM with this user
+        const dmChat = await createOrGetDM(item.userData.id);
+        if (dmChat) {
+          setSelectedChat({
+            ...dmChat,
+            userData: item.userData,
+            loading: false
+          });
+          // Load messages in background
+          loadMessages(dmChat.id);
+        }
       } else {
-        // No messages yet, start with empty array
-        setMessages([]);
+        // Regular chat selection
+        setSelectedChat({
+          ...item,
+          loading: false
+        });
+        // Load messages in background
+        loadMessages(item.id);
       }
-    } catch (err) {
-      console.error('Failed to load messages:', err);
-      // Start with empty messages if chat doesn't exist yet
-      setMessages([]);
-    } finally {
-      setIsLoading(false);
+    } catch (error) {
+      console.error('Failed to select chat:', error);
+      setSelectedChat(null);
     }
   };
 
   const handleSendMessage = async () => {
-    if (!messageText.trim() || !selectedChat) return;
-
-    // Create a chat ID for DM between current user and selected user
-    const currentUserId = currentUser.id || currentUser._id;
-    const chatId = currentUserId < selectedChat.id
-      ? `dm_${currentUserId}_${selectedChat.id}`
-      : `dm_${selectedChat.id}_${currentUserId}`;
+    const content = messageInput.trim();
+    if (!content || !selectedChat) return;
 
     try {
-      await api.post('/chat/send', {
-        chatId: chatId,
-        message: messageText
-      });
-      setMessageText('');
-      loadMessages();
-      getAllUnreadCounts();
-    } catch (err) {
-      console.error('Failed to send message:', err);
-      console.error('Send message data:', {
-        chatId: chatId,
-        message: messageText,
-        currentUser: currentUser
-      });
-      // Add user feedback for errors
-      alert('Failed to send message. Please try again.');
+      setMessageInput('');
+      await sendChatMessage(selectedChat.id, content);
+    } catch (error) {
+      console.error('Failed to send message:', error);
     }
   };
 
-  const createAnnouncement = async (title: string, content: string) => {
-    try {
-      await api.post('/announcements', {
-        title,
-        content,
-        priority: 'normal'
-      });
-      alert('Announcement created successfully! All users will be notified.');
-      // Reload announcements if we're on that tab
-      if (activeTab === 'announcements') {
-        loadChats();
-      }
-    } catch (err) {
-      console.error('Failed to create announcement:', err);
-      alert('Failed to create announcement. Please try again.');
-    }
-  };
+  // Authentication guard
+  const isAuthenticated = !!localStorage.getItem('accessToken');
+  const isLanding = typeof window !== 'undefined' && window.location.pathname === '/';
+  if (!isAuthenticated || isLanding) {
+    return null;
+  }
 
-  const createGroup = async (name: string, description?: string) => {
-    try {
-      const response = await api.post('/chat/groups', {
-        name,
-        description: description || '',
-        is_private: false
-      });
+  const themeClasses = darkMode
+    ? 'bg-gray-900 text-white border-gray-700'
+    : 'bg-white text-gray-900 border-gray-200';
 
-      if (response.data?.success) {
-        alert(`Group "${name}" created successfully!`);
-        // Reload groups if we're on that tab
-        if (activeTab === 'groups') {
-          loadChats();
-        }
-      } else {
-        throw new Error('Failed to create group');
-      }
-    } catch (err) {
-      console.error('Failed to create group:', err);
-      alert('Failed to create group. Please try again.');
-    }
-  };
-
-  const filteredChats = chats.filter(chat =>
-  (chat.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (chat.fullName && chat.fullName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (chat.email && chat.email.toLowerCase().includes(searchQuery.toLowerCase())))
-  );
-
-  const bgColor = darkMode ? 'bg-gray-900' : 'bg-white';
-  const textColor = darkMode ? 'text-white' : 'text-gray-900';
-  const borderColor = darkMode ? 'border-gray-700' : 'border-gray-200';
-  const inputBg = darkMode ? 'bg-gray-800' : 'bg-gray-100';
-
-  // Don't render if user is not authenticated or on auth pages
-  if (!currentUser || !authService.isAuthenticated()) return null;
-
-  // Don't render on auth pages
-  const isAuthPage = window.location.pathname.includes('/auth') ||
-    window.location.pathname.includes('/confirm') ||
-    window.location.pathname.includes('/reset-password');
-  if (isAuthPage) return null;
-
-  // Calculate draggable bounds to keep bubble visible
-  const calculateBounds = () => {
-    if (typeof window === 'undefined') return 'parent';
-    return {
-      left: 0,
-      top: 0,
-      right: window.innerWidth - 56, // 56px = button width
-      bottom: window.innerHeight - 56 // 56px = button height
-    };
-  };
-
-  const getRoleBadgeClass = (role: string) => {
-    switch (role?.toLowerCase()) {
-      case 'super-admin':
-        return 'bg-purple-600 text-white text-xs px-2 py-1 rounded-full font-semibold';
-      case 'admin':
-        return 'bg-red-500 text-white text-xs px-2 py-1 rounded-full font-semibold';
-      case 'hr':
-        return 'bg-blue-500 text-white text-xs px-2 py-1 rounded-full font-semibold';
-      case 'employee':
-        return 'bg-green-500 text-white text-xs px-2 py-1 rounded-full font-semibold';
-      default:
-        return 'bg-gray-500 text-white text-xs px-2 py-1 rounded-full font-semibold';
-    }
-  };
-
-  const onDragStart = () => {
-    setIsDragging(false);
-  };
-
-  const onDrag = () => {
-    setIsDragging(true);
-  };
-
-  const onDragStop = () => {
-    // Small delay to allow click events to process
-    setTimeout(() => {
-      setIsDragging(false);
-    }, 100);
-  };
-
-  const handleChatButtonClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!isDragging) {
-      setIsOpen(true);
-    }
-  };
+  // Chat button when closed
+  if (!isOpen) {
+    return (
+      <div className={`fixed bottom-6 right-6 z-50 ${className}`}>
+        <div className="relative">
+          <button
+            onClick={() => setIsOpen(true)}
+            className="w-14 h-14 rounded-full shadow-lg transition-all duration-300 hover:scale-110 flex items-center justify-center focus:outline-none focus:ring-4 focus:ring-blue-300"
+            style={{
+              background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+            }}
+            title="Open Chat"
+          >
+            <MessageCircle className="w-6 h-6 text-white" />
+          </button>
+          <ChatBadge count={totalUnreadCount} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
-      {/* Background overlay when chat is open */}
-      {isOpen && (
+      {/* Modal Backdrop */}
+      <div
+        className="fixed inset-0 bg-black bg-opacity-50 z-40"
+        onClick={() => setIsOpen(false)}
+      />
+
+      {/* Modal Container - Fixed positioning that works at all zoom levels */}
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
         <div
-          className="fixed inset-0 bg-black/20 z-40"
-          onClick={() => {
-            setIsOpen(false);
-            setSelectedChat(null);
-            setIsFullscreen(false);
+          className={`${themeClasses} rounded-xl shadow-2xl border transition-all duration-300 w-full h-full sm:w-[85vw] sm:h-[85vh] sm:max-w-5xl sm:max-h-[700px] sm:min-h-[500px] overflow-hidden flex flex-col`}
+          style={{
+            maxHeight: 'calc(100vh - 2rem)', // Ensure modal never exceeds viewport minus padding
           }}
-        />
-      )}
-      {isFullscreen && (
-        // Fullscreen backdrop
-        <div
-          className="fixed inset-0 bg-black/50 z-40"
-          onClick={() => setIsFullscreen(false)}
-        />
-      )}
-      <Draggable
-        defaultPosition={WIDGET_DEFAULT_POS}
-        bounds={isFullscreen ? false : calculateBounds()}
-        nodeRef={dragRef}
-        disabled={isFullscreen || isOpen}
-        onStart={onDragStart}
-        onDrag={onDrag}
-        onStop={onDragStop}
-      >
-        <div
-          ref={dragRef}
-          className={`fixed z-50 ${isFullscreen ? 'inset-0 flex items-center justify-center cursor-default' : 'cursor-move'}`}
         >
-          {!isOpen ? (
-            // Chat Bubble Button
-            <div
-              className="relative w-14 h-14 rounded-full shadow-lg transition-all duration-300 hover:scale-110 flex items-center justify-center cursor-pointer"
-              style={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              }}
-              title="Open Chat"
-              onClick={handleChatButtonClick}
-            >
-              <MessageCircle className="w-6 h-6 text-white" />
+          {/* Header */}
+          <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-4 flex items-center justify-between text-white flex-shrink-0">
+            <div className="flex items-center gap-3">
+              <MessageCircle className="w-5 h-5" />
+              <h3 className="font-semibold text-lg">Go3net Chat</h3>
               {totalUnreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                <div className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
                   {totalUnreadCount > 99 ? '99+' : totalUnreadCount}
-                </span>
+                </div>
               )}
             </div>
-          ) : (
-            // Chat Modal
-            <div
-              ref={fullscreenRef}
-              className={`${bgColor} ${textColor} ${isFullscreen ? 'w-[90vw] max-w-4xl h-[90vh] rounded-lg' : 'w-96 h-[600px] rounded-lg'} shadow-2xl flex flex-col border ${borderColor}`}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Header */}
-              <div className={`${darkMode ? 'bg-gray-800' : 'bg-gray-100'} p-4 border-b ${borderColor} flex items-center justify-between ${isFullscreen ? '' : 'rounded-t-lg'}`}>
-                <div className="flex items-center space-x-2">
-                  <MessageCircle className="w-5 h-5" />
-                  <h3 className="font-semibold">{isFullscreen ? 'Chat - Full Screen' : 'Chat'}</h3>
-                </div>
-                <div className="flex items-center space-x-2">
+
+            <div className="flex items-center gap-2">
+              {/* Dark Mode Toggle */}
+              <button
+                onClick={() => setDarkMode(!darkMode)}
+                className="p-2 rounded hover:bg-white/20 transition-colors"
+                title="Toggle Dark Mode"
+              >
+                {darkMode ? '☀️' : '🌙'}
+              </button>
+
+              {/* Close Button */}
+              <button
+                onClick={() => setIsOpen(false)}
+                className="p-2 rounded hover:bg-white/20 transition-colors"
+                title="Close Chat"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-1 overflow-hidden">
+            {/* Sidebar - DMs List */}
+            <div className={`${selectedChat ? 'hidden md:flex' : 'flex'} w-full md:w-80 flex-col border-r ${darkMode ? 'border-gray-700' : 'border-gray-200'} flex-shrink-0`}>
+              {/* Tab Navigation */}
+              <div className={`flex border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'} flex-shrink-0`}>
+                {[
+                  { key: 'dms', label: 'DMs', icon: MessageCircle },
+                  { key: 'groups', label: 'Groups', icon: Users },
+                  { key: 'announcements', label: 'News', icon: Bell },
+                  { key: 'history', label: 'History', icon: History }
+                ].map(({ key, label, icon: Icon }) => (
                   <button
-                    onClick={() => setDarkMode(!darkMode)}
-                    className={`p-2 rounded ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'}`}
-                    title="Toggle dark mode"
+                    key={key}
+                    onClick={() => setActiveTab(key as TabType)}
+                    className={`flex-1 p-3 text-xs font-medium transition-colors flex flex-col items-center gap-1 ${activeTab === key
+                      ? darkMode ? 'bg-gray-800 text-blue-400' : 'bg-blue-50 text-blue-600'
+                      : darkMode ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'
+                      }`}
                   >
-                    {darkMode ? (
-                      <Sun className="w-4 h-4 text-yellow-400" />
-                    ) : (
-                      <Moon className="w-4 h-4 text-gray-700" />
-                    )}
+                    <Icon className="w-4 h-4" />
+                    <span>{label}</span>
                   </button>
-                  <button
-                    onClick={() => setIsFullscreen(!isFullscreen)}
-                    className={`p-2 rounded ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'}`}
-                    title={isFullscreen ? 'Exit fullscreen (ESC)' : 'Enter fullscreen'}
-                  >
-                    {isFullscreen ? (
-                      <Minimize2 className="w-4 h-4" />
-                    ) : (
-                      <Maximize2 className="w-4 h-4" />
-                    )}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setIsOpen(false);
-                      setSelectedChat(null);
-                      setIsFullscreen(false);
-                    }}
-                    className={`p-2 rounded ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'}`}
-                    title="Close chat"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
+                ))}
               </div>
 
-              {!selectedChat ? (
-                <>
-                  {/* Tabs */}
-                  <div className={`flex border-b ${borderColor} overflow-x-auto`}>
-                    {(['dms', 'groups', 'announcements', 'history'] as const).map(tab => (
-                      <button
-                        key={tab}
-                        onClick={() => {
-                          setActiveTab(tab);
-                          setSearchQuery('');
-                        }}
-                        className={`flex-1 py-2 text-sm font-medium capitalize transition-colors ${activeTab === tab
-                            ? darkMode
-                              ? 'border-b-2 border-purple-500 text-purple-400'
-                              : 'border-b-2 border-purple-600 text-purple-600'
-                            : darkMode
-                              ? 'text-gray-400'
-                              : 'text-gray-600'
-                          }`}
-                      >
-                        {tab.replace('announcements', 'news')}
-                      </button>
-                    ))}
-                  </div>
+              {/* Search Bar */}
+              <div className="p-4 flex-shrink-0">
+                <div className="relative mb-2">
+                  <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+                  <input
+                    type="text"
+                    placeholder="Search users..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className={`w-full pl-10 pr-4 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${darkMode
+                      ? 'bg-gray-800 border-gray-600 text-white placeholder-gray-400'
+                      : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500'
+                      }`}
+                  />
+                </div>
 
-                  {/* Search */}
-                  <div className={`p-3 border-b ${borderColor}`}>
-                    <div className={`flex items-center space-x-2 ${inputBg} rounded-lg px-3 py-2`}>
-                      <Search className="w-4 h-4 text-gray-400" />
-                      <input
-                        type="text"
-                        placeholder="Search..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className={`flex-1 outline-none text-sm ${inputBg} ${textColor} placeholder-gray-500`}
-                      />
-                    </div>
-                  </div>
+                {/* Debug: Refresh Users Button */}
+                <button
+                  onClick={() => {
+                    console.log('🔄 Manual refresh users clicked');
+                    loadUsers();
+                  }}
+                  className="w-full px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                >
+                  Refresh Users (Debug)
+                </button>
+              </div>
 
-                  {/* Chat List */}
-                  <div className="flex-1 overflow-y-auto">
-                    {isLoading ? (
-                      <div className="flex items-center justify-center h-full">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-500"></div>
-                      </div>
-                    ) : filteredChats.length > 0 ? (
-                      <div>
-                        {filteredChats.map(chat => (
-                          <div
-                            key={chat.id}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              if (!isDragging) {
-                                setSelectedChat(chat);
-                              }
-                            }}
-                            className={`w-full p-3 border-b ${borderColor} hover:${darkMode ? 'bg-gray-800' : 'bg-gray-50'} transition-colors text-left flex items-center space-x-3 cursor-pointer`}
-                          >
-                            <div className="relative">
-                              <img
-                                src={chat.avatar}
-                                alt={chat.fullName || chat.name}
-                                className="w-12 h-12 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600"
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement;
-                                  target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(chat.fullName || chat.name)}&background=random&color=fff`;
-                                }}
-                              />
-                              {/* Online status indicator */}
-                              <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></div>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex justify-between items-start">
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-semibold text-sm truncate">{chat.fullName || chat.name}</p>
-                                  <div className="flex items-center gap-2 mt-1">
-                                    {chat.role && (
-                                      <span className={getRoleBadgeClass(chat.role)}>
-                                        {chat.role.toUpperCase()}
-                                      </span>
-                                    )}
-                                    {activeTab === 'dms' && (
-                                      <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} truncate`}>
-                                        {chat.email}
-                                      </p>
-                                    )}
-                                  </div>
-                                  {chat.lastMessage && (
-                                    <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} truncate mt-1`}>
-                                      {chat.lastMessage}
-                                    </p>
-                                  )}
-                                </div>
-                                {chat.unreadCount > 0 && (
-                                  <span className="ml-2 bg-red-500 text-white text-xs font-bold rounded-full px-2 py-1 min-w-[20px] text-center">
-                                    {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className={`flex flex-col items-center justify-center h-full ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                        <p className="text-center px-4">
-                          {activeTab === 'dms' ? 'Select a user to start chatting' :
-                            activeTab === 'groups' ? 'No groups yet. Create one to get started.' :
-                              activeTab === 'announcements' ? 'No announcements available.' :
-                                'No chat history available.'}
-                        </p>
-                        {activeTab === 'groups' && (
-                          <button
-                            onClick={() => {
-                              const groupName = prompt('Group Name:');
-                              if (groupName) {
-                                const description = prompt('Group Description (optional):');
-                                createGroup(groupName, description || undefined);
-                              }
-                            }}
-                            className="mt-3 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-                          >
-                            <span className="text-lg">+</span>
-                            Create Group
-                          </button>
-                        )}
-                        {activeTab === 'announcements' && ['super-admin', 'admin', 'hr'].includes(currentUser?.role) && (
-                          <button
-                            onClick={() => {
-                              const title = prompt('Announcement Title:');
-                              if (title) {
-                                const content = prompt('Announcement Content:');
-                                if (content) {
-                                  createAnnouncement(title, content);
-                                }
-                              }
-                            }}
-                            className="mt-3 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-                          >
-                            <span className="text-lg">📢</span>
-                            Create Announcement
-                          </button>
-                        )}
-                      </div>
+              {/* User/Chat List */}
+              <div className="flex-1 overflow-y-auto">
+                {isLoading ? (
+                  <div className={`p-6 text-center ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                    <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"></div>
+                    <p className="text-sm">Loading users...</p>
+                  </div>
+                ) : displayItems.length === 0 ? (
+                  <div className={`p-6 text-center ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                    <MessageCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">
+                      {activeTab === 'dms' ? 'No users available' : 'No chats found'}
+                    </p>
+                    {chatError && (
+                      <p className="text-xs mt-2 text-red-500">
+                        Error: {chatError}
+                      </p>
                     )}
                   </div>
-                </>
-              ) : (
-                <>
-                  {/* Back Button & Chat Header */}
-                  <div className={`${darkMode ? 'bg-gray-800' : 'bg-gray-100'} p-3 border-b ${borderColor} flex items-center`}>
+                ) : (
+                  displayItems.map((item) => (
+                    <div
+                      key={item.id}
+                      onClick={() => handleChatSelect(item)}
+                      className={`p-4 border-b cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${selectedChat?.id === item.id
+                        ? darkMode ? 'bg-gray-800' : 'bg-blue-50'
+                        : darkMode ? 'border-gray-700' : 'border-gray-100'
+                        }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        {/* Circular Avatar (40px) */}
+                        <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium text-sm flex-shrink-0">
+                          {item.name ? item.name.charAt(0).toUpperCase() : 'U'}
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-1">
+                            <h4 className="font-bold text-sm truncate">{item.name}</h4>
+                            <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                              {item.lastMessageTime}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <p className={`text-sm truncate ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                {item.lastMessage}
+                              </p>
+                              {/* Role Badge for non-employees */}
+                              {item.userData?.role && item.userData.role !== 'employee' && (
+                                <span className={`text-xs px-2 py-0.5 rounded-full ${getRoleBadgeColor(item.userData.role)}`}>
+                                  {item.userData.role}
+                                </span>
+                              )}
+                            </div>
+
+                            {item.unreadCount > 0 && (
+                              <div className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full ml-2">
+                                {item.unreadCount > 99 ? '99+' : item.unreadCount}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Chat Messages Area */}
+            {selectedChat && (
+              <div className="flex-1 flex flex-col">
+                {/* Chat Header */}
+                <div className={`p-4 border-b flex items-center justify-between ${darkMode ? 'border-gray-700' : 'border-gray-200'} flex-shrink-0`}>
+                  <div className="flex items-center gap-3">
                     <button
                       onClick={() => setSelectedChat(null)}
-                      className={`mr-3 p-1 rounded ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'}`}
+                      className={`p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors md:hidden`}
                     >
-                      ←
+                      <ArrowLeft className="w-5 h-5" />
                     </button>
-                    <img src={selectedChat.avatar || '/default-avatar.png'} alt={selectedChat.fullName || selectedChat.name} className="w-8 h-8 rounded-full mr-2" />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold truncate">{selectedChat.fullName || selectedChat.name}</p>
-                      {selectedChat.role && selectedChat.role.toLowerCase() !== 'employee' && (
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${getRoleBadgeClass(selectedChat.role)}`}>{selectedChat.role}</span>
-                      )}
+
+                    {/* Avatar */}
+                    <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium text-sm">
+                      {selectedChat.userData?.name?.charAt(0).toUpperCase() || selectedChat.name?.charAt(0).toUpperCase() || 'U'}
+                    </div>
+
+                    <div>
+                      <h3 className="font-medium text-gray-900 dark:text-white">
+                        {selectedChat.userData?.name || selectedChat.name || 'Chat'}
+                      </h3>
+                      <div className="flex items-center gap-2">
+                        {selectedChat.userData?.role && (
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${getRoleBadgeColor(selectedChat.userData.role)}`}>
+                            {selectedChat.userData.role}
+                          </span>
+                        )}
+                        <span className="text-sm text-gray-500 dark:text-gray-400">Online</span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Messages */}
-                  <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                    {isLoading ? (
-                      <div className="flex items-center justify-center h-full">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-500"></div>
-                      </div>
-                    ) : messages.length > 0 ? (
-                      messages.map(msg => (
-                        <div
-                          key={msg.id}
-                          className={`flex flex-col ${msg.sender_id === (currentUser?.id || currentUser?._id) ? 'items-end' : 'items-start'}`}
-                        >
-                          <div
-                            className={`max-w-xs px-3 py-2 rounded-lg text-sm ${msg.sender_id === (currentUser?.id || currentUser?._id)
-                                ? 'bg-green-500 text-white rounded-br-none'
-                                : `${darkMode ? 'bg-gray-700' : 'bg-gray-200'} rounded-bl-none`
-                              }`}
-                          >
-                            {msg.message}
-                          </div>
-                          <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} mt-1`}>{new Date(msg.timestamp).toLocaleTimeString()}</p>
-                        </div>
-                      ))
-                    ) : (
-                      <div className={`flex flex-col items-center justify-center h-full ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                        <p>No messages yet. Start a conversation.</p>
-                      </div>
-                    )}
-                    {typingUsers.length > 0 && (
-                      <div className="text-xs text-gray-500">
-                        {typingUsers.join(', ')} {typingUsers.length > 1 ? 'are' : 'is'} typing...
-                      </div>
-                    )}
-                  </div>
+                  <button className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors`}>
+                    <Settings className="w-4 h-4" />
+                  </button>
+                </div>
 
-                  {/* Input */}
-                  <div className={`border-t ${borderColor} p-3 flex gap-2`}>
+                {/* Messages */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                  {selectedChat?.loading ? (
+                    <div className="text-center text-gray-500 dark:text-gray-400 mt-8">
+                      <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"></div>
+                      <p>Loading messages...</p>
+                    </div>
+                  ) : !selectedChat || !messages[selectedChat.id] || messages[selectedChat.id].length === 0 ? (
+                    <div className="text-center text-gray-500 dark:text-gray-400 mt-8">
+                      <MessageCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p>No messages yet. Start the conversation!</p>
+                      <button className="mt-2 p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors">
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    messages[selectedChat.id]?.map((message) => {
+                      const isMyMessage = message.senderId === getCurrentUserId();
+                      return (
+                        <div key={message.id} className={`flex ${isMyMessage ? 'justify-end' : 'justify-start'} mb-4`}>
+                          <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${isMyMessage
+                            ? 'bg-blue-500 text-white rounded-br-sm'
+                            : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded-bl-sm'
+                            }`}>
+                            {!isMyMessage && (
+                              <p className="text-xs font-medium mb-1 opacity-70">
+                                {message.senderName || 'Unknown User'}
+                              </p>
+                            )}
+                            <p className="text-sm">{message.content}</p>
+                            <p className="text-xs mt-1 opacity-70">
+                              {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+
+                {/* Message Input */}
+                <div className={`p-4 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'} flex-shrink-0`}>
+                  <div className="flex items-center gap-2">
                     <input
+                      ref={inputRef}
                       type="text"
-                      value={messageText}
-                      onChange={(e) => {
-                        setMessageText(e.target.value);
-                        setIsTyping(true);
+                      value={messageInput}
+                      onChange={(e) => setMessageInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSendMessage();
+                        }
                       }}
-                      onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
                       placeholder="Type a message..."
-                      className={`flex-1 px-3 py-2 rounded-full text-sm outline-none ${inputBg} ${textColor} placeholder-gray-500`}
+                      className={`flex-1 px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 ${darkMode
+                        ? 'bg-gray-800 border-gray-600 text-white placeholder-gray-400'
+                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                        }`}
                     />
                     <button
                       onClick={handleSendMessage}
-                      disabled={!messageText.trim()}
-                      className="p-2 rounded-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-500 text-white transition-colors"
+                      disabled={!messageInput.trim()}
+                      className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                       <Send className="w-4 h-4" />
                     </button>
                   </div>
-                </>
-              )}
-            </div>
-          )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      </Draggable>
+      </div>
     </>
   );
+}
+
+// Helper function to get current user ID
+function getCurrentUserId(): string {
+  try {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      const user = JSON.parse(storedUser);
+      return user.id || '';
+    }
+  } catch (error) {
+    console.error('Failed to get current user ID:', error);
+  }
+  return '';
 }

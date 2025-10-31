@@ -160,7 +160,7 @@ export const useRealtimeChat = (chatId: string | null): UseRealtimeChatReturn =>
     return () => {
       unsubscribeFromChat();
     };
-  }, [chatId, subscribeToChat, unsubscribeFromChat]);
+  }, [chatId]); // Only depend on chatId, not the callback functions
 
   // Cleanup timeouts on unmount
   useEffect(() => {

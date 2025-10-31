@@ -1,23 +1,58 @@
 import supabaseConfig from '../config/supabase';
 import logger from '../utils/logger';
-import { IChatMessage, IChatUnreadCount } from '../models/SupabaseChatMessage';
 import { SupabaseClient } from '@supabase/supabase-js';
+import { 
+  ChatMessage, 
+  ChatUnreadCount, 
+  CreateChatMessageInput,
+  UpdateMessageStatusInput,
+  ChatModelTransformer
+} from '../models/ChatModels';
+import { getSchemaValidator, validateSchema } from '../utils/schemaValidator';
+import { monitorPerformance, getPerformanceMonitor } from '../utils/performanceMonitor';
 
 export class ChatService {
   private supabase: SupabaseClient;
+  private schemaValidator: any;
+  private performanceMonitor: any;
 
   constructor() {
     this.supabase = supabaseConfig.getClient();
+    this.schemaValidator = getSchemaValidator(this.supabase);
+    this.performanceMonitor = getPerformanceMonitor();
+    
+    // Validate schemas on initialization
+    this.validateSchemas();
   }
 
   /**
-   * Send a message in a chat
+   * Lightweight schema validation - just log that service is ready
    */
+  private async validateSchemas(): Promise<void> {
+    try {
+      // Quick validation without heavy queries
+      const validation = await this.schemaValidator.validateAllChatSchemas();
+      
+      if (validation.overallValid) {
+        logger.info('✅ Chat service ready - tables accessible');
+      } else {
+        logger.warn('⚠️ Chat tables may not be ready, but service will continue');
+      }
+    } catch (error) {
+      logger.warn('Schema validation skipped:', (error as Error).message);
+      // Don't throw - let service start anyway
+    }
+  }
+
+  /**
+   * Send a message in a chat - Performance monitored
+   */
+  @monitorPerformance('ChatService', 'sendMessage')
   async sendMessage(
     chatId: string,
     senderId: string,
     message: string
-  ): Promise<IChatMessage> {
+  ): Promise<ChatMessage> {
     try {
       logger.info('ChatService: Sending message', { chatId, senderId, messageLength: message.length });
 
@@ -35,6 +70,27 @@ export class ChatService {
       if (error) {
         logger.error('ChatService: Failed to send message', { error: error.message });
         throw error;
+      }
+
+      // Extract recipient ID from DM chat ID format: dm_userId1_userId2
+      if (chatId.startsWith('dm_')) {
+        const userIds = chatId.replace('dm_', '').split('_');
+        const recipientId = userIds.find(id => id !== senderId);
+        
+        if (recipientId) {
+          try {
+            // Increment unread count for recipient
+            await this.incrementUnreadCount(recipientId, chatId);
+            logger.info('ChatService: Incremented unread count for recipient', { recipientId, chatId });
+          } catch (unreadError) {
+            logger.error('ChatService: Failed to increment unread count', { 
+              error: (unreadError as Error).message,
+              recipientId,
+              chatId 
+            });
+            // Don't fail the message send if unread count fails
+          }
+        }
       }
 
       logger.info('ChatService: Message sent successfully', { messageId: data.id });
@@ -106,7 +162,7 @@ export class ChatService {
   /**
    * Get or create unread count entry
    */
-  async getOrCreateUnreadCount(userId: string, chatId: string): Promise<IChatUnreadCount> {
+  async getOrCreateUnreadCount(userId: string, chatId: string): Promise<ChatUnreadCount> {
     try {
       const { data, error } = await this.supabase
         .from('chat_unread_count')
@@ -290,7 +346,7 @@ export class ChatService {
     userId: string,
     limit: number = 50,
     offset: number = 0
-  ): Promise<IChatMessage[]> {
+  ): Promise<ChatMessage[]> {
     try {
       logger.info('ChatService: Getting chat history', { chatId, limit, offset });
 
@@ -298,7 +354,7 @@ export class ChatService {
         .from('chat_messages')
         .select()
         .eq('chat_id', chatId)
-        .order('created_at', { ascending: false })
+        .order('timestamp', { ascending: true })
         .range(offset, offset + limit - 1);
 
       if (error) {
@@ -372,7 +428,7 @@ export class ChatService {
   async broadcastMessage(
     chatId: string,
     senderId: string,
-    message: IChatMessage
+    message: ChatMessage
   ): Promise<void> {
     try {
       logger.info('ChatService: Broadcasting message', { chatId, messageId: message.id });
@@ -425,69 +481,58 @@ export class ChatService {
 
   /**
    * Create or get a DM chat between two users
+   * Uses simple chat_id format: dm_userId1_userId2
    */
   async createOrGetDMChat(userId: string, recipientId: string): Promise<any> {
     try {
       logger.info('ChatService: Creating or getting DM chat', { userId, recipientId });
 
-      // Check if DM chat already exists between these users
-      const { data: existingChat, error: searchError } = await this.supabase
-        .from('chats')
-        .select(`
-          *,
-          chat_participants!inner(employee_id)
-        `)
-        .eq('type', 'dm')
-        .eq('chat_participants.employee_id', userId);
+      // Generate consistent chat ID (smaller ID first for consistency)
+      const sortedIds = [userId, recipientId].sort();
+      const chatId = `dm_${sortedIds[0]}_${sortedIds[1]}`;
+
+      // Check if messages already exist for this chat
+      const { data: existingMessages, error: searchError } = await this.supabase
+        .from('chat_messages')
+        .select('chat_id')
+        .eq('chat_id', chatId)
+        .limit(1);
 
       if (searchError) {
         logger.error('ChatService: Failed to search for existing DM', { error: searchError.message });
         throw searchError;
       }
 
-      // Find chat where both users are participants
-      const dmChat = existingChat?.find(chat => {
-        const participantIds = chat.chat_participants.map((p: any) => p.employee_id);
-        return participantIds.includes(recipientId) && participantIds.length === 2;
-      });
-
-      if (dmChat) {
-        logger.info('ChatService: Found existing DM chat', { chatId: dmChat.id });
-        return dmChat;
-      }
-
-      // Create new DM chat
-      const { data: newChat, error: createError } = await this.supabase
-        .from('chats')
-        .insert({
-          type: 'dm',
-          created_by: userId,
-          name: null, // DMs don't have names
-          description: null
-        })
-        .select()
+      // Get recipient info for chat name
+      const { data: recipientData, error: recipientError } = await this.supabase
+        .from('users')
+        .select('full_name, email')
+        .eq('id', recipientId)
         .single();
 
-      if (createError) {
-        logger.error('ChatService: Failed to create DM chat', { error: createError.message });
-        throw createError;
+      const recipientName = recipientData?.full_name || recipientData?.email || 'Unknown User';
+
+      const chatInfo = {
+        id: chatId,
+        name: recipientName,
+        type: 'dm',
+        created_by: userId,
+        created_at: new Date().toISOString(),
+        otherParticipantId: recipientId,
+        participants: [userId, recipientId]
+      };
+
+      if (existingMessages && existingMessages.length > 0) {
+        logger.info('ChatService: Found existing DM chat', { chatId });
+        return chatInfo;
       }
 
-      // Add both users as participants
-      const { error: participantsError } = await this.supabase
-        .from('chat_participants')
-        .insert([
-          { chat_id: newChat.id, employee_id: userId, role: 'member' },
-          { chat_id: newChat.id, employee_id: recipientId, role: 'member' }
-        ]);
+      // Create unread count entries for both users if they don't exist
+      await this.getOrCreateUnreadCount(userId, chatId);
+      await this.getOrCreateUnreadCount(recipientId, chatId);
 
-      if (participantsError) {
-        logger.error('ChatService: Failed to add DM participants', { error: participantsError.message });
-        throw participantsError;
-      }
-
-      logger.info('ChatService: Created new DM chat', { chatId: newChat.id });
-      return newChat;
+      logger.info('ChatService: DM chat ready', { chatId });
+      return chatInfo;
     } catch (error) {
       logger.error('ChatService: Create or get DM chat failed', { error: (error as Error).message });
       throw error;
@@ -549,53 +594,75 @@ export class ChatService {
   }
 
   /**
-   * Get user's chats (both DMs and groups)
+   * Get user's chats (both DMs and groups) - Simple schema version
    */
   async getUserChats(userId: string): Promise<any[]> {
     try {
       logger.info('ChatService: Getting user chats', { userId });
 
-      const { data: chats, error } = await this.supabase
-        .from('chats')
-        .select(`
-          *,
-          chat_participants!inner(employee_id, role, joined_at),
-          chat_messages(message, created_at, sender_id)
-        `)
-        .eq('chat_participants.employee_id', userId)
-        .is('chat_participants.left_at', null)
-        .order('last_message_at', { ascending: false });
+      // Get all chat_ids where user has sent or received messages
+      const { data: userMessages, error: messagesError } = await this.supabase
+        .from('chat_messages')
+        .select('chat_id, message, timestamp, sender_id')
+        .or(`sender_id.eq.${userId},chat_id.like.%${userId}%`)
+        .order('timestamp', { ascending: false });
 
-      if (error) {
-        logger.error('ChatService: Failed to get user chats', { error: error.message });
-        throw error;
+      if (messagesError) {
+        logger.error('ChatService: Failed to get user messages', { error: messagesError.message });
+        throw messagesError;
       }
 
-      // Process chats to add additional info
-      const processedChats = chats?.map(chat => {
-        // Get last message
-        const lastMessage = chat.chat_messages?.[0];
+      // Group messages by chat_id and get the latest message for each chat
+      const chatMap = new Map();
+      
+      userMessages?.forEach(message => {
+        const chatId = message.chat_id;
         
-        // For DMs, get the other participant's info
-        if (chat.type === 'dm') {
-          const otherParticipant = chat.chat_participants.find((p: any) => p.employee_id !== userId);
-          return {
-            ...chat,
-            lastMessage: lastMessage?.message || '',
-            lastMessageAt: lastMessage?.created_at || chat.created_at,
-            otherParticipantId: otherParticipant?.employee_id
-          };
+        // Only include DM chats that involve this user
+        if (chatId.startsWith('dm_') && chatId.includes(userId)) {
+          if (!chatMap.has(chatId) || new Date(message.timestamp) > new Date(chatMap.get(chatId).timestamp)) {
+            chatMap.set(chatId, message);
+          }
         }
+      });
 
-        return {
-          ...chat,
-          lastMessage: lastMessage?.message || '',
-          lastMessageAt: lastMessage?.created_at || chat.created_at
-        };
-      }) || [];
+      // Convert to chat objects with additional info
+      const chats = [];
+      
+      for (const [chatId, lastMessage] of chatMap.entries()) {
+        // Extract other participant ID from DM chat ID
+        const userIds = chatId.replace('dm_', '').split('_');
+        const otherUserId = userIds.find((id: string) => id !== userId);
+        
+        if (otherUserId) {
+          // Get other user's info
+          const { data: otherUser } = await this.supabase
+            .from('users')
+            .select('full_name, email')
+            .eq('id', otherUserId)
+            .single();
 
-      logger.info('ChatService: User chats retrieved', { chatCount: processedChats.length });
-      return processedChats;
+          // Get unread count
+          const unreadCount = await this.getChatUnreadCount(userId, chatId);
+
+          chats.push({
+            id: chatId,
+            name: otherUser?.full_name || otherUser?.email || 'Unknown User',
+            type: 'dm',
+            lastMessage: lastMessage.message,
+            lastMessageAt: lastMessage.timestamp,
+            unreadCount: unreadCount,
+            otherParticipantId: otherUserId,
+            participants: [userId, otherUserId]
+          });
+        }
+      }
+
+      // Sort by last message time
+      chats.sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime());
+
+      logger.info('ChatService: User chats retrieved', { chatCount: chats.length });
+      return chats;
     } catch (error) {
       logger.error('ChatService: Get user chats failed', { error: (error as Error).message });
       throw error;
