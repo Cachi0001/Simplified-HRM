@@ -79,18 +79,28 @@ export function useChat() {
   // Load users
   const loadUsers = useCallback(async () => {
     try {
-      console.log('🔄 Loading users for chat...');
-      
-      // Use the specific endpoint for chat users
-      const response = await api.get('/employees/for-chat');
-      
-      console.log('📡 API Response:', response.data);
+      setIsLoading(true);
+      setError(null);
+
+      // Try the specific endpoint for chat users first
+      let response;
+      try {
+        response = await api.get('/employees/for-chat');
+      } catch (chatEndpointError) {
+        console.warn('Chat endpoint failed, trying fallback:', chatEndpointError);
+        
+        // Fallback to general employees endpoint
+        try {
+          response = await api.get('/employees');
+        } catch (fallbackError) {
+          console.error('Both endpoints failed:', fallbackError);
+          throw fallbackError;
+        }
+      }
 
       if (response.data?.status === 'success') {
         const employees: any[] = response.data.data || [];
         
-        console.log('👥 Raw employees data:', employees);
-
         const formattedUsers = employees.map((emp: any) => ({
           id: emp.id,
           name: emp.fullName || emp.full_name || emp.name || emp.email || 'Unknown User',
@@ -100,18 +110,31 @@ export function useChat() {
           status: 'online' as const
         }));
 
-        console.log('✅ Formatted users:', formattedUsers);
         setUsers(formattedUsers);
         setError(null);
       } else {
-        console.log('❌ API response not successful:', response.data);
         setUsers([]);
         setError('No users found');
       }
     } catch (error) {
-      console.error('❌ Failed to load users:', error);
-      setError(`Failed to load users: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('Failed to load users:', error);
+      
+      // Provide more specific error messages
+      let errorMessage = 'Failed to load users';
+      if (error instanceof Error) {
+        if (error.message.includes('Network Error') || error.message.includes('internet connection')) {
+          errorMessage = 'Cannot connect to server. Please check if the backend server is running on port 3000.';
+        } else if (error.message.includes('timeout')) {
+          errorMessage = 'Server request timed out. Please try again.';
+        } else {
+          errorMessage = `Failed to load users: ${error.message}`;
+        }
+      }
+      
+      setError(errorMessage);
       setUsers([]);
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
@@ -123,17 +146,31 @@ export function useChat() {
         const responseData = response.data.data as { messages?: any[] };
         if (responseData.messages && Array.isArray(responseData.messages)) {
           const currentUserId = getCurrentUserId();
-          const formattedMessages: ChatMessage[] = responseData.messages.map((msg: any) => ({
-            id: msg.id,
-            chatId: msg.chat_id,
-            senderId: msg.sender_id,
-            senderName: msg.senderName || 'User',
-            senderAvatar: msg.senderAvatar,
-            content: msg.message,
-            timestamp: msg.timestamp,
-            isOwn: msg.sender_id === currentUserId,
-            status: getMessageStatus(msg) as 'sending' | 'sent' | 'delivered' | 'read'
-          }));
+          const formattedMessages: ChatMessage[] = responseData.messages.map((msg: any) => {
+            // Try multiple fields for sender name
+            const senderName = msg.senderName || msg.sender_name || msg.full_name || msg.name || msg.email || 'Unknown User';
+            
+            // Debug logging only in development
+            if (process.env.NODE_ENV === 'development') {
+              console.log('Message formatting:', {
+                msgId: msg.id,
+                senderId: msg.sender_id,
+                senderName: senderName
+              });
+            }
+            
+            return {
+              id: msg.id,
+              chatId: msg.chat_id,
+              senderId: msg.sender_id,
+              senderName: senderName,
+              senderAvatar: msg.senderAvatar || msg.sender_avatar || msg.avatar,
+              content: msg.message,
+              timestamp: msg.timestamp,
+              isOwn: msg.sender_id === currentUserId,
+              status: getMessageStatus(msg) as 'sending' | 'sent' | 'delivered' | 'read'
+            };
+          });
 
           setMessages(prev => ({
             ...prev,

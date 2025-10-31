@@ -12,6 +12,13 @@ export interface ChatMessage {
   senderName?: string;
   senderAvatar?: string;
   updated_at?: string | null;
+
+  // Support for useChat hook format (for compatibility)
+  chatId?: string;
+  senderId?: string;
+  content?: string;
+  isOwn?: boolean;
+  status?: 'sending' | 'sent' | 'delivered' | 'read';
 }
 
 export interface GroupChat {
