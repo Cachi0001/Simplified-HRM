@@ -6,16 +6,11 @@ const result = dotenv.config({ path: path.resolve(__dirname, '../.env') });
 if (result.error) {
   console.error('❌ Failed to load .env file:', result.error);
 } else {
-  console.log('✅ .env file loaded successfully');
-  console.log('🔍 Environment variables:', {
-    NODE_ENV: process.env.NODE_ENV,
-    SUPABASE_URL: process.env.SUPABASE_URL ? 'SET' : 'NOT SET',
-    PORT: process.env.PORT
-  });
+  // .env file loaded successfully (reduced logging)
 }
 
 if (process.env.NODE_ENV !== 'production') {
-  console.log('🔄 Loading .env file for development...');
+  // Loading .env file for development (reduced logging)
   dotenv.config({ path: path.resolve(__dirname, '../.env') });
 }
 
@@ -23,6 +18,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 
 import express, { Request, Response, NextFunction } from 'express';
+import { createServer } from 'http';
 import helmet from 'helmet';
 import jwt from 'jsonwebtoken';
 import logger from './utils/logger';
@@ -47,6 +43,7 @@ import jobsRoutes from './routes/jobs.routes';
 import CheckoutMonitoringService from './services/CheckoutMonitoringService';
 import JobScheduler from './services/JobScheduler';
 import supabaseConfig from './config/supabase';
+import { initializeWebSocketService } from './services/WebSocketService';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -58,45 +55,27 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   const origin = req.headers.origin || 'No origin';
   const forwardedFor = req.headers['x-forwarded-for'] || 'Not set';
   const userAgent = req.headers['user-agent'] || 'Not set';
-  console.log('Incoming request', {
-    requestId,
-    method: req.method,
-    url: req.originalUrl,
-    origin,
-    host: req.headers.host || 'No host',
-    ip: req.ip,
-    forwardedFor,
-    userAgent
-  });
-  logger.info('Incoming request', {
-    requestId,
-    method: req.method,
-    url: req.originalUrl,
-    origin,
-    host: req.headers.host || 'No host',
-    ip: req.ip,
-    forwardedFor,
-    userAgent
-  });
+  // Only log chat-related requests
+  if (req.originalUrl.includes('/chat') || req.originalUrl.includes('/message')) {
+    logger.info('Chat request', {
+      requestId,
+      method: req.method,
+      url: req.originalUrl
+    });
+  }
+  
   res.on('finish', () => {
-    const duration = Date.now() - startTime;
-    const contentLength = res.getHeader('content-length') || 'Not set';
-    console.log('Request completed', {
-      requestId,
-      method: req.method,
-      url: req.originalUrl,
-      status: res.statusCode,
-      duration,
-      contentLength
-    });
-    logger.info('Request completed', {
-      requestId,
-      method: req.method,
-      url: req.originalUrl,
-      status: res.statusCode,
-      duration,
-      contentLength
-    });
+    // Only log chat-related request completions
+    if (req.originalUrl.includes('/chat') || req.originalUrl.includes('/message')) {
+      const duration = Date.now() - startTime;
+      logger.info('Chat request completed', {
+        requestId,
+        method: req.method,
+        url: req.originalUrl,
+        status: res.statusCode,
+        duration
+      });
+    }
   });
   next();
 });
@@ -105,7 +84,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 async function initializeDatabase() {
   try {
     await supabaseConfig.connect();
-    console.log('✅ Supabase connected successfully');
+    // Supabase connected successfully (reduced logging)
     logger.info('✅ Supabase connected successfully');
   } catch (error) {
     console.error('❌ Supabase connection failed:', error);
@@ -154,11 +133,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     res.header('Vary', 'Origin');
   } else {
     // Log rejected origins for debugging
-    console.log('❌ CORS: Rejected origin', {
-      origin,
-      allowedOrigins,
-      timestamp: new Date().toISOString()
-    });
+    // CORS: Rejected origin (reduced logging)
     logger.warn('❌ CORS: Rejected origin', {
       origin,
       allowedOrigins,
@@ -174,14 +149,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
   // Handle preflight requests - must come before any other middleware
   if (req.method === 'OPTIONS') {
-    console.log('🔄 CORS: Handling preflight request', {
-      origin,
-      method: req.headers['access-control-request-method'],
-      headers: req.headers['access-control-request-headers'],
-      url: req.originalUrl,
-      timestamp: new Date().toISOString(),
-      userAgent: req.headers['user-agent']
-    });
+    // CORS: Handling preflight request (reduced logging)
     logger.info('🔄 CORS: Handling preflight request', {
       origin,
       method: req.headers['access-control-request-method'],
@@ -258,13 +226,40 @@ app.get('/api/debug/user', async (req: Request, res: Response) => {
   }
 });
 
+// WebSocket health check endpoint
+app.get('/api/websocket/health', async (req: Request, res: Response) => {
+  try {
+    const { getWebSocketService } = await import('./services/WebSocketService');
+    const webSocketService = getWebSocketService();
+    
+    if (webSocketService) {
+      const health = webSocketService.getHealthStatus();
+      res.status(200).json({
+        status: 'ok',
+        message: 'WebSocket service is running',
+        timestamp: new Date().toISOString(),
+        websocket: health
+      });
+    } else {
+      res.status(503).json({
+        status: 'error',
+        message: 'WebSocket service not initialized',
+        timestamp: new Date().toISOString()
+      });
+    }
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to check WebSocket health',
+      error: error instanceof Error ? error.message : String(error),
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Health check endpoint
 app.get('/api/health', async (req: Request, res: Response) => {
-  console.log('Health check requested', {
-    ip: req.ip,
-    userAgent: req.headers['user-agent'],
-    origin: req.headers.origin || 'No origin'
-  });
+  // Health check requested (reduced logging)
   logger.info('Health check requested', {
     ip: req.ip,
     userAgent: req.headers['user-agent'],
@@ -312,13 +307,7 @@ app.get('/api/cors-test', (req: Request, res: Response) => {
   const userAgent = req.headers['user-agent'] || 'No user-agent';
   const host = req.headers.host || 'No host';
 
-  console.log('CORS test requested', {
-    ip: req.ip,
-    origin,
-    referer,
-    userAgent,
-    host
-  });
+  // CORS test requested (reduced logging)
   logger.info('CORS test requested', {
     ip: req.ip,
     origin,
@@ -343,8 +332,7 @@ app.get('/api/cors-test', (req: Request, res: Response) => {
   delete headers.authorization;
   delete headers.cookie;
 
-  console.log('CORS configuration', { corsConfig });
-  console.log('Request headers', { headers });
+  // CORS configuration (reduced logging)
 
   logger.debug('CORS configuration', { corsConfig });
   logger.debug('Request headers', { headers });
@@ -372,10 +360,7 @@ app.get('/api/cors-test', (req: Request, res: Response) => {
 
 // Add a simple preflight test endpoint
 app.options('/api/preflight-test', (req: Request, res: Response) => {
-  console.log('Preflight test requested', {
-    origin: req.headers.origin || 'No origin',
-    method: req.method
-  });
+  // Preflight test requested (reduced logging)
   logger.info('Preflight test requested', {
     origin: req.headers.origin || 'No origin',
     method: req.method
@@ -387,10 +372,7 @@ app.options('/api/preflight-test', (req: Request, res: Response) => {
 app.get('/api/preflight-test', (req: Request, res: Response) => {
   const origin = req.headers.origin || 'No origin';
 
-  console.log('Preflight test GET requested', {
-    origin,
-    method: req.method
-  });
+  // Preflight test GET requested (reduced logging)
   logger.info('Preflight test GET requested', {
     origin,
     method: req.method
@@ -405,11 +387,7 @@ app.get('/api/preflight-test', (req: Request, res: Response) => {
 
 // Specific test for password reset CORS
 app.options('/api/auth/reset-password/:token', (req: Request, res: Response) => {
-  console.log('🔑 Password reset preflight requested', {
-    origin: req.headers.origin || 'No origin',
-    token: req.params.token ? 'PRESENT' : 'MISSING',
-    method: req.method
-  });
+  // Password reset preflight requested (reduced logging)
   logger.info('🔑 Password reset preflight requested', {
     origin: req.headers.origin || 'No origin',
     token: req.params.token ? 'PRESENT' : 'MISSING',
@@ -486,16 +464,23 @@ if (require.main === module) {
     JobScheduler;
     logger.info('✅ Job scheduler initialized with all CRON jobs');
     
-    app.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT}`);
-      console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`Deployment: ${process.env.VERCEL ? 'Vercel' : 'Local'}`);
-      console.log(`Health check available at http://localhost:${PORT}/api/health`);
+    // Create HTTP server
+    const server = createServer(app);
+    
+    // Initialize WebSocket service
+    const webSocketService = initializeWebSocketService(server);
+    logger.info('✅ WebSocket service initialized with Redis');
+    
+    server.listen(PORT, () => {
+      console.log(`💬 Chat server running on port ${PORT}`);
+      console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`🔌 WebSocket ready for real-time chat`);
 
       logger.info(`Server is running on port ${PORT}`);
       logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
       logger.info(`Deployment: ${process.env.VERCEL ? 'Vercel' : 'Local'}`);
       logger.info(`Health check available at http://localhost:${PORT}/api/health`);
+      logger.info(`WebSocket server ready for real-time chat`);
     });
   })();
 }

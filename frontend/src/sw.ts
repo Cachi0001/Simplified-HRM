@@ -57,16 +57,17 @@ self.addEventListener('push', (event: PushEvent) => {
       tag: `notification-${data.notificationId || Date.now()}`, // Prevents duplicates
       requireInteraction: false,
       silent: false,
-      actions: [
-        {
-          action: 'open',
-          title: 'View',
-        },
-        {
-          action: 'close',
-          title: 'Close',
-        },
-      ],
+      // Note: actions property may not be supported in all browsers
+      // actions: [
+      //   {
+      //     action: 'open',
+      //     title: 'View',
+      //   },
+      //   {
+      //     action: 'close',
+      //     title: 'Close',
+      //   },
+      // ],
       data: {
         type: data.type,
         action_url: data.action_url || data.actionUrl,
@@ -136,7 +137,7 @@ self.addEventListener(
 
             // Check if app is already open
             for (const client of clients) {
-              if (client.url === new URL(actionUrl, self.location).href) {
+              if (client.url === new URL(actionUrl, self.location.origin).href) {
                 targetClient = client;
                 break;
               }
@@ -388,4 +389,4 @@ self.addEventListener('install', (event: ExtendableEvent) => {
   self.skipWaiting();
 });
 
-export {}; // Ensure this is treated as a module
+export { }; // Ensure this is treated as a module

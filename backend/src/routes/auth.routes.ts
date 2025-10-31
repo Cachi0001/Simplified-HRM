@@ -29,14 +29,12 @@ router.post('/reset-password/:token', (req, res) => authController.resetPassword
 
 // Handle OPTIONS requests for password reset routes
 router.options('/forgot-password', (req, res) => {
-  console.log('🔑 Password reset forgot-password OPTIONS request');
+  // Password reset forgot-password OPTIONS request (reduced logging)
   res.status(200).end();
 });
 
 router.options('/reset-password/:token', (req, res) => {
-  console.log('🔑 Password reset with token OPTIONS request', {
-    token: req.params.token ? 'PRESENT' : 'MISSING'
-  });
+  // Password reset with token OPTIONS request (reduced logging)
   res.status(200).end();
 });
 router.put('/update-password', (req, res) => authController.updatePassword(req, res));

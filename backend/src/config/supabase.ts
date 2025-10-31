@@ -40,12 +40,7 @@ export class SupabaseConfig {
       logger.info('✅ Supabase connected successfully');
 
       // Log environment variables
-      console.log('🔍 Supabase Environment Variables:', {
-        hasSupabaseUrl: !!process.env.SUPABASE_URL,
-        hasServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-        supabaseUrlLength: process.env.SUPABASE_URL?.length || 0,
-        nodeEnv: process.env.NODE_ENV
-      });
+      // Supabase Environment Variables checked (reduced logging)
 
     } catch (error) {
       logger.error('❌ Failed to connect to Supabase:', {

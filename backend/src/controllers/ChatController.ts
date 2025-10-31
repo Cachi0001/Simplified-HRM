@@ -1,12 +1,13 @@
 import { Request, Response } from 'express';
 import { ChatService } from '../services/ChatService';
 import { getTypingService } from '../services/TypingService';
+import { getWebSocketService } from '../services/WebSocketService';
 import logger from '../utils/logger';
 
 export class ChatController {
   private typingService = getTypingService();
-  
-  constructor(private chatService: ChatService) {}
+
+  constructor(private chatService: ChatService) { }
 
   async sendMessage(req: Request, res: Response): Promise<void> {
     try {
@@ -28,6 +29,26 @@ export class ChatController {
       });
 
       const sentMessage = await this.chatService.sendMessage(chatId, userId, message);
+
+      // Broadcast via WebSocket if service is available
+      const webSocketService = getWebSocketService();
+      if (webSocketService) {
+        try {
+          await webSocketService.broadcastMessageFromAPI({
+            id: sentMessage.id,
+            chatId: sentMessage.chat_id,
+            senderId: sentMessage.sender_id,
+            senderName: req.user?.full_name || 'Unknown User',
+            senderEmail: req.user?.email,
+            senderRole: req.user?.role,
+            message: sentMessage.message,
+            timestamp: sentMessage.timestamp
+          });
+          logger.info('📢 Message broadcasted via WebSocket:', { messageId: sentMessage.id });
+        } catch (wsError) {
+          logger.warn('⚠️ WebSocket broadcast failed, message still saved:', wsError);
+        }
+      }
 
       res.status(201).json({
         status: 'success',
@@ -100,6 +121,17 @@ export class ChatController {
       });
 
       await this.chatService.markChatAsRead(chatId, userId);
+
+      // Broadcast read receipt via WebSocket if service is available
+      const webSocketService = getWebSocketService();
+      if (webSocketService) {
+        try {
+          await webSocketService.broadcastReadReceiptFromAPI(chatId, userId);
+          logger.info('📢 Read receipt broadcasted via WebSocket:', { chatId, userId });
+        } catch (wsError) {
+          logger.warn('⚠️ WebSocket read receipt broadcast failed:', wsError);
+        }
+      }
 
       res.status(200).json({
         status: 'success',
@@ -463,7 +495,7 @@ export class ChatController {
 
       res.status(200).json({
         status: 'success',
-        data: { 
+        data: {
           typingUsers,
           count: typingUsers.length,
           userIds: typingUserIds
@@ -717,7 +749,7 @@ export class ChatController {
 
       logger.info('👥 [ChatController] Get groups', { userId });
       const groups = await this.chatService.getUserGroups(userId);
-      
+
       res.status(200).json({
         status: 'success',
         data: groups,
@@ -750,7 +782,7 @@ export class ChatController {
 
       logger.info('👥 [ChatController] Create group', { name, userId });
       const group = await this.chatService.createGroup(userId, name, description, is_private);
-      
+
       res.status(201).json({
         status: 'success',
         message: 'Group created successfully',
@@ -783,7 +815,7 @@ export class ChatController {
 
       logger.info('👥 [ChatController] Get group', { groupId, userId });
       const group = await this.chatService.getGroup(groupId, userId);
-      
+
       res.status(200).json({
         status: 'success',
         data: group
@@ -816,7 +848,7 @@ export class ChatController {
 
       logger.info('👥 [ChatController] Update group', { groupId, userId });
       const group = await this.chatService.updateGroup(groupId, userId, { name, description, is_private });
-      
+
       res.status(200).json({
         status: 'success',
         message: 'Group updated successfully',
@@ -849,7 +881,7 @@ export class ChatController {
 
       logger.info('👥 [ChatController] Delete group', { groupId, userId });
       await this.chatService.deleteGroup(groupId, userId);
-      
+
       res.status(200).json({
         status: 'success',
         message: 'Group deleted successfully'
@@ -882,7 +914,7 @@ export class ChatController {
 
       logger.info('👥 [ChatController] Add group member', { groupId, employeeId, userId });
       const member = await this.chatService.addGroupMember(groupId, userId, employeeId, role);
-      
+
       res.status(201).json({
         status: 'success',
         message: 'Member added successfully',
@@ -916,7 +948,7 @@ export class ChatController {
 
       logger.info('👥 [ChatController] Remove group member', { groupId, memberId, userId });
       await this.chatService.removeGroupMember(groupId, userId, memberId);
-      
+
       res.status(200).json({
         status: 'success',
         message: 'Member removed successfully'
@@ -949,7 +981,7 @@ export class ChatController {
 
       logger.info('👥 [ChatController] Get group members', { groupId, userId });
       const members = await this.chatService.getGroupMembers(groupId, userId);
-      
+
       res.status(200).json({
         status: 'success',
         data: members
@@ -979,7 +1011,7 @@ export class ChatController {
 
       logger.info('📜 [ChatController] Get chat history for user', { userId });
       const history = await this.chatService.getChatHistoryForUser(userId);
-      
+
       res.status(200).json({
         status: 'success',
         data: history

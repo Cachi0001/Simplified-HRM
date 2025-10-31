@@ -285,9 +285,9 @@ export class SupabaseEmployeeRepository {
     try {
       const { data, error } = await this.supabase
         .from('employees')
-        .select('id, email, full_name, role, department, profile_picture')
+        .select('id, user_id, email, full_name, role, department, profile_picture')
         .eq('status', 'active')
-        .neq('id', currentUserId)
+        .neq('user_id', currentUserId)
         .order('full_name');
 
       if (error) {

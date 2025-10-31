@@ -6,6 +6,7 @@ import {
 import { ChatBadge } from './ChatBadge';
 import { useChat, Chat, User } from '../../hooks/useChat';
 import api from '../../lib/api';
+import webSocketService from '../../services/WebSocketService';
 
 interface FloatingChatWidgetProps {
   className?: string;
@@ -50,22 +51,24 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
     messages,
     isLoading,
     error: chatError,
+    connectionStatus,
     loadMessages,
     loadUsers,
     sendMessage: sendChatMessage,
     createOrGetDM,
     markChatAsRead,
     getTotalUnreadCount,
+    subscribeToChat,
+    unsubscribeFromChat,
   } = useChat();
 
   // State for typing indicator - only show when actually typing
   const [isTyping, setIsTyping] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
 
-  // Temporarily disable real-time to fix WebSocket errors
-  const realtimeMessages: any[] = [];
-  const connectionStatus = 'disconnected';
-  const clearRealtimeMessages = useCallback(() => { }, []);
+  // Real-time messaging state
+  const [realtimeMessages, setRealtimeMessages] = useState<any[]>([]);
+  const clearRealtimeMessages = useCallback(() => setRealtimeMessages([]), []);
 
   // Save dark mode preference
   useEffect(() => {
@@ -75,6 +78,12 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
   // Load messages when chat is selected
   useEffect(() => {
     if (selectedChat) {
+      console.log('🔍 useEffect: Loading messages for selected chat:', {
+        chatId: selectedChat.id,
+        chatName: selectedChat.name,
+        isUser: selectedChat.isUser,
+        userData: selectedChat.userData
+      });
       loadMessages(selectedChat.id);
       markChatAsRead(selectedChat.id);
     }
@@ -83,6 +92,31 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
   // Combine regular messages with real-time messages
   const regularMessages = selectedChat?.id ? (messages[selectedChat.id] || []) : [];
   const allMessages = [...regularMessages, ...realtimeMessages];
+  
+  // Detailed logging for message display
+  useEffect(() => {
+    if (selectedChat?.id) {
+      console.log('🔍 DETAILED: Message display update:', {
+        chatId: selectedChat.id,
+        regularMessageCount: regularMessages.length,
+        realtimeMessageCount: realtimeMessages.length,
+        totalMessageCount: allMessages.length,
+        messagesState: messages,
+        regularMessages: regularMessages.map(m => ({
+          id: m.id,
+          sender: m.senderId,
+          isOwn: m.isOwn,
+          content: m.content?.substring(0, 30) + '...'
+        })),
+        allMessages: allMessages.map(m => ({
+          id: m.id,
+          sender: m.senderId || m.sender_id,
+          isOwn: m.isOwn,
+          content: (m.content || m.message)?.substring(0, 30) + '...'
+        }))
+      });
+    }
+  }, [selectedChat?.id, regularMessages.length, realtimeMessages.length, allMessages.length]);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -96,7 +130,103 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
     setTypingUsers([]);
     setIsTyping(false);
     clearRealtimeMessages();
-  }, [selectedChat?.id, clearRealtimeMessages]); // clearRealtimeMessages is now stable with useCallback
+  }, [selectedChat?.id, clearRealtimeMessages]);
+
+  // Real-time message subscription (replaces polling)
+  useEffect(() => {
+    if (!selectedChat?.id) {
+      console.log('🔍 No selected chat, skipping realtime setup');
+      return;
+    }
+
+    console.log('🔄 Setting up realtime subscription for chat:', {
+      chatId: selectedChat.id,
+      chatName: selectedChat.name,
+      chatType: selectedChat.type,
+      connectionStatus
+    });
+
+    // Initial load of messages
+    loadMessages(selectedChat.id);
+
+    // Set up realtime subscription with retry logic
+    let currentChannel: any = null;
+    let retryCount = 0;
+    const maxRetries = 3;
+    let retryTimeout: NodeJS.Timeout | null = null;
+
+    const setupSubscription = () => {
+      console.log(`🔄 Setting up subscription attempt ${retryCount + 1}/${maxRetries + 1} for chat:`, selectedChat.id);
+      
+      try {
+        currentChannel = subscribeToChat(selectedChat.id);
+        
+        // Monitor for connection failures and retry
+        const connectionMonitor = setInterval(() => {
+          if (connectionStatus === 'disconnected' && retryCount < maxRetries) {
+            console.log(`🔄 Connection failed, scheduling retry ${retryCount + 1}/${maxRetries} for chat:`, selectedChat.id);
+            retryCount++;
+            
+            // Clean up current channel
+            if (currentChannel) {
+              unsubscribeFromChat(currentChannel);
+              currentChannel = null;
+            }
+            
+            // Retry with exponential backoff
+            const delay = Math.min(1000 * Math.pow(2, retryCount - 1), 10000);
+            retryTimeout = setTimeout(() => {
+              setupSubscription();
+            }, delay);
+            
+            clearInterval(connectionMonitor);
+          } else if (connectionStatus === 'connected') {
+            // Reset retry count on successful connection
+            retryCount = 0;
+          }
+        }, 3000);
+
+        // Store monitor for cleanup
+        if (currentChannel) {
+          (currentChannel as any)._connectionMonitor = connectionMonitor;
+        }
+        
+      } catch (error) {
+        console.error('❌ Failed to setup subscription:', error);
+        
+        if (retryCount < maxRetries) {
+          retryCount++;
+          const delay = Math.min(1000 * Math.pow(2, retryCount - 1), 10000);
+          console.log(`🔄 Retrying subscription setup in ${delay}ms...`);
+          
+          retryTimeout = setTimeout(() => {
+            setupSubscription();
+          }, delay);
+        }
+      }
+    };
+
+    setupSubscription();
+
+    return () => {
+      console.log('🛑 Cleaning up realtime subscription for chat:', selectedChat.id);
+      
+      // Clear retry timeout
+      if (retryTimeout) {
+        clearTimeout(retryTimeout);
+      }
+      
+      // Clean up current channel
+      if (currentChannel) {
+        // Clear connection monitor
+        if ((currentChannel as any)._connectionMonitor) {
+          clearInterval((currentChannel as any)._connectionMonitor);
+        }
+        
+        unsubscribeFromChat(currentChannel);
+      }
+    };
+  }, [selectedChat?.id, loadMessages, subscribeToChat, unsubscribeFromChat, connectionStatus]);
 
   const totalUnreadCount = getTotalUnreadCount();
 
@@ -138,11 +268,9 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
 
   const displayItems = getDisplayItems();
 
-  // Reduced debug logging for performance
+  // Handle chat errors silently
   useEffect(() => {
-    if (process.env.NODE_ENV === 'development' && chatError) {
-      console.log('Chat Error:', chatError);
-    }
+    // Errors are handled by the useChat hook
   }, [chatError]);
 
   const handleChatSelect = async (item: ExtendedChat) => {
@@ -157,12 +285,20 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
         // Create or get DM with this user
         const dmChat = await createOrGetDM(item.userData.id);
         if (dmChat) {
+          console.log('🔍 DM Chat created/retrieved:', {
+            dmChatId: dmChat.id,
+            recipientId: item.userData.id,
+            recipientName: item.userData.name
+          });
+          
           setSelectedChat({
             ...dmChat,
             userData: item.userData,
             loading: false
           });
-          // Load messages in background
+          
+          // Load messages with the correct DM chat ID
+          console.log('📜 Loading messages for DM chat:', dmChat.id);
           loadMessages(dmChat.id);
         }
       } else {
@@ -189,6 +325,13 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
     try {
       setIsSending(true);
       setMessageInput('');
+      
+      console.log('📤 Sending message to chat:', {
+        chatId: selectedChat.id,
+        content: content.substring(0, 50) + (content.length > 50 ? '...' : ''),
+        chatName: selectedChat.name
+      });
+      
       await sendChatMessage(selectedChat.id, content);
     } catch (error) {
       console.error('Failed to send message:', error);
@@ -202,58 +345,43 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
   // Helper function to get current user ID
   const getCurrentUserId = () => {
     try {
-      // Debug: Check what's in localStorage
-      console.log('🔍 Checking localStorage for user data...');
-      console.log('localStorage keys:', Object.keys(localStorage));
-      
-      // Try multiple possible keys
+      // Try multiple possible keys for user data
       const possibleKeys = ['user', 'currentUser', 'authUser', 'userData'];
-      
+
       for (const key of possibleKeys) {
         const storedData = localStorage.getItem(key);
         if (storedData) {
-          console.log(`✅ Found data in localStorage['${key}']:`, storedData);
           try {
             const parsed = JSON.parse(storedData);
             if (parsed && (parsed.id || parsed.userId || parsed.user_id)) {
-              const userId = parsed.id || parsed.userId || parsed.user_id;
-              console.log(`✅ Extracted user ID: ${userId} from key: ${key}`);
-              return userId;
+              return parsed.id || parsed.userId || parsed.user_id;
             }
           } catch (parseError) {
-            console.log(`❌ Failed to parse data from ${key}:`, parseError);
+            continue;
           }
         }
       }
-      
-      // Also check if there's a token with user info
+
+      // Try to extract from JWT token
       const token = localStorage.getItem('accessToken');
       if (token) {
-        console.log('🔍 Found accessToken, checking if it contains user info...');
         try {
-          // Try to decode JWT token (basic decode, not verification)
           const base64Url = token.split('.')[1];
           const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-          const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+          const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
             return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
           }).join(''));
-          
+
           const decoded = JSON.parse(jsonPayload);
-          console.log('🔍 Decoded token payload:', decoded);
-          
           if (decoded && (decoded.id || decoded.userId || decoded.user_id || decoded.sub)) {
-            const userId = decoded.id || decoded.userId || decoded.user_id || decoded.sub;
-            console.log(`✅ Extracted user ID from token: ${userId}`);
-            return userId;
+            return decoded.id || decoded.userId || decoded.user_id || decoded.sub;
           }
         } catch (tokenError) {
-          console.log('❌ Failed to decode token:', tokenError);
+          // Silent fail
         }
       }
-      
-      console.log('❌ No user ID found in localStorage');
     } catch (error) {
-      console.error('❌ Failed to get current user ID:', error);
+      console.error('Failed to get current user ID:', error);
     }
     return null;
   };
@@ -397,47 +525,82 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                   <button
                     onClick={async () => {
                       try {
-                        console.log('🔍 Testing server connection...');
-
-                        // Test both direct fetch and API client
-                        const directResponse = await fetch('http://localhost:3000/api/health');
-                        const directData = await directResponse.json();
-                        console.log('✅ Direct fetch health check:', directData);
-
-                        // Test via API client
-                        const apiResponse = await api.get('/health');
-                        console.log('✅ API client health check:', apiResponse.data);
-
-                        alert(`Server is running!\\nDirect: ${JSON.stringify(directData)}\\nAPI: ${JSON.stringify(apiResponse.data)}`);
+                        // Check WebSocket connection status (reduced logging)
+                        const wsStatus = webSocketService.getConnectionStatus();
+                        
+                        // Try to reconnect if disconnected
+                        if (wsStatus === 'disconnected') {
+                          webSocketService.reconnect();
+                          alert('🔄 WebSocket disconnected. Attempting to reconnect...\n\nCheck console for details.');
+                        } else {
+                          alert(`✅ WebSocket is ${wsStatus}!\n\nUsers: ${users.length}\nChats: ${chats.length}\n\nCheck console for detailed logs.`);
+                        }
                       } catch (error) {
-                        console.error('❌ Server health check failed:', error);
-                        alert(`Server connection failed: ${error instanceof Error ? error.message : 'Unknown error'}\\n\\nMake sure the backend server is running on port 3000.`);
+                        console.error('❌ Debug error:', error);
+                        alert(`❌ Debug failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
                       }
                     }}
-                    className="w-full px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+                    className="w-full px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
                   >
-                    Test Server
+                    Debug WebSocket
                   </button>
 
                   <button
                     onClick={async () => {
                       try {
-                        console.log('🔍 Testing employees endpoint...');
-                        const response = await api.get('/employees/for-chat');
-                        console.log('✅ Employees endpoint response:', response.data);
-                        alert(`Employees endpoint works!\\n${JSON.stringify(response.data, null, 2)}`);
+                        const authStatus = webSocketService.debugAuth();
+                        
+                        if (!authStatus.canAuthenticate) {
+                          alert(`❌ Cannot authenticate WebSocket!\n\nIssues:\n- Has Token: ${authStatus.hasToken}\n- Has User ID: ${authStatus.hasUserId}\n- User ID: ${authStatus.userId || 'MISSING'}\n\nCheck console for detailed debug info.`);
+                        } else {
+                          alert(`✅ WebSocket authentication looks good!\n\n- Connected: ${authStatus.isConnected}\n- User ID: ${authStatus.userId}\n- Can Authenticate: ${authStatus.canAuthenticate}\n\nCheck console for detailed debug info.`);
+                        }
                       } catch (error) {
-                        console.error('❌ Employees endpoint failed:', error);
-                        alert(`Employees endpoint failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                        console.error('❌ Auth debug error:', error);
+                        alert(`❌ Auth debug failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
                       }
                     }}
                     className="w-full px-2 py-1 text-xs bg-purple-500 text-white rounded hover:bg-purple-600 transition-colors"
                   >
-                    Test Employees API
+                    Debug Auth
+                  </button>
+
+                  <button
+                    onClick={async () => {
+                      try {
+                        if (selectedChat) {
+                          // Force join the chat room first
+                          console.log('🏠 Joining chat room:', selectedChat.id);
+                          webSocketService.joinChat(selectedChat.id);
+                          
+                          // Wait a moment for join to complete
+                          await new Promise(resolve => setTimeout(resolve, 1000));
+                          
+                          const testMessage = `Test message at ${new Date().toLocaleTimeString()}`;
+                          const messageId = `test-${Date.now()}`;
+                          
+                          const sent = webSocketService.sendMessage(selectedChat.id, testMessage, messageId);
+                          
+                          if (sent) {
+                            alert('✅ Test message sent via WebSocket!\n\nCheck the chat for the message and backend logs.');
+                          } else {
+                            alert('❌ WebSocket not connected. Cannot send test message.');
+                          }
+                        } else {
+                          alert('⚠️ Please select a chat first to test messaging.');
+                        }
+                      } catch (error) {
+                        console.error('❌ Test error:', error);
+                        alert(`❌ Test failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                      }
+                    }}
+                    className="w-full px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+                  >
+                    Test Message
                   </button>
 
                   <div className="text-xs text-gray-500 dark:text-gray-400">
-                    Users: {users.length} | Error: {chatError || 'None'}
+                    Users: {users.length} | Status: {connectionStatus} | Error: {chatError || 'None'}
                   </div>
                 </div>
               </div>
@@ -541,8 +704,14 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                           </span>
                         )}
                         <div className="flex items-center gap-1">
-                          <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">Online</span>
+                          <div className={`w-2 h-2 rounded-full ${
+                            connectionStatus === 'connected' ? 'bg-green-500' : 
+                            connectionStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'
+                          }`}></div>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            {connectionStatus === 'connected' ? 'Real-time' : 
+                             connectionStatus === 'connecting' ? 'Connecting...' : 'Offline'}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -552,6 +721,28 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                     </button>
                   </div>
                 </div>
+
+                {/* Connection Status Banner */}
+                {connectionStatus === 'disconnected' && (
+                  <div className="p-3 bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 text-center text-sm">
+                    <div className="flex items-center justify-center gap-2">
+                      <span>⚠️ Real-time connection failed. Messages may not update automatically.</span>
+                      <button
+                        onClick={() => {
+                          if (selectedChat) {
+                            console.log('🔄 Retrying real-time connection...');
+                            const channel = subscribeToChat(selectedChat.id);
+                            // Store channel for cleanup
+                            (selectedChat as any)._realtimeChannel = channel;
+                          }
+                        }}
+                        className="ml-2 px-2 py-1 bg-yellow-600 hover:bg-yellow-700 text-white text-xs rounded transition-colors"
+                      >
+                        Retry Connection
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Messages */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-2">
@@ -569,7 +760,7 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                       </button>
                     </div>
                   ) : (
-                    allMessages.map((message: any) => {
+                    allMessages.map((message: any, index: number) => {
                       const currentUserId = getCurrentUserId();
 
                       // Handle both message formats (useChat vs useRealtimeChat)
@@ -582,15 +773,16 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                       // Handle type mismatches by converting both to strings
                       const isMyMessage = String(senderId) === String(currentUserId) && currentUserId !== '';
 
-                      // 🔍 Debug logging for message positioning
-                      console.log('💬 Message Debug:', {
-                        messageId: messageId?.substring(0, 8) + '...',
+                      // Detailed logging for each message being rendered
+                      console.log(`🔍 DETAILED: Rendering message ${index + 1}/${allMessages.length}:`, {
+                        messageId,
                         senderId,
                         currentUserId,
                         isMyMessage,
                         senderName,
-                        content: messageContent?.substring(0, 30) + '...',
-                        side: isMyMessage ? '➡️ RIGHT (MY MESSAGE)' : '⬅️ LEFT (RECEIVED)'
+                        messageContent,
+                        timestamp,
+                        rawMessage: message
                       });
 
                       return (

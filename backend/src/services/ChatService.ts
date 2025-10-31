@@ -339,7 +339,7 @@ export class ChatService {
   }
 
   /**
-   * Get chat history
+   * Get chat history with sender information - Simplified and optimized
    */
   async getChatHistory(
     chatId: string,
@@ -348,24 +348,82 @@ export class ChatService {
     offset: number = 0
   ): Promise<ChatMessage[]> {
     try {
-      logger.info('ChatService: Getting chat history', { chatId, limit, offset });
+      logger.info('ChatService: Getting chat history', { chatId, userId, limit, offset });
 
-      const { data, error } = await this.supabase
+      // Check access (DM only)
+      if (chatId.startsWith('dm_')) {
+        const userIds = chatId.replace('dm_', '').split('_');
+        if (!userIds.includes(userId)) {
+          logger.warn('ChatService: Access denied', { chatId, userId, participants: userIds });
+          throw new Error('Access denied: You are not a participant in this chat');
+        }
+      }
+
+      // Simple query - no complex filters, just chat_id and order by timestamp
+      const { data: messages, error } = await this.supabase
         .from('chat_messages')
-        .select()
+        .select(`
+          *,
+          sender:users(
+            id,
+            full_name,
+            email,
+            role
+          )
+        `)
         .eq('chat_id', chatId)
-        .order('timestamp', { ascending: true })
+        .order('timestamp', { ascending: true }) // Oldest first for chat flow
         .range(offset, offset + limit - 1);
 
       if (error) {
-        logger.error('ChatService: Failed to get chat history', { error: error.message });
+        logger.error('ChatService: Failed to get chat messages', { error: error.message });
         throw error;
       }
 
-      logger.info('ChatService: Chat history retrieved', { count: data?.length || 0 });
-      return data || [];
+      if (!messages || messages.length === 0) {
+        logger.info('ChatService: No messages found for chat', { chatId });
+        return [];
+      }
+
+      // Transform with sender info
+      const messagesWithSender = messages.map(msg => ({
+        id: msg.id,
+        chat_id: msg.chat_id,
+        sender_id: msg.sender_id,
+        message: msg.message,
+        timestamp: msg.timestamp,
+        chat_type: msg.chat_type,
+        message_type: msg.message_type,
+        created_at: msg.created_at,
+        updated_at: msg.updated_at,
+        read_at: msg.read_at,
+        delivered_at: msg.delivered_at,
+        sent_at: msg.sent_at,
+        edited_at: msg.edited_at,
+        // Sender information
+        senderName: msg.sender?.full_name || msg.sender?.email || 'Unknown User',
+        sender_name: msg.sender?.full_name || msg.sender?.email || 'Unknown User',
+        sender_email: msg.sender?.email || null,
+        senderRole: msg.sender?.role || null,
+        // Message ownership
+        isOwn: msg.sender_id === userId,
+        // Message status
+        status: msg.read_at ? 'read' : msg.delivered_at ? 'delivered' : msg.sent_at ? 'sent' : 'sending'
+      }));
+
+      logger.info('ChatService: Chat history retrieved successfully', { 
+        count: messagesWithSender.length,
+        chatId,
+        sampleMessage: messagesWithSender[0] ? {
+          id: messagesWithSender[0].id,
+          sender: messagesWithSender[0].senderName,
+          content: messagesWithSender[0].message?.substring(0, 50) + '...'
+        } : null
+      });
+      
+      return messagesWithSender;
     } catch (error) {
-      logger.error('ChatService: Get chat history failed', { error: (error as Error).message });
+      logger.error('ChatService: Get chat history failed', { error: (error as Error).message, chatId, userId });
       throw error;
     }
   }
@@ -594,17 +652,58 @@ export class ChatService {
   }
 
   /**
-   * Get user's chats (both DMs and groups) - Simple schema version
+   * Get user's chats (both DMs and groups) - Enhanced version with proper participant lookup
    */
   async getUserChats(userId: string): Promise<any[]> {
     try {
       logger.info('ChatService: Getting user chats', { userId });
 
-      // Get all chat_ids where user has sent or received messages
+      // Method 1: Try using chat_participants table if it exists
+      let userChatIds: string[] = [];
+      
+      try {
+        const { data: participantData, error: participantError } = await this.supabase
+          .from('chat_participants')
+          .select('chat_id')
+          .eq('user_id', userId);
+
+        if (!participantError && participantData) {
+          userChatIds = participantData.map(p => p.chat_id);
+          logger.info('ChatService: Found chats via participants table', { chatCount: userChatIds.length });
+        }
+      } catch (participantTableError) {
+        logger.info('ChatService: chat_participants table not available, using fallback method');
+      }
+
+      // Method 2: Fallback - Parse DM chat IDs to find user participation
+      if (userChatIds.length === 0) {
+        const { data: allDMMessages, error: dmError } = await this.supabase
+          .from('chat_messages')
+          .select('chat_id')
+          .like('chat_id', 'dm_%');
+
+        if (!dmError && allDMMessages) {
+          // Filter DM chats where this user is a participant
+          const uniqueChatIds = [...new Set(allDMMessages.map((m: any) => m.chat_id))];
+          userChatIds = uniqueChatIds.filter(chatId => {
+            const userIds = chatId.replace('dm_', '').split('_');
+            return userIds.includes(userId);
+          });
+          
+          logger.info('ChatService: Found chats via DM parsing', { chatCount: userChatIds.length });
+        }
+      }
+
+      if (userChatIds.length === 0) {
+        logger.info('ChatService: No chats found for user', { userId });
+        return [];
+      }
+
+      // Get latest message for each chat the user participates in
       const { data: userMessages, error: messagesError } = await this.supabase
         .from('chat_messages')
         .select('chat_id, message, timestamp, sender_id')
-        .or(`sender_id.eq.${userId},chat_id.like.%${userId}%`)
+        .in('chat_id', userChatIds)
         .order('timestamp', { ascending: false });
 
       if (messagesError) {
@@ -618,11 +717,8 @@ export class ChatService {
       userMessages?.forEach(message => {
         const chatId = message.chat_id;
         
-        // Only include DM chats that involve this user
-        if (chatId.startsWith('dm_') && chatId.includes(userId)) {
-          if (!chatMap.has(chatId) || new Date(message.timestamp) > new Date(chatMap.get(chatId).timestamp)) {
-            chatMap.set(chatId, message);
-          }
+        if (!chatMap.has(chatId) || new Date(message.timestamp) > new Date(chatMap.get(chatId).timestamp)) {
+          chatMap.set(chatId, message);
         }
       });
 

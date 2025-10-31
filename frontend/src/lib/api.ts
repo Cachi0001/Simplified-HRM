@@ -131,14 +131,11 @@ api.interceptors.request.use(
       // Remove leading slash from the URL path to prevent double slashes
       config.url = config.url.replace(/^\//, '');
 
-      // Log the full URL being constructed for debugging
-      const fullUrl = `${config.baseURL}/${config.url}`;
-      console.log(`🚀 API Request [${requestId}]: ${config.method?.toUpperCase()} ${fullUrl}`, {
-        baseURL: config.baseURL,
-        url: config.url,
-        headers: config.headers,
-        data: config.data
-      });
+      // Only log chat-related API requests
+      if (config.url?.includes('chat') || config.url?.includes('message')) {
+        const fullUrl = `${config.baseURL}/${config.url}`;
+        console.log(`💬 Chat API [${requestId}]: ${config.method?.toUpperCase()} ${fullUrl}`);
+      }
     }
 
     // Add auth token if available
@@ -233,13 +230,10 @@ api.interceptors.response.use(
     // Get the request ID from the config or generate a new one
     const requestId = response.config.requestId || `resp_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
     
-    // Log successful responses for debugging
-    console.log(`✅ API Response Success [${requestId}]: ${response.config.method?.toUpperCase()} ${response.config.url}`, {
-      status: response.status,
-      statusText: response.statusText,
-      data: response.data,
-      contentType: response.headers?.['content-type']
-    });
+    // Only log chat-related successful responses
+    if (response.config.url?.includes('chat') || response.config.url?.includes('message')) {
+      console.log(`💬 Chat API Success [${requestId}]: ${response.config.method?.toUpperCase()} ${response.config.url}`);
+    }
     
     // Special handling for password reset endpoints
     if (response.config.url?.includes('auth/reset-password/') ||

@@ -101,6 +101,7 @@ export class EmployeeService {
       const employees = await this.employeeRepository.getEmployeesForChat(currentUserId);
       return employees.map(emp => ({
         id: emp.id,
+        userId: emp.user_id,
         email: emp.email,
         fullName: emp.full_name,
         role: emp.role,
