@@ -286,6 +286,19 @@ export function useChat() {
       if (response.data?.status === 'success') {
         console.log('✅ Message sent successfully!');
         
+        // Update chat list immediately for better UX
+        setChats(prevChats => prevChats.map(chat => 
+          chat.id === chatId 
+            ? {
+                ...chat,
+                lastMessage: content,
+                lastMessageTime: formatTime(new Date().toISOString()),
+                // Reset unread count for own messages
+                unreadCount: 0
+              }
+            : chat
+        ));
+        
         // Trigger indicator for current user
         const currentUserId = getCurrentUserId();
         if (currentUserId) {
