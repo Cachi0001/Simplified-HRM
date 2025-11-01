@@ -25,27 +25,25 @@ describe('RoleHierarchyService', () => {
   });
 
   describe('Permission Tests', () => {
-    test('superadmin should have all permissions', () => {
-      expect(roleService.hasPermission('superadmin', 'admin')).toBe(true);
-      expect(roleService.hasPermission('superadmin', 'hr')).toBe(true);
-      expect(roleService.hasPermission('superadmin', 'teamlead')).toBe(true);
-      expect(roleService.hasPermission('superadmin', 'employee')).toBe(true);
+    test('superadmin should have system permissions', () => {
+      expect(roleService.hasPermission('superadmin', 'system:manage')).toBe(true);
+      expect(roleService.hasPermission('superadmin', 'users:manage')).toBe(true);
+      expect(roleService.hasPermission('superadmin', 'roles:manage')).toBe(true);
+      expect(roleService.hasPermission('superadmin', 'conversations:view_all')).toBe(true);
     });
 
-    test('admin should have permissions for hr and below', () => {
-      expect(roleService.hasPermission('admin', 'superadmin')).toBe(false);
-      expect(roleService.hasPermission('admin', 'admin')).toBe(true);
-      expect(roleService.hasPermission('admin', 'hr')).toBe(true);
-      expect(roleService.hasPermission('admin', 'teamlead')).toBe(true);
-      expect(roleService.hasPermission('admin', 'employee')).toBe(true);
+    test('admin should have operational permissions', () => {
+      expect(roleService.hasPermission('admin', 'system:manage')).toBe(false);
+      expect(roleService.hasPermission('admin', 'users:manage')).toBe(true);
+      expect(roleService.hasPermission('admin', 'departments:manage')).toBe(true);
+      expect(roleService.hasPermission('admin', 'conversations:view_non_superadmin')).toBe(true);
     });
 
-    test('employee should only have employee permissions', () => {
-      expect(roleService.hasPermission('employee', 'superadmin')).toBe(false);
-      expect(roleService.hasPermission('employee', 'admin')).toBe(false);
-      expect(roleService.hasPermission('employee', 'hr')).toBe(false);
-      expect(roleService.hasPermission('employee', 'teamlead')).toBe(false);
-      expect(roleService.hasPermission('employee', 'employee')).toBe(true);
+    test('employee should have basic permissions', () => {
+      expect(roleService.hasPermission('employee', 'system:manage')).toBe(false);
+      expect(roleService.hasPermission('employee', 'users:manage')).toBe(false);
+      expect(roleService.hasPermission('employee', 'profile:manage')).toBe(true);
+      expect(roleService.hasPermission('employee', 'requests:create')).toBe(true);
     });
   });
 
@@ -75,12 +73,12 @@ describe('RoleHierarchyService', () => {
       // Invalid role change: employee trying to change admin
       const invalidChange = roleService.validateRoleChange('employee', 'admin', 'hr');
       expect(invalidChange.isValid).toBe(false);
-      expect(invalidChange.reason).toContain('cannot manage');
+      expect(invalidChange.reason).toContain('Insufficient permissions');
 
       // Invalid role escalation: hr trying to assign admin role
       const escalationChange = roleService.validateRoleChange('hr', 'employee', 'admin');
       expect(escalationChange.isValid).toBe(false);
-      expect(escalationChange.reason).toContain('cannot assign');
+      expect(escalationChange.reason).toContain('Cannot assign a role equal to or higher');
     });
   });
 
@@ -137,10 +135,10 @@ describe('RoleHierarchyService', () => {
 
   describe('Utility Tests', () => {
     test('should normalize role names correctly', () => {
-      expect(roleService.normalizeRole('super-admin')).toBe('superadmin');
       expect(roleService.normalizeRole('ADMIN')).toBe('admin');
       expect(roleService.normalizeRole('TeamLead')).toBe('teamlead');
-      expect(roleService.normalizeRole('teamleader')).toBe('teamlead');
+      expect(roleService.normalizeRole('  EMPLOYEE  ')).toBe('employee');
+      expect(roleService.normalizeRole('HR')).toBe('hr');
     });
 
     test('should validate roles correctly', () => {

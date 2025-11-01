@@ -6,11 +6,9 @@ import logger from '../utils/logger';
 
 export class DepartmentController {
     private departmentNotificationService: typeof DepartmentNotificationService;
-    private roleHierarchyService: RoleHierarchyService;
 
     constructor(private departmentService: DepartmentService) {
         this.departmentNotificationService = DepartmentNotificationService;
-        this.roleHierarchyService = new RoleHierarchyService();
     }
 
     /**
@@ -32,7 +30,7 @@ export class DepartmentController {
             }
 
             // Check if user has permission to create departments (HR and above)
-            if (!this.roleHierarchyService.hasPermission(userRole, 'hr')) {
+            if (!RoleHierarchyService.hasPermission(userRole, 'departments:manage')) {
                 res.status(403).json({
                     status: 'error',
                     message: 'Insufficient permissions to create departments'
@@ -155,7 +153,7 @@ export class DepartmentController {
             }
 
             // Check if user has permission to update departments (HR and above)
-            if (!this.roleHierarchyService.hasPermission(userRole, 'hr')) {
+            if (!RoleHierarchyService.hasPermission(userRole, 'departments:manage')) {
                 res.status(403).json({
                     status: 'error',
                     message: 'Insufficient permissions to update departments'
@@ -206,7 +204,7 @@ export class DepartmentController {
             }
 
             // Check if user has permission to delete departments (Admin and above)
-            if (!this.roleHierarchyService.hasPermission(userRole, 'admin')) {
+            if (!RoleHierarchyService.hasPermission(userRole, 'departments:manage')) {
                 res.status(403).json({
                     status: 'error',
                     message: 'Insufficient permissions to delete departments'
