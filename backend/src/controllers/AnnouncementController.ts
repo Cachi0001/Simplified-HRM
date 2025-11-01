@@ -9,7 +9,7 @@ export class AnnouncementController {
    */
   async createAnnouncement(req: Request, res: Response): Promise<void> {
     try {
-      const { title, content, priority = 'normal' } = req.body;
+      const { title, content, priority = 'normal', status = 'published', target_audience = 'all', scheduled_for } = req.body;
       const userId = req.user?.id;
       const userRole = req.user?.role;
 
@@ -26,6 +26,24 @@ export class AnnouncementController {
         res.status(400).json({
           status: 'error',
           message: 'Title and content are required'
+        });
+        return;
+      }
+
+      // Validate status
+      if (!['draft', 'published', 'archived'].includes(status)) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Status must be one of: draft, published, archived'
+        });
+        return;
+      }
+
+      // Validate target_audience
+      if (!['all', 'employees', 'hr', 'managers', 'department'].includes(target_audience)) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Target audience must be one of: all, employees, hr, managers, department'
         });
         return;
       }
@@ -56,15 +74,24 @@ export class AnnouncementController {
       }
 
       // Insert announcement
+      const insertData: any = {
+        title,
+        content,
+        author_id: userId,
+        priority,
+        status,
+        target_audience
+      };
+
+      // Add scheduled_for if provided and status is draft
+      if (scheduled_for && status === 'draft') {
+        insertData.scheduled_for = scheduled_for;
+      }
+
       const { data: announcement, error: insertError } = await supabase
         .from('announcements')
-        .insert({
-          title,
-          content,
-          author_id: userId,
-          priority
-        })
-        .select('id, title, content, priority, created_at')
+        .insert(insertData)
+        .select('id, title, content, priority, status, target_audience, scheduled_for, created_at')
         .single();
 
       if (insertError) {
@@ -74,12 +101,14 @@ export class AnnouncementController {
       // Use the employee data we already fetched
       const author = employee;
 
-      // Send notifications to all users (this would typically be done via a job queue)
-      try {
-        await this.notifyAllUsers(announcement, author);
-      } catch (notifyError) {
-        logger.error('Failed to send notifications', { error: notifyError });
-        // Don't fail the announcement creation if notifications fail
+      // Send notifications to all users only if status is published
+      if (status === 'published') {
+        try {
+          await this.notifyAllUsers(announcement, author);
+        } catch (notifyError) {
+          logger.error('Failed to send notifications', { error: notifyError });
+          // Don't fail the announcement creation if notifications fail
+        }
       }
 
       res.status(201).json({
@@ -113,23 +142,42 @@ export class AnnouncementController {
     try {
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
       const offset = req.query.offset ? parseInt(req.query.offset as string) : 0;
+      const status = req.query.status as string;
+      const priority = req.query.priority as string;
+      const target_audience = req.query.target_audience as string;
 
       logger.info('📢 [AnnouncementController] Getting announcements', {
         limit,
-        offset
+        offset,
+        status,
+        priority,
+        target_audience
       });
 
       const supabase = supabaseConfig.getClient();
 
-      const { data: announcements, error } = await supabase
+      let query = supabase
         .from('announcements')
         .select(`
-          id, title, content, priority, created_at, updated_at,
+          id, title, content, priority, status, target_audience, scheduled_for, created_at, updated_at,
           employees!announcements_author_id_fkey (
             full_name,
             email
           )
-        `)
+        `);
+
+      // Apply filters
+      if (status) {
+        query = query.eq('status', status);
+      }
+      if (priority) {
+        query = query.eq('priority', priority);
+      }
+      if (target_audience) {
+        query = query.eq('target_audience', target_audience);
+      }
+
+      const { data: announcements, error } = await query
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);
 
@@ -178,7 +226,7 @@ export class AnnouncementController {
       const { data: announcement, error } = await supabase
         .from('announcements')
         .select(`
-          id, title, content, priority, created_at, updated_at,
+          id, title, content, priority, status, target_audience, scheduled_for, created_at, updated_at,
           employees!announcements_author_id_fkey (
             full_name,
             email
@@ -226,7 +274,7 @@ export class AnnouncementController {
   async updateAnnouncement(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
-      const { title, content, priority } = req.body;
+      const { title, content, priority, status, target_audience, scheduled_for } = req.body;
       const userId = req.user?.id;
       const userRole = req.user?.role;
 
@@ -247,17 +295,80 @@ export class AnnouncementController {
 
       const supabase = supabaseConfig.getClient();
 
+      // Validate status if provided
+      if (status && !['draft', 'published', 'archived'].includes(status)) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Status must be one of: draft, published, archived'
+        });
+        return;
+      }
+
+      // Validate target_audience if provided
+      if (target_audience && !['all', 'employees', 'hr', 'managers', 'department'].includes(target_audience)) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Target audience must be one of: all, employees, hr, managers, department'
+        });
+        return;
+      }
+
       const updateData: any = {};
       if (title !== undefined) updateData.title = title;
       if (content !== undefined) updateData.content = content;
       if (priority !== undefined) updateData.priority = priority;
+      if (status !== undefined) updateData.status = status;
+      if (target_audience !== undefined) updateData.target_audience = target_audience;
+      if (scheduled_for !== undefined) updateData.scheduled_for = scheduled_for;
+
+      // Get current announcement to check status change
+      const { data: currentAnnouncement, error: getCurrentError } = await supabase
+        .from('announcements')
+        .select('status, author_id')
+        .eq('id', id)
+        .single();
+
+      if (getCurrentError || !currentAnnouncement) {
+        res.status(404).json({
+          status: 'error',
+          message: 'Announcement not found'
+        });
+        return;
+      }
 
       const { data: announcement, error } = await supabase
         .from('announcements')
         .update(updateData)
         .eq('id', id)
-        .select('id, title, content, priority, created_at, updated_at')
+        .select('id, title, content, priority, status, target_audience, scheduled_for, created_at, updated_at')
         .single();
+
+      if (error || !announcement) {
+        res.status(404).json({
+          status: 'error',
+          message: 'Announcement not found'
+        });
+        return;
+      }
+
+      // If status changed from draft to published, send notifications
+      if (currentAnnouncement.status === 'draft' && status === 'published') {
+        try {
+          // Get author info for notifications
+          const { data: author } = await supabase
+            .from('employees')
+            .select('id, full_name, email')
+            .eq('id', currentAnnouncement.author_id)
+            .single();
+
+          if (author) {
+            await this.notifyAllUsers(announcement, author);
+          }
+        } catch (notifyError) {
+          logger.error('Failed to send notifications on status change', { error: notifyError });
+          // Don't fail the update if notifications fail
+        }
+      }
 
       if (error || !announcement) {
         res.status(404).json({
@@ -336,6 +447,230 @@ export class AnnouncementController {
       res.status(500).json({
         status: 'error',
         message: 'Failed to delete announcement'
+      });
+    }
+  }
+
+  /**
+   * Get announcements by status
+   * GET /api/announcements/status/:status
+   */
+  async getAnnouncementsByStatus(req: Request, res: Response): Promise<void> {
+    try {
+      const { status } = req.params;
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+      const offset = req.query.offset ? parseInt(req.query.offset as string) : 0;
+
+      if (!['draft', 'published', 'archived'].includes(status)) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Status must be one of: draft, published, archived'
+        });
+        return;
+      }
+
+      logger.info('📢 [AnnouncementController] Getting announcements by status', {
+        status,
+        limit,
+        offset
+      });
+
+      const supabase = supabaseConfig.getClient();
+
+      const { data: announcements, error } = await supabase
+        .from('announcements')
+        .select(`
+          id, title, content, priority, status, target_audience, scheduled_for, created_at, updated_at,
+          employees!announcements_author_id_fkey (
+            full_name,
+            email
+          )
+        `)
+        .eq('status', status)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (error) {
+        throw error;
+      }
+
+      // Transform the data to match expected format
+      const formattedData = announcements?.map((announcement: any) => ({
+        ...announcement,
+        author_name: announcement.employees?.full_name || 'Unknown',
+        author_email: announcement.employees?.email || '',
+        employees: undefined // Remove the nested object
+      })) || [];
+
+      res.status(200).json({
+        status: 'success',
+        data: formattedData,
+        count: formattedData.length,
+        limit,
+        offset
+      });
+    } catch (error) {
+      logger.error('❌ [AnnouncementController] Get announcements by status error', {
+        error: (error as Error).message,
+        status: req.params.status
+      });
+      res.status(500).json({
+        status: 'error',
+        message: 'Failed to get announcements by status'
+      });
+    }
+  }
+
+  /**
+   * Publish a draft announcement
+   * POST /api/announcements/:id/publish
+   */
+  async publishAnnouncement(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const userRole = req.user?.role;
+
+      // Check if user has permission to publish announcements
+      if (!['super-admin', 'admin', 'hr'].includes(userRole)) {
+        res.status(403).json({
+          status: 'error',
+          message: 'You do not have permission to publish announcements'
+        });
+        return;
+      }
+
+      logger.info('📢 [AnnouncementController] Publishing announcement', {
+        id,
+        userRole
+      });
+
+      const supabase = supabaseConfig.getClient();
+
+      // Get current announcement
+      const { data: currentAnnouncement, error: getCurrentError } = await supabase
+        .from('announcements')
+        .select('status, author_id, title, content')
+        .eq('id', id)
+        .single();
+
+      if (getCurrentError || !currentAnnouncement) {
+        res.status(404).json({
+          status: 'error',
+          message: 'Announcement not found'
+        });
+        return;
+      }
+
+      if (currentAnnouncement.status !== 'draft') {
+        res.status(400).json({
+          status: 'error',
+          message: 'Only draft announcements can be published'
+        });
+        return;
+      }
+
+      // Update status to published
+      const { data: announcement, error } = await supabase
+        .from('announcements')
+        .update({ status: 'published' })
+        .eq('id', id)
+        .select('id, title, content, priority, status, target_audience, created_at, updated_at')
+        .single();
+
+      if (error || !announcement) {
+        res.status(500).json({
+          status: 'error',
+          message: 'Failed to publish announcement'
+        });
+        return;
+      }
+
+      // Send notifications to all users
+      try {
+        const { data: author } = await supabase
+          .from('employees')
+          .select('id, full_name, email')
+          .eq('id', currentAnnouncement.author_id)
+          .single();
+
+        if (author) {
+          await this.notifyAllUsers(announcement, author);
+        }
+      } catch (notifyError) {
+        logger.error('Failed to send notifications on publish', { error: notifyError });
+        // Don't fail the publish if notifications fail
+      }
+
+      res.status(200).json({
+        status: 'success',
+        message: 'Announcement published successfully',
+        data: announcement
+      });
+    } catch (error) {
+      logger.error('❌ [AnnouncementController] Publish announcement error', {
+        error: (error as Error).message,
+        id: req.params.id
+      });
+      res.status(500).json({
+        status: 'error',
+        message: 'Failed to publish announcement'
+      });
+    }
+  }
+
+  /**
+   * Archive an announcement
+   * POST /api/announcements/:id/archive
+   */
+  async archiveAnnouncement(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const userRole = req.user?.role;
+
+      // Check if user has permission to archive announcements
+      if (!['super-admin', 'admin', 'hr'].includes(userRole)) {
+        res.status(403).json({
+          status: 'error',
+          message: 'You do not have permission to archive announcements'
+        });
+        return;
+      }
+
+      logger.info('📢 [AnnouncementController] Archiving announcement', {
+        id,
+        userRole
+      });
+
+      const supabase = supabaseConfig.getClient();
+
+      const { data: announcement, error } = await supabase
+        .from('announcements')
+        .update({ status: 'archived' })
+        .eq('id', id)
+        .select('id, title, status')
+        .single();
+
+      if (error || !announcement) {
+        res.status(404).json({
+          status: 'error',
+          message: 'Announcement not found'
+        });
+        return;
+      }
+
+      res.status(200).json({
+        status: 'success',
+        message: 'Announcement archived successfully',
+        data: announcement
+      });
+    } catch (error) {
+      logger.error('❌ [AnnouncementController] Archive announcement error', {
+        error: (error as Error).message,
+        id: req.params.id
+      });
+      res.status(500).json({
+        status: 'error',
+        message: 'Failed to archive announcement'
       });
     }
   }

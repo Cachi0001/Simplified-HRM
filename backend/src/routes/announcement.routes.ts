@@ -32,4 +32,13 @@ router.delete('/:id/reactions', (req, res) => announcementController.removeReact
 // GET /api/announcements/:id/reactions - Get reactions for announcement
 router.get('/:id/reactions', (req, res) => announcementController.getReactions(req, res));
 
+// GET /api/announcements/status/:status - Get announcements by status
+router.get('/status/:status', (req, res) => announcementController.getAnnouncementsByStatus(req, res));
+
+// POST /api/announcements/:id/publish - Publish a draft announcement
+router.post('/:id/publish', (req, res) => announcementController.publishAnnouncement(req, res));
+
+// POST /api/announcements/:id/archive - Archive an announcement
+router.post('/:id/archive', (req, res) => announcementController.archiveAnnouncement(req, res));
+
 export default router;
