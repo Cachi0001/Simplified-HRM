@@ -2,6 +2,7 @@ import * as cron from 'node-cron';
 import logger from '../utils/logger';
 import PerformanceMetricsJob from './PerformanceMetricsJob';
 import CheckoutMonitoringService from './CheckoutMonitoringService';
+import SupabaseConfig from '../config/supabase';
 
 export interface ScheduledJob {
     name: string;
@@ -80,6 +81,18 @@ export class JobScheduler {
                 logger.info('JobScheduler: Starting attendance pattern analysis');
                 // This could analyze weekly attendance patterns
                 logger.info('JobScheduler: Attendance pattern analysis completed');
+            },
+            enabled: true
+        });
+
+        // Message indicator cleanup - Every 5 minutes
+        this.scheduleJob({
+            name: 'message_indicator_cleanup',
+            schedule: '*/5 * * * *', // Every 5 minutes
+            task: async () => {
+                logger.info('JobScheduler: Starting message indicator cleanup');
+                await this.cleanupExpiredMessageIndicators();
+                logger.info('JobScheduler: Message indicator cleanup completed');
             },
             enabled: true
         });
@@ -319,6 +332,47 @@ export class JobScheduler {
             return nextRun;
         } catch (error) {
             return null;
+        }
+    }
+
+    /**
+     * Cleanup expired message indicators
+     */
+    private async cleanupExpiredMessageIndicators(): Promise<void> {
+        try {
+            const supabase = SupabaseConfig.getClient();
+            
+            // Get count of expired indicators before deletion
+            const { count: expiredCount, error: countError } = await supabase
+                .from('message_indicators')
+                .select('*', { count: 'exact', head: true })
+                .lt('expires_at', new Date().toISOString());
+
+            if (countError) {
+                logger.error('JobScheduler: Error counting expired indicators', { error: countError.message });
+                return;
+            }
+
+            if (expiredCount && expiredCount > 0) {
+                // Delete expired indicators
+                const { error: deleteError } = await supabase
+                    .from('message_indicators')
+                    .delete()
+                    .lt('expires_at', new Date().toISOString());
+
+                if (deleteError) {
+                    logger.error('JobScheduler: Error deleting expired indicators', { error: deleteError.message });
+                    return;
+                }
+
+                logger.info('JobScheduler: Cleaned up expired message indicators', { 
+                    expiredCount 
+                });
+            }
+        } catch (error) {
+            logger.error('JobScheduler: Message indicator cleanup failed', {
+                error: (error as Error).message
+            });
         }
     }
 

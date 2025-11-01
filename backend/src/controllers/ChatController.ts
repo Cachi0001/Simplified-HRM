@@ -56,6 +56,9 @@ export class ChatController {
 
       const sentMessage = await this.chatService.sendMessage(chatId, userId, message);
 
+      // Create message indicator for sent message
+      await this.createMessageIndicator(userId, chatId, 'sent');
+
       // Broadcast via WebSocket if service is available
       const webSocketService = getWebSocketService();
       if (webSocketService) {
