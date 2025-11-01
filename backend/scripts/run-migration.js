@@ -23,7 +23,7 @@ async function runMigration() {
         // or use a different approach
         
         console.log('Note: This migration needs to be run manually in Supabase dashboard');
-        console.log('Please copy the SQL from backend/database/migrations/chat_enhancements_migration.sql');
+        console.log('Please copy the SQL from database/migrations/019_chat_enhancements_comprehensive.sql');
         console.log('and run it in the Supabase SQL editor.');
         
         // For now, let's just verify if the tables exist
@@ -83,8 +83,25 @@ async function runMigration() {
             console.log('✗ Typing indicators table needs to be created');
         }
         
+        try {
+            const { data: tasks } = await supabase.from('tasks').select('id').limit(1);
+            console.log('✓ Tasks table exists');
+            
+            // Try to check if the expected columns exist
+            try {
+                const { data: taskColumns } = await supabase.from('tasks').select('assigner_id, assignee_id').limit(1);
+                console.log('✓ Tasks table has assigner_id and assignee_id columns');
+            } catch (columnError) {
+                console.log('✗ Tasks table missing assigner_id or assignee_id columns');
+                console.log('   This might cause index creation errors in the migration');
+            }
+        } catch (error) {
+            console.log('✗ Tasks table needs to be created');
+        }
+        
         console.log('\nMigration check completed!');
         console.log('If any tables are missing, please run the SQL migration manually in Supabase dashboard.');
+        console.log('The migration has been updated to handle existing table structures safely.');
         
     } catch (error) {
         console.error('Migration check failed:', error);
