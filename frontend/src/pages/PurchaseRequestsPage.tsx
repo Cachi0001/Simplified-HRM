@@ -3,18 +3,21 @@ import { Plus, Trash2, Edit2, Clock, CheckCircle, XCircle, AlertCircle, DollarSi
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { useToast } from '../components/ui/Toast';
-import axios from 'axios';
+import { useTheme } from '../contexts/ThemeContext';
+import api from '../lib/api';
 
 interface PurchaseRequest {
-  _id: string;
-  employee_id: string;
-  item_name: string;
+  id: string;
+  userId: string; // Use consistent userId pattern
+  itemName: string;
   description: string;
   quantity: number;
-  estimated_cost: number;
+  estimatedCost: number;
+  totalAmount?: number;
+  urgency?: 'low' | 'medium' | 'high';
   status: 'pending' | 'approved' | 'rejected' | 'purchased';
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
   employeeName?: string;
 }
 
@@ -24,14 +27,16 @@ export function PurchaseRequestsPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [formData, setFormData] = useState({
-    item_name: '',
+    itemName: '',
     description: '',
     quantity: 1,
-    estimated_cost: 0,
+    estimatedCost: 0,
+    urgency: 'medium' as 'low' | 'medium' | 'high'
   });
 
   const navigate = useNavigate();
   const { addToast } = useToast();
+  const { darkMode } = useTheme();
 
   useEffect(() => {
     const user = authService.getCurrentUserFromStorage();
@@ -46,12 +51,26 @@ export function PurchaseRequestsPage() {
   const fetchPurchaseRequests = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/purchase-requests', {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-        },
-      });
-      setPurchaseRequests(response.data);
+      const response = await api.get('/purchase-requests');
+      const requests = response.data.data || response.data;
+      
+      // Transform data to match our interface
+      const transformedRequests = requests.map((req: any) => ({
+        id: req.id || req._id,
+        userId: req.user_id || req.employee_id,
+        itemName: req.item_name || req.itemName,
+        description: req.description,
+        quantity: req.quantity,
+        estimatedCost: req.estimated_cost || req.estimatedCost,
+        totalAmount: req.total_amount || req.totalAmount,
+        urgency: req.urgency || 'medium',
+        status: req.status,
+        createdAt: req.created_at || req.createdAt,
+        updatedAt: req.updated_at || req.updatedAt,
+        employeeName: req.employee_name || req.employeeName
+      }));
+      
+      setPurchaseRequests(transformedRequests);
     } catch (error: any) {
       console.error('Error fetching purchase requests:', error);
       addToast('error', 'Failed to fetch purchase requests');
@@ -63,19 +82,40 @@ export function PurchaseRequestsPage() {
   const handleCreatePurchaseRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.item_name || !formData.description || formData.quantity <= 0 || formData.estimated_cost <= 0) {
+    if (!formData.itemName || !formData.description || formData.quantity <= 0 || formData.estimatedCost <= 0) {
       addToast('error', 'Please fill all fields correctly');
       return;
     }
 
     try {
-      const response = await axios.post('/api/purchase-requests', formData, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-        },
-      });
-      setPurchaseRequests([response.data, ...purchaseRequests]);
-      setFormData({ item_name: '', description: '', quantity: 1, estimated_cost: 0 });
+      // Transform data to match backend expectations
+      const requestData = {
+        item_name: formData.itemName,
+        description: formData.description,
+        quantity: formData.quantity,
+        estimated_cost: formData.estimatedCost,
+        urgency: formData.urgency
+      };
+      
+      const response = await api.post('/purchase-requests', requestData);
+      const newRequest = response.data.data || response.data;
+      
+      // Transform response to match our interface
+      const transformedRequest = {
+        id: newRequest.id || newRequest._id,
+        userId: newRequest.user_id || newRequest.employee_id,
+        itemName: newRequest.item_name || newRequest.itemName,
+        description: newRequest.description,
+        quantity: newRequest.quantity,
+        estimatedCost: newRequest.estimated_cost || newRequest.estimatedCost,
+        urgency: newRequest.urgency,
+        status: newRequest.status,
+        createdAt: newRequest.created_at || newRequest.createdAt,
+        updatedAt: newRequest.updated_at || newRequest.updatedAt
+      };
+      
+      setPurchaseRequests([transformedRequest, ...purchaseRequests]);
+      setFormData({ itemName: '', description: '', quantity: 1, estimatedCost: 0, urgency: 'medium' });
       setIsCreating(false);
       addToast('success', 'Purchase request created successfully');
     } catch (error: any) {

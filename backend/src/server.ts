@@ -177,7 +177,9 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/leave', leaveRoutes);
+app.use('/api/leave-requests', leaveRoutes); // Alias for frontend compatibility
 app.use('/api/purchase', purchaseRoutes);
+app.use('/api/purchase-requests', purchaseRoutes); // Alias for frontend compatibility
 app.use('/api/chat', chatRoutes);
 app.use('/api/typing', typingRoutes);
 app.use('/api/announcements', announcementRoutes);

@@ -19,6 +19,7 @@ import { NotificationsPage } from './src/pages/NotificationsPage';
 import Header from './src/components/layout/Header';
 import Footer from './src/components/layout/Footer';
 import { ToastProvider } from './src/components/ui/Toast';
+import { ThemeProvider } from './src/contexts/ThemeContext';
 import { ProtectedRoute } from './src/components/auth/ProtectedRoute';
 import ApiConnectionTest from './src/components/ApiConnectionTest';
 import { FloatingChatWidget } from './src/components/chat/FloatingChatWidget';
@@ -124,11 +125,13 @@ function AppContent() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ToastProvider>
-        <BrowserRouter>
-          <AppContent />
-        </BrowserRouter>
-      </ToastProvider>
+      <ThemeProvider>
+        <ToastProvider>
+          <BrowserRouter>
+            <AppContent />
+          </BrowserRouter>
+        </ToastProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

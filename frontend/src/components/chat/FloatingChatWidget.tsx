@@ -1,12 +1,17 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   MessageCircle, X, Send, Users, Search, Plus, Settings,
-  ArrowLeft, Bell, History
+  ArrowLeft, Bell, History, Moon, Sun
 } from 'lucide-react';
 import { ChatBadge } from './ChatBadge';
 import { useChat, Chat, User } from '../../hooks/useChat';
+import { useTheme } from '../../contexts/ThemeContext';
 import api from '../../lib/api';
 import webSocketService from '../../services/WebSocketService';
+import userStatusService from '../../services/UserStatusService';
+import { IndicatorWrapper } from '../indicators/IndicatorWrapper';
+import { IndicatorTest } from '../indicators/IndicatorTest';
+import WhatsAppMessageList from './WhatsAppMessageList';
 
 interface FloatingChatWidgetProps {
   className?: string;
@@ -14,32 +19,21 @@ interface FloatingChatWidgetProps {
 
 type TabType = 'dms' | 'groups' | 'announcements' | 'history';
 
-// Extended Chat interface to include additional properties we need
 interface ExtendedChat extends Chat {
   userData?: User;
   loading?: boolean;
   isUser?: boolean;
 }
 
-/**
- * Fixed Modal Chat Widget with Responsive Design
- * Features:
- * - Fixed modal positioning that works at all zoom levels
- * - Responsive design: full-screen mobile, 80% desktop
- * - Proper message bubble design with avatars
- * - Color-coded role badges
- * - Real-time messaging
- */
 export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('dms');
   const [selectedChat, setSelectedChat] = useState<ExtendedChat | null>(null);
   const [messageInput, setMessageInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [darkMode, setDarkMode] = useState(() => {
-    const saved = localStorage.getItem('chatWidgetDarkMode');
-    return saved ? JSON.parse(saved) : false;
-  });
+
+  // Use global theme instead of local state
+  const { darkMode, toggleDarkMode } = useTheme();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -55,6 +49,7 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
     loadMessages,
     loadUsers,
     sendMessage: sendChatMessage,
+    retryMessage,
     createOrGetDM,
     markChatAsRead,
     getTotalUnreadCount,
@@ -66,71 +61,67 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
   const [isTyping, setIsTyping] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
 
-  // Real-time messaging state
-  const [realtimeMessages, setRealtimeMessages] = useState<any[]>([]);
-  const clearRealtimeMessages = useCallback(() => setRealtimeMessages([]), []);
-
-  // Save dark mode preference
+  // Initialize user status service
   useEffect(() => {
-    localStorage.setItem('chatWidgetDarkMode', JSON.stringify(darkMode));
-  }, [darkMode]);
+    userStatusService.initialize();
+  }, []);
+
+  // Remove conflicting real-time message state - messages are handled by useChat hook
+
+  // Dark mode is now managed globally - no need for local storage
 
   // Load messages when chat is selected
   useEffect(() => {
-    if (selectedChat) {
+    if (selectedChat?.id) {
       console.log('🔍 useEffect: Loading messages for selected chat:', {
         chatId: selectedChat.id,
         chatName: selectedChat.name,
         isUser: selectedChat.isUser,
         userData: selectedChat.userData
       });
-      loadMessages(selectedChat.id);
-      markChatAsRead(selectedChat.id);
-    }
-  }, [selectedChat?.id]); // Only depend on selectedChat.id to prevent infinite loops
 
-  // Combine regular messages with real-time messages
-  const regularMessages = selectedChat?.id ? (messages[selectedChat.id] || []) : [];
-  const allMessages = [...regularMessages, ...realtimeMessages];
-  
+      // Load messages with a small delay to ensure chat is properly selected
+      const loadTimer = setTimeout(() => {
+        loadMessages(selectedChat.id);
+        markChatAsRead(selectedChat.id);
+      }, 100);
+
+      return () => clearTimeout(loadTimer);
+    }
+  }, [selectedChat?.id, loadMessages, markChatAsRead]); // Include dependencies
+
+  // Get messages for the selected chat
+  const chatMessages = selectedChat?.id ? (messages[selectedChat.id] || []) : [];
+
   // Detailed logging for message display
   useEffect(() => {
     if (selectedChat?.id) {
       console.log('🔍 DETAILED: Message display update:', {
         chatId: selectedChat.id,
-        regularMessageCount: regularMessages.length,
-        realtimeMessageCount: realtimeMessages.length,
-        totalMessageCount: allMessages.length,
+        messageCount: chatMessages.length,
         messagesState: messages,
-        regularMessages: regularMessages.map(m => ({
+        chatMessages: chatMessages.map(m => ({
           id: m.id,
           sender: m.senderId,
           isOwn: m.isOwn,
           content: m.content?.substring(0, 30) + '...'
-        })),
-        allMessages: allMessages.map(m => ({
-          id: m.id,
-          sender: m.senderId || m.sender_id,
-          isOwn: m.isOwn,
-          content: (m.content || m.message)?.substring(0, 30) + '...'
         }))
       });
     }
-  }, [selectedChat?.id, regularMessages.length, realtimeMessages.length, allMessages.length]);
+  }, [selectedChat?.id, chatMessages.length, messages]);
 
   // Auto-scroll to bottom
   useEffect(() => {
     if (messagesEndRef.current && selectedChat) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [allMessages, selectedChat]);
+  }, [chatMessages, selectedChat]);
 
-  // Clear typing indicators and real-time messages when switching chats
+  // Clear typing indicators when switching chats
   useEffect(() => {
     setTypingUsers([]);
     setIsTyping(false);
-    clearRealtimeMessages();
-  }, [selectedChat?.id, clearRealtimeMessages]);
+  }, [selectedChat?.id]);
 
   // Real-time message subscription (replaces polling)
   useEffect(() => {
@@ -157,28 +148,28 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
 
     const setupSubscription = () => {
       console.log(`🔄 Setting up subscription attempt ${retryCount + 1}/${maxRetries + 1} for chat:`, selectedChat.id);
-      
+
       try {
         currentChannel = subscribeToChat(selectedChat.id);
-        
+
         // Monitor for connection failures and retry
         const connectionMonitor = setInterval(() => {
           if (connectionStatus === 'disconnected' && retryCount < maxRetries) {
             console.log(`🔄 Connection failed, scheduling retry ${retryCount + 1}/${maxRetries} for chat:`, selectedChat.id);
             retryCount++;
-            
+
             // Clean up current channel
             if (currentChannel) {
               unsubscribeFromChat(currentChannel);
               currentChannel = null;
             }
-            
+
             // Retry with exponential backoff
             const delay = Math.min(1000 * Math.pow(2, retryCount - 1), 10000);
             retryTimeout = setTimeout(() => {
               setupSubscription();
             }, delay);
-            
+
             clearInterval(connectionMonitor);
           } else if (connectionStatus === 'connected') {
             // Reset retry count on successful connection
@@ -190,15 +181,14 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
         if (currentChannel) {
           (currentChannel as any)._connectionMonitor = connectionMonitor;
         }
-        
+
       } catch (error) {
-        console.error('❌ Failed to setup subscription:', error);
-        
+
         if (retryCount < maxRetries) {
           retryCount++;
           const delay = Math.min(1000 * Math.pow(2, retryCount - 1), 10000);
           console.log(`🔄 Retrying subscription setup in ${delay}ms...`);
-          
+
           retryTimeout = setTimeout(() => {
             setupSubscription();
           }, delay);
@@ -209,20 +199,19 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
     setupSubscription();
 
     return () => {
-      console.log('🛑 Cleaning up realtime subscription for chat:', selectedChat.id);
-      
+
       // Clear retry timeout
       if (retryTimeout) {
         clearTimeout(retryTimeout);
       }
-      
+
       // Clean up current channel
       if (currentChannel) {
         // Clear connection monitor
         if ((currentChannel as any)._connectionMonitor) {
           clearInterval((currentChannel as any)._connectionMonitor);
         }
-        
+
         unsubscribeFromChat(currentChannel);
       }
     };
@@ -240,7 +229,28 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
     }
   };
 
-  // For DMs, show available users to chat with
+  // WhatsApp-style time formatting for chat list
+  const formatWhatsAppTime = (timestamp: string): string => {
+    try {
+      const date = new Date(timestamp);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays = Math.floor(diffMs / 86400000);
+
+      if (diffMins < 1) return 'now';
+      if (diffMins < 60) return `${diffMins}m`;
+      if (diffHours < 24) return `${diffHours}h`;
+      if (diffDays === 1) return 'yesterday';
+      if (diffDays < 7) return date.toLocaleDateString([], { weekday: 'short' });
+      return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    } catch (error) {
+      return '';
+    }
+  };
+
+  // For DMs, show available users to chat with. For chats, sort by latest message (WhatsApp style)
   const getDisplayItems = (): ExtendedChat[] => {
     if (activeTab === 'dms') {
       return users.filter(user => {
@@ -251,18 +261,48 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
         name: user.name || user.email || 'Unknown User',
         type: 'dm' as const,
         lastMessage: `${user.role || 'Member'} • Click to start chat`,
-        lastMessageTime: user.status || 'Online',
+        lastMessageTime: userStatusService.getStatusText(user.id),
         unreadCount: 0,
         isUser: true,
         userData: user
       }));
     } else {
-      return chats.filter(chat => {
+      // Sort chats by latest message timestamp (WhatsApp style)
+      const filteredChats = chats.filter(chat => {
         if (activeTab === 'groups' && chat.type !== 'group') return false;
         if (activeTab === 'announcements' && chat.type !== 'announcement') return false;
         if (searchQuery && !chat.name?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
         return true;
-      }).map(chat => ({ ...chat }));
+      });
+
+      // Sort by latest message timestamp, with unread chats prioritized
+      return filteredChats
+        .map(chat => {
+          // Get latest message for this chat
+          const chatMessages = messages[chat.id] || [];
+          const latestMessage = chatMessages.length > 0 
+            ? chatMessages[chatMessages.length - 1] 
+            : null;
+
+          return {
+            ...chat,
+            lastMessage: latestMessage?.content || chat.lastMessage || 'No messages yet',
+            lastMessageTime: latestMessage?.timestamp 
+              ? formatWhatsAppTime(latestMessage.timestamp)
+              : chat.lastMessageTime || '',
+            // Add sort priority: unread messages first, then by timestamp
+            sortTimestamp: latestMessage?.timestamp || chat.createdAt || '1970-01-01T00:00:00Z',
+            hasUnread: chat.unreadCount > 0
+          };
+        })
+        .sort((a, b) => {
+          // First sort by unread status (unread chats first)
+          if (a.hasUnread && !b.hasUnread) return -1;
+          if (!a.hasUnread && b.hasUnread) return 1;
+          
+          // Then sort by latest message timestamp (newest first)
+          return new Date(b.sortTimestamp).getTime() - new Date(a.sortTimestamp).getTime();
+        });
     }
   };
 
@@ -290,13 +330,13 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
             recipientId: item.userData.id,
             recipientName: item.userData.name
           });
-          
+
           setSelectedChat({
             ...dmChat,
             userData: item.userData,
             loading: false
           });
-          
+
           // Load messages with the correct DM chat ID
           console.log('📜 Loading messages for DM chat:', dmChat.id);
           loadMessages(dmChat.id);
@@ -325,13 +365,13 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
     try {
       setIsSending(true);
       setMessageInput('');
-      
+
       console.log('📤 Sending message to chat:', {
         chatId: selectedChat.id,
         content: content.substring(0, 50) + (content.length > 50 ? '...' : ''),
         chatName: selectedChat.name
       });
-      
+
       await sendChatMessage(selectedChat.id, content);
     } catch (error) {
       console.error('Failed to send message:', error);
@@ -394,8 +434,8 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
   }
 
   const themeClasses = darkMode
-    ? 'bg-gray-900 text-white border-gray-700'
-    : 'bg-white text-gray-900 border-gray-200';
+    ? 'bg-gray-900 text-white border-gray-700 transition-colors duration-300'
+    : 'bg-white text-gray-900 border-gray-200 transition-colors duration-300';
 
   // Chat button when closed
   if (!isOpen) {
@@ -446,14 +486,16 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
               )}
             </div>
 
+
+
             <div className="flex items-center gap-2">
               {/* Dark Mode Toggle */}
               <button
-                onClick={() => setDarkMode(!darkMode)}
-                className="p-2 rounded hover:bg-white/20 transition-colors"
-                title="Toggle Dark Mode"
+                onClick={toggleDarkMode}
+                className="p-2 rounded hover:bg-white/20 transition-all duration-200"
+                title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
               >
-                {darkMode ? '☀️' : '🌙'}
+                {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
               </button>
 
               {/* Close Button */}
@@ -510,98 +552,49 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
 
                 {/* Debug Panel */}
                 <div className="space-y-2 p-2 bg-gray-100 dark:bg-gray-800 rounded">
-                  <div className="text-xs font-semibold text-gray-600 dark:text-gray-300">Debug Panel</div>
-
                   <button
                     onClick={() => {
-                      console.log('🔄 Manual refresh users clicked');
                       loadUsers();
                     }}
                     className="w-full px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
                   >
                     Refresh Users
                   </button>
-
+                  {selectedChat && (
+                    <button
+                      onClick={() => {
+                        console.log('🔍 Debug: Current message state:', {
+                          selectedChatId: selectedChat.id,
+                          messageCount: chatMessages.length,
+                          messages: chatMessages,
+                          allMessagesState: messages
+                        });
+                        loadMessages(selectedChat.id);
+                      }}
+                      className="w-full px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+                    >
+                      Debug Messages
+                    </button>
+                  )}
                   <button
-                    onClick={async () => {
-                      try {
-                        // Check WebSocket connection status (reduced logging)
-                        const wsStatus = webSocketService.getConnectionStatus();
-                        
-                        // Try to reconnect if disconnected
-                        if (wsStatus === 'disconnected') {
-                          webSocketService.reconnect();
-                          alert('🔄 WebSocket disconnected. Attempting to reconnect...\n\nCheck console for details.');
-                        } else {
-                          alert(`✅ WebSocket is ${wsStatus}!\n\nUsers: ${users.length}\nChats: ${chats.length}\n\nCheck console for detailed logs.`);
+                    onClick={() => {
+                      // Test indicator for current user
+                      const currentUserId = localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user') || '{}').id : 'test-user';
+                      window.dispatchEvent(new CustomEvent('message-indicator', {
+                        detail: {
+                          type: 'message_sent',
+                          userId: currentUserId,
+                          chatId: selectedChat?.id || 'test-chat',
+                          timestamp: Date.now(),
+                          messageId: `test-${Date.now()}`
                         }
-                      } catch (error) {
-                        console.error('❌ Debug error:', error);
-                        alert(`❌ Debug failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-                      }
-                    }}
-                    className="w-full px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
-                  >
-                    Debug WebSocket
-                  </button>
-
-                  <button
-                    onClick={async () => {
-                      try {
-                        const authStatus = webSocketService.debugAuth();
-                        
-                        if (!authStatus.canAuthenticate) {
-                          alert(`❌ Cannot authenticate WebSocket!\n\nIssues:\n- Has Token: ${authStatus.hasToken}\n- Has User ID: ${authStatus.hasUserId}\n- User ID: ${authStatus.userId || 'MISSING'}\n\nCheck console for detailed debug info.`);
-                        } else {
-                          alert(`✅ WebSocket authentication looks good!\n\n- Connected: ${authStatus.isConnected}\n- User ID: ${authStatus.userId}\n- Can Authenticate: ${authStatus.canAuthenticate}\n\nCheck console for detailed debug info.`);
-                        }
-                      } catch (error) {
-                        console.error('❌ Auth debug error:', error);
-                        alert(`❌ Auth debug failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-                      }
+                      }));
+                      console.log('✨ Test indicator triggered for user:', currentUserId);
                     }}
                     className="w-full px-2 py-1 text-xs bg-purple-500 text-white rounded hover:bg-purple-600 transition-colors"
                   >
-                    Debug Auth
+                    Test Indicator
                   </button>
-
-                  <button
-                    onClick={async () => {
-                      try {
-                        if (selectedChat) {
-                          // Force join the chat room first
-                          console.log('🏠 Joining chat room:', selectedChat.id);
-                          webSocketService.joinChat(selectedChat.id);
-                          
-                          // Wait a moment for join to complete
-                          await new Promise(resolve => setTimeout(resolve, 1000));
-                          
-                          const testMessage = `Test message at ${new Date().toLocaleTimeString()}`;
-                          const messageId = `test-${Date.now()}`;
-                          
-                          const sent = webSocketService.sendMessage(selectedChat.id, testMessage, messageId);
-                          
-                          if (sent) {
-                            alert('✅ Test message sent via WebSocket!\n\nCheck the chat for the message and backend logs.');
-                          } else {
-                            alert('❌ WebSocket not connected. Cannot send test message.');
-                          }
-                        } else {
-                          alert('⚠️ Please select a chat first to test messaging.');
-                        }
-                      } catch (error) {
-                        console.error('❌ Test error:', error);
-                        alert(`❌ Test failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-                      }
-                    }}
-                    className="w-full px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
-                  >
-                    Test Message
-                  </button>
-
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    Users: {users.length} | Status: {connectionStatus} | Error: {chatError || 'None'}
-                  </div>
                 </div>
               </div>
 
@@ -620,7 +613,7 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                     </p>
                     {chatError && (
                       <p className="text-xs mt-2 text-red-500">
-                        Error: {chatError}
+                        Error please click the refresh button
                       </p>
                     )}
                   </div>
@@ -635,9 +628,17 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                         }`}
                     >
                       <div className="flex items-center gap-3">
-                        {/* Circular Avatar (40px) */}
-                        <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium text-sm flex-shrink-0">
-                          {item.name ? item.name.charAt(0).toUpperCase() : 'U'}
+                        {/* Circular Avatar (40px) with status indicator */}
+                        <div className="relative w-10 h-10 flex-shrink-0">
+                          <IndicatorWrapper userId={item.id}>
+                            <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium text-sm">
+                              {item.name ? item.name.charAt(0).toUpperCase() : 'U'}
+                            </div>
+                          </IndicatorWrapper>
+                          {/* Status indicator */}
+                          {item.isUser && (
+                            <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${userStatusService.getStatusColor(item.userData?.id || '')}`}></div>
+                          )}
                         </div>
 
                         <div className="flex-1 min-w-0">
@@ -649,10 +650,35 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                           </div>
 
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <p className={`text-sm truncate ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                                {item.lastMessage}
-                              </p>
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              {/* Show message preview with sender info for groups */}
+                              <div className="flex-1 min-w-0">
+                                {!item.isUser && item.lastMessage && item.lastMessage !== 'No messages yet' ? (
+                                  <div className="flex items-center gap-1">
+                                    {/* Show "You:" for own messages in groups */}
+                                    {(() => {
+                                      const chatMessages = messages[item.id] || [];
+                                      const latestMessage = chatMessages[chatMessages.length - 1];
+                                      const currentUserId = getCurrentUserId();
+                                      const isOwnMessage = latestMessage && String(latestMessage.senderId) === String(currentUserId);
+                                      
+                                      return isOwnMessage ? (
+                                        <span className={`text-xs font-medium ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
+                                          You:
+                                        </span>
+                                      ) : null;
+                                    })()}
+                                    <p className={`text-sm truncate ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                      {item.lastMessage}
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <p className={`text-sm truncate ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                    {item.lastMessage}
+                                  </p>
+                                )}
+                              </div>
+                              
                               {/* Role Badge for non-employees */}
                               {item.userData?.role && item.userData.role !== 'employee' && (
                                 <span className={`text-xs px-2 py-0.5 rounded-full ${getRoleBadgeColor(item.userData.role)}`}>
@@ -661,11 +687,35 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                               )}
                             </div>
 
-                            {item.unreadCount > 0 && (
-                              <div className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full ml-2">
-                                {item.unreadCount > 99 ? '99+' : item.unreadCount}
-                              </div>
-                            )}
+                            <div className="flex items-center gap-2 ml-2">
+                              {/* Message status for own messages */}
+                              {(() => {
+                                const chatMessages = messages[item.id] || [];
+                                const latestMessage = chatMessages[chatMessages.length - 1];
+                                const currentUserId = getCurrentUserId();
+                                const isOwnMessage = latestMessage && String(latestMessage.senderId) === String(currentUserId);
+                                
+                                if (isOwnMessage && latestMessage?.status) {
+                                  return (
+                                    <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                      {latestMessage.status === 'sending' && '⏳'}
+                                      {latestMessage.status === 'sent' && '✓'}
+                                      {latestMessage.status === 'delivered' && '✓✓'}
+                                      {latestMessage.status === 'read' && '✓✓'}
+                                      {latestMessage.status === 'failed' && '❌'}
+                                    </span>
+                                  );
+                                }
+                                return null;
+                              })()}
+
+                              {/* Unread count badge */}
+                              {item.unreadCount > 0 && (
+                                <div className="bg-green-500 text-white text-xs px-2 py-0.5 rounded-full min-w-[20px] text-center">
+                                  {item.unreadCount > 99 ? '99+' : item.unreadCount}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -689,9 +739,11 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                     </button>
 
                     {/* Avatar */}
-                    <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium text-sm">
-                      {selectedChat.userData?.name?.charAt(0).toUpperCase() || selectedChat.name?.charAt(0).toUpperCase() || 'U'}
-                    </div>
+                    <IndicatorWrapper userId={selectedChat.userData?.id || selectedChat.id}>
+                      <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium text-sm">
+                        {selectedChat.userData?.name?.charAt(0).toUpperCase() || selectedChat.name?.charAt(0).toUpperCase() || 'U'}
+                      </div>
+                    </IndicatorWrapper>
 
                     <div>
                       <h3 className="font-medium text-gray-900 dark:text-white">
@@ -704,13 +756,12 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                           </span>
                         )}
                         <div className="flex items-center gap-1">
-                          <div className={`w-2 h-2 rounded-full ${
-                            connectionStatus === 'connected' ? 'bg-green-500' : 
+                          <div className={`w-2 h-2 rounded-full ${connectionStatus === 'connected' ? 'bg-green-500' :
                             connectionStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'
-                          }`}></div>
+                            }`}></div>
                           <span className="text-xs text-gray-500 dark:text-gray-400">
-                            {connectionStatus === 'connected' ? 'Real-time' : 
-                             connectionStatus === 'connecting' ? 'Connecting...' : 'Offline'}
+                            {connectionStatus === 'connected' ? 'Real-time' :
+                              connectionStatus === 'connecting' ? 'Connecting...' : 'Offline'}
                           </span>
                         </div>
                       </div>
@@ -730,6 +781,28 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                       <button
                         onClick={() => {
                           if (selectedChat) {
+                            console.log('🔄 Refreshing messages...');
+                            loadMessages(selectedChat.id);
+                          }
+                        }}
+                        className="ml-2 px-2 py-1 bg-yellow-600 hover:bg-yellow-700 text-white text-xs rounded transition-colors"
+                      >
+                        Refresh Messages
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (selectedChat) {
+                            console.log('🔄 Refreshing messages...');
+                            loadMessages(selectedChat.id);
+                          }
+                        }}
+                        className="ml-2 px-2 py-1 bg-yellow-600 hover:bg-yellow-700 text-white text-xs rounded transition-colors"
+                      >
+                        Refresh Messages
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (selectedChat) {
                             console.log('🔄 Retrying real-time connection...');
                             const channel = subscribeToChat(selectedChat.id);
                             // Store channel for cleanup
@@ -744,114 +817,42 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                   </div>
                 )}
 
-                {/* Messages */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                  {selectedChat?.loading ? (
-                    <div className="text-center text-gray-500 dark:text-gray-400 mt-8">
+                {/* Messages - WhatsApp Style */}
+                {selectedChat?.loading ? (
+                  <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">
+                    <div className="text-center">
                       <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"></div>
                       <p>Loading messages...</p>
                     </div>
-                  ) : allMessages.length === 0 ? (
-                    <div className="text-center text-gray-500 dark:text-gray-400 mt-8">
-                      <MessageCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                      <p>No messages yet. Start the conversation!</p>
-                      <button className="mt-2 p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors">
-                        <Plus className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ) : (
-                    allMessages.map((message: any, index: number) => {
-                      const currentUserId = getCurrentUserId();
+                  </div>
+                ) : (
+                  <WhatsAppMessageList
+                    messages={chatMessages}
+                    currentUserId={getCurrentUserId()}
+                    onRetryMessage={retryMessage}
+                    darkMode={darkMode}
+                  />
+                )}
+                
+                <div ref={messagesEndRef} />
 
-                      // Handle both message formats (useChat vs useRealtimeChat)
-                      const senderId = message.senderId || message.sender_id;
-                      const messageContent = message.content || message.message;
-                      const senderName = message.senderName || message.sender_name || 'Unknown User';
-                      const messageId = message.id;
-                      const timestamp = message.timestamp || message.created_at;
-
-                      // Handle type mismatches by converting both to strings
-                      const isMyMessage = String(senderId) === String(currentUserId) && currentUserId !== '';
-
-                      // Detailed logging for each message being rendered
-                      console.log(`🔍 DETAILED: Rendering message ${index + 1}/${allMessages.length}:`, {
-                        messageId,
-                        senderId,
-                        currentUserId,
-                        isMyMessage,
-                        senderName,
-                        messageContent,
-                        timestamp,
-                        rawMessage: message
-                      });
-
-                      return (
-                        <div key={messageId} className={`flex items-end gap-3 mb-6 ${isMyMessage ? 'justify-end' : 'justify-start'}`}>
-                          {isMyMessage ? (
-                            // 📤 MY MESSAGE - RIGHT SIDE (SENT)
-                            <div className="flex items-end gap-3 max-w-[75%]">
-                              <div className="flex flex-col items-end">
-                                <div className="px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-2xl rounded-br-md shadow-lg">
-                                  <p className="text-sm leading-relaxed break-words">{messageContent}</p>
-                                  <div className="flex items-center justify-end gap-1 mt-2 text-blue-100">
-                                    <span className="text-xs">
-                                      {new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    </span>
-                                    <span className="text-xs">✓✓</span>
-                                  </div>
-                                </div>
-                                <div className="text-xs text-gray-500 mt-1 mr-2">You</div>
-                              </div>
-                              <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-700 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 shadow-lg border-2 border-white">
-                                ME
-                              </div>
-                            </div>
-                          ) : (
-                            // 📥 RECEIVED MESSAGE - LEFT SIDE (RECEIVED)
-                            <div className="flex items-end gap-3 max-w-[75%]">
-                              <div className="w-10 h-10 rounded-full bg-gradient-to-r from-gray-500 to-gray-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 shadow-lg border-2 border-white">
-                                {senderName?.charAt(0).toUpperCase() || 'U'}
-                              </div>
-                              <div className="flex flex-col items-start">
-                                <div className="px-4 py-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-2xl rounded-bl-md shadow-lg border border-gray-200 dark:border-gray-600">
-                                  <p className="text-xs font-semibold mb-2 text-blue-600 dark:text-blue-400">
-                                    {senderName}
-                                  </p>
-                                  <p className="text-sm leading-relaxed break-words">{messageContent}</p>
-                                  <div className="flex items-center justify-end gap-1 mt-2 text-gray-500 dark:text-gray-400">
-                                    <span className="text-xs">
-                                      {new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    </span>
-                                  </div>
-                                </div>
-                                <div className="text-xs text-gray-500 mt-1 ml-2">{senderName}</div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })
-                  )}
-                  <div ref={messagesEndRef} />
-
-                  {/* Typing Indicator - Only show when someone is actually typing */}
-                  {typingUsers.length > 0 && (
-                    <div className="px-4 py-2">
-                      <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-sm">
-                        <div className="flex gap-1">
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                        </div>
-                        <span className="text-xs">
-                          {typingUsers.length === 1
-                            ? `${typingUsers[0]} is typing...`
-                            : `${typingUsers.length} people are typing...`}
-                        </span>
+                {/* Typing Indicator - Only show when someone is actually typing */}
+                {typingUsers.length > 0 && (
+                  <div className="px-4 py-2">
+                    <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-sm">
+                      <div className="flex gap-1">
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                       </div>
+                      <span className="text-xs">
+                        {typingUsers.length === 1
+                          ? `${typingUsers[0]} is typing...`
+                          : `${typingUsers.length} people are typing...`}
+                      </span>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 {/* Message Input */}
                 <div className={`p-4 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'} flex-shrink-0`}>

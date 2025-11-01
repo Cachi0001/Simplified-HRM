@@ -24,7 +24,7 @@ export interface ChatMessage {
   content: string;
   timestamp: string;
   isOwn: boolean;
-  status?: 'sending' | 'sent' | 'delivered' | 'read';
+  status?: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
 }
 
 export interface User {
@@ -268,84 +268,80 @@ export function useChat() {
     }
   }, []);
 
-  // Send message
+  // Send message - simplified for debugging
   const sendMessage = useCallback(async (chatId: string, content: string) => {
+    console.log('🚀 SEND MESSAGE CALLED:', { chatId, content });
+    
     try {
-      const messageId = `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const optimisticMessage: ChatMessage = {
-        id: messageId,
-        chatId,
-        senderId: getCurrentUserId(),
-        senderName: 'You',
-        content,
-        timestamp: new Date().toISOString(),
-        isOwn: true,
-        status: 'sending'
-      };
-
-      // Add optimistic message
-      setMessages(prev => ({
-        ...prev,
-        [chatId]: [...(prev[chatId] || []), optimisticMessage]
-      }));
-
-      // Try WebSocket first if connected
-      if (connectionStatus === 'connected') {
-        const sent = webSocketService.sendMessage(chatId, content, messageId);
-        if (sent) {
-          // Update message status to sent
-          setMessages(prev => ({
-            ...prev,
-            [chatId]: prev[chatId]?.map(msg =>
-              msg.id === messageId ? { ...msg, status: 'sent' } : msg
-            ) || []
-          }));
-          return; // WebSocket sent successfully
-        }
-      }
-
-      // Fallback to REST API
+      // First, just try the API call without optimistic updates
+      console.log('🌐 Sending via REST API...');
+      
       const response = await api.post('/chat/send', {
         chatId,
         message: content
       });
 
-      if (response.data?.status === 'success' && response.data) {
-        const responseData = response.data.data as { message?: any };
-        if (responseData.message) {
-          const serverMessage = responseData.message;
-          const realMessage: ChatMessage = {
-            id: serverMessage.id,
-            chatId: serverMessage.chat_id,
-            senderId: serverMessage.sender_id,
-            senderName: 'You',
-            content: serverMessage.message,
-            timestamp: serverMessage.timestamp,
-            isOwn: true,
-            status: 'sent'
-          };
+      console.log('📨 API Response received:', response.data);
 
-          // Replace optimistic message with real one
-          setMessages(prev => ({
-            ...prev,
-            [chatId]: prev[chatId]?.map(msg =>
-              msg.id === messageId ? realMessage : msg
-            ) || [realMessage]
+      if (response.data?.status === 'success') {
+        console.log('✅ Message sent successfully!');
+        
+        // Trigger indicator for current user
+        const currentUserId = getCurrentUserId();
+        if (currentUserId) {
+          window.dispatchEvent(new CustomEvent('message-indicator', { 
+            detail: {
+              type: 'message_sent',
+              userId: currentUserId,
+              chatId,
+              timestamp: Date.now(),
+              messageId: response.data.data?.message?.id || `msg-${Date.now()}`
+            }
           }));
+          console.log('✨ Message indicator triggered for user:', currentUserId);
         }
+        
+        // Reload messages to see the new message
+        await loadMessages(chatId);
+      } else {
+        console.error('❌ API returned error:', response.data);
+        throw new Error('API returned error status');
       }
     } catch (error) {
-      console.error('Failed to send message:', error);
-
-      // Update optimistic message to failed state
-      setMessages(prev => ({
-        ...prev,
-        [chatId]: prev[chatId]?.map(msg =>
-          msg.id.startsWith('msg-') ? { ...msg, status: 'failed' as any } : msg
-        ) || []
-      }));
+      console.error('❌ Send message error:', error);
+      throw error;
     }
-  }, [connectionStatus]);
+  }, [loadMessages]);
+
+  // Retry failed message
+  const retryMessage = useCallback(async (messageId: string) => {
+    // Find the failed message
+    for (const [chatId, chatMessages] of Object.entries(messages)) {
+      const failedMessage = chatMessages.find(msg => msg.id === messageId && msg.status === 'failed');
+      if (failedMessage) {
+        console.log('🔄 Retrying message:', failedMessage);
+        
+        // Remove the failed message
+        setMessages(prev => ({
+          ...prev,
+          [chatId]: prev[chatId]?.filter(msg => msg.id !== messageId) || []
+        }));
+        
+        // Resend the message
+        try {
+          await sendMessage(chatId, failedMessage.content);
+        } catch (error) {
+          console.error('Failed to retry message:', error);
+          // Add the failed message back
+          setMessages(prev => ({
+            ...prev,
+            [chatId]: [...(prev[chatId] || []), failedMessage]
+          }));
+        }
+        break;
+      }
+    }
+  }, [messages, sendMessage]);
 
   // Create group
   const createGroup = useCallback(async (name: string, description?: string, memberIds?: string[]) => {
@@ -614,8 +610,14 @@ export function useChat() {
 
   // Load initial data
   useEffect(() => {
-    loadChats();
-    loadUsers();
+    const token = localStorage.getItem('accessToken');
+    if (token) {
+      console.log('🔄 Token found, loading chat data...');
+      loadChats();
+      loadUsers();
+    } else {
+      console.log('⚠️ No token found, skipping chat data load');
+    }
 
     // Test WebSocket connection on startup
     const initializeConnection = async () => {
@@ -630,15 +632,39 @@ export function useChat() {
       }
     };
 
-    initializeConnection();
+    if (token) {
+      initializeConnection();
+    }
   }, [loadChats, loadUsers, testWebSocketConnection]);
 
   // Re-try loading users when auth token appears (e.g., after login refresh)
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
-    if (token && users.length === 0) {
+    if (token && users.length === 0 && !isLoading) {
+      console.log('🔄 Auth token detected, auto-loading users...');
       loadUsers();
     }
+  }, [loadUsers, users.length, isLoading]);
+
+  // Auto-reload when connection status changes to connected
+  useEffect(() => {
+    if (connectionStatus === 'connected' && users.length === 0 && !isLoading) {
+      console.log('🔄 WebSocket connected, auto-loading users...');
+      loadUsers();
+    }
+  }, [connectionStatus, users.length, isLoading, loadUsers]);
+
+  // Auto-reload users when authentication state changes
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'accessToken' && e.newValue && users.length === 0) {
+        console.log('🔄 New auth token detected, loading users...');
+        setTimeout(() => loadUsers(), 100); // Small delay to ensure auth is ready
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, [loadUsers, users.length]);
 
   // Realtime subscription for chat messages
@@ -653,19 +679,30 @@ export function useChat() {
     webSocketService.onMessage(chatId, (message: WSChatMessage) => {
       console.log('📨 WebSocket message received:', message);
       
-      // Add the new message to the chat
+      // Add the new message to the chat with deduplication
       setMessages(prev => {
         const existingMessages = prev[chatId] || [];
         
-        // Check if message already exists to prevent duplicates
-        const messageExists = existingMessages.some(msg => msg.id === message.id);
+        // Check if message already exists
+        const messageExists = existingMessages.some(msg => 
+          msg.id === message.id || 
+          (msg.content === message.content && 
+           msg.senderId === message.senderId &&
+           Math.abs(new Date(msg.timestamp).getTime() - new Date(message.timestamp).getTime()) < 10000)
+        );
+        
         if (messageExists) {
-          console.log('⏭️ Message already exists, skipping duplicate');
+          console.log('⏭️ Message already exists, skipping duplicate:', message.id);
           return prev;
         }
 
-        const updatedMessages = [...existingMessages, message];
-        console.log('✅ Message added to chat:', {
+        // Remove any optimistic messages that match this real message
+        const filteredMessages = existingMessages.filter(msg => 
+          !(msg.status === 'sending' && msg.content === message.content && msg.senderId === message.senderId)
+        );
+
+        const updatedMessages = [...filteredMessages, message];
+        console.log('✅ WebSocket message added:', {
           chatId,
           messageId: message.id,
           sender: message.senderName,
@@ -710,6 +747,7 @@ export function useChat() {
     loadUsers,
     loadMessages,
     sendMessage,
+    retryMessage,
     createGroup,
     createOrGetDM,
     markChatAsRead,

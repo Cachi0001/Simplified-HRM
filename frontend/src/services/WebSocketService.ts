@@ -1,4 +1,5 @@
 import { io, Socket } from 'socket.io-client';
+import { IndicatorEvent } from '../types/indicators';
 
 export interface ChatMessage {
   id: string;
@@ -31,12 +32,12 @@ class WebSocketService {
 
   private connect() {
     // Force localhost in development, use environment URL in production
-    const serverUrl = import.meta.env.PROD 
+    const serverUrl = import.meta.env.PROD
       ? (import.meta.env.VITE_API_URL?.replace('/api', '') || 'https://go3nethrm-backend.vercel.app')
       : 'http://localhost:3000';
-    
+
     // Connecting to WebSocket server (reduced logging)
-    
+
     this.socket = io(serverUrl, {
       transports: ['websocket', 'polling'],
       timeout: 20000,
@@ -53,11 +54,11 @@ class WebSocketService {
       console.log('✅ WebSocket connected:', this.socket?.id);
       this.isConnected = true;
       this.notifyConnectionHandlers(true);
-      
+
       // Authenticate if we have a token
       const token = localStorage.getItem('accessToken');
       const userId = this.getCurrentUserId();
-      
+
       if (token && userId) {
         console.log('🔐 Authenticating WebSocket with user:', userId);
         this.authenticate(userId, token);
@@ -102,30 +103,50 @@ class WebSocketService {
 
     this.socket.on('new_message', (messageData) => {
       console.log('📨 New message received:', messageData);
+
+      // Handle different message data formats from server
+      const currentUserId = this.getCurrentUserId();
       
       const message: ChatMessage = {
         id: messageData.id,
-        chatId: messageData.chatId,
-        senderId: messageData.senderId,
-        senderName: messageData.senderName || 'Unknown User',
-        senderAvatar: messageData.senderAvatar,
-        content: messageData.message,
-        timestamp: messageData.timestamp,
-        isOwn: false, // Messages from WebSocket are always from others
+        chatId: messageData.chatId || messageData.chat_id,
+        senderId: messageData.senderId || messageData.sender_id,
+        senderName: messageData.senderName || messageData.sender_name || 'Unknown User',
+        senderAvatar: messageData.senderAvatar || messageData.sender_avatar,
+        content: messageData.message || messageData.content,
+        timestamp: messageData.timestamp || messageData.created_at,
+        isOwn: String(messageData.senderId || messageData.sender_id) === String(currentUserId),
         status: 'delivered'
       };
 
+      console.log('📨 Processed message:', {
+        originalData: messageData,
+        processedMessage: message,
+        currentUserId,
+        isOwn: message.isOwn
+      });
+
       // Notify message handlers for this chat
-      const handler = this.messageHandlers.get(messageData.chatId);
+      const handler = this.messageHandlers.get(message.chatId);
       if (handler) {
         handler(message);
       }
 
-      // Notify all message handlers (for global message updates)
-      this.messageHandlers.forEach((handler, chatId) => {
-        if (chatId === messageData.chatId) {
-          handler(message);
+      // Also notify handlers that might be listening to the original chatId format
+      if (messageData.chatId !== message.chatId) {
+        const altHandler = this.messageHandlers.get(messageData.chatId);
+        if (altHandler) {
+          altHandler(message);
         }
+      }
+
+      // Trigger message indicator for the sender
+      this.emitIndicatorEvent({
+        type: 'message_sent',
+        userId: message.senderId,
+        chatId: message.chatId,
+        timestamp: Date.now(),
+        messageId: message.id
       });
     });
 
@@ -149,7 +170,7 @@ class WebSocketService {
 
     this.socket.on('typing_update', (data) => {
       console.log('⌨️ Typing update:', data);
-      
+
       // Notify typing handlers
       this.typingHandlers.forEach((handler) => {
         handler(data);
@@ -331,7 +352,7 @@ class WebSocketService {
   public debugAuth() {
     const token = localStorage.getItem('accessToken');
     const userId = this.getCurrentUserId();
-    
+
     console.log('🔍 WebSocket Authentication Debug:', {
       isConnected: this.isConnected,
       hasSocket: !!this.socket,
@@ -356,6 +377,17 @@ class WebSocketService {
       userId,
       canAuthenticate: !!(token && userId)
     };
+  }
+
+  // Emit indicator event for message sender visual feedback
+  private emitIndicatorEvent(event: IndicatorEvent) {
+    try {
+      // Emit to global event system for indicator components
+      window.dispatchEvent(new CustomEvent('message-indicator', { detail: event }));
+      console.log('✨ Indicator event emitted:', event);
+    } catch (error) {
+      console.error('❌ Failed to emit indicator event:', error);
+    }
   }
 }
 
