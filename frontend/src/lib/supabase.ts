@@ -56,7 +56,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
  */
 export async function checkSupabaseConnection(): Promise<boolean> {
   try {
-    const { error } = await supabase.from('group_chats').select('count', { count: 'exact', head: true });
+    const { error } = await supabase.from('chats').select('count', { count: 'exact', head: true });
 
     if (error && error.code !== 'PGRST116') {
       throw error;

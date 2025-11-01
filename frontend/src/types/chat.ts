@@ -21,14 +21,7 @@ export interface ChatMessage {
   status?: 'sending' | 'sent' | 'delivered' | 'read';
 }
 
-export interface GroupChat {
-  id: string;
-  name: string;
-  created_by: string;
-  created_at: string;
-  unread_count?: number;
-  participant_count?: number;
-}
+
 
 export interface ChatParticipant {
   user_id: string;

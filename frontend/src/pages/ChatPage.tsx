@@ -7,7 +7,7 @@ import { useChat } from '@/hooks/useChat';
 import { useTypingIndicator } from '@/hooks/useTypingIndicator';
 import { useChatUnreadCount } from '@/hooks/useChatUnreadCount';
 import { authService } from '@/services/authService';
-import type { ChatMessage as ChatMessageType, GroupChat } from '@/types/chat';
+import type { ChatMessage as ChatMessageType } from '@/types/chat';
 import api from '@/lib/api';
 
 /**
@@ -26,7 +26,7 @@ export default function ChatPage() {
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // State
-  const [chats, setChats] = useState<GroupChat[]>([]);
+  const [chats, setChats] = useState<any[]>([]);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [messageText, setMessageText] = useState('');
   const [isLoadingChats, setIsLoadingChats] = useState(true);

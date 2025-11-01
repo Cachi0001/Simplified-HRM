@@ -5,7 +5,7 @@ import webSocketService, { ChatMessage as WSChatMessage } from '@/services/WebSo
 export interface Chat {
   id: string;
   name: string;
-  type: 'dm' | 'group' | 'announcement';
+  type: 'dm' | 'announcement';
   lastMessage?: string;
   lastMessageTime?: string;
   unreadCount: number;
@@ -343,24 +343,7 @@ export function useChat() {
     }
   }, [messages, sendMessage]);
 
-  // Create group
-  const createGroup = useCallback(async (name: string, description?: string, memberIds?: string[]) => {
-    try {
-      const response = await api.post('/chat/groups', {
-        name,
-        description,
-        memberIds
-      });
 
-      if (response.data?.status === 'success') {
-        await loadChats(); // Refresh chats
-        return response.data.data;
-      }
-    } catch (error) {
-      console.error('Failed to create group:', error);
-      throw error;
-    }
-  }, [loadChats]);
 
   // Create or get DM chat
   const createOrGetDM = useCallback(async (recipientId: string) => {
@@ -761,7 +744,7 @@ export function useChat() {
     loadMessages,
     sendMessage,
     retryMessage,
-    createGroup,
+
     createOrGetDM,
     markChatAsRead,
     startTyping,
