@@ -56,6 +56,9 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
     getTotalUnreadCount,
     subscribeToChat,
     unsubscribeFromChat,
+    startTyping,
+    stopTyping,
+    typingUsers: chatTypingUsers,
   } = useChat();
 
   // Initialize message indicators
@@ -63,7 +66,10 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
 
   // State for typing indicator - only show when actually typing
   const [isTyping, setIsTyping] = useState(false);
-  const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
+
+  // Use typing users from useChat hook
+  const currentChatTypingUsers = selectedChat ? (chatTypingUsers[selectedChat.id] || []) : [];
 
   // Initialize user status service
   useEffect(() => {
@@ -123,9 +129,38 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
 
   // Clear typing indicators when switching chats
   useEffect(() => {
-    setTypingUsers([]);
     setIsTyping(false);
+    if (typingTimeout) {
+      clearTimeout(typingTimeout);
+      setTypingTimeout(null);
+    }
   }, [selectedChat?.id]);
+
+  // Handle typing indicator
+  const handleTypingChange = useCallback((value: string) => {
+    if (!selectedChat) return;
+
+    if (value.trim() && !isTyping) {
+      // Start typing
+      setIsTyping(true);
+      startTyping(selectedChat.id);
+    }
+
+    // Clear existing timeout
+    if (typingTimeout) {
+      clearTimeout(typingTimeout);
+    }
+
+    // Set new timeout to stop typing after 2 seconds of inactivity
+    const newTimeout = setTimeout(() => {
+      if (isTyping) {
+        setIsTyping(false);
+        stopTyping(selectedChat.id);
+      }
+    }, 2000);
+
+    setTypingTimeout(newTimeout);
+  }, [selectedChat, isTyping, typingTimeout, startTyping, stopTyping]);
 
   // Real-time message subscription (replaces polling)
   useEffect(() => {
@@ -369,6 +404,16 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
     try {
       setIsSending(true);
       setMessageInput('');
+      
+      // Stop typing indicator when sending message
+      if (isTyping) {
+        setIsTyping(false);
+        stopTyping(selectedChat.id);
+        if (typingTimeout) {
+          clearTimeout(typingTimeout);
+          setTypingTimeout(null);
+        }
+      }
 
       console.log('📤 Sending message to chat:', {
         chatId: selectedChat.id,
@@ -846,7 +891,7 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                 <div ref={messagesEndRef} />
 
                 {/* Typing Indicator - Only show when someone is actually typing */}
-                {typingUsers.length > 0 && (
+                {currentChatTypingUsers.length > 0 && (
                   <div className="px-4 py-2">
                     <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-sm">
                       <div className="flex gap-1">
@@ -855,9 +900,9 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                         <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                       </div>
                       <span className="text-xs">
-                        {typingUsers.length === 1
-                          ? `${typingUsers[0]} is typing...`
-                          : `${typingUsers.length} people are typing...`}
+                        {currentChatTypingUsers.length === 1
+                          ? `${currentChatTypingUsers[0]} is typing...`
+                          : `${currentChatTypingUsers.length} people are typing...`}
                       </span>
                     </div>
                   </div>
@@ -870,7 +915,10 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                       ref={inputRef}
                       type="text"
                       value={messageInput}
-                      onChange={(e) => setMessageInput(e.target.value)}
+                      onChange={(e) => {
+                        setMessageInput(e.target.value);
+                        handleTypingChange(e.target.value);
+                      }}
                       onKeyPress={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();

@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { IndicatorWrapperProps } from '../../types/indicators';
-import { useIndicatorListener } from '../../hooks/useMessageIndicators';
+import { useMessageIndicators } from '../../hooks/useMessageIndicators';
 import MessageIndicator from './MessageIndicator';
 
 /**
@@ -17,15 +17,16 @@ export function IndicatorWrapper({
   children, 
   className = '' 
 }: IndicatorWrapperProps) {
-  const { isActive, indicatorState } = useIndicatorListener(userId);
+  const { hasActiveIndicator } = useMessageIndicators();
+  const isActive = hasActiveIndicator(userId);
 
   return (
     <div className={`relative ${className}`}>
       {children}
-      {indicatorState && (
+      {isActive && (
         <MessageIndicator
           isActive={isActive}
-          style={indicatorState.style}
+          style="pulse"
           respectReducedMotion={true}
         />
       )}
