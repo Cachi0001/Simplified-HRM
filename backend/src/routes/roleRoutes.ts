@@ -4,8 +4,8 @@ import { authenticateToken } from '../middleware/auth.middleware';
 import { 
   requireAdmin, 
   requireRoleManagement, 
-  requirePermission 
-} from '../middleware/roleMiddleware';
+  validateRoleChange 
+} from '../middleware/auth.middleware';
 
 const router = Router();
 const roleController = new RoleController();
