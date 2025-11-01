@@ -1,13 +1,16 @@
 import { Request, Response } from 'express';
 import { DepartmentService } from '../services/DepartmentService';
 import DepartmentNotificationService from '../services/DepartmentNotificationService';
+import { RoleHierarchyService } from '../services/RoleHierarchyService';
 import logger from '../utils/logger';
 
 export class DepartmentController {
     private departmentNotificationService: typeof DepartmentNotificationService;
+    private roleHierarchyService: RoleHierarchyService;
 
     constructor(private departmentService: DepartmentService) {
         this.departmentNotificationService = DepartmentNotificationService;
+        this.roleHierarchyService = new RoleHierarchyService();
     }
 
     /**
@@ -28,8 +31,8 @@ export class DepartmentController {
                 return;
             }
 
-            // Check if user has permission to create departments
-            if (!['super-admin', 'admin', 'hr'].includes(userRole)) {
+            // Check if user has permission to create departments (HR and above)
+            if (!this.roleHierarchyService.hasPermission(userRole, 'hr')) {
                 res.status(403).json({
                     status: 'error',
                     message: 'Insufficient permissions to create departments'
@@ -151,8 +154,8 @@ export class DepartmentController {
                 return;
             }
 
-            // Check if user has permission to update departments
-            if (!['super-admin', 'admin', 'hr'].includes(userRole)) {
+            // Check if user has permission to update departments (HR and above)
+            if (!this.roleHierarchyService.hasPermission(userRole, 'hr')) {
                 res.status(403).json({
                     status: 'error',
                     message: 'Insufficient permissions to update departments'
@@ -202,8 +205,8 @@ export class DepartmentController {
                 return;
             }
 
-            // Check if user has permission to delete departments
-            if (!['super-admin', 'admin'].includes(userRole)) {
+            // Check if user has permission to delete departments (Admin and above)
+            if (!this.roleHierarchyService.hasPermission(userRole, 'admin')) {
                 res.status(403).json({
                     status: 'error',
                     message: 'Insufficient permissions to delete departments'
