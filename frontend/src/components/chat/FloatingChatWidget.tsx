@@ -343,7 +343,6 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
     } else {
       // Sort chats by latest message timestamp (WhatsApp style)
       const filteredChats = chats.filter(chat => {
-        // Groups removed - skip group filtering
         if (activeTab === 'announcements' && chat.type !== 'announcement') return false;
         if (searchQuery && !chat.name?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
         return true;
@@ -740,11 +739,11 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
 
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2 flex-1 min-w-0">
-                              {/* Show message preview with sender info for groups */}
+                              {/* Show message preview with sender info */}
                               <div className="flex-1 min-w-0">
                                 {!item.isUser && item.lastMessage && item.lastMessage !== 'No messages yet' ? (
                                   <div className="flex items-center gap-1">
-                                    {/* Show "You:" for own messages in groups */}
+                                    {/* Show "You:" for own messages */}
                                     {(() => {
                                       const chatMessages = messages[item.id] || [];
                                       const latestMessage = chatMessages[chatMessages.length - 1];
