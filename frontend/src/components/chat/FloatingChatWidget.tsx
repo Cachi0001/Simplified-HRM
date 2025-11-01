@@ -13,6 +13,8 @@ import { IndicatorWrapper } from '../indicators/IndicatorWrapper';
 import { IndicatorTest } from '../indicators/IndicatorTest';
 import WhatsAppMessageList from './WhatsAppMessageList';
 import { useMessageIndicators } from '../../hooks/useMessageIndicators';
+import Logo from '../ui/Logo';
+
 
 interface FloatingChatWidgetProps {
   className?: string;
@@ -568,7 +570,8 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
           <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-4 flex items-center justify-between text-white flex-shrink-0">
             <div className="flex items-center gap-3">
               <MessageCircle className="w-5 h-5" />
-              <h3 className="font-semibold text-lg">Go3net Chat</h3>
+              <Logo className="h-7 w" />
+              <h3 className="font-semibold text-lg">Chat</h3>
               {totalUnreadCount > 0 && (
                 <div className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
                   {totalUnreadCount > 99 ? '99+' : totalUnreadCount}
