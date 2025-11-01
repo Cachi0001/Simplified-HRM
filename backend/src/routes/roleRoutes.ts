@@ -42,11 +42,18 @@ router.put('/update', requireAdmin, requireRoleManagement, roleController.update
 router.get('/users/:role', requireAdmin, roleController.getUsersByRole.bind(roleController));
 
 /**
- * @route GET /api/roles/permissions/:userId?
+ * @route GET /api/roles/permissions/:userId
  * @desc Get user permissions (own or another user's if authorized)
  * @access Private (All authenticated users for own, Admin+ for others)
  */
-router.get('/permissions/:userId?', roleController.getUserPermissions.bind(roleController));
+router.get('/permissions/:userId', roleController.getUserPermissions.bind(roleController));
+
+/**
+ * @route GET /api/roles/permissions
+ * @desc Get current user's permissions
+ * @access Private
+ */
+router.get('/permissions', roleController.getUserPermissions.bind(roleController));
 
 /**
  * @route POST /api/roles/check-permission
