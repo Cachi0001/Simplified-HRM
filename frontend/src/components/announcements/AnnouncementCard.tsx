@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Clock, User, AlertCircle, CheckCircle, Calendar, Eye, Heart, MessageCircle } from 'lucide-react';
+import { Clock, User, AlertCircle, CheckCircle, Calendar, Eye } from 'lucide-react';
 import { Announcement } from '../../types/announcement';
+import { ReactionButton } from '../reactions';
 
 interface AnnouncementCardProps {
   announcement: Announcement;
@@ -153,36 +154,15 @@ const AnnouncementCard: React.FC<AnnouncementCardProps> = ({
       {/* Reactions and Stats */}
       <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-4">
-          {/* Reaction Buttons */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleReaction('like');
-              }}
-              className={`flex items-center gap-1 px-2 py-1 rounded-full text-sm transition-colors ${
-                darkMode 
-                  ? 'hover:bg-gray-700 text-gray-400 hover:text-red-400' 
-                  : 'hover:bg-gray-100 text-gray-600 hover:text-red-600'
-              }`}
-            >
-              <Heart className="w-4 h-4" />
-              <span>{announcement.reaction_counts?.like || 0}</span>
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleReaction('acknowledge');
-              }}
-              className={`flex items-center gap-1 px-2 py-1 rounded-full text-sm transition-colors ${
-                darkMode 
-                  ? 'hover:bg-gray-700 text-gray-400 hover:text-green-400' 
-                  : 'hover:bg-gray-100 text-gray-600 hover:text-green-600'
-              }`}
-            >
-              <CheckCircle className="w-4 h-4" />
-              <span>{announcement.reaction_counts?.acknowledge || 0}</span>
-            </button>
+          {/* Reaction Component */}
+          <div onClick={(e) => e.stopPropagation()}>
+            <ReactionButton
+              reactions={announcement.reaction_counts || {}}
+              userReaction={announcement.user_reaction}
+              onReactionSelect={handleReaction}
+              darkMode={darkMode}
+              size="sm"
+            />
           </div>
 
           {/* Read Count */}
