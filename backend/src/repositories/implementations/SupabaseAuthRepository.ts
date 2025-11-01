@@ -897,7 +897,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
         email: user.email,
       },
       this.jwtRefreshSecret,
-      { expiresIn: '7d' }
+      { expiresIn: '30d' } // Extended to 30 days
     );
   }
 
@@ -909,7 +909,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
         role: user.role,
       },
       this.jwtSecret,
-      { expiresIn: '15m' }
+      { expiresIn: '14d' } // Extended to 14 days
     );
   }
 

@@ -673,7 +673,7 @@ export class AuthController {
         role: user.role,
       },
       jwtSecret,
-      { expiresIn: '15m' }
+      { expiresIn: '14d' } // Extended to 14 days
     );
   }
 
@@ -687,7 +687,7 @@ export class AuthController {
         email: user.email,
       },
       jwtRefreshSecret,
-      { expiresIn: '7d' }
+      { expiresIn: '30d' } // Extended to 30 days
     );
   }
 }

@@ -1,165 +1,160 @@
 /**
- * useMessageIndicators Hook
- * 
- * React hook for managing message sender indicators
+ * useMessageIndicators - Hook for managing message indicators
  */
+import { useState, useEffect, useCallback } from 'react';
+import api from '../lib/api';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { 
-  MessageIndicatorState, 
-  IndicatorConfig, 
-  IndicatorEvent,
-  INDICATOR_EVENTS 
-} from '../types/indicators';
-import { getIndicatorService } from '../services/IndicatorService';
-
-interface UseMessageIndicatorsReturn {
-  indicators: Map<string, MessageIndicatorState>;
-  handleMessageSent: (userId: string, chatId?: string, messageId?: string) => void;
-  getIndicatorState: (userId: string) => MessageIndicatorState | null;
-  hasActiveIndicator: (userId: string) => boolean;
-  activateIndicator: (userId: string) => void;
-  deactivateIndicator: (userId: string) => void;
-  cleanup: () => void;
+export interface MessageIndicator {
+  id: string;
+  user_id: string;
+  chat_id: string;
+  indicator_type: 'sent' | 'received';
+  expires_at: string;
+  created_at: string;
 }
 
-/**
- * Hook for managing message sender indicators
- */
-export function useMessageIndicators(config?: Partial<IndicatorConfig>): UseMessageIndicatorsReturn {
-  const [indicators, setIndicators] = useState<Map<string, MessageIndicatorState>>(new Map());
-  const serviceRef = useRef(getIndicatorService(config));
-  const unsubscribeRef = useRef<(() => void) | null>(null);
+export const useMessageIndicators = () => {
+  const [indicators, setIndicators] = useState<MessageIndicator[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Initialize service and subscribe to changes
-  useEffect(() => {
+  // Create a message indicator
+  const createIndicator = useCallback(async (chatId: string, indicatorType: 'sent' | 'received') => {
     try {
-      const service = serviceRef.current;
-
-      // Subscribe to indicator changes
-      const unsubscribe = service.subscribe((newIndicators) => {
-        try {
-          setIndicators(new Map(newIndicators));
-        } catch (error) {
-          console.error('❌ Error updating indicators state:', error);
-        }
+      setError(null);
+      const response = await api.post('/message-indicators', {
+        chatId,
+        indicatorType
       });
-
-      unsubscribeRef.current = unsubscribe;
-
-      // Listen for global indicator events
-      const handleIndicatorEvent = (event: CustomEvent<IndicatorEvent>) => {
-        try {
-          const { userId } = event.detail;
-          if (userId) {
-            service.activateIndicator(userId);
-          }
-        } catch (error) {
-          console.error('❌ Error handling indicator event:', error);
-        }
-      };
-
-      window.addEventListener('message-indicator', handleIndicatorEvent as EventListener);
-
-      return () => {
-        try {
-          unsubscribe();
-          window.removeEventListener('message-indicator', handleIndicatorEvent as EventListener);
-        } catch (error) {
-          console.error('❌ Error during indicator cleanup:', error);
-        }
-      };
-    } catch (error) {
-      console.error('❌ Error initializing message indicators:', error);
-    }
-  }, []);
-
-  // Handle message sent events
-  const handleMessageSent = useCallback((userId: string, chatId?: string, messageId?: string) => {
-    try {
-      const service = serviceRef.current;
-      service.activateIndicator(userId);
-
-      // Emit global event for other components
-      const event: IndicatorEvent = {
-        type: 'message_sent',
-        userId,
-        chatId: chatId || '',
-        timestamp: Date.now(),
-        messageId: messageId || ''
-      };
-
-      window.dispatchEvent(new CustomEvent('message-indicator', { detail: event }));
       
-      console.log('📤 Message indicator triggered for user:', userId);
-    } catch (error) {
-      console.error('❌ Failed to handle message sent event:', error);
+      const newIndicator = response.data.data.indicator;
+      setIndicators(prev => [...prev, newIndicator]);
+      
+      // Auto-expire after 3 seconds
+      setTimeout(() => {
+        setIndicators(prev => prev.filter(ind => ind.id !== newIndicator.id));
+      }, 3000);
+      
+      return newIndicator;
+    } catch (error: any) {
+      console.error('❌ Error creating message indicator:', error);
+      setError(error.response?.data?.message || 'Failed to create indicator');
+      throw error;
     }
   }, []);
 
-  // Get indicator state for specific user
-  const getIndicatorState = useCallback((userId: string) => {
-    return serviceRef.current.getIndicatorState(userId);
+  // Handle message sent (create sent indicator)
+  const handleMessageSent = useCallback(async (userId: string, chatId: string) => {
+    try {
+      await createIndicator(chatId, 'sent');
+      console.log('✨ Message sent indicator created for user:', userId);
+    } catch (error) {
+      console.error('❌ Failed to create sent indicator:', error);
+    }
+  }, [createIndicator]);
+
+  // Handle message received (create received indicator)
+  const handleMessageReceived = useCallback(async (userId: string, chatId: string) => {
+    try {
+      await createIndicator(chatId, 'received');
+      console.log('✨ Message received indicator created for user:', userId);
+    } catch (error) {
+      console.error('❌ Failed to create received indicator:', error);
+    }
+  }, [createIndicator]);
+
+  // Get active indicators
+  const getActiveIndicators = useCallback(async (userIds?: string[], chatId?: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const params: any = {};
+      if (userIds) params.userIds = userIds;
+      if (chatId) params.chatId = chatId;
+      
+      const response = await api.get('/message-indicators/active', { params });
+      const activeIndicators = response.data.data.indicators;
+      
+      setIndicators(activeIndicators);
+      return activeIndicators;
+    } catch (error: any) {
+      console.error('❌ Error fetching active indicators:', error);
+      setError(error.response?.data?.message || 'Failed to fetch indicators');
+      return [];
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  // Expire an indicator manually
+  const expireIndicator = useCallback(async (indicatorId: string) => {
+    try {
+      await api.delete(`/message-indicators/${indicatorId}`);
+      setIndicators(prev => prev.filter(ind => ind.id !== indicatorId));
+    } catch (error: any) {
+      console.error('❌ Error expiring indicator:', error);
+      setError(error.response?.data?.message || 'Failed to expire indicator');
+    }
+  }, []);
+
+  // Get indicators for a specific user
+  const getUserIndicators = useCallback((userId: string) => {
+    return indicators.filter(ind => ind.user_id === userId);
+  }, [indicators]);
+
+  // Get indicators for a specific chat
+  const getChatIndicators = useCallback((chatId: string) => {
+    return indicators.filter(ind => ind.chat_id === chatId);
+  }, [indicators]);
 
   // Check if user has active indicator
-  const hasActiveIndicator = useCallback((userId: string) => {
-    return serviceRef.current.hasActiveIndicator(userId);
-  }, []);
+  const hasActiveIndicator = useCallback((userId: string, chatId?: string) => {
+    return indicators.some(ind => {
+      const matchesUser = ind.user_id === userId;
+      const matchesChat = chatId ? ind.chat_id === chatId : true;
+      const isActive = new Date(ind.expires_at) > new Date();
+      return matchesUser && matchesChat && isActive;
+    });
+  }, [indicators]);
 
-  // Manually activate indicator
-  const activateIndicator = useCallback((userId: string) => {
-    serviceRef.current.activateIndicator(userId);
-  }, []);
-
-  // Manually deactivate indicator
-  const deactivateIndicator = useCallback((userId: string) => {
-    serviceRef.current.deactivateIndicator(userId);
-  }, []);
-
-  // Cleanup function
-  const cleanup = useCallback(() => {
-    if (unsubscribeRef.current) {
-      unsubscribeRef.current();
-      unsubscribeRef.current = null;
+  // Get indicator statistics
+  const getIndicatorStats = useCallback(async () => {
+    try {
+      const response = await api.get('/message-indicators/stats');
+      return response.data.data;
+    } catch (error: any) {
+      console.error('❌ Error fetching indicator stats:', error);
+      setError(error.response?.data?.message || 'Failed to fetch stats');
+      return null;
     }
-    serviceRef.current.cleanup();
   }, []);
+
+  // Cleanup expired indicators from state
+  const cleanupExpiredIndicators = useCallback(() => {
+    const now = new Date();
+    setIndicators(prev => prev.filter(ind => new Date(ind.expires_at) > now));
+  }, []);
+
+  // Auto-cleanup expired indicators every 5 seconds
+  useEffect(() => {
+    const interval = setInterval(cleanupExpiredIndicators, 5000);
+    return () => clearInterval(interval);
+  }, [cleanupExpiredIndicators]);
 
   return {
     indicators,
+    loading,
+    error,
+    createIndicator,
     handleMessageSent,
-    getIndicatorState,
+    handleMessageReceived,
+    getActiveIndicators,
+    expireIndicator,
+    getUserIndicators,
+    getChatIndicators,
     hasActiveIndicator,
-    activateIndicator,
-    deactivateIndicator,
-    cleanup
+    getIndicatorStats,
+    cleanupExpiredIndicators
   };
-}
-
-/**
- * Hook for listening to indicator events only (lightweight version)
- */
-export function useIndicatorListener(userId: string): {
-  isActive: boolean;
-  indicatorState: MessageIndicatorState | null;
-} {
-  const [isActive, setIsActive] = useState(false);
-  const [indicatorState, setIndicatorState] = useState<MessageIndicatorState | null>(null);
-
-  useEffect(() => {
-    const service = getIndicatorService();
-
-    const unsubscribe = service.subscribe((indicators) => {
-      const userIndicator = indicators.get(userId);
-      setIsActive(!!userIndicator?.isActive);
-      setIndicatorState(userIndicator || null);
-    });
-
-    return unsubscribe;
-  }, [userId]);
-
-  return { isActive, indicatorState };
-}
-
-export default useMessageIndicators;
+};

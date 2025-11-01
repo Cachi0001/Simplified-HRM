@@ -710,6 +710,19 @@ export function useChat() {
           totalMessages: updatedMessages.length
         });
 
+        // Update chat list to reflect new message
+        setChats(prevChats => prevChats.map(chat => 
+          chat.id === chatId 
+            ? {
+                ...chat,
+                lastMessage: message.content,
+                lastMessageTime: formatTime(message.timestamp),
+                // Increment unread count if not own message
+                unreadCount: message.isOwn ? chat.unreadCount : chat.unreadCount + 1
+              }
+            : chat
+        ));
+
         return {
           ...prev,
           [chatId]: updatedMessages

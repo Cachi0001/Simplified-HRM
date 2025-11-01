@@ -121,6 +121,7 @@ coverage/
 # Build outputs
 build/
 dist/
+backend/api/
 
 # IDE and editor files
 .vscode/

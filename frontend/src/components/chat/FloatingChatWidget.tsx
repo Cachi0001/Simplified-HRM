@@ -12,12 +12,13 @@ import userStatusService from '../../services/UserStatusService';
 import { IndicatorWrapper } from '../indicators/IndicatorWrapper';
 import { IndicatorTest } from '../indicators/IndicatorTest';
 import WhatsAppMessageList from './WhatsAppMessageList';
+import { useMessageIndicators } from '../../hooks/useMessageIndicators';
 
 interface FloatingChatWidgetProps {
   className?: string;
 }
 
-type TabType = 'dms' | 'groups' | 'announcements' | 'history';
+type TabType = 'dms' | 'announcements' | 'history';
 
 interface ExtendedChat extends Chat {
   userData?: User;
@@ -56,6 +57,9 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
     subscribeToChat,
     unsubscribeFromChat,
   } = useChat();
+
+  // Initialize message indicators
+  const { handleMessageSent, handleMessageReceived, hasActiveIndicator } = useMessageIndicators();
 
   // State for typing indicator - only show when actually typing
   const [isTyping, setIsTyping] = useState(false);
@@ -269,7 +273,7 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
     } else {
       // Sort chats by latest message timestamp (WhatsApp style)
       const filteredChats = chats.filter(chat => {
-        if (activeTab === 'groups' && chat.type !== 'group') return false;
+        // Groups removed - skip group filtering
         if (activeTab === 'announcements' && chat.type !== 'announcement') return false;
         if (searchQuery && !chat.name?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
         return true;
@@ -373,6 +377,13 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
       });
 
       await sendChatMessage(selectedChat.id, content);
+      
+      // Trigger message indicator for current user
+      const currentUserId = getCurrentUserId();
+      if (currentUserId) {
+        handleMessageSent(currentUserId, selectedChat.id);
+        console.log('✨ Message indicator triggered for user:', currentUserId);
+      }
     } catch (error) {
       console.error('Failed to send message:', error);
       // Restore message input on error

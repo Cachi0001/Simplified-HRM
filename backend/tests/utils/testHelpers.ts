@@ -7,7 +7,7 @@ import { Express } from 'express';
  */
 export function generateTestToken(userId: string = 'test-user-123', role: string = 'user'): string {
   const secret = process.env.JWT_SECRET || 'test-jwt-secret-key-for-testing';
-  return jwt.sign({ id: userId, role }, secret, { expiresIn: '24h' });
+  return jwt.sign({ id: userId, role }, secret, { expiresIn: '14d' }); // Updated to match production settings
 }
 
 /**
