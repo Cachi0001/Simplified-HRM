@@ -1,304 +1,212 @@
 import React, { useState } from 'react';
-import { Clock, User, Heart, ThumbsUp, Smile, Frown, Eye, MoreHorizontal, MessageCircle } from 'lucide-react';
-import { useTheme } from '../../contexts/ThemeContext';
-
-export interface Announcement {
-  id: string;
-  title: string;
-  content: string;
-  author_name: string;
-  author_email: string;
-  priority: 'low' | 'normal' | 'high';
-  status: 'draft' | 'published' | 'archived';
-  target_audience: 'all' | 'employees' | 'hr' | 'managers' | 'department';
-  created_at: string;
-  updated_at?: string;
-  reactions?: {
-    counts: { [key: string]: number };
-    users: { [key: string]: any[] };
-    totalReactions: number;
-  };
-}
+import { Clock, User, AlertCircle, CheckCircle, Calendar, Eye, Heart, MessageCircle } from 'lucide-react';
+import { Announcement } from '../../types/announcement';
 
 interface AnnouncementCardProps {
   announcement: Announcement;
-  onReact?: (announcementId: string, reactionType: string) => void;
-  onRemoveReaction?: (announcementId: string) => void;
-  onEdit?: (announcement: Announcement) => void;
-  onDelete?: (announcementId: string) => void;
-  canEdit?: boolean;
-  canDelete?: boolean;
-  currentUserReaction?: string | null;
+  onReaction?: (announcementId: string, reactionType: string) => void;
+  onMarkAsRead?: (announcementId: string) => void;
+  darkMode?: boolean;
+  currentUserId?: string;
 }
 
-const reactionEmojis = {
-  like: '👍',
-  love: '❤️',
-  laugh: '😂',
-  wow: '😮',
-  sad: '😢',
-  angry: '😠'
-};
-
-const priorityColors = {
-  low: 'bg-green-100 text-green-800 border-green-200',
-  normal: 'bg-blue-100 text-blue-800 border-blue-200',
-  high: 'bg-red-100 text-red-800 border-red-200'
-};
-
-const priorityColorsDark = {
-  low: 'bg-green-900 text-green-200 border-green-700',
-  normal: 'bg-blue-900 text-blue-200 border-blue-700',
-  high: 'bg-red-900 text-red-200 border-red-700'
-};
-
-export function AnnouncementCard({
+const AnnouncementCard: React.FC<AnnouncementCardProps> = ({
   announcement,
-  onReact,
-  onRemoveReaction,
-  onEdit,
-  onDelete,
-  canEdit = false,
-  canDelete = false,
-  currentUserReaction = null
-}: AnnouncementCardProps) {
-  const { darkMode } = useTheme();
-  const [showReactions, setShowReactions] = useState(false);
-  const [showMenu, setShowMenu] = useState(false);
+  onReaction,
+  onMarkAsRead,
+  darkMode = false,
+  currentUserId
+}) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'urgent':
+        return 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900 dark:text-red-200 dark:border-red-700';
+      case 'high':
+        return 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900 dark:text-orange-200 dark:border-orange-700';
+      case 'medium':
+        return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900 dark:text-blue-200 dark:border-blue-700';
+      case 'low':
+        return 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600';
+    }
+  };
+
+  const getPriorityIcon = (priority: string) => {
+    switch (priority) {
+      case 'urgent':
+      case 'high':
+        return <AlertCircle className="w-4 h-4" />;
+      case 'medium':
+        return <CheckCircle className="w-4 h-4" />;
+      case 'low':
+        return <Clock className="w-4 h-4" />;
+      default:
+        return <Clock className="w-4 h-4" />;
+    }
+  };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
 
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
+  const handleMarkAsRead = () => {
+    if (onMarkAsRead && !announcement.is_read) {
+      onMarkAsRead(announcement.id);
+    }
   };
 
   const handleReaction = (reactionType: string) => {
-    if (currentUserReaction === reactionType) {
-      // Remove reaction if clicking the same one
-      onRemoveReaction?.(announcement.id);
-    } else {
-      // Add or change reaction
-      onReact?.(announcement.id, reactionType);
+    if (onReaction) {
+      onReaction(announcement.id, reactionType);
     }
-    setShowReactions(false);
   };
 
-  const totalReactions = announcement.reactions?.totalReactions || 0;
-  const reactionCounts = announcement.reactions?.counts || {};
+  const truncateContent = (content: string, maxLength: number = 200) => {
+    if (content.length <= maxLength) return content;
+    return content.substring(0, maxLength) + '...';
+  };
 
   return (
-    <div className={`rounded-lg border p-6 transition-all duration-200 hover:shadow-md ${
-      darkMode 
-        ? 'bg-gray-800 border-gray-700 hover:shadow-gray-900/20' 
-        : 'bg-white border-gray-200 hover:shadow-gray-200/50'
-    }`}>
+    <div 
+      className={`rounded-lg border p-4 mb-4 transition-all duration-200 hover:shadow-md ${
+        darkMode 
+          ? 'bg-gray-800 border-gray-700 hover:bg-gray-750' 
+          : 'bg-white border-gray-200 hover:bg-gray-50'
+      } ${!announcement.is_read ? 'ring-2 ring-blue-500 ring-opacity-20' : ''}`}
+      onClick={handleMarkAsRead}
+    >
       {/* Header */}
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center gap-3">
-          {/* Author Avatar */}
-          <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-medium">
-            {announcement.author_name?.charAt(0).toUpperCase() || 'A'}
-          </div>
-          
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                {announcement.author_name}
-              </h3>
-              
-              {/* Priority Badge */}
-              <span className={`px-2 py-1 text-xs font-medium rounded-full border ${
-                darkMode ? priorityColorsDark[announcement.priority] : priorityColors[announcement.priority]
-              }`}>
-                {announcement.priority.toUpperCase()}
-              </span>
-            </div>
-            
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <Clock className="w-4 h-4" />
-              <span>{formatDate(announcement.created_at)}</span>
-              {announcement.target_audience !== 'all' && (
-                <>
-                  <span>•</span>
-                  <span className="capitalize">{announcement.target_audience}</span>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Menu */}
-        {(canEdit || canDelete) && (
-          <div className="relative">
-            <button
-              onClick={() => setShowMenu(!showMenu)}
-              className={`p-2 rounded-lg transition-colors ${
-                darkMode 
-                  ? 'hover:bg-gray-700 text-gray-400 hover:text-white' 
-                  : 'hover:bg-gray-100 text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <MoreHorizontal className="w-5 h-5" />
-            </button>
-
-            {showMenu && (
-              <div className={`absolute right-0 top-full mt-1 w-48 rounded-lg border shadow-lg z-10 ${
-                darkMode 
-                  ? 'bg-gray-800 border-gray-700' 
-                  : 'bg-white border-gray-200'
-              }`}>
-                {canEdit && (
-                  <button
-                    onClick={() => {
-                      onEdit?.(announcement);
-                      setShowMenu(false);
-                    }}
-                    className={`w-full px-4 py-2 text-left text-sm transition-colors ${
-                      darkMode 
-                        ? 'hover:bg-gray-700 text-gray-300 hover:text-white' 
-                        : 'hover:bg-gray-50 text-gray-700 hover:text-gray-900'
-                    }`}
-                  >
-                    Edit Announcement
-                  </button>
-                )}
-                {canDelete && (
-                  <button
-                    onClick={() => {
-                      onDelete?.(announcement.id);
-                      setShowMenu(false);
-                    }}
-                    className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                  >
-                    Delete Announcement
-                  </button>
-                )}
-              </div>
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-2">
+            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${getPriorityColor(announcement.priority)}`}>
+              {getPriorityIcon(announcement.priority)}
+              {announcement.priority.toUpperCase()}
+            </span>
+            {!announcement.is_read && (
+              <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
             )}
+          </div>
+          <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+            {announcement.title}
+          </h3>
+        </div>
+      </div>
+
+      {/* Author and Date */}
+      <div className={`flex items-center gap-4 mb-3 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+        <div className="flex items-center gap-1">
+          <User className="w-4 h-4" />
+          <span>{announcement.author_name || 'Unknown Author'}</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <Calendar className="w-4 h-4" />
+          <span>{formatDate(announcement.published_at || announcement.created_at)}</span>
+        </div>
+        {announcement.expires_at && (
+          <div className="flex items-center gap-1">
+            <Clock className="w-4 h-4" />
+            <span>Expires: {formatDate(announcement.expires_at)}</span>
           </div>
         )}
       </div>
 
-      {/* Title */}
-      <h2 className={`text-xl font-bold mb-3 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-        {announcement.title}
-      </h2>
-
       {/* Content */}
-      <div className={`prose max-w-none mb-4 ${darkMode ? 'prose-invert' : ''}`}>
-        <p className={`whitespace-pre-wrap ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-          {announcement.content}
+      <div className={`mb-4 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+        <p className="whitespace-pre-wrap">
+          {isExpanded ? announcement.content : truncateContent(announcement.content)}
         </p>
+        {announcement.content.length > 200 && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsExpanded(!isExpanded);
+            }}
+            className={`mt-2 text-sm font-medium ${darkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'}`}
+          >
+            {isExpanded ? 'Show less' : 'Show more'}
+          </button>
+        )}
       </div>
 
-      {/* Reactions */}
-      <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
+      {/* Target Audience */}
+      {announcement.target_type !== 'all' && (
+        <div className={`mb-3 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+          <span className="font-medium">Target: </span>
+          <span className="capitalize">{announcement.target_type}</span>
+          {announcement.target_ids && announcement.target_ids.length > 0 && (
+            <span> ({announcement.target_ids.length} selected)</span>
+          )}
+        </div>
+      )}
+
+      {/* Reactions and Stats */}
+      <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-4">
-          {/* Reaction Button */}
-          <div className="relative">
+          {/* Reaction Buttons */}
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => setShowReactions(!showReactions)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-                currentUserReaction
-                  ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
-                  : darkMode 
-                    ? 'hover:bg-gray-700 text-gray-400 hover:text-white' 
-                    : 'hover:bg-gray-100 text-gray-500 hover:text-gray-700'
+              onClick={(e) => {
+                e.stopPropagation();
+                handleReaction('like');
+              }}
+              className={`flex items-center gap-1 px-2 py-1 rounded-full text-sm transition-colors ${
+                darkMode 
+                  ? 'hover:bg-gray-700 text-gray-400 hover:text-red-400' 
+                  : 'hover:bg-gray-100 text-gray-600 hover:text-red-600'
               }`}
             >
-              {currentUserReaction ? (
-                <span className="text-lg">{reactionEmojis[currentUserReaction as keyof typeof reactionEmojis]}</span>
-              ) : (
-                <ThumbsUp className="w-5 h-5" />
-              )}
-              <span className="text-sm font-medium">
-                {currentUserReaction ? 'Reacted' : 'React'}
-              </span>
+              <Heart className="w-4 h-4" />
+              <span>{announcement.reaction_counts?.like || 0}</span>
             </button>
-
-            {/* Reaction Picker */}
-            {showReactions && (
-              <div className={`absolute bottom-full left-0 mb-2 p-2 rounded-lg border shadow-lg z-10 ${
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleReaction('acknowledge');
+              }}
+              className={`flex items-center gap-1 px-2 py-1 rounded-full text-sm transition-colors ${
                 darkMode 
-                  ? 'bg-gray-800 border-gray-700' 
-                  : 'bg-white border-gray-200'
-              }`}>
-                <div className="flex gap-1">
-                  {Object.entries(reactionEmojis).map(([type, emoji]) => (
-                    <button
-                      key={type}
-                      onClick={() => handleReaction(type)}
-                      className={`p-2 rounded-lg text-xl transition-all hover:scale-110 ${
-                        currentUserReaction === type
-                          ? 'bg-blue-100 dark:bg-blue-900/30'
-                          : 'hover:bg-gray-100 dark:hover:bg-gray-700'
-                      }`}
-                      title={type}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+                  ? 'hover:bg-gray-700 text-gray-400 hover:text-green-400' 
+                  : 'hover:bg-gray-100 text-gray-600 hover:text-green-600'
+              }`}
+            >
+              <CheckCircle className="w-4 h-4" />
+              <span>{announcement.reaction_counts?.acknowledge || 0}</span>
+            </button>
           </div>
 
-          {/* Reaction Count */}
-          {totalReactions > 0 && (
-            <div className="flex items-center gap-1">
-              <div className="flex -space-x-1">
-                {Object.entries(reactionCounts).slice(0, 3).map(([type, count]) => (
-                  count > 0 && (
-                    <span
-                      key={type}
-                      className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-sm border-2 border-white dark:border-gray-800"
-                    >
-                      {reactionEmojis[type as keyof typeof reactionEmojis]}
-                    </span>
-                  )
-                ))}
-              </div>
-              <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                {totalReactions}
-              </span>
-            </div>
-          )}
+          {/* Read Count */}
+          <div className={`flex items-center gap-1 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+            <Eye className="w-4 h-4" />
+            <span>{announcement.read_count || 0} read</span>
+          </div>
         </div>
 
-        {/* Status Badge */}
+        {/* Status */}
         <div className="flex items-center gap-2">
-          {announcement.status === 'draft' && (
-            <span className="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
-              Draft
-            </span>
-          )}
-          {announcement.status === 'archived' && (
-            <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
-              Archived
-            </span>
-          )}
+          <span className={`text-xs px-2 py-1 rounded-full ${
+            announcement.status === 'published' 
+              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+              : announcement.status === 'scheduled'
+              ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+              : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+          }`}>
+            {announcement.status}
+          </span>
         </div>
       </div>
-
-      {/* Click outside to close menus */}
-      {(showReactions || showMenu) && (
-        <div
-          className="fixed inset-0 z-0"
-          onClick={() => {
-            setShowReactions(false);
-            setShowMenu(false);
-          }}
-        />
-      )}
     </div>
   );
-}
+};
+
+export default AnnouncementCard;
