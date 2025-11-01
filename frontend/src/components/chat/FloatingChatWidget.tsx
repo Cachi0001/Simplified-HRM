@@ -359,11 +359,11 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
         userData: user
       }));
     } else {
-      // Sort chats by latest message timestamp (WhatsApp style) - only for DMs
-      const filteredChats = activeTab === 'dms' ? chats.filter(chat => {
+      // Sort chats by latest message timestamp (WhatsApp style) - for announcements tab
+      const filteredChats = chats.filter(chat => {
         if (searchQuery && !chat.name?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
         return true;
-      }) : [];
+      });
 
       // Sort by latest message timestamp, with unread chats prioritized
       return filteredChats
