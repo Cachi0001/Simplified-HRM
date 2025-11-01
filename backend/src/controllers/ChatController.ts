@@ -2,12 +2,38 @@ import { Request, Response } from 'express';
 import { ChatService } from '../services/ChatService';
 import { getTypingService } from '../services/TypingService';
 import { getWebSocketService } from '../services/WebSocketService';
+import SupabaseConfig from '../config/supabase';
 import logger from '../utils/logger';
+
+const supabase = SupabaseConfig.getClient();
 
 export class ChatController {
   private typingService = getTypingService();
 
   constructor(private chatService: ChatService) { }
+
+  // Helper method to create message indicator
+  private async createMessageIndicator(userId: string, chatId: string, indicatorType: 'sent' | 'received'): Promise<void> {
+    try {
+      const expiresAt = new Date(Date.now() + 3000); // 3 seconds from now
+      
+      await supabase
+        .from('message_indicators')
+        .insert([
+          {
+            user_id: userId,
+            chat_id: chatId,
+            indicator_type: indicatorType,
+            expires_at: expiresAt.toISOString(),
+            created_at: new Date().toISOString()
+          }
+        ]);
+
+      logger.info('✅ Message indicator created', { userId, chatId, indicatorType });
+    } catch (error) {
+      logger.warn('⚠️ Failed to create message indicator (non-critical):', error);
+    }
+  }
 
   async sendMessage(req: Request, res: Response): Promise<void> {
     try {

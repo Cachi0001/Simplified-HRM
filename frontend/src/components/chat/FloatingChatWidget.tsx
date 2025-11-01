@@ -18,7 +18,7 @@ interface FloatingChatWidgetProps {
   className?: string;
 }
 
-type TabType = 'dms' | 'announcements' | 'history';
+type TabType = 'dms' | 'announcements';
 
 interface ExtendedChat extends Chat {
   userData?: User;
@@ -527,9 +527,7 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
               <div className={`flex border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'} flex-shrink-0`}>
                 {[
                   { key: 'dms', label: 'DMs', icon: MessageCircle },
-                  { key: 'groups', label: 'Groups', icon: Users },
-                  { key: 'announcements', label: 'News', icon: Bell },
-                  { key: 'history', label: 'History', icon: History }
+                  { key: 'announcements', label: 'News', icon: Bell }
                 ].map(({ key, label, icon: Icon }) => (
                   <button
                     key={key}

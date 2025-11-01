@@ -23,4 +23,13 @@ router.put('/:id', (req, res) => announcementController.updateAnnouncement(req, 
 // DELETE /api/announcements/:id - Delete announcement (admin only)
 router.delete('/:id', (req, res) => announcementController.deleteAnnouncement(req, res));
 
+// POST /api/announcements/:id/reactions - Add or update reaction
+router.post('/:id/reactions', (req, res) => announcementController.addReaction(req, res));
+
+// DELETE /api/announcements/:id/reactions - Remove reaction
+router.delete('/:id/reactions', (req, res) => announcementController.removeReaction(req, res));
+
+// GET /api/announcements/:id/reactions - Get reactions for announcement
+router.get('/:id/reactions', (req, res) => announcementController.getReactions(req, res));
+
 export default router;

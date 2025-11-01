@@ -341,6 +341,281 @@ export class AnnouncementController {
   }
 
   /**
+   * Add or update reaction to announcement
+   * POST /api/announcements/:id/reactions
+   */
+  async addReaction(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { reactionType } = req.body;
+      const userId = req.user?.id;
+
+      if (!userId) {
+        res.status(401).json({
+          status: 'error',
+          message: 'Authentication required'
+        });
+        return;
+      }
+
+      if (!reactionType || !['like', 'love', 'laugh', 'wow', 'sad', 'angry'].includes(reactionType)) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Valid reaction type is required (like, love, laugh, wow, sad, angry)'
+        });
+        return;
+      }
+
+      logger.info('👍 [AnnouncementController] Adding reaction', {
+        announcementId: id,
+        userId,
+        reactionType
+      });
+
+      const supabase = supabaseConfig.getClient();
+
+      // Check if announcement exists
+      const { data: announcement, error: announcementError } = await supabase
+        .from('announcements')
+        .select('id, title, author_id')
+        .eq('id', id)
+        .single();
+
+      if (announcementError || !announcement) {
+        res.status(404).json({
+          status: 'error',
+          message: 'Announcement not found'
+        });
+        return;
+      }
+
+      // Upsert reaction (replace existing reaction or create new one)
+      const { data: reaction, error: reactionError } = await supabase
+        .from('announcement_reactions')
+        .upsert({
+          announcement_id: id,
+          user_id: userId,
+          reaction_type: reactionType
+        }, {
+          onConflict: 'announcement_id,user_id'
+        })
+        .select()
+        .single();
+
+      if (reactionError) {
+        throw reactionError;
+      }
+
+      // Send notification to announcement author (if not reacting to own announcement)
+      if (announcement.author_id !== userId) {
+        try {
+          await this.notifyAuthorOfReaction(announcement, userId, reactionType);
+        } catch (notifyError) {
+          logger.error('Failed to notify author of reaction', { error: notifyError });
+          // Don't fail the reaction if notification fails
+        }
+      }
+
+      res.status(200).json({
+        status: 'success',
+        message: 'Reaction added successfully',
+        data: { reaction }
+      });
+    } catch (error) {
+      logger.error('❌ [AnnouncementController] Add reaction error', {
+        error: (error as Error).message,
+        announcementId: req.params.id
+      });
+      res.status(500).json({
+        status: 'error',
+        message: 'Failed to add reaction'
+      });
+    }
+  }
+
+  /**
+   * Remove reaction from announcement
+   * DELETE /api/announcements/:id/reactions
+   */
+  async removeReaction(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.id;
+
+      if (!userId) {
+        res.status(401).json({
+          status: 'error',
+          message: 'Authentication required'
+        });
+        return;
+      }
+
+      logger.info('👎 [AnnouncementController] Removing reaction', {
+        announcementId: id,
+        userId
+      });
+
+      const supabase = supabaseConfig.getClient();
+
+      const { data: reaction, error } = await supabase
+        .from('announcement_reactions')
+        .delete()
+        .eq('announcement_id', id)
+        .eq('user_id', userId)
+        .select()
+        .single();
+
+      if (error || !reaction) {
+        res.status(404).json({
+          status: 'error',
+          message: 'Reaction not found'
+        });
+        return;
+      }
+
+      res.status(200).json({
+        status: 'success',
+        message: 'Reaction removed successfully'
+      });
+    } catch (error) {
+      logger.error('❌ [AnnouncementController] Remove reaction error', {
+        error: (error as Error).message,
+        announcementId: req.params.id
+      });
+      res.status(500).json({
+        status: 'error',
+        message: 'Failed to remove reaction'
+      });
+    }
+  }
+
+  /**
+   * Get reactions for announcement
+   * GET /api/announcements/:id/reactions
+   */
+  async getReactions(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+
+      logger.info('📊 [AnnouncementController] Getting reactions', {
+        announcementId: id
+      });
+
+      const supabase = supabaseConfig.getClient();
+
+      const { data: reactions, error } = await supabase
+        .from('announcement_reactions')
+        .select(`
+          id,
+          reaction_type,
+          created_at,
+          employees!announcement_reactions_user_id_fkey (
+            id,
+            full_name,
+            email
+          )
+        `)
+        .eq('announcement_id', id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      // Group reactions by type and count them
+      const reactionCounts: { [key: string]: number } = {};
+      const reactionUsers: { [key: string]: any[] } = {};
+
+      reactions?.forEach((reaction: any) => {
+        const type = reaction.reaction_type;
+        reactionCounts[type] = (reactionCounts[type] || 0) + 1;
+        
+        if (!reactionUsers[type]) {
+          reactionUsers[type] = [];
+        }
+        
+        reactionUsers[type].push({
+          id: reaction.employees?.id,
+          name: reaction.employees?.full_name,
+          email: reaction.employees?.email
+        });
+      });
+
+      res.status(200).json({
+        status: 'success',
+        data: {
+          reactions: reactions || [],
+          counts: reactionCounts,
+          users: reactionUsers,
+          totalReactions: reactions?.length || 0
+        }
+      });
+    } catch (error) {
+      logger.error('❌ [AnnouncementController] Get reactions error', {
+        error: (error as Error).message,
+        announcementId: req.params.id
+      });
+      res.status(500).json({
+        status: 'error',
+        message: 'Failed to get reactions'
+      });
+    }
+  }
+
+  /**
+   * Notify announcement author of reaction
+   */
+  private async notifyAuthorOfReaction(announcement: any, reactorId: string, reactionType: string): Promise<void> {
+    try {
+      const supabase = supabaseConfig.getClient();
+
+      // Get reactor info
+      const { data: reactor, error: reactorError } = await supabase
+        .from('employees')
+        .select('full_name, email')
+        .eq('id', reactorId)
+        .single();
+
+      if (reactorError || !reactor) {
+        throw new Error('Reactor not found');
+      }
+
+      // Create notification for author
+      const { error: notificationError } = await supabase
+        .from('notifications')
+        .insert({
+          user_id: announcement.author_id,
+          title: `${reactor.full_name} reacted to your announcement`,
+          message: `${reactor.full_name} reacted with ${reactionType} to your announcement "${announcement.title}"`,
+          type: 'reaction',
+          data: {
+            announcementId: announcement.id,
+            reactionType,
+            reactorId,
+            reactorName: reactor.full_name
+          }
+        });
+
+      if (notificationError) {
+        throw notificationError;
+      }
+
+      logger.info('📢 [AnnouncementController] Author notified of reaction', {
+        announcementId: announcement.id,
+        authorId: announcement.author_id,
+        reactorId,
+        reactionType
+      });
+    } catch (error) {
+      logger.error('❌ [AnnouncementController] Failed to notify author of reaction', {
+        error: (error as Error).message,
+        announcementId: announcement.id
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Notify all users about a new announcement
    * This would typically be done via a job queue in production
    */
