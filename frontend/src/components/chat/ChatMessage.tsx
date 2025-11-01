@@ -63,7 +63,6 @@ export function ChatMessage({
       id={`message-${id}`}
     >
       <div className={`flex ${isOwn ? 'flex-row-reverse' : 'flex-row'} gap-2 max-w-xs lg:max-w-md xl:max-w-lg`}>
-        {/* No avatar - removed as requested */}
 
         {/* Message Container */}
         <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
