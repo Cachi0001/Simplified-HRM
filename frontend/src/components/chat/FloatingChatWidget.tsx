@@ -13,6 +13,8 @@ import { IndicatorWrapper } from '../indicators/IndicatorWrapper';
 import { IndicatorTest } from '../indicators/IndicatorTest';
 import WhatsAppMessageList from './WhatsAppMessageList';
 import { useMessageIndicators } from '../../hooks/useMessageIndicators';
+import { AnnouncementList, CreateAnnouncement } from '../announcements';
+import { useAnnouncements } from '../../hooks/useAnnouncements';
 import Logo from '../ui/Logo';
 
 
@@ -34,6 +36,7 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
   const [selectedChat, setSelectedChat] = useState<ExtendedChat | null>(null);
   const [messageInput, setMessageInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showCreateAnnouncement, setShowCreateAnnouncement] = useState(false);
 
   // Use global theme instead of local state
   const { darkMode, toggleDarkMode } = useTheme();
@@ -65,6 +68,20 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
 
   // Initialize message indicators
   const { handleMessageSent, handleMessageReceived, hasActiveIndicator } = useMessageIndicators();
+
+  // Use announcements hook
+  const {
+    announcements,
+    loading: announcementsLoading,
+    error: announcementsError,
+    currentUserReactions,
+    loadAnnouncements,
+    createAnnouncement,
+    updateAnnouncement,
+    deleteAnnouncement,
+    addReaction,
+    removeReaction
+  } = useAnnouncements();
 
   // State for typing indicator - only show when actually typing
   const [isTyping, setIsTyping] = useState(false);
@@ -518,6 +535,74 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
     return null;
   };
 
+  // Helper function to get current user's role
+  const getCurrentUserRole = () => {
+    try {
+      // Try multiple possible keys for user data
+      const possibleKeys = ['user', 'currentUser', 'authUser', 'userData'];
+
+      for (const key of possibleKeys) {
+        const storedData = localStorage.getItem(key);
+        if (storedData) {
+          try {
+            const parsed = JSON.parse(storedData);
+            if (parsed && parsed.role) {
+              return parsed.role;
+            }
+          } catch (parseError) {
+            continue;
+          }
+        }
+      }
+
+      // Try to extract from JWT token
+      const token = localStorage.getItem('accessToken');
+      if (token) {
+        try {
+          const base64Url = token.split('.')[1];
+          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+          const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+          }).join(''));
+
+          const decoded = JSON.parse(jsonPayload);
+          if (decoded && decoded.role) {
+            return decoded.role;
+          }
+        } catch (tokenError) {
+          // Silent fail
+        }
+      }
+    } catch (error) {
+      console.error('Failed to get current user role:', error);
+    }
+    return 'employee'; // Default to employee role
+  };
+
+  // Helper function to check if user can create announcements
+  const canCreateAnnouncements = () => {
+    const userRole = getCurrentUserRole();
+    return ['superadmin', 'admin', 'hr'].includes(userRole);
+  };
+
+  // Helper function to check if user can edit/delete announcements
+  const canManageAnnouncement = (announcement: any) => {
+    const userRole = getCurrentUserRole();
+    const currentUserId = getCurrentUserId();
+    
+    // Superadmin and admin can manage all announcements
+    if (['superadmin', 'admin'].includes(userRole)) {
+      return true;
+    }
+    
+    // HR can manage their own announcements
+    if (userRole === 'hr' && announcement.author_id === currentUserId) {
+      return true;
+    }
+    
+    return false;
+  };
+
   // Authentication guard
   const isAuthenticated = !!localStorage.getItem('accessToken');
   const isLanding = typeof window !== 'undefined' && window.location.pathname === '/';
@@ -570,7 +655,7 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
           <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-4 flex items-center justify-between text-white flex-shrink-0">
             <div className="flex items-center gap-3">
               <MessageCircle className="w-5 h-5" />
-              <Logo className="h-7 w" />
+              <Logo className="h-7 w9" />
               <h3 className="font-semibold text-lg">Chat</h3>
               {totalUnreadCount > 0 && (
                 <div className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
@@ -816,8 +901,35 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
               </div>
             </div>
 
-            {/* Chat Messages Area */}
-            {selectedChat && (
+            {/* Main Content Area */}
+            {activeTab === 'announcements' && !selectedChat ? (
+              /* Announcements View */
+              <div className="flex-1 flex flex-col p-6 overflow-hidden">
+                <AnnouncementList
+                  announcements={announcements}
+                  loading={announcementsLoading}
+                  error={announcementsError}
+                  onReact={addReaction}
+                  onRemoveReaction={removeReaction}
+                  onEdit={(announcement) => {
+                    // Handle edit - you can implement this later
+                    console.log('Edit announcement:', announcement);
+                  }}
+                  onDelete={deleteAnnouncement}
+                  onCreate={() => setShowCreateAnnouncement(true)}
+                  onRefresh={loadAnnouncements}
+                  canCreate={canCreateAnnouncements()}
+                  canEdit={(announcement) => {
+                    return canManageAnnouncement(announcement);
+                  }}
+                  canDelete={(announcement) => {
+                    return canManageAnnouncement(announcement);
+                  }}
+                  currentUserReactions={currentUserReactions}
+                />
+              </div>
+            ) : selectedChat ? (
+              /* Chat Messages Area */
               <div className="flex-1 flex flex-col">
                 {/* Chat Header */}
                 <div className={`p-4 border-b flex items-center justify-between ${darkMode ? 'border-gray-700' : 'border-gray-200'} flex-shrink-0`}>
@@ -876,18 +988,7 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                             loadMessages(selectedChat.id);
                           }
                         }}
-                        className="ml-2 px-2 py-1 bg-yellow-600 hover:bg-yellow-700 text-white text-xs rounded transition-colors"
-                      >
-                        Refresh Messages
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (selectedChat) {
-                            console.log('🔄 Refreshing messages...');
-                            loadMessages(selectedChat.id);
-                          }
-                        }}
-                        className="ml-2 px-2 py-1 bg-yellow-600 hover:bg-yellow-700 text-white text-xs rounded transition-colors"
+                        className="animate-spin ml-2 px-2 py-1 bg-yellow-600 hover:bg-yellow-700 text-white text-xs rounded transition-colors"
                       >
                         Refresh Messages
                       </button>
@@ -984,6 +1085,19 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                       )}
                     </button>
                   </div>
+                </div>
+              </div>
+            ) : (
+              /* Default view - show welcome message */
+              <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">
+                <div className="text-center">
+                  <MessageCircle className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                  <h3 className="text-lg font-medium mb-2">Welcome to Chat</h3>
+                  <p className="text-sm">
+                    {activeTab === 'dms' 
+                      ? 'Select a user to start a conversation' 
+                      : 'Check out the latest announcements'}
+                  </p>
                 </div>
               </div>
             )}
