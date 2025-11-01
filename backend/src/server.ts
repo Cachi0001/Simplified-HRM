@@ -43,6 +43,7 @@ import jobsRoutes from './routes/jobs.routes';
 import messageIndicatorRoutes from './routes/messageIndicators';
 import roleManagementRoutes from './routes/roleManagement';
 import typingIndicatorRoutes from './routes/typingIndicators';
+import conversationHistoryRoutes from './routes/conversationHistory.routes';
 import CheckoutMonitoringService from './services/CheckoutMonitoringService';
 import JobScheduler from './services/JobScheduler';
 import supabaseConfig from './config/supabase';
@@ -197,6 +198,7 @@ app.use('/api/jobs', jobsRoutes);
 app.use('/api/message-indicators', messageIndicatorRoutes);
 app.use('/api/role-management', roleManagementRoutes);
 app.use('/api/typing-indicators', typingIndicatorRoutes);
+app.use('/api/conversation-history', conversationHistoryRoutes);
 
 // Debug endpoint to check current user
 app.get('/api/debug/user', async (req: Request, res: Response) => {
