@@ -74,13 +74,12 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
     announcements,
     loading: announcementsLoading,
     error: announcementsError,
-    currentUserReactions,
-    loadAnnouncements,
+    canCreate: canCreateAnnouncements,
     createAnnouncement,
-    updateAnnouncement,
-    deleteAnnouncement,
-    addReaction,
-    removeReaction
+    handleReaction,
+    markAsRead,
+    updateFilters,
+    refresh: refreshAnnouncements
   } = useAnnouncements();
 
   // State for typing indicator - only show when actually typing
@@ -360,12 +359,11 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
         userData: user
       }));
     } else {
-      // Sort chats by latest message timestamp (WhatsApp style)
-      const filteredChats = chats.filter(chat => {
-        if (activeTab === 'announcements' && chat.type !== 'announcement') return false;
+      // Sort chats by latest message timestamp (WhatsApp style) - only for DMs
+      const filteredChats = activeTab === 'dms' ? chats.filter(chat => {
         if (searchQuery && !chat.name?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
         return true;
-      });
+      }) : [];
 
       // Sort by latest message timestamp, with unread chats prioritized
       return filteredChats
@@ -577,12 +575,6 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
       console.error('Failed to get current user role:', error);
     }
     return 'employee'; // Default to employee role
-  };
-
-  // Helper function to check if user can create announcements
-  const canCreateAnnouncements = () => {
-    const userRole = getCurrentUserRole();
-    return ['superadmin', 'admin', 'hr'].includes(userRole);
   };
 
   // Helper function to check if user can edit/delete announcements
@@ -909,23 +901,13 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                   announcements={announcements}
                   loading={announcementsLoading}
                   error={announcementsError}
-                  onReact={addReaction}
-                  onRemoveReaction={removeReaction}
-                  onEdit={(announcement) => {
-                    // Handle edit - you can implement this later
-                    console.log('Edit announcement:', announcement);
-                  }}
-                  onDelete={deleteAnnouncement}
-                  onCreate={() => setShowCreateAnnouncement(true)}
-                  onRefresh={loadAnnouncements}
-                  canCreate={canCreateAnnouncements()}
-                  canEdit={(announcement) => {
-                    return canManageAnnouncement(announcement);
-                  }}
-                  canDelete={(announcement) => {
-                    return canManageAnnouncement(announcement);
-                  }}
-                  currentUserReactions={currentUserReactions}
+                  onReaction={handleReaction}
+                  onMarkAsRead={markAsRead}
+                  onFiltersChange={updateFilters}
+                  onRefresh={refreshAnnouncements}
+                  onCreateNew={() => setShowCreateAnnouncement(true)}
+                  canCreate={canCreateAnnouncements}
+                  darkMode={darkMode}
                 />
               </div>
             ) : selectedChat ? (
@@ -1104,6 +1086,22 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
           </div>
         </div>
       </div>
+      {/* Create Announcement Modal */}
+      {showCreateAnnouncement && (
+        <CreateAnnouncement
+          onSubmit={async (data, publish) => {
+            try {
+              await createAnnouncement(data, publish);
+              setShowCreateAnnouncement(false);
+            } catch (error) {
+              console.error('Failed to create announcement:', error);
+            }
+          }}
+          onClose={() => setShowCreateAnnouncement(false)}
+          darkMode={darkMode}
+          loading={announcementsLoading}
+        />
+      )}
     </>
   );
 }
