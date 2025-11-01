@@ -253,6 +253,9 @@ export class WebSocketService {
             timestamp: data.timestamp,
             status: 'sent'
           });
+
+          // Emit message indicator events for real-time visual feedback
+          await this.broadcastMessageIndicator(savedMessage.chat_id, savedMessage.sender_id, 'sent');
           
           logger.info('📨 WebSocket: Message sent successfully:', { 
             chatId: savedMessage.chat_id, 
@@ -383,6 +386,9 @@ export class WebSocketService {
             break;
           case 'chat_read_receipts':
             await this.handleReadReceipt(data);
+            break;
+          case 'message_indicator':
+            await this.handleMessageIndicatorSync(data);
             break;
           case 'user_presence':
             await this.handlePresenceUpdate(data);
@@ -533,6 +539,59 @@ export class WebSocketService {
     logger.info('👤 Presence update broadcasted:', { userId, status });
   }
 
+  private async handleMessageIndicatorSync(data: any) {
+    const { userId, chatId, indicatorType, timestamp, expiresAt } = data;
+    
+    // Broadcast indicator update to all connected clients
+    this.io.emit('user_indicator', {
+      userId,
+      indicatorType,
+      chatId,
+      timestamp,
+      expiresAt
+    });
+    
+    logger.info('🔄 Message indicator synced across clients:', { userId, chatId, indicatorType });
+  }
+
+  /**
+   * Broadcast message indicator for visual feedback
+   */
+  private async broadcastMessageIndicator(chatId: string, userId: string, indicatorType: 'sent' | 'received') {
+    try {
+      // Create indicator data
+      const indicatorData = {
+        type: 'message_indicator',
+        userId,
+        chatId,
+        indicatorType,
+        timestamp: Date.now(),
+        expiresAt: Date.now() + 3000 // 3 seconds from now
+      };
+
+      // Broadcast to all users in the chat for visual feedback
+      this.io.to(chatId).emit('message_indicator', indicatorData);
+
+      // Also broadcast to global indicator listeners (for avatar indicators)
+      this.io.emit('user_indicator', {
+        userId,
+        indicatorType,
+        chatId,
+        timestamp: indicatorData.timestamp,
+        expiresAt: indicatorData.expiresAt
+      });
+
+      logger.info('✨ Message indicator broadcasted:', {
+        chatId,
+        userId,
+        indicatorType,
+        timestamp: indicatorData.timestamp
+      });
+    } catch (error) {
+      logger.error('❌ Failed to broadcast message indicator:', error);
+    }
+  }
+
   private getUserSockets(userId: string): string[] {
     const sockets: string[] = [];
     
@@ -587,6 +646,25 @@ export class WebSocketService {
       timestamp: new Date().toISOString(),
       type: 'read_receipt'
     }));
+  }
+
+  public async broadcastIndicatorFromAPI(userId: string, chatId: string, indicatorType: 'sent' | 'received') {
+    try {
+      await this.broadcastMessageIndicator(chatId, userId, indicatorType);
+      
+      // Also publish to Redis for cross-server synchronization
+      await this.pubClient.publish('message_indicator', JSON.stringify({
+        userId,
+        chatId,
+        indicatorType,
+        timestamp: Date.now(),
+        expiresAt: Date.now() + 3000
+      }));
+      
+      logger.info('📡 Message indicator published from API:', { userId, chatId, indicatorType });
+    } catch (error) {
+      logger.error('❌ Failed to broadcast indicator from API:', error);
+    }
   }
 
   public getHealthStatus() {

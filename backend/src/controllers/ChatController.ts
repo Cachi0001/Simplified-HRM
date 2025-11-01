@@ -73,7 +73,11 @@ export class ChatController {
             message: sentMessage.message,
             timestamp: sentMessage.timestamp
           });
-          logger.info('📢 Message broadcasted via WebSocket:', { messageId: sentMessage.id });
+
+          // Broadcast message indicator for real-time visual feedback
+          await webSocketService.broadcastIndicatorFromAPI(userId, chatId, 'sent');
+          
+          logger.info('📢 Message and indicator broadcasted via WebSocket:', { messageId: sentMessage.id });
         } catch (wsError) {
           logger.warn('⚠️ WebSocket broadcast failed, message still saved:', wsError);
         }
