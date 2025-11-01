@@ -76,6 +76,41 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
     userStatusService.initialize();
   }, []);
 
+  // Set up WebSocket listeners for message indicators
+  useEffect(() => {
+    const handleMessageIndicator = (event: CustomEvent) => {
+      const { userId, chatId, indicatorType } = event.detail;
+      console.log('✨ Message indicator event received:', { userId, chatId, indicatorType });
+      
+      if (indicatorType === 'sent') {
+        handleMessageSent(userId, chatId);
+      } else if (indicatorType === 'received') {
+        handleMessageReceived(userId, chatId);
+      }
+    };
+
+    const handleUserIndicator = (event: CustomEvent) => {
+      const { userId, chatId, indicatorType } = event.detail;
+      console.log('👤 User indicator event received:', { userId, chatId, indicatorType });
+      
+      // Handle global user indicators (for avatar indicators)
+      if (indicatorType === 'sent') {
+        handleMessageSent(userId, chatId);
+      } else if (indicatorType === 'received') {
+        handleMessageReceived(userId, chatId);
+      }
+    };
+
+    // Listen for WebSocket indicator events
+    window.addEventListener('message-indicator', handleMessageIndicator as EventListener);
+    window.addEventListener('user-indicator', handleUserIndicator as EventListener);
+
+    return () => {
+      window.removeEventListener('message-indicator', handleMessageIndicator as EventListener);
+      window.removeEventListener('user-indicator', handleUserIndicator as EventListener);
+    };
+  }, [handleMessageSent, handleMessageReceived]);
+
   // Remove conflicting real-time message state - messages are handled by useChat hook
 
   // Dark mode is now managed globally - no need for local storage
