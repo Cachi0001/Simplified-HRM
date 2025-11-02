@@ -30,6 +30,12 @@ router.patch('/mark-all-read', (req, res) => notificationController.markAllAsRea
 router.delete('/:notificationId', (req, res) => notificationController.deleteNotification(req, res));
 
 /**
+ * Profile Update Notifications
+ */
+router.get('/with-highlighting', (req, res) => notificationController.getNotificationsWithHighlighting(req, res));
+router.patch('/:notificationId/profile-read', (req, res) => notificationController.markProfileUpdateNotificationAsRead(req, res));
+
+/**
  * Push Token Management
  */
 router.post('/push-token', (req, res) => notificationController.savePushToken(req, res));

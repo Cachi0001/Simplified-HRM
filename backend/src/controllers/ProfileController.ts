@@ -552,12 +552,34 @@ export class ProfileController {
                     !['full-time', 'part-time', 'contract', 'intern'].includes(data.employmentType)) {
                     errors.push('Invalid employment type');
                 }
+                if (data.workDays) {
+                    const validDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+                    const invalidDays = data.workDays.filter((day: string) => !validDays.includes(day.toLowerCase()));
+                    
+                    if (invalidDays.length > 0) {
+                        errors.push(`Invalid working days: ${invalidDays.join(', ')}`);
+                    }
+                    
+                    if (data.workDays.length === 0) {
+                        errors.push('At least one working day must be selected');
+                    }
+                }
                 break;
 
             case 'preferences':
                 if (data.profileVisibility && 
                     !['public', 'team', 'private'].includes(data.profileVisibility)) {
                     errors.push('Invalid profile visibility');
+                }
+                if (data.workingHours) {
+                    if (data.workingHours.start && data.workingHours.end) {
+                        const startTime = new Date(`2000-01-01T${data.workingHours.start}:00`);
+                        const endTime = new Date(`2000-01-01T${data.workingHours.end}:00`);
+                        
+                        if (startTime >= endTime) {
+                            errors.push('Start time must be before end time');
+                        }
+                    }
                 }
                 break;
         }
@@ -725,6 +747,64 @@ export class ProfileController {
             });
         } catch (error) {
             logger.error('❌ [ProfileController] Get profile update history error', {
+                error: (error as Error).message
+            });
+            res.status(400).json({
+                status: 'error',
+                message: (error as Error).message
+            });
+        }
+    }
+
+    /**
+     * Update working days for an employee
+     * PATCH /api/profile/working-days
+     */
+    async updateWorkingDays(req: Request, res: Response): Promise<void> {
+        try {
+            const userId = req.user?.id;
+            const { workDays, workingHours } = req.body;
+
+            if (!userId) {
+                res.status(400).json({
+                    status: 'error',
+                    message: 'User ID is required'
+                });
+                return;
+            }
+
+            if (!workDays && !workingHours) {
+                res.status(400).json({
+                    status: 'error',
+                    message: 'Working days or working hours data is required'
+                });
+                return;
+            }
+
+            logger.info('📅 [ProfileController] Update working days', { 
+                userId,
+                workDays,
+                workingHours
+            });
+
+            // Prepare update data
+            const updateData: any = {};
+            if (workDays) updateData.workDays = workDays;
+            if (workingHours) updateData.workingHours = workingHours;
+
+            // Use the enhanced ProfileUpdateService
+            const updatedEmployee = await this.profileUpdateService.updateProfile(userId, updateData);
+
+            res.status(200).json({
+                status: 'success',
+                message: 'Working days updated successfully',
+                data: { 
+                    employee: updatedEmployee,
+                    workDays: updatedEmployee.work_days
+                }
+            });
+        } catch (error) {
+            logger.error('❌ [ProfileController] Update working days error', {
                 error: (error as Error).message
             });
             res.status(400).json({

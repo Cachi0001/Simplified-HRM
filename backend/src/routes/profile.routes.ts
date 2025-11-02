@@ -46,6 +46,11 @@ router.get('/search', (req, res) => ProfileController.searchProfiles(req, res));
 router.post('/request-approval', (req, res) => ProfileController.requestProfileApproval(req, res));
 
 /**
+ * Working Days Management
+ */
+router.patch('/working-days', (req, res) => ProfileController.updateWorkingDays(req, res));
+
+/**
  * Profile Update History and Management
  */
 router.get('/update-history/:employeeId', (req, res) => ProfileController.getProfileUpdateHistory(req, res));

@@ -444,6 +444,169 @@ export class NotificationService {
   }
 
   /**
+   * Create profile update notifications for administrators
+   */
+  async notifyProfileUpdate(
+    employeeId: string,
+    employeeName: string,
+    updatedFields: string[],
+    adminUserIds: string[]
+  ): Promise<void> {
+    try {
+      logger.info('NotificationService: Creating profile update notifications', {
+        employeeId,
+        employeeName,
+        adminCount: adminUserIds.length
+      });
+
+      const fieldsText = updatedFields.join(', ');
+      const title = 'Employee Profile Updated';
+      const message = `${employeeName} has updated their profile (${fieldsText})`;
+
+      for (const adminUserId of adminUserIds) {
+        await this.createNotification({
+          userId: adminUserId,
+          type: 'update',
+          title,
+          message,
+          relatedId: employeeId,
+          actionUrl: `/employee-management?highlight=${employeeId}`
+        });
+      }
+
+      logger.info('NotificationService: Profile update notifications created', {
+        employeeId,
+        employeeName,
+        adminCount: adminUserIds.length
+      });
+    } catch (error) {
+      logger.error('NotificationService: Failed to create profile update notifications', {
+        error: (error as Error).message,
+        employeeId
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Create employee deactivation notifications
+   */
+  async notifyEmployeeDeactivation(
+    employeeId: string,
+    employeeName: string,
+    deactivatedBy: string,
+    adminUserIds: string[]
+  ): Promise<void> {
+    try {
+      logger.info('NotificationService: Creating employee deactivation notifications', {
+        employeeId,
+        employeeName,
+        deactivatedBy
+      });
+
+      const title = 'Employee Deactivated';
+      const message = `${employeeName} has been deactivated by an administrator`;
+
+      for (const adminUserId of adminUserIds) {
+        await this.createNotification({
+          userId: adminUserId,
+          type: 'update',
+          title,
+          message,
+          relatedId: employeeId,
+          actionUrl: `/employee-management?highlight=${employeeId}`
+        });
+      }
+
+      logger.info('NotificationService: Employee deactivation notifications created', {
+        employeeId,
+        employeeName,
+        adminCount: adminUserIds.length
+      });
+    } catch (error) {
+      logger.error('NotificationService: Failed to create employee deactivation notifications', {
+        error: (error as Error).message,
+        employeeId
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get notifications with highlighting information
+   */
+  async getNotificationsWithHighlighting(
+    userId: string,
+    limit: number = 50,
+    offset: number = 0
+  ): Promise<Array<DatabaseNotification & { shouldHighlight?: boolean }>> {
+    try {
+      logger.info('NotificationService: Getting notifications with highlighting', { userId, limit, offset });
+
+      const { data, error } = await this.supabase
+        .from('notifications')
+        .select()
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (error) {
+        logger.error('NotificationService: Failed to get notifications', { error: error.message });
+        throw error;
+      }
+
+      // Add highlighting information for recent profile update notifications
+      const notificationsWithHighlighting = (data || []).map(notification => {
+        const shouldHighlight = 
+          notification.type === 'update' && 
+          notification.action_url?.includes('employee-management') &&
+          !notification.is_read &&
+          new Date(notification.created_at) > new Date(Date.now() - 5 * 60 * 1000); // Last 5 minutes
+
+        return {
+          ...notification,
+          shouldHighlight
+        };
+      });
+
+      logger.info('NotificationService: Notifications with highlighting retrieved', { 
+        count: notificationsWithHighlighting.length,
+        highlightedCount: notificationsWithHighlighting.filter(n => n.shouldHighlight).length
+      });
+
+      return notificationsWithHighlighting;
+    } catch (error) {
+      logger.error('NotificationService: Get notifications with highlighting failed', { 
+        error: (error as Error).message 
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Mark profile update notification as read and remove highlighting
+   */
+  async markProfileUpdateNotificationAsRead(notificationId: string, userId: string): Promise<void> {
+    try {
+      logger.info('NotificationService: Marking profile update notification as read', { 
+        notificationId, 
+        userId 
+      });
+
+      await this.markAsRead(notificationId, userId);
+
+      // Additional logic for removing highlighting could be added here
+      logger.info('NotificationService: Profile update notification marked as read');
+    } catch (error) {
+      logger.error('NotificationService: Failed to mark profile update notification as read', {
+        error: (error as Error).message,
+        notificationId
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Delete expired notifications (older than 30 days)
    */
   async deleteExpiredNotifications(): Promise<number> {

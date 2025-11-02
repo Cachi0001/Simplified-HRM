@@ -4,6 +4,7 @@ import logger from '../utils/logger';
 import NotificationService from './NotificationService';
 import { getWebSocketService } from './WebSocketService';
 import { EmailService } from './EmailService';
+import ProfileUpdateEmailTemplateService from './ProfileUpdateEmailTemplateService';
 
 export interface ProfileUpdateData {
   fullName?: string;
@@ -13,6 +14,13 @@ export interface ProfileUpdateData {
   address?: string;
   department?: string;
   position?: string;
+  workDays?: string[];
+  workingHours?: {
+    start?: string;
+    end?: string;
+    timezone?: string;
+    workDays?: string[];
+  };
 }
 
 export interface ProfileChanges {
@@ -131,6 +139,15 @@ export class ProfileUpdateService {
         updatedFields.push('Position');
       }
 
+      if (updates.workDays && JSON.stringify(updates.workDays) !== JSON.stringify(currentEmployee.work_days)) {
+        changes.push({
+          field: 'work_days',
+          oldValue: currentEmployee.work_days,
+          newValue: updates.workDays
+        });
+        updatedFields.push('Working Days');
+      }
+
       // If no changes, return current data
       if (changes.length === 0) {
         logger.info('ProfileUpdateService: No changes detected', { userId });
@@ -154,6 +171,7 @@ export class ProfileUpdateService {
       if (updates.address) updateData.address = updates.address;
       if (updates.department) updateData.department = updates.department;
       if (updates.position) updateData.position = updates.position;
+      if (updates.workDays) updateData.work_days = updates.workDays;
 
       // Update employee record
       const { data: updatedEmployee, error: updateError } = await this.supabase
@@ -165,6 +183,44 @@ export class ProfileUpdateService {
 
       if (updateError) {
         throw updateError;
+      }
+
+      // Update employee_profiles table if working hours are provided
+      if (updates.workingHours) {
+        // Get current working hours from employee_profiles
+        const { data: currentProfile } = await this.supabase
+          .from('employee_profiles')
+          .select('working_hours')
+          .eq('employee_id', updatedEmployee.id)
+          .single();
+
+        const currentWorkingHours = currentProfile?.working_hours || {
+          start: '08:30',
+          end: '17:00',
+          timezone: 'UTC',
+          workDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+        };
+
+        const updatedWorkingHours = {
+          ...currentWorkingHours,
+          ...updates.workingHours
+        };
+
+        const { error: profileError } = await this.supabase
+          .from('employee_profiles')
+          .upsert({
+            employee_id: updatedEmployee.id,
+            working_hours: updatedWorkingHours,
+            updated_at: new Date().toISOString()
+          });
+
+        if (profileError) {
+          logger.error('ProfileUpdateService: Failed to update working hours in profile', {
+            error: profileError.message,
+            employeeId: updatedEmployee.id
+          });
+          // Don't throw error, just log it
+        }
       }
 
       logger.info('ProfileUpdateService: Profile updated successfully', { 
@@ -259,6 +315,45 @@ export class ProfileUpdateService {
       }
     }
 
+    // Validate working days
+    if (data.workDays) {
+      const validDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+      const invalidDays = data.workDays.filter(day => !validDays.includes(day.toLowerCase()));
+      
+      if (invalidDays.length > 0) {
+        errors.push({ field: 'workDays', message: `Invalid working days: ${invalidDays.join(', ')}` });
+      }
+      
+      if (data.workDays.length === 0) {
+        errors.push({ field: 'workDays', message: 'At least one working day must be selected' });
+      }
+      
+      if (data.workDays.length > 7) {
+        errors.push({ field: 'workDays', message: 'Cannot have more than 7 working days' });
+      }
+    }
+
+    // Validate working hours
+    if (data.workingHours) {
+      if (data.workingHours.start && data.workingHours.end) {
+        const startTime = new Date(`2000-01-01T${data.workingHours.start}:00`);
+        const endTime = new Date(`2000-01-01T${data.workingHours.end}:00`);
+        
+        if (startTime >= endTime) {
+          errors.push({ field: 'workingHours', message: 'Start time must be before end time' });
+        }
+      }
+      
+      if (data.workingHours.workDays) {
+        const validDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        const invalidDays = data.workingHours.workDays.filter(day => !validDays.includes(day));
+        
+        if (invalidDays.length > 0) {
+          errors.push({ field: 'workingHours', message: `Invalid working days in hours: ${invalidDays.join(', ')}` });
+        }
+      }
+    }
+
     return {
       isValid: errors.length === 0,
       errors
@@ -342,17 +437,14 @@ export class ProfileUpdateService {
       const notificationTitle = 'Employee Profile Updated';
       const notificationMessage = `${employeeName} has updated their profile (${fieldsText})`;
 
-      // Create in-app notifications
-      for (const admin of administrators) {
-        await NotificationService.createNotification({
-          userId: admin.user_id,
-          type: 'update',
-          title: notificationTitle,
-          message: notificationMessage,
-          relatedId: employeeId,
-          actionUrl: `/employee-management?highlight=${employeeId}`
-        });
-      }
+      // Create in-app notifications using the enhanced method
+      const adminUserIds = administrators.map(admin => admin.user_id);
+      await NotificationService.notifyProfileUpdate(
+        employeeId,
+        employeeName,
+        updatedFields,
+        adminUserIds
+      );
 
       // Send email notifications
       const adminEmails = administrators.map(admin => admin.email);
@@ -382,36 +474,35 @@ export class ProfileUpdateService {
     updatedFields: string[]
   ): Promise<void> {
     try {
-      const fieldsText = updatedFields.join(', ');
-      const subject = 'Employee Profile Update Notification';
-      const htmlContent = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #333;">Employee Profile Updated</h2>
-          <p>Hello,</p>
-          <p><strong>${employeeName}</strong> has updated their profile information.</p>
-          <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
-            <h3 style="margin-top: 0; color: #555;">Updated Fields:</h3>
-            <p style="margin-bottom: 0;"><strong>${fieldsText}</strong></p>
-          </div>
-          <p>Please review the changes in the Employee Management section of the HR system.</p>
-          <p style="margin-top: 30px; color: #666; font-size: 14px;">
-            This is an automated notification from the Go3net HR Management System.
-          </p>
-        </div>
-      `;
+      // Generate email content using the template service
+      const emailData = ProfileUpdateEmailTemplateService.generateProfileUpdateEmailData(
+        employeeName,
+        updatedFields,
+        '', // employeeId not needed for email template
+        'Administrator'
+      );
+
+      // Log email generation
+      ProfileUpdateEmailTemplateService.logEmailGeneration(
+        employeeName,
+        updatedFields,
+        adminEmails.length
+      );
 
       const emailService = new EmailService();
       for (const email of adminEmails) {
         await emailService.sendEmail({
           to: email,
-          subject,
-          html: htmlContent
+          subject: emailData.subject,
+          html: emailData.html,
+          text: emailData.text
         });
       }
 
       logger.info('ProfileUpdateService: Email notifications sent', {
         recipientCount: adminEmails.length,
-        employeeName
+        employeeName,
+        subject: emailData.subject
       });
     } catch (error) {
       logger.error('ProfileUpdateService: Failed to send email notifications', {

@@ -288,6 +288,96 @@ export class NotificationController {
   }
 
   /**
+   * Get notifications with highlighting information for profile updates
+   * GET /api/notifications/with-highlighting
+   */
+  async getNotificationsWithHighlighting(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.id;
+      const page = req.query.page ? parseInt(req.query.page as string) : 1;
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 20;
+
+      if (!userId) {
+        res.status(400).json({
+          status: 'error',
+          message: 'userId is required'
+        });
+        return;
+      }
+
+      logger.info('🎯 [NotificationController] Get notifications with highlighting', {
+        userId,
+        page,
+        limit
+      });
+
+      const notifications = await this.notificationService.getNotificationsWithHighlighting(
+        userId,
+        limit,
+        (page - 1) * limit
+      );
+
+      res.status(200).json({
+        status: 'success',
+        data: {
+          notifications,
+          count: notifications.length,
+          page,
+          limit,
+          highlightedCount: notifications.filter(n => n.shouldHighlight).length
+        }
+      });
+    } catch (error) {
+      logger.error('❌ [NotificationController] Get notifications with highlighting error', {
+        error: (error as Error).message
+      });
+      res.status(400).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
+
+  /**
+   * Mark profile update notification as read and remove highlighting
+   * PATCH /api/notifications/:notificationId/profile-read
+   */
+  async markProfileUpdateNotificationAsRead(req: Request, res: Response): Promise<void> {
+    try {
+      const { notificationId } = req.params;
+      const userId = req.user?.id;
+
+      if (!notificationId || !userId) {
+        res.status(400).json({
+          status: 'error',
+          message: 'notificationId and userId are required'
+        });
+        return;
+      }
+
+      logger.info('✅ [NotificationController] Mark profile update notification as read', {
+        notificationId,
+        userId
+      });
+
+      await this.notificationService.markProfileUpdateNotificationAsRead(notificationId, userId);
+
+      res.status(200).json({
+        status: 'success',
+        message: 'Profile update notification marked as read'
+      });
+    } catch (error) {
+      logger.error('❌ [NotificationController] Mark profile update notification as read error', {
+        error: (error as Error).message
+      });
+      res.status(400).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
+
+  /**
    * Get users with push tokens for a specific notification type
    * This is typically called internally when sending notifications
    * GET /api/notifications/push-tokens/:notificationType
