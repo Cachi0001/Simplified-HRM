@@ -611,6 +611,223 @@ class EmailService {
             throw error;
         }
     }
+    async sendApprovalWithRoleConfirmation(email, fullName, role, reason) {
+        try {
+            const loginUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/auth`;
+            const dashboardUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard`;
+            
+            const mailOptions = {
+                from: `"Go3net HR Management System" <${process.env.FROM_EMAIL}>`,
+                to: email,
+                subject: `Welcome to Go3net! Your ${role.toUpperCase()} Account is Approved`,
+                html: `
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Account Approved - Go3net HR Management</title>
+              <style>
+                  body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
+                  .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+                  .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; margin: -20px -20px 30px -20px; }
+                  .header h1 { margin: 0; font-size: 28px; }
+                  .content { padding: 0 10px; }
+                  .success-badge { background-color: #10b981; color: white; padding: 8px 16px; border-radius: 20px; display: inline-block; font-weight: bold; margin: 20px 0; }
+                  .role-badge { background-color: #3b82f6; color: white; padding: 6px 12px; border-radius: 15px; display: inline-block; font-weight: bold; text-transform: uppercase; }
+                  .cta-button { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 30px; text-decoration: none; border-radius: 25px; display: inline-block; font-weight: bold; margin: 20px 0; }
+                  .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #666; font-size: 14px; }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <div class="header">
+                      <h1>🎉 Welcome to Go3net!</h1>
+                      <p style="margin: 10px 0 0 0; font-size: 18px;">Your account has been approved</p>
+                  </div>
+                  <div class="content">
+                      <div class="success-badge">✅ Account Approved</div>
+                      
+                      <p style="font-size: 18px;">Dear <strong>${fullName}</strong>,</p>
+                      
+                      <p style="font-size: 16px;">Congratulations! Your Go3net HR Management System account has been approved and you've been assigned the role of <span class="role-badge">${role}</span>.</p>
+                      
+                      ${reason ? `<div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #3b82f6; margin: 20px 0;">
+                          <strong>Approval Note:</strong> ${reason}
+                      </div>` : ''}
+                      
+                      <div style="background-color: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                          <h3 style="color: #1e40af; margin-top: 0;">Your Role Permissions:</h3>
+                          ${this.getRolePermissionsHtml(role)}
+                      </div>
+                      
+                      <p style="font-size: 16px;">You can now log in to your account and start using the system:</p>
+                      
+                      <div style="text-align: center; margin: 30px 0;">
+                          <a href="${loginUrl}" class="cta-button">Login to Your Account</a>
+                      </div>
+                      
+                      <p style="font-size: 16px; color: #555;">Once logged in, you'll be redirected to your personalized dashboard where you can access all the features available to your role.</p>
+                      
+                      <div style="background-color: #fef3c7; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                          <strong>💡 Getting Started Tips:</strong>
+                          <ul style="margin: 10px 0;">
+                              <li>Complete your profile information</li>
+                              <li>Explore the dashboard features</li>
+                              <li>Check for any assigned tasks</li>
+                              <li>Familiarize yourself with the system navigation</li>
+                          </ul>
+                      </div>
+                  </div>
+                  <div class="footer">
+                      <p>This is an automated message from Go3net HR Management System.</p>
+                      <p style="margin-top: 15px;">© Go3net HR Management System. All rights reserved.</p>
+                  </div>
+              </div>
+          </body>
+          </html>
+        `
+            };
+            
+            logger_1.default.info('📧 Sending approval with role confirmation', {
+                to: email,
+                role
+            });
+            
+            const result = await this.transporter.sendMail(mailOptions);
+            logger_1.default.info('✅ Approval with role email sent successfully', {
+                messageId: result.messageId,
+                to: email,
+                role
+            });
+        }
+        catch (error) {
+            logger_1.default.error('Failed to send approval with role email', { error: error.message });
+            throw error;
+        }
+    }
+    
+    async sendRejectionNotification(email, fullName, reason) {
+        try {
+            const supportEmail = process.env.SUPPORT_EMAIL || 'support@go3net.com.ng';
+            
+            const mailOptions = {
+                from: `"Go3net HR Management System" <${process.env.FROM_EMAIL}>`,
+                to: email,
+                subject: 'Registration Update - Go3net HR Management',
+                html: `
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Registration Update - Go3net HR Management</title>
+              <style>
+                  body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
+                  .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+                  .header { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; margin: -20px -20px 30px -20px; }
+                  .header h1 { margin: 0; font-size: 28px; }
+                  .content { padding: 0 10px; }
+                  .status-badge { background-color: #ef4444; color: white; padding: 8px 16px; border-radius: 20px; display: inline-block; font-weight: bold; margin: 20px 0; }
+                  .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #666; font-size: 14px; }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <div class="header">
+                      <h1>Registration Update</h1>
+                      <p style="margin: 10px 0 0 0; font-size: 18px;">Go3net HR Management System</p>
+                  </div>
+                  <div class="content">
+                      <div class="status-badge">Registration Not Approved</div>
+                      
+                      <p style="font-size: 18px;">Dear <strong>${fullName}</strong>,</p>
+                      
+                      <p style="font-size: 16px;">Thank you for your interest in joining Go3net HR Management System. After careful review, we are unable to approve your registration at this time.</p>
+                      
+                      ${reason ? `<div style="background-color: #fef2f2; padding: 15px; border-left: 4px solid #ef4444; margin: 20px 0;">
+                          <strong>Reason:</strong> ${reason}
+                      </div>` : ''}
+                      
+                      <p style="font-size: 16px;">If you believe this decision was made in error or if you have additional information that might affect this decision, please don't hesitate to contact our support team.</p>
+                      
+                      <div style="background-color: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                          <h3 style="color: #1e40af; margin-top: 0;">Need Help?</h3>
+                          <p>Contact our support team at: <a href="mailto:${supportEmail}">${supportEmail}</a></p>
+                          <p>We're here to help and answer any questions you may have.</p>
+                      </div>
+                      
+                      <p style="font-size: 16px; color: #555;">Thank you for your understanding.</p>
+                  </div>
+                  <div class="footer">
+                      <p>This is an automated message from Go3net HR Management System.</p>
+                      <p style="margin-top: 15px;">© Go3net HR Management System. All rights reserved.</p>
+                  </div>
+              </div>
+          </body>
+          </html>
+        `
+            };
+            
+            logger_1.default.info('📧 Sending rejection notification', {
+                to: email,
+                reason
+            });
+            
+            const result = await this.transporter.sendMail(mailOptions);
+            logger_1.default.info('✅ Rejection email sent successfully', {
+                messageId: result.messageId,
+                to: email
+            });
+        }
+        catch (error) {
+            logger_1.default.error('Failed to send rejection email', { error: error.message });
+            throw error;
+        }
+    }
+    
+    getRolePermissionsHtml(role) {
+        const permissions = {
+            'employee': `
+                <ul style="color: #1e40af; margin: 0;">
+                    <li>Access personal dashboard</li>
+                    <li>View and update profile</li>
+                    <li>Manage assigned tasks</li>
+                    <li>View company announcements</li>
+                </ul>
+            `,
+            'hr': `
+                <ul style="color: #1e40af; margin: 0;">
+                    <li>All employee permissions</li>
+                    <li>Manage employee registrations</li>
+                    <li>View employee profiles</li>
+                    <li>Assign tasks to employees</li>
+                    <li>Access HR dashboard</li>
+                </ul>
+            `,
+            'admin': `
+                <ul style="color: #1e40af; margin: 0;">
+                    <li>All HR permissions</li>
+                    <li>Full system administration</li>
+                    <li>Manage user roles</li>
+                    <li>System configuration</li>
+                    <li>Advanced reporting</li>
+                </ul>
+            `,
+            'super-admin': `
+                <ul style="color: #1e40af; margin: 0;">
+                    <li>Complete system control</li>
+                    <li>Manage all users and roles</li>
+                    <li>System-wide configuration</li>
+                    <li>Advanced security settings</li>
+                    <li>Full audit capabilities</li>
+                </ul>
+            `
+        };
+        
+        return permissions[role] || permissions['employee'];
+    }
+
     getSupabaseAdmin() {
         const { createClient } = require('@supabase/supabase-js');
         return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);

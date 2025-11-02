@@ -1,211 +1,187 @@
-import { useState, useEffect } from 'react';
-import { TeamLeadTasks } from '../components/dashboard/TeamLeadTasks';
-import { TeamLeadEmployees } from '../components/dashboard/TeamLeadEmployees';
-import { TeamLeadOverview } from '../components/dashboard/TeamLeadOverview';
-import { NotificationManager, triggerNotification, NotificationUtils } from '../components/notifications/NotificationManager';
-import { useQuery } from '@tanstack/react-query';
-import { notificationService } from '../services/notificationService';
-import Logo from '../components/ui/Logo';
-import { authService } from '../services/authService';
-import { BottomNavbar } from '../components/layout/BottomNavbar';
-import { useToast } from '../components/ui/Toast';
-import { DarkModeToggle } from '../components/ui/DarkModeToggle';
-import { NotificationBell } from '../components/dashboard/NotificationBell';
-import { OverviewCards } from '../components/dashboard/OverviewCards';
-import api from '../lib/api';
-import { useTokenValidation } from '../hooks/useTokenValidation';
+import React from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { Users, CheckSquare, BarChart3, Calendar, MessageSquare, Settings } from 'lucide-react';
 
-export default function TeamLeadDashboard() {
-  const [darkMode, setDarkMode] = useState(() => {
-    const saved = localStorage.getItem('darkMode');
-    return saved ? JSON.parse(saved) : false;
-  });
+const TeamLeadDashboard: React.FC = () => {
+  const { user } = useAuth();
 
-  const [currentUser, setCurrentUser] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('overview');
-
-  const { addToast } = useToast();
-
-  useTokenValidation({
-    checkInterval: 2 * 60 * 1000,
-    onTokenExpired: () => {
-      addToast('warning', 'Your session has expired. Redirecting to login...');
+  const dashboardCards = [
+    {
+      title: 'Team Members',
+      description: 'Manage your team members and assignments',
+      icon: Users,
+      color: 'bg-blue-500',
+      href: '/team-members'
+    },
+    {
+      title: 'Task Management',
+      description: 'Assign and track team tasks',
+      icon: CheckSquare,
+      color: 'bg-green-500',
+      href: '/tasks'
+    },
+    {
+      title: 'Team Performance',
+      description: 'View team performance metrics',
+      icon: BarChart3,
+      color: 'bg-purple-500',
+      href: '/team-performance'
+    },
+    {
+      title: 'Schedule Management',
+      description: 'Manage team schedules and attendance',
+      icon: Calendar,
+      color: 'bg-orange-500',
+      href: '/team-schedule'
+    },
+    {
+      title: 'Team Chat',
+      description: 'Communicate with your team',
+      icon: MessageSquare,
+      color: 'bg-indigo-500',
+      href: '/chat'
+    },
+    {
+      title: 'Settings',
+      description: 'Manage your profile and preferences',
+      icon: Settings,
+      color: 'bg-gray-500',
+      href: '/settings'
     }
-  });
-
-  useEffect(() => {
-    localStorage.setItem('darkMode', JSON.stringify(darkMode));
-  }, [darkMode]);
-
-  useEffect(() => {
-    try {
-      const user = authService.getCurrentUserFromStorage();
-      console.log('Current user from localStorage:', user);
-      
-      if (user) {
-        setCurrentUser(user);
-        
-        // Verify user has team lead role
-        if (user.role !== 'teamlead') {
-          setError('Access denied. Team Lead role required.');
-          addToast('error', 'Access denied. Team Lead role required.');
-          return;
-        }
-      } else {
-        setError('No user found. Please log in.');
-        addToast('error', 'Please log in to access the dashboard.');
-      }
-    } catch (error) {
-      console.error('Error loading user:', error);
-      setError('Failed to load user data.');
-      addToast('error', 'Failed to load user data.');
-    }
-  }, [addToast]);
-
-  const { data: notifications = [], refetch: refetchNotifications } = useQuery({
-    queryKey: ['notifications'],
-    queryFn: () => notificationService.getNotifications(),
-    enabled: !!currentUser,
-    refetchInterval: 30000,
-  });
-
-  const handleLogout = () => {
-    authService.logout();
-    window.location.href = '/auth';
-  };
-
-  const handleNotificationClick = async (notification: any) => {
-    try {
-      await notificationService.markAsRead(notification.id);
-      refetchNotifications();
-      
-      if (notification.action_url) {
-        window.location.href = notification.action_url;
-      }
-    } catch (error) {
-      console.error('Error handling notification click:', error);
-      addToast('error', 'Failed to handle notification');
-    }
-  };
-
-  const tabs = [
-    { id: 'overview', label: 'Overview', icon: '📊' },
-    { id: 'tasks', label: 'Task Management', icon: '✅' },
-    { id: 'team', label: 'My Team', icon: '👥' },
   ];
 
-  if (error) {
-    return (
-      <div className={`min-h-screen ${darkMode ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}>
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-red-600 mb-4">Access Error</h1>
-            <p className="text-gray-600 mb-4">{error}</p>
-            <button
-              onClick={() => window.location.href = '/auth'}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              Go to Login
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!currentUser) {
-    return (
-      <div className={`min-h-screen ${darkMode ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}>
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className={`min-h-screen ${darkMode ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}>
-      {/* Header */}
-      <header className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-b sticky top-0 z-50`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-4">
-              <Logo />
-              <div>
-                <h1 className="text-xl font-semibold">Team Lead Dashboard</h1>
-                <p className="text-sm text-gray-500">Welcome back, {currentUser?.full_name || currentUser?.name}</p>
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">
+            Welcome back, {user?.fullName || user?.name || 'Team Lead'}!
+          </h1>
+          <p className="text-gray-600 mt-2">
+            Manage your team and track progress from your dashboard
+          </p>
+        </div>
+
+        {/* Quick Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <Card className="p-6">
+            <div className="flex items-center">
+              <div className="p-3 rounded-full bg-blue-100">
+                <Users className="h-6 w-6 text-blue-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Team Members</p>
+                <p className="text-2xl font-bold text-gray-900">8</p>
               </div>
             </div>
-            
-            <div className="flex items-center space-x-4">
-              <DarkModeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
-              <NotificationBell 
-                notifications={notifications}
-                onNotificationClick={handleNotificationClick}
-                darkMode={darkMode}
-              />
-              <button
-                onClick={handleLogout}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                  darkMode 
-                    ? 'bg-red-600 hover:bg-red-700 text-white' 
-                    : 'bg-red-600 hover:bg-red-700 text-white'
-                }`}
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
+          </Card>
 
-      {/* Navigation Tabs */}
-      <div className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-b`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <nav className="flex space-x-8">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === tab.id
-                    ? darkMode
-                      ? 'border-blue-400 text-blue-400'
-                      : 'border-blue-500 text-blue-600'
-                    : darkMode
-                      ? 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <span className="mr-2">{tab.icon}</span>
-                {tab.label}
-              </button>
-            ))}
-          </nav>
+          <Card className="p-6">
+            <div className="flex items-center">
+              <div className="p-3 rounded-full bg-green-100">
+                <CheckSquare className="h-6 w-6 text-green-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Active Tasks</p>
+                <p className="text-2xl font-bold text-gray-900">12</p>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-6">
+            <div className="flex items-center">
+              <div className="p-3 rounded-full bg-purple-100">
+                <BarChart3 className="h-6 w-6 text-purple-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Completion Rate</p>
+                <p className="text-2xl font-bold text-gray-900">85%</p>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-6">
+            <div className="flex items-center">
+              <div className="p-3 rounded-full bg-orange-100">
+                <Calendar className="h-6 w-6 text-orange-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">This Week</p>
+                <p className="text-2xl font-bold text-gray-900">40h</p>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Dashboard Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {dashboardCards.map((card, index) => {
+            const IconComponent = card.icon;
+            return (
+              <Card key={index} className="p-6 hover:shadow-lg transition-shadow cursor-pointer">
+                <div className="flex items-center mb-4">
+                  <div className={`p-3 rounded-full ${card.color}`}>
+                    <IconComponent className="h-6 w-6 text-white" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 ml-3">
+                    {card.title}
+                  </h3>
+                </div>
+                <p className="text-gray-600 mb-4">
+                  {card.description}
+                </p>
+                <Button 
+                  className="w-full bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300"
+                  onClick={() => window.location.href = card.href}
+                >
+                  Access
+                </Button>
+              </Card>
+            );
+          })}
+        </div>
+
+        {/* Recent Activity */}
+        <div className="mt-8">
+          <Card className="p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Team Activity</h3>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between py-3 border-b border-gray-200">
+                <div>
+                  <p className="font-medium text-gray-900">Task "Website Redesign" completed</p>
+                  <p className="text-sm text-gray-600">by John Doe • 2 hours ago</p>
+                </div>
+                <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+                  Completed
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-3 border-b border-gray-200">
+                <div>
+                  <p className="font-medium text-gray-900">New task assigned to Sarah Wilson</p>
+                  <p className="text-sm text-gray-600">Database optimization • 4 hours ago</p>
+                </div>
+                <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                  Assigned
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-3">
+                <div>
+                  <p className="font-medium text-gray-900">Team meeting scheduled</p>
+                  <p className="text-sm text-gray-600">Weekly standup • Tomorrow 9:00 AM</p>
+                </div>
+                <span className="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">
+                  Upcoming
+                </span>
+              </div>
+            </div>
+          </Card>
         </div>
       </div>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'overview' && (
-          <div className="space-y-6">
-            <TeamLeadOverview currentUser={currentUser} darkMode={darkMode} />
-            <OverviewCards darkMode={darkMode} />
-          </div>
-        )}
-        
-        {activeTab === 'tasks' && (
-          <TeamLeadTasks currentUser={currentUser} darkMode={darkMode} />
-        )}
-        
-        {activeTab === 'team' && (
-          <TeamLeadEmployees currentUser={currentUser} darkMode={darkMode} />
-        )}
-      </main>
-
-      <BottomNavbar />
-      <NotificationManager />
     </div>
   );
-}
+};
+
+export default TeamLeadDashboard;

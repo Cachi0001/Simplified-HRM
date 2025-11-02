@@ -432,11 +432,10 @@ export class SupabaseEmployeeRepository {
       const { data, error } = await this.supabase.rpc(
         'approve_employee_with_role',
         {
-          p_employee_id: employeeId,
-          p_new_role: newRole,
-          p_approved_by_id: approvedById,
-          p_approved_by_name: approvedByName,
-          p_reason: reason || null
+          employee_id: employeeId,
+          assigned_role: newRole,
+          approved_by: approvedById,
+          reason: reason || null
         }
       );
 
@@ -475,11 +474,10 @@ export class SupabaseEmployeeRepository {
       const { data, error } = await this.supabase.rpc(
         'update_employee_role',
         {
-          p_employee_id: employeeId,
-          p_new_role: newRole,
-          p_updated_by_id: updatedById,
-          p_updated_by_name: updatedByName,
-          p_reason: reason || null
+          employee_id: employeeId,
+          new_role: newRole,
+          updated_by: updatedById,
+          reason: reason || null
         }
       );
 

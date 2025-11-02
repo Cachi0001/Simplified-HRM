@@ -16,6 +16,8 @@ import ChatPage from './src/pages/ChatPage';
 import { LeaveRequestsPage } from './src/pages/LeaveRequestsPage';
 import { PurchaseRequestsPage } from './src/pages/PurchaseRequestsPage';
 import { NotificationsPage } from './src/pages/NotificationsPage';
+import EmployeeManagementPage from './src/pages/EmployeeManagementPage';
+import PerformanceMetrics from './src/pages/PerformanceMetrics';
 import Header from './src/components/layout/Header';
 import Footer from './src/components/layout/Footer';
 import { ToastProvider } from './src/components/ui/Toast';
@@ -49,6 +51,8 @@ function AppContent() {
                          location.pathname.startsWith('/leave-requests') ||
                          location.pathname.startsWith('/purchase-requests') ||
                          location.pathname.startsWith('/notifications') ||
+                         location.pathname.startsWith('/admin/employees') ||
+                         location.pathname.startsWith('/performance-metrics') ||
                          location.pathname.startsWith('/chat');
 
   return (
@@ -119,6 +123,16 @@ function AppContent() {
           <Route path="/notifications" element={
             <ProtectedRoute>
               <NotificationsPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/employees" element={
+            <ProtectedRoute>
+              <EmployeeManagementPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/performance-metrics" element={
+            <ProtectedRoute>
+              <PerformanceMetrics />
             </ProtectedRoute>
           } />
           <Route path="/api-test" element={<ApiConnectionTest />} />

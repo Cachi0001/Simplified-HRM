@@ -197,6 +197,10 @@ class NotificationService {
     }
   }
 
+  async markAsRead(notificationId: string): Promise<void> {
+    return this.markNotificationAsRead(notificationId);
+  }
+
   async getNotifications(userId?: string): Promise<Go3netNotification[]> {
     try {
       const allNotifications: Go3netNotification[] = [];

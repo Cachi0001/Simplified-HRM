@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { AdminLeaveRequests } from '../components/dashboard/AdminLeaveRequests';
@@ -169,10 +169,10 @@ export default function HRDashboard() {
                 ✓ Task Management
               </button>
               <button
-                onClick={() => navigate('/attendance-report')}
+                onClick={() => navigate('/performance-metrics')}
                 className="w-full px-4 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-semibold transition-colors"
               >
-                📊 Attendance Report
+                📊 Performance Metrics
               </button>
             </div>
           </div>

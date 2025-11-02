@@ -63,12 +63,31 @@ class EmployeeService {
     }
     async getAllEmployees(query, currentUserRole) {
         try {
-            logger_1.default.info('EmployeeService: Getting all employees', { role: currentUserRole });
+            logger_1.default.info('EmployeeService: Getting all employees', { 
+                role: currentUserRole, 
+                originalQuery: query 
+            });
+            
             // Non-admin users can only see active employees
-            if (currentUserRole !== 'admin') {
+            if (currentUserRole !== 'admin' && currentUserRole !== 'super-admin' && currentUserRole !== 'hr') {
                 query = { ...query, status: 'active' };
+                logger_1.default.info('EmployeeService: Non-admin user, filtering to active only', { 
+                    modifiedQuery: query 
+                });
+            } else {
+                logger_1.default.info('EmployeeService: Admin/HR user, showing all employees', { 
+                    role: currentUserRole 
+                });
             }
-            return await this.employeeRepository.findAll(query);
+            
+            const result = await this.employeeRepository.findAll(query);
+            logger_1.default.info('EmployeeService: Repository result', { 
+                employeeCount: result?.employees?.length || 0,
+                total: result?.total || 0,
+                result: result
+            });
+            
+            return result;
         }
         catch (error) {
             logger_1.default.error('EmployeeService: Get all employees failed', { error: error.message });
@@ -240,14 +259,75 @@ class EmployeeService {
             throw error;
         }
     }
-    async rejectEmployee(id) {
+    async rejectEmployee(id, reason) {
         try {
+            // Get employee details before deletion for email
+            const employee = await this.employeeRepository.findById(id);
+            if (!employee) {
+                throw new Error('Employee not found');
+            }
+            
             // Delete the employee record (reject registration)
             await this.employeeRepository.delete(id);
-            logger_1.default.info('Employee rejected successfully', { employeeId: id });
+            
+            // Send rejection email
+            try {
+                const emailService = new (await Promise.resolve().then(() => __importStar(require('../services/EmailService')))).EmailService();
+                await emailService.sendRejectionNotification(employee.email, employee.fullName, reason);
+                logger_1.default.info('Rejection email sent', { email: employee.email });
+            }
+            catch (emailError) {
+                logger_1.default.warn('Rejection email failed (non-critical)', { error: emailError.message });
+            }
+            
+            logger_1.default.info('Employee rejected successfully', { employeeId: id, reason });
         }
         catch (error) {
             logger_1.default.error('Reject employee failed', { error: error.message });
+            throw error;
+        }
+    }
+    async approveEmployeeWithRole(id, role, reason, approvedBy) {
+        try {
+            logger_1.default.info('EmployeeService: Approving employee with role', { employeeId: id, role, approvedBy });
+            
+            // Get employee details first
+            const employee = await this.employeeRepository.findById(id);
+            if (!employee) {
+                throw new Error('Employee not found');
+            }
+            
+            // Use the repository method that calls the database function
+            const updatedEmployee = await this.employeeRepository.approveEmployeeWithRole(
+                id, 
+                role, 
+                approvedBy, 
+                'Admin User', // approvedByName - we'll get this from the database
+                reason
+            );
+            
+            // The database function handles user updates, so we don't need to do it here
+            logger_1.default.info('✅ Employee approved with role via database function', {
+                employeeId: id,
+                role: role,
+                result: updatedEmployee
+            });
+            
+            // Send approval email with role information
+            try {
+                const emailService = new (await Promise.resolve().then(() => __importStar(require('../services/EmailService')))).EmailService();
+                await emailService.sendApprovalWithRoleConfirmation(updatedEmployee.email, updatedEmployee.full_name, role, reason);
+                logger_1.default.info('Approval with role email sent', { email: updatedEmployee.email, role });
+            }
+            catch (emailError) {
+                logger_1.default.warn('Approval email failed (non-critical)', { error: emailError.message });
+            }
+            
+            logger_1.default.info('EmployeeService: Employee approved with role successfully', { employeeId: id, role });
+            return updatedEmployee;
+        }
+        catch (error) {
+            logger_1.default.error('EmployeeService: Approve employee with role failed', { error: error.message });
             throw error;
         }
     }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Bell } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { notificationService } from '../../services/notificationService';
@@ -7,9 +7,15 @@ import { useNavigate } from 'react-router-dom';
 
 interface NotificationBellProps {
   darkMode?: boolean;
+  notifications?: any[];
+  onNotificationClick?: (notification: any) => Promise<void>;
 }
 
-export function NotificationBell({ darkMode = false }: NotificationBellProps) {
+export function NotificationBell({ 
+  darkMode = false, 
+  notifications: propNotifications, 
+  onNotificationClick: propOnNotificationClick 
+}: NotificationBellProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [localDarkMode, setLocalDarkMode] = useState(() => {
     // Load dark mode preference from localStorage
@@ -23,20 +29,31 @@ export function NotificationBell({ darkMode = false }: NotificationBellProps) {
     setLocalDarkMode(darkMode);
   }, [darkMode]);
 
-  // Fetch real notifications from the service
-  const { data: notifications = [], refetch } = useQuery({
+  // Fetch real notifications from the service or use prop notifications
+  const { data: fetchedNotifications = [], refetch } = useQuery({
     queryKey: ['notifications'],
     queryFn: async () => {
       return await notificationService.getNotifications();
     },
     refetchInterval: 30000,
+    enabled: !propNotifications, // Only fetch if no prop notifications provided
   });
 
-  const handleNotificationClick = async (notification: any) => {
-    await notificationService.markNotificationAsRead(notification.id);
+  const notifications = propNotifications || fetchedNotifications;
 
-    notification.read = true;
-    void refetch();
+  const handleNotificationClick = async (notification: any) => {
+    // Use prop handler if provided, otherwise use default behavior
+    if (propOnNotificationClick) {
+      await propOnNotificationClick(notification);
+      setIsOpen(false);
+      return;
+    }
+
+    // Mark as read and force refetch
+    await notificationService.markNotificationAsRead(notification.id);
+    
+    // Force immediate refetch to update the counter
+    await refetch();
     localStorage.setItem('notifications:lastInteraction', Date.now().toString());
 
     let navigateUrl = '/dashboard';

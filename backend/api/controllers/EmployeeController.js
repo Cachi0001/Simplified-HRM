@@ -269,7 +269,8 @@ class EmployeeController {
     async rejectEmployee(req, res) {
         try {
             const { id } = req.params;
-            await this.employeeService.rejectEmployee(id);
+            const { reason } = req.body;
+            await this.employeeService.rejectEmployee(id, reason);
             res.status(200).json({
                 status: 'success',
                 message: 'Employee registration rejected'
@@ -277,6 +278,26 @@ class EmployeeController {
         }
         catch (error) {
             logger_1.default.error('EmployeeController: Reject employee error', { error: error.message });
+            res.status(400).json({
+                status: 'error',
+                message: error.message
+            });
+        }
+    }
+    async approveEmployeeWithRole(req, res) {
+        try {
+            const { id } = req.params;
+            const { role, reason } = req.body;
+            const approvedBy = req.user?.id;
+            const employee = await this.employeeService.approveEmployeeWithRole(id, role, reason, approvedBy);
+            res.status(200).json({
+                status: 'success',
+                message: 'Employee approved successfully',
+                data: { employee }
+            });
+        }
+        catch (error) {
+            logger_1.default.error('EmployeeController: Approve employee with role error', { error: error.message });
             res.status(400).json({
                 status: 'error',
                 message: error.message

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  MessageCircle, X, Send, Users, Search, Plus, Settings,
+  MessageCircle, X, Send, Users, Search, Plus,
   ArrowLeft, Bell, History, Moon, Sun
 } from 'lucide-react';
 import { ChatBadge } from './ChatBadge';
@@ -798,11 +798,17 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                       <div className="flex items-center gap-3">
                         {/* Circular Avatar (40px) with status indicator */}
                         <div className="relative w-10 h-10 flex-shrink-0">
-                          <IndicatorWrapper userId={item.id}>
+                          {activeTab === 'dms' ? (
+                            <IndicatorWrapper userId={item.id}>
+                              <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium text-sm">
+                                {item.name ? item.name.charAt(0).toUpperCase() : 'U'}
+                              </div>
+                            </IndicatorWrapper>
+                          ) : (
                             <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium text-sm">
                               {item.name ? item.name.charAt(0).toUpperCase() : 'U'}
                             </div>
-                          </IndicatorWrapper>
+                          )}
                           {/* Status indicator */}
                           {item.isUser && (
                             <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${userStatusService.getStatusColor(item.userData?.id || '')}`}></div>
@@ -952,9 +958,7 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                       </div>
                     </div>
 
-                    <button className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors`}>
-                      <Settings className="w-4 h-4" />
-                    </button>
+
                   </div>
                 </div>
 

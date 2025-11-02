@@ -135,10 +135,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
       // Find user by email
       const { data: user, error: userError } = await this.supabase
         .from('users')
-        .select(`
-          *,
-          employees!inner(*)
-        `)
+        .select('*')
         .eq('email', credentials.email)
         .single();
 
@@ -154,14 +151,19 @@ export class SupabaseAuthRepository implements IAuthRepository {
         throw new Error('Invalid email or password');
       }
 
-      const employeeRecords = Array.isArray(user.employees) ? user.employees : [user.employees].filter(Boolean);
-      const employee = employeeRecords[0];
+      // Get employee record separately
+      const { data: employee, error: empError } = await this.supabase
+        .from('employees')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
 
-      if (!employee) {
+      if (empError || !employee) {
         logger.error('❌ [SupabaseAuthRepository] Employee record not found for user', {
           userId: user.id,
           email: user.email,
-          role: user.role
+          role: user.role,
+          empError: empError?.message
         });
         throw new Error('Employee record not found. Please contact support.');
       }
@@ -240,10 +242,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
       // Find user and validate refresh token
       const { data: user, error: userError } = await this.supabase
         .from('users')
-        .select(`
-          *,
-          employees!inner(*)
-        `)
+        .select('*')
         .eq('id', decoded.sub)
         .single();
 
@@ -263,8 +262,15 @@ export class SupabaseAuthRepository implements IAuthRepository {
       // Replace old refresh token with new one
       await this.replaceRefreshToken(user.id, refreshToken, newRefreshToken);
 
+      // Get employee record
+      const { data: employee, error: empError } = await this.supabase
+        .from('employees')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
       return {
-        user: this.mapSupabaseUserToInterface(user, user.employees),
+        user: this.mapSupabaseUserToInterface(user, employee),
         accessToken: newAccessToken,
         refreshToken: newRefreshToken,
       };
@@ -283,10 +289,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
       // Find user with employee data
       const { data: user, error: userError } = await this.supabase
         .from('users')
-        .select(`
-          *,
-          employees!inner(*)
-        `)
+        .select('*')
         .eq('id', decoded.sub)
         .single();
 
@@ -294,11 +297,16 @@ export class SupabaseAuthRepository implements IAuthRepository {
         throw new Error('User not found');
       }
 
-      const employee = user.employees;
+      // Get employee record
+      const { data: employee, error: empError } = await this.supabase
+        .from('employees')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
 
       logger.debug('✅ [SupabaseAuthRepository] Included employee status in user response', {
         userId: user.id,
-        status: employee.status
+        status: employee?.status
       });
 
       return this.mapSupabaseUserToInterface(user, employee);
@@ -646,10 +654,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
       // Get updated user data with employee info
       const { data: updatedUser, error: updatedUserError } = await this.supabase
         .from('users')
-        .select(`
-          *,
-          employees!inner(*)
-        `)
+        .select('*')
         .eq('id', user.id)
         .single();
 
@@ -657,7 +662,12 @@ export class SupabaseAuthRepository implements IAuthRepository {
         throw new Error('Failed to retrieve updated user data');
       }
 
-      const employeeData = updatedUser.employees;
+      // Get employee record
+      const { data: employeeData, error: empDataError } = await this.supabase
+        .from('employees')
+        .select('*')
+        .eq('user_id', updatedUser.id)
+        .single();
 
       // Generate JWT tokens (admin users bypass employee approval, others need active status)
       let accessToken = '';

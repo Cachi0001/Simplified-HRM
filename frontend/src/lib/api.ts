@@ -425,7 +425,7 @@ export interface User {
   id: string;
   email: string;
   fullName: string;
-  role: 'admin' | 'employee' | 'hr';
+  role: 'superadmin' | 'admin' | 'employee' | 'hr' | 'teamlead';
   status?: 'active' | 'inactive' | 'pending';
   emailVerified: boolean;
   createdAt: string;

@@ -78,7 +78,7 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
             window.location.href = '/employee-dashboard';
           }
         }, 1000);
-      } else if (user.role === 'super-admin') {
+      } else if (user.role === 'superadmin') {
         addToast('success', 'Login successful! Redirecting to super admin dashboard...');
         setTimeout(() => {
           try {
@@ -96,6 +96,16 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
           } catch (error) {
             console.error('Navigation error:', error);
             window.location.href = '/hr-dashboard';
+          }
+        }, 1000);
+      } else if (user.role === 'teamlead') {
+        addToast('success', 'Login successful! Redirecting to team lead dashboard...');
+        setTimeout(() => {
+          try {
+            navigate('/teamlead-dashboard', { replace: true });
+          } catch (error) {
+            console.error('Navigation error:', error);
+            window.location.href = '/teamlead-dashboard';
           }
         }, 1000);
       } else {
@@ -149,6 +159,19 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
         responseData: err.response?.data
       });
 
+      // Handle different error types appropriately
+      if (errorMessage.includes('Invalid email or password')) {
+        addToast('error', 'Invalid email or password. Please check your credentials and try again.');
+      } else if (errorMessage.includes('pending approval') || errorMessage.includes('pending admin approval')) {
+        addToast('warning', 'Your account is pending admin approval. Please wait for admin approval before logging in.');
+      } else if (errorMessage.includes('Account not found')) {
+        addToast('error', 'Account not found. Please check your email or contact support.');
+      } else {
+        addToast('error', errorMessage);
+      }
+
+      // Original error handling (commented out but kept for reference)
+      /*
       // Provide more specific guidance based on error type
       if (errorMessage.includes('Invalid email or password')) {
         addToast('error', 'Invalid email or password. Please check your credentials and try again.');
@@ -162,6 +185,9 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
       } else {
         addToast('error', errorMessage);
       }
+      */
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -234,9 +260,9 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
         <div className="text-center text-sm text-gray-500">
           <p className="mb-2">Sign in with your email and password</p>
           <p>Don't have an account?{' '}
-          <button type="button" onClick={onSwitchToSignup} className="font-medium text-highlight hover:text-blue-500">
-            Sign up
-          </button></p>
+            <button type="button" onClick={onSwitchToSignup} className="font-medium text-highlight hover:text-blue-500">
+              Sign up
+            </button></p>
         </div>
       </form>
     </AuthCard>

@@ -10,6 +10,7 @@ import { useToast } from '../components/ui/Toast';
 import { DarkModeToggle } from '../components/ui/DarkModeToggle';
 import { NotificationBell } from '../components/dashboard/NotificationBell';
 import { OverviewCards } from '../components/dashboard/OverviewCards';
+import { PendingApprovals } from '../components/dashboard/PendingApprovals';
 import api from '../lib/api';
 import { useTokenValidation } from '../hooks/useTokenValidation';
 
@@ -175,9 +176,17 @@ export default function SuperAdminDashboardPage() {
           )}
         </section>
 
+        {/* Pending Approvals */}
+        <section className="mb-8">
+          <h2 className={`text-2xl font-semibold mb-6 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+            Pending Approvals
+          </h2>
+          <PendingApprovals darkMode={darkMode} />
+        </section>
+
         {/* Super-Admin Dashboard Component */}
         <section>
-          <SuperAdminDashboard />
+          <SuperAdminDashboard darkMode={darkMode} />
         </section>
       </div>
 

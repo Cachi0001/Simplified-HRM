@@ -8,11 +8,11 @@ import {
   CreateTemplateRequest
 } from '../types/announcement';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000/api';
 
 class AnnouncementService {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('accessToken');
     
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,

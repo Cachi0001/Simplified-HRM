@@ -110,7 +110,7 @@ export function MoreSection({ darkMode = false, isOpen, onClose }: MoreSectionPr
       path: '/admin/employees',
       description: 'Manage employee records',
       category: 'management',
-      roles: ['admin', 'hr', 'super-admin']
+      roles: ['superadmin', 'admin', 'hr']
     },
     {
       icon: FileText,
@@ -118,7 +118,7 @@ export function MoreSection({ darkMode = false, isOpen, onClose }: MoreSectionPr
       path: '/admin/approvals',
       description: 'Manage approval processes',
       category: 'management',
-      roles: ['admin', 'hr', 'super-admin']
+      roles: ['superadmin', 'admin', 'hr']
     },
     {
       icon: Clock,
@@ -126,17 +126,17 @@ export function MoreSection({ darkMode = false, isOpen, onClose }: MoreSectionPr
       path: '/admin/time-tracking',
       description: 'Monitor employee attendance',
       category: 'management',
-      roles: ['admin', 'hr', 'super-admin']
+      roles: ['superadmin', 'admin', 'hr']
     },
 
     // Reports Section (Admin/HR only)
     {
       icon: BarChart3,
-      label: 'Analytics Dashboard',
-      path: '/admin/analytics',
-      description: 'View performance metrics',
+      label: 'Performance Metrics',
+      path: '/performance-metrics',
+      description: 'View employee performance analytics',
       category: 'reports',
-      roles: ['admin', 'hr', 'super-admin']
+      roles: ['superadmin', 'admin', 'hr']
     },
     {
       icon: FileText,
@@ -144,7 +144,7 @@ export function MoreSection({ darkMode = false, isOpen, onClose }: MoreSectionPr
       path: '/admin/reports',
       description: 'Generate and view reports',
       category: 'reports',
-      roles: ['admin', 'hr', 'super-admin']
+      roles: ['superadmin', 'admin', 'hr']
     },
 
     // Account Section
@@ -293,7 +293,7 @@ export function MoreSection({ darkMode = false, isOpen, onClose }: MoreSectionPr
               {currentUser?.full_name || 'User'}
             </span>
             <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-              currentUser?.role === 'super-admin' 
+              currentUser?.role === 'superadmin' 
                 ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400'
                 : currentUser?.role === 'admin'
                 ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
