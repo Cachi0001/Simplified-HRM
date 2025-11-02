@@ -46,6 +46,7 @@ export default function ChatPage() {
 
   const {
     typingUsers,
+    typingUserNames,
     startTyping,
     stopTyping,
     getTypingUsers
@@ -211,7 +212,7 @@ export default function ChatPage() {
   };
 
   const getTypingUserNames = (): string[] => {
-    return typingUsers.filter(userId => userId !== currentUser?.id);
+    return typingUserNames; // Use the names from the hook, not IDs
   };
 
   // Filter out current user from messages to determine if "own" message

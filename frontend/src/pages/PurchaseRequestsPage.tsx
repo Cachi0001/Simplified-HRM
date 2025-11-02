@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit2, Clock, CheckCircle, XCircle, AlertCircle, DollarSign } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Plus, Trash2, Edit2, Clock, CheckCircle, XCircle, AlertCircle, DollarSign, ArrowLeft } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { useToast } from '../components/ui/Toast';
 import { useTheme } from '../contexts/ThemeContext';
@@ -175,7 +175,12 @@ export function PurchaseRequestsPage() {
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Purchase Requests</h1>
+          <div className="flex items-center space-x-4">
+            <Link to="/dashboard" className={`${darkMode ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}>
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+            <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Purchase Requests</h1>
+          </div>
           {!isCreating && (
             <button
               onClick={() => setIsCreating(true)}

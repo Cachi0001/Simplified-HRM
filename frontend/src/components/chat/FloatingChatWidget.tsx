@@ -88,8 +88,12 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
   const [isTyping, setIsTyping] = useState(false);
   const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
 
-  // Use typing users from useChat hook
-  const currentChatTypingUsers = selectedChat ? (chatTypingUsers[selectedChat.id] || []) : [];
+  // Use typing users from useChat hook and convert IDs to names
+  const currentChatTypingUserIds = selectedChat ? (chatTypingUsers[selectedChat.id] || []) : [];
+  const currentChatTypingUsers = currentChatTypingUserIds.map(userId => {
+    const user = users.find(u => u.id === userId);
+    return user ? user.name : `User ${userId}`;
+  });
 
   // Initialize user status service
   useEffect(() => {
