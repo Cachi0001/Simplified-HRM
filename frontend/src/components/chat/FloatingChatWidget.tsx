@@ -22,7 +22,7 @@ interface FloatingChatWidgetProps {
   className?: string;
 }
 
-type TabType = 'dms' | 'announcements';
+type TabType = 'dms' | 'announcements' | 'history';
 
 interface ExtendedChat extends Chat {
   userData?: User;
@@ -37,6 +37,8 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
   const [messageInput, setMessageInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateAnnouncement, setShowCreateAnnouncement] = useState(false);
+  const [conversationHistory, setConversationHistory] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   // Use global theme instead of local state
   const { darkMode, toggleDarkMode } = useTheme();
@@ -358,6 +360,29 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
         isUser: true,
         userData: user
       }));
+    } else if (activeTab === 'history') {
+      // For history tab, show conversation history as chat items
+      return conversationHistory.filter(conversation => {
+        if (searchQuery && !conversation.participantNames?.some((name: string) => 
+          name.toLowerCase().includes(searchQuery.toLowerCase())
+        )) return false;
+        return true;
+      }).map(conversation => ({
+        id: conversation.id,
+        name: conversation.participantNames?.join(', ') || 'Unknown participants',
+        type: 'dm' as const,
+        lastMessage: conversation.lastMessage || 'No messages yet',
+        lastMessageTime: conversation.lastMessageAt 
+          ? new Date(conversation.lastMessageAt).toLocaleDateString()
+          : 'No date',
+        unreadCount: 0,
+        userData: {
+          id: conversation.id,
+          name: conversation.participantNames?.join(', ') || 'Unknown participants',
+          role: 'conversation'
+        },
+        isUser: false
+      }));
     } else {
       // Sort chats by latest message timestamp (WhatsApp style) - for announcements tab
       const filteredChats = chats.filter(chat => {
@@ -595,6 +620,35 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
     return false;
   };
 
+  // Helper function to check if user can access conversation history
+  const canAccessHistory = () => {
+    const userRole = getCurrentUserRole();
+    return ['hr', 'admin', 'superadmin'].includes(userRole);
+  };
+
+  // Fetch conversation history for administrators
+  const fetchConversationHistory = async () => {
+    if (!canAccessHistory()) return;
+
+    try {
+      setHistoryLoading(true);
+      const response = await api.get('/conversation-history');
+      setConversationHistory(response.data.data?.conversations || []);
+    } catch (error) {
+      console.error('Failed to fetch conversation history:', error);
+      setConversationHistory([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  // Load conversation history when History tab is selected
+  useEffect(() => {
+    if (activeTab === 'history' && canAccessHistory()) {
+      fetchConversationHistory();
+    }
+  }, [activeTab]);
+
   // Authentication guard
   const isAuthenticated = !!localStorage.getItem('accessToken');
   const isLanding = typeof window !== 'undefined' && window.location.pathname === '/';
@@ -686,7 +740,8 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
               <div className={`flex border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'} flex-shrink-0`}>
                 {[
                   { key: 'dms', label: 'DMs', icon: MessageCircle },
-                  { key: 'announcements', label: 'News', icon: Bell }
+                  { key: 'announcements', label: 'News', icon: Bell },
+                  ...(canAccessHistory() ? [{ key: 'history', label: 'History', icon: History }] : [])
                 ].map(({ key, label, icon: Icon }) => (
                   <button
                     key={key}
@@ -777,7 +832,12 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                   <div className={`p-6 text-center ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                     <MessageCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
                     <p className="text-sm">
-                      {activeTab === 'dms' ? 'No users available' : 'No chats found'}
+                      {activeTab === 'dms' 
+                        ? 'No users available' 
+                        : activeTab === 'history' 
+                          ? 'No conversation history found'
+                          : 'No chats found'
+                      }
                     </p>
                     {chatError && (
                       <p className="text-xs mt-2 text-red-500">
@@ -915,6 +975,89 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                   canCreate={canCreateAnnouncements}
                   darkMode={darkMode}
                 />
+              </div>
+            ) : activeTab === 'history' && !selectedChat ? (
+              /* Conversation History View */
+              <div className="flex-1 flex flex-col p-6 overflow-hidden">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                    Conversation History
+                  </h2>
+                  <button
+                    onClick={fetchConversationHistory}
+                    className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                      darkMode 
+                        ? 'bg-gray-700 hover:bg-gray-600 text-gray-300' 
+                        : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                    }`}
+                  >
+                    Refresh
+                  </button>
+                </div>
+
+                {historyLoading ? (
+                  <div className="flex-1 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className={`animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2`}></div>
+                      <p className={darkMode ? 'text-gray-300' : 'text-gray-600'}>Loading conversation history...</p>
+                    </div>
+                  </div>
+                ) : conversationHistory.length === 0 ? (
+                  <div className="flex-1 flex items-center justify-center">
+                    <div className="text-center">
+                      <History className={`w-12 h-12 mx-auto mb-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+                      <p className={`text-lg font-medium mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                        No conversation history
+                      </p>
+                      <p className={darkMode ? 'text-gray-400' : 'text-gray-600'}>
+                        Conversation history will appear here when users start chatting
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex-1 overflow-y-auto space-y-3">
+                    {conversationHistory.map((conversation) => (
+                      <div
+                        key={conversation.id}
+                        className={`p-4 rounded-lg border cursor-pointer transition-colors ${
+                          darkMode 
+                            ? 'bg-gray-800 border-gray-700 hover:bg-gray-700' 
+                            : 'bg-white border-gray-200 hover:bg-gray-50'
+                        }`}
+                        onClick={() => {
+                          // Handle conversation selection - could open the conversation
+                          console.log('Selected conversation:', conversation);
+                        }}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <h3 className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                                {conversation.participantNames?.join(', ') || 'Unknown participants'}
+                              </h3>
+                              <span className={`text-xs px-2 py-1 rounded-full ${
+                                darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'
+                              }`}>
+                                {conversation.messageCount || 0} messages
+                              </span>
+                            </div>
+                            <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'} line-clamp-2`}>
+                              {conversation.lastMessage || 'No messages yet'}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+                              {conversation.lastMessageAt 
+                                ? new Date(conversation.lastMessageAt).toLocaleDateString()
+                                : 'No date'
+                              }
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ) : selectedChat ? (
               /* Chat Messages Area */
@@ -1082,7 +1225,10 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                   <p className="text-sm">
                     {activeTab === 'dms' 
                       ? 'Select a user to start a conversation' 
-                      : 'Check out the latest announcements'}
+                      : activeTab === 'history'
+                        ? 'View conversation history and access past chats'
+                        : 'Check out the latest announcements'
+                    }
                   </p>
                 </div>
               </div>
