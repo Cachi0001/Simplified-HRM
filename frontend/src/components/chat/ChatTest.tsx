@@ -1,14 +1,38 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { apiClient } from '../../services/apiClient';
 
+interface User {
+  id: string;
+  full_name: string;
+  email: string;
+  role: string;
+}
+
+interface Chat {
+  id: string;
+  name: string;
+  type: string;
+}
+
+interface Message {
+  id: string;
+  message: string;
+  sender_id: string;
+  timestamp: string;
+}
+
+interface ApiResponse<T = any> {
+  status: string;
+  data?: T;
+}
+
 export function ChatTest() {
-  const [users, setUsers] = useState<any[]>([]);
-  const [chats, setChats] = useState<any[]>([]);
-  const [selectedUser, setSelectedUser] = useState<any>(null);
-  const [selectedChat, setSelectedChat] = useState<any>(null);
-  const [messages, setMessages] = useState<any[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   useEffect(() => {
     loadCurrentUser();
@@ -29,9 +53,9 @@ export function ChatTest() {
 
   const loadUsers = async () => {
     try {
-      const response = await apiClient.get('/employees');
+      const response = await apiClient.get('/employees') as ApiResponse<{ data: User[] }>;
       if (response.status === 'success') {
-        setUsers(response.data || []);
+        setUsers(response?.data?.data || []);
       }
     } catch (error) {
       console.error('Failed to load users:', error);
@@ -40,7 +64,7 @@ export function ChatTest() {
 
   const loadChats = async () => {
     try {
-      const response = await apiClient.get('/chat/list');
+      const response = await apiClient.get('/chat/list') as ApiResponse<Chat[]>;
       if (response.status === 'success') {
         setChats(response.data || []);
       }
@@ -51,8 +75,8 @@ export function ChatTest() {
 
   const createDM = async (recipientId: string) => {
     try {
-      const response = await apiClient.post('/chat/dm', { recipientId });
-      if (response.status === 'success') {
+      const response = await apiClient.post('/chat/dm', { recipientId }) as ApiResponse<{ chat: Chat }>;
+      if (response.status === 'success' && response.data?.chat) {
         setSelectedChat(response.data.chat);
         loadChats(); // Refresh chat list
         loadMessages(response.data.chat.id);
@@ -64,9 +88,9 @@ export function ChatTest() {
 
   const loadMessages = async (chatId: string) => {
     try {
-      const response = await apiClient.get(`/chat/${chatId}/history`);
+      const response = await apiClient.get(`/chat/${chatId}/history`) as ApiResponse<{ messages: Message[] }>;
       if (response.status === 'success') {
-        setMessages(response.data.messages || []);
+        setMessages(response.data?.messages || []);
       }
     } catch (error) {
       console.error('Failed to load messages:', error);
