@@ -58,7 +58,11 @@ export function NotificationBell({
 
     let navigateUrl = '/dashboard';
 
-    if (notification.category === 'employee') {
+    // Handle profile update notifications
+    if (notification.type === 'update' && notification.title === 'Employee Profile Updated') {
+      // Use the action URL which includes the highlight parameter
+      navigateUrl = notification.actionUrl || `/employee-management?highlight=${notification.relatedId}`;
+    } else if (notification.category === 'employee') {
       // For employee approval notifications, navigate to login
       if (notification.type === 'approval_success' || notification.message.includes('approved') || notification.message.includes('Welcome')) {
         navigateUrl = '/auth';
@@ -73,6 +77,9 @@ export function NotificationBell({
       // Use the action URL if available
       const action = notification.actions[0];
       navigateUrl = action.url || '/dashboard';
+    } else if (notification.actionUrl) {
+      // Use actionUrl if available (for profile updates and other notifications)
+      navigateUrl = notification.actionUrl;
     }
 
     // Navigate to the determined URL
