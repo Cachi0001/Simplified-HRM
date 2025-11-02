@@ -8,8 +8,6 @@ import {
   LogOut,
   Users,
   BarChart3,
-  FileText,
-  Clock,
   X,
   ChevronRight,
 } from 'lucide-react';
@@ -107,42 +105,17 @@ export function MoreSection({ darkMode = false, isOpen, onClose }: MoreSectionPr
     {
       icon: Users,
       label: 'Employee Management',
-      path: '/admin/employees',
-      description: 'Manage employee records',
+      path: '/employee-management',
+      description: 'Manage employee records and approvals',
       category: 'management',
       roles: ['superadmin', 'admin', 'hr']
     },
-    {
-      icon: FileText,
-      label: 'Approval Workflows',
-      path: '/admin/approvals',
-      description: 'Manage approval processes',
-      category: 'management',
-      roles: ['superadmin', 'admin', 'hr']
-    },
-    {
-      icon: Clock,
-      label: 'Time Tracking',
-      path: '/admin/time-tracking',
-      description: 'Monitor employee attendance',
-      category: 'management',
-      roles: ['superadmin', 'admin', 'hr']
-    },
-
-    // Reports Section (Admin/HR only)
+    // Keep Performance Metrics but remove other reports
     {
       icon: BarChart3,
       label: 'Performance Metrics',
       path: '/performance-metrics',
       description: 'View employee performance analytics',
-      category: 'reports',
-      roles: ['superadmin', 'admin', 'hr']
-    },
-    {
-      icon: FileText,
-      label: 'Reports',
-      path: '/admin/reports',
-      description: 'Generate and view reports',
       category: 'reports',
       roles: ['superadmin', 'admin', 'hr']
     },

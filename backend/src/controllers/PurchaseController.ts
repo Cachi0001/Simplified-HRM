@@ -1,9 +1,18 @@
 import { Request, Response } from 'express';
 import { PurchaseService } from '../services/PurchaseService';
+import { ApprovalWorkflowService } from '../services/ApprovalWorkflowService';
+import { NotificationService } from '../services/NotificationService';
+import { EmailService } from '../services/EmailService';
+import { validateApprovalPermissions, ApprovalValidationRequest } from '../middleware/approvalValidation';
 import logger from '../utils/logger';
 
 export class PurchaseController {
-    constructor(private purchaseService: PurchaseService) {}
+    constructor(
+        private purchaseService: PurchaseService,
+        private approvalWorkflowService: ApprovalWorkflowService,
+        private notificationService: NotificationService,
+        private emailService: EmailService
+    ) {}
 
     /**
      * Create a new purchase request
@@ -190,7 +199,7 @@ export class PurchaseController {
             const userRole = req.user?.role;
 
             // Check if user has permission to approve requests
-            if (!['super-admin', 'admin', 'hr'].includes(userRole)) {
+            if (!['superadmin', 'admin', 'hr'].includes(userRole)) {
                 res.status(403).json({
                     status: 'error',
                     message: 'Insufficient permissions'
@@ -200,7 +209,8 @@ export class PurchaseController {
 
             logger.info('📋 [PurchaseController] Get pending purchase requests', { userRole });
 
-            const pendingRequests = await this.purchaseService.getPendingPurchaseRequests();
+            // Use the enhanced approval workflow service to get role-specific pending requests
+            const pendingRequests = await this.approvalWorkflowService.getPendingRequestsForApprover(userRole, 'purchase');
 
             res.status(200).json({
                 status: 'success',
@@ -221,12 +231,12 @@ export class PurchaseController {
      * Approve a purchase request
      * PUT /api/purchase/:id/approve
      */
-    async approvePurchaseRequest(req: Request, res: Response): Promise<void> {
+    async approvePurchaseRequest(req: ApprovalValidationRequest, res: Response): Promise<void> {
         try {
             const { id } = req.params;
-            const { notes, budget_code } = req.body;
+            const { approval_comments, budget_code } = req.body;
             const approverId = req.user?.employeeId || req.user?.id;
-            const userRole = req.user?.role;
+            const approverRole = req.user?.role;
 
             if (!id || !approverId) {
                 res.status(400).json({
@@ -236,22 +246,19 @@ export class PurchaseController {
                 return;
             }
 
-            // Check if user has permission to approve
-            if (!['super-admin', 'admin', 'hr'].includes(userRole)) {
-                res.status(403).json({
-                    status: 'error',
-                    message: 'Insufficient permissions to approve purchase requests'
-                });
-                return;
-            }
+            logger.info('✅ [PurchaseController] Approve purchase request', { id, approverId, approverRole });
 
-            logger.info('✅ [PurchaseController] Approve purchase request', { id, approverId });
-
-            const approvedRequest = await this.purchaseService.approvePurchaseRequest(id, {
-                approved_by: approverId,
-                notes,
-                budget_code
-            });
+            // Use the enhanced approval workflow service
+            const approvedRequest = await this.approvalWorkflowService.processApproval(
+                id,
+                'purchase',
+                approverId,
+                approverRole,
+                {
+                    approved_by: approverId,
+                    approval_comments: approval_comments || budget_code
+                }
+            );
 
             res.status(200).json({
                 status: 'success',
@@ -273,12 +280,12 @@ export class PurchaseController {
      * Reject a purchase request
      * PUT /api/purchase/:id/reject
      */
-    async rejectPurchaseRequest(req: Request, res: Response): Promise<void> {
+    async rejectPurchaseRequest(req: ApprovalValidationRequest, res: Response): Promise<void> {
         try {
             const { id } = req.params;
             const { rejection_reason } = req.body;
             const approverId = req.user?.employeeId || req.user?.id;
-            const userRole = req.user?.role;
+            const approverRole = req.user?.role;
 
             if (!id || !approverId || !rejection_reason) {
                 res.status(400).json({
@@ -288,21 +295,19 @@ export class PurchaseController {
                 return;
             }
 
-            // Check if user has permission to reject
-            if (!['super-admin', 'admin', 'hr'].includes(userRole)) {
-                res.status(403).json({
-                    status: 'error',
-                    message: 'Insufficient permissions to reject purchase requests'
-                });
-                return;
-            }
+            logger.info('❌ [PurchaseController] Reject purchase request', { id, approverId, approverRole });
 
-            logger.info('❌ [PurchaseController] Reject purchase request', { id, approverId });
-
-            const rejectedRequest = await this.purchaseService.rejectPurchaseRequest(id, {
-                approved_by: approverId,
-                rejection_reason
-            });
+            // Use the enhanced approval workflow service
+            const rejectedRequest = await this.approvalWorkflowService.processApproval(
+                id,
+                'purchase',
+                approverId,
+                approverRole,
+                {
+                    rejected_by: approverId,
+                    rejection_reason
+                }
+            );
 
             res.status(200).json({
                 status: 'success',
@@ -447,6 +452,51 @@ export class PurchaseController {
             });
         } catch (error) {
             logger.error('❌ [PurchaseController] Get purchase stats error', {
+                error: (error as Error).message
+            });
+            res.status(400).json({
+                status: 'error',
+                message: (error as Error).message
+            });
+        }
+    }
+
+    /**
+     * Get approval history for a purchase request
+     * GET /api/purchase/:id/history
+     */
+    async getPurchaseApprovalHistory(req: Request, res: Response): Promise<void> {
+        try {
+            const { id } = req.params;
+            const userRole = req.user?.role;
+
+            if (!id) {
+                res.status(400).json({
+                    status: 'error',
+                    message: 'Purchase request ID is required'
+                });
+                return;
+            }
+
+            // Check if user has permission to view approval history
+            if (!['superadmin', 'admin', 'hr'].includes(userRole)) {
+                res.status(403).json({
+                    status: 'error',
+                    message: 'Insufficient permissions to view approval history'
+                });
+                return;
+            }
+
+            logger.info('📋 [PurchaseController] Get purchase approval history', { id, userRole });
+
+            const history = await this.approvalWorkflowService.getApprovalHistory(id, 'purchase');
+
+            res.status(200).json({
+                status: 'success',
+                data: { history, count: history.length }
+            });
+        } catch (error) {
+            logger.error('❌ [PurchaseController] Get purchase approval history error', {
                 error: (error as Error).message
             });
             res.status(400).json({
