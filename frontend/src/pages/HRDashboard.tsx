@@ -3,89 +3,105 @@ import { useNavigate } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { AdminLeaveRequests } from '../components/dashboard/AdminLeaveRequests';
 import { AdminEmployeeManagement } from '../components/dashboard/AdminEmployeeManagement';
-import { DraggableHamburgerMenu } from '../components/layout/DraggableHamburgerMenu';
 import { BottomNavbar } from '../components/layout/BottomNavbar';
+import { DarkModeToggle } from '../components/ui/DarkModeToggle';
+import { NotificationBell } from '../components/dashboard/NotificationBell';
+import { NotificationManager } from '../components/notifications/NotificationManager';
+import Logo from '../components/ui/Logo';
 import { Clock, Users, FileText } from 'lucide-react';
+import { useTokenValidation } from '../hooks/useTokenValidation';
 
 export default function HRDashboard() {
   const navigate = useNavigate();
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => {
+    const saved = localStorage.getItem('darkMode');
+    return saved ? JSON.parse(saved) : false;
+  });
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [stats, setStats] = useState({
+  const [stats] = useState({
     pendingLeaves: 0,
     pendingEmployees: 0,
     pendingPurchases: 0
   });
 
+  // Save dark mode preference
   useEffect(() => {
-    const user = authService.getCurrentUserFromStorage();
-    if (!user) {
+    localStorage.setItem('darkMode', JSON.stringify(darkMode));
+  }, [darkMode]);
+
+  // Get current user
+  useEffect(() => {
+    try {
+      const user = authService.getCurrentUserFromStorage();
+      if (!user) {
+        navigate('/auth');
+        return;
+      }
+
+      // Check if user is HR or Admin
+      if (user.role !== 'hr' && user.role !== 'admin') {
+        navigate('/employee-dashboard');
+        return;
+      }
+
+      setCurrentUser(user);
+    } catch (err) {
+      console.error('Error getting current user:', err);
       navigate('/auth');
-      return;
-    }
-
-    // Check if user is HR or Admin
-    if (user.role !== 'hr' && user.role !== 'admin') {
-      navigate('/employee-dashboard');
-      return;
-    }
-
-    setCurrentUser(user);
-
-    // Load dark mode preference
-    const savedDarkMode = localStorage.getItem('darkMode');
-    if (savedDarkMode) {
-      setDarkMode(JSON.parse(savedDarkMode));
     }
   }, [navigate]);
 
-  const toggleDarkMode = () => {
-    setDarkMode(!darkMode);
-    localStorage.setItem('darkMode', JSON.stringify(!darkMode));
-  };
+  // Add token validation
+  useTokenValidation({
+    checkInterval: 2 * 60 * 1000,
+    onTokenExpired: () => {
+      console.log('HR Dashboard token expired, redirecting to login');
+    }
+  });
+
+  // Initialize push notifications
+  useEffect(() => {
+    if (currentUser) {
+      const userId = currentUser._id || currentUser.id;
+      console.log('Initializing push notifications for HR dashboard:', userId);
+    }
+  }, [currentUser]);
 
   if (!currentUser) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="inline-block h-12 w-12 border-4 border-t-blue-500 border-gray-300 rounded-full animate-spin" />
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
+    <div className={`min-h-screen transition-colors duration-300 ${darkMode ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}>
       {/* Header */}
-      <div className={`sticky top-0 z-20 ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-md`}>
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div>
-            <h1 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-              HR Dashboard
-            </h1>
-            <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-              Welcome, {currentUser.full_name}
-            </p>
+      <header className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-b sticky top-0 z-40`}>
+        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+          <div className="flex items-center space-x-4">
+            <Logo className="h-8 w-auto" />
+            <div>
+              <h1 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                HR Dashboard
+              </h1>
+              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                Welcome back, {currentUser.fullName || currentUser.full_name}
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={toggleDarkMode}
-              className={`p-2 rounded-lg transition-colors ${
-                darkMode
-                  ? 'bg-gray-700 hover:bg-gray-600 text-yellow-400'
-                  : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
-              }`}
-              title="Toggle dark mode"
-            >
-              {darkMode ? '☀️' : '🌙'}
-            </button>
+          <div className="flex items-center space-x-4">
+            <DarkModeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
+            <NotificationBell darkMode={darkMode} />
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-8 pb-24">
+      <div className="container mx-auto px-4 py-6">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
@@ -180,10 +196,15 @@ export default function HRDashboard() {
 
         {/* Employee Management */}
         <AdminEmployeeManagement darkMode={darkMode} />
-      </main>
+      </div>
 
-      {/* Hamburger Menu */}
-      <DraggableHamburgerMenu darkMode={darkMode} />
+      {/* Notification Manager */}
+      <NotificationManager
+        userId={currentUser?._id || currentUser?.id}
+        darkMode={darkMode}
+        position="top-right"
+        maxToasts={5}
+      />
 
       {/* Bottom Navigation */}
       <BottomNavbar darkMode={darkMode} />

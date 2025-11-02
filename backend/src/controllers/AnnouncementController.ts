@@ -14,7 +14,7 @@ export class AnnouncementController {
       const userRole = req.user?.role;
 
       // Check if user has permission to create announcements
-      if (!['super-admin', 'admin', 'hr'].includes(userRole)) {
+      if (!['superadmin', 'admin', 'hr'].includes(userRole)) {
         res.status(403).json({
           status: 'error',
           message: 'You do not have permission to create announcements'
@@ -60,8 +60,8 @@ export class AnnouncementController {
       // First, verify the user exists in employees table
       const { data: employee, error: employeeError } = await supabase
         .from('employees')
-        .select('id, full_name, email')
-        .eq('id', userId)
+        .select('id, full_name, email, user_id')
+        .eq('user_id', userId)
         .single();
 
       if (employeeError || !employee) {
@@ -77,7 +77,7 @@ export class AnnouncementController {
       const insertData: any = {
         title,
         content,
-        author_id: userId,
+        author_id: employee.id, // Use employee ID, not user ID
         priority,
         status,
         target_audience
@@ -279,7 +279,7 @@ export class AnnouncementController {
       const userRole = req.user?.role;
 
       // Check if user has permission to update announcements
-      if (!['super-admin', 'admin', 'hr'].includes(userRole)) {
+      if (!['superadmin', 'admin', 'hr'].includes(userRole)) {
         res.status(403).json({
           status: 'error',
           message: 'You do not have permission to update announcements'
@@ -405,7 +405,7 @@ export class AnnouncementController {
       const userRole = req.user?.role;
 
       // Check if user has permission to delete announcements
-      if (!['super-admin', 'admin'].includes(userRole)) {
+      if (!['superadmin', 'admin'].includes(userRole)) {
         res.status(403).json({
           status: 'error',
           message: 'You do not have permission to delete announcements'
@@ -531,7 +531,7 @@ export class AnnouncementController {
       const userRole = req.user?.role;
 
       // Check if user has permission to publish announcements
-      if (!['super-admin', 'admin', 'hr'].includes(userRole)) {
+      if (!['superadmin', 'admin', 'hr'].includes(userRole)) {
         res.status(403).json({
           status: 'error',
           message: 'You do not have permission to publish announcements'
@@ -628,7 +628,7 @@ export class AnnouncementController {
       const userRole = req.user?.role;
 
       // Check if user has permission to archive announcements
-      if (!['super-admin', 'admin', 'hr'].includes(userRole)) {
+      if (!['superadmin', 'admin', 'hr'].includes(userRole)) {
         res.status(403).json({
           status: 'error',
           message: 'You do not have permission to archive announcements'
