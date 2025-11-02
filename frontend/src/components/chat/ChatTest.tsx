@@ -118,7 +118,7 @@ export function ChatTest() {
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <h1 className="text-2xl font-bold mb-6">Chat System Test</h1>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Current User */}
         <div className="bg-white p-4 rounded-lg shadow">
@@ -160,11 +160,10 @@ export function ChatTest() {
           <h2 className="font-semibold mb-2">Existing Chats</h2>
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {chats.map(chat => (
-              <div 
-                key={chat.id} 
-                className={`p-2 border rounded cursor-pointer hover:bg-gray-50 ${
-                  selectedChat?.id === chat.id ? 'bg-blue-50 border-blue-300' : ''
-                }`}
+              <div
+                key={chat.id}
+                className={`p-2 border rounded cursor-pointer hover:bg-gray-50 ${selectedChat?.id === chat.id ? 'bg-blue-50 border-blue-300' : ''
+                  }`}
                 onClick={() => {
                   setSelectedChat(chat);
                   loadMessages(chat.id);
@@ -182,7 +181,7 @@ export function ChatTest() {
       {selectedChat && (
         <div className="mt-6 bg-white p-4 rounded-lg shadow">
           <h2 className="font-semibold mb-4">Chat: {selectedChat.name}</h2>
-          
+
           {/* Messages */}
           <div className="border rounded p-4 h-64 overflow-y-auto mb-4 bg-gray-50">
             {messages.length === 0 ? (
@@ -190,11 +189,10 @@ export function ChatTest() {
             ) : (
               messages.map(message => (
                 <div key={message.id} className={`mb-2 ${message.sender_id === currentUser?.id ? 'text-right' : 'text-left'}`}>
-                  <div className={`inline-block p-2 rounded max-w-xs ${
-                    message.sender_id === currentUser?.id 
-                      ? 'bg-blue-500 text-white' 
+                  <div className={`inline-block p-2 rounded max-w-xs ${message.sender_id === currentUser?.id
+                      ? 'bg-blue-500 text-white'
                       : 'bg-white border'
-                  }`}>
+                    }`}>
                     <p className="text-sm">{message.message}</p>
                     <p className="text-xs opacity-75 mt-1">
                       {new Date(message.timestamp).toLocaleTimeString()}

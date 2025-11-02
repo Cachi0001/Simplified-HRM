@@ -232,7 +232,6 @@ api.interceptors.response.use(
     
     // Only log chat-related successful responses
     if (response.config.url?.includes('chat') || response.config.url?.includes('message')) {
-      console.log(`💬 Chat API Success [${requestId}]: ${response.config.method?.toUpperCase()} ${response.config.url}`);
     }
     
     // Special handling for password reset endpoints
@@ -250,24 +249,6 @@ api.interceptors.response.use(
     // Create a unique error ID for tracking
     const errorId = `err_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
     
-    // Log detailed error information with the error ID
-    console.error(`❌ API Response Error [${errorId}] for request [${requestId}]: ${error.config?.method?.toUpperCase()} ${error.config?.url}`, {
-      errorId,
-      requestId,
-      message: error.message,
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data,
-      headers: error.response?.headers,
-      request: {
-        baseURL: error.config?.baseURL,
-        url: error.config?.url,
-        method: error.config?.method,
-        headers: error.config?.headers,
-        data: error.config?.data
-      }
-    });
-
     // Add error ID and request ID to the error object for reference
     error.errorId = errorId;
     error.requestId = requestId;

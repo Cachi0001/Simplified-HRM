@@ -1,4 +1,3 @@
-import React from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import HomePage from './src/pages/HomePage';
@@ -8,6 +7,7 @@ import ResetPasswordCard from './src/components/auth/ResetPasswordCard';
 import AdminDashboard from './src/pages/AdminDashboard';
 import EmployeeDashboard from './src/pages/EmployeeDashboard';
 import HRDashboard from './src/pages/HRDashboard';
+import TeamLeadDashboard from './src/pages/TeamLeadDashboard';
 import SuperAdminDashboardPage from './src/pages/SuperAdminDashboardPage';
 import AttendanceReportPage from './src/pages/AttendanceReportPage';
 import TasksPage from './src/pages/TasksPage';
@@ -20,6 +20,7 @@ import Header from './src/components/layout/Header';
 import Footer from './src/components/layout/Footer';
 import { ToastProvider } from './src/components/ui/Toast';
 import { ThemeProvider } from './src/contexts/ThemeContext';
+import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import { ProtectedRoute } from './src/components/auth/ProtectedRoute';
 import ApiConnectionTest from './src/components/ApiConnectionTest';
 import { FloatingChatWidget } from './src/components/chat/FloatingChatWidget';
@@ -36,9 +37,11 @@ const queryClient = new QueryClient({
 
 function AppContent() {
   const location = useLocation();
+  const { isAuthenticated } = useAuth();
   const isDashboardPage = location.pathname.startsWith('/dashboard') ||
                          location.pathname.startsWith('/employee-dashboard') ||
                          location.pathname.startsWith('/hr-dashboard') ||
+                         location.pathname.startsWith('/teamlead-dashboard') ||
                          location.pathname.startsWith('/super-admin-dashboard') ||
                          location.pathname.startsWith('/attendance-report') ||
                          location.pathname.startsWith('/tasks') ||
@@ -51,7 +54,7 @@ function AppContent() {
   return (
     <div className="flex flex-col min-h-screen bg-primary">
       {!isDashboardPage && <Header />}
-      <FloatingChatWidget />
+      {isAuthenticated && isDashboardPage && <FloatingChatWidget />}
       <main className="flex-grow">
         <Routes>
           <Route path="/" element={<HomePage />} />
@@ -71,6 +74,11 @@ function AppContent() {
           <Route path="/hr-dashboard" element={
             <ProtectedRoute>
               <HRDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/teamlead-dashboard" element={
+            <ProtectedRoute>
+              <TeamLeadDashboard />
             </ProtectedRoute>
           } />
           <Route path="/super-admin-dashboard" element={
@@ -128,7 +136,9 @@ function App() {
       <ThemeProvider>
         <ToastProvider>
           <BrowserRouter>
-            <AppContent />
+            <AuthProvider>
+              <AppContent />
+            </AuthProvider>
           </BrowserRouter>
         </ToastProvider>
       </ThemeProvider>
