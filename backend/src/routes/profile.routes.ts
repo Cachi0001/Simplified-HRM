@@ -46,6 +46,12 @@ router.get('/search', (req, res) => ProfileController.searchProfiles(req, res));
 router.post('/request-approval', (req, res) => ProfileController.requestProfileApproval(req, res));
 
 /**
+ * Profile Update History and Management
+ */
+router.get('/update-history/:employeeId', (req, res) => ProfileController.getProfileUpdateHistory(req, res));
+router.get('/recent-updates', (req, res) => ProfileController.getRecentProfileUpdates(req, res));
+
+/**
  * View Other Profiles
  */
 router.get('/:userId', (req, res) => ProfileController.getProfileById(req, res));

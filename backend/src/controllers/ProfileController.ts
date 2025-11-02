@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import ProfileService from '../services/ProfileService';
+import ProfileUpdateService from '../services/ProfileUpdateService';
 import ApprovalWorkflowService from '../services/ApprovalWorkflowService';
 import NotificationService, { NotificationService as NotificationServiceClass } from '../services/NotificationService';
 import logger from '../utils/logger';
@@ -55,10 +56,12 @@ export interface UserProfile {
 
 export class ProfileController {
     private profileService: typeof ProfileService;
+    private profileUpdateService: typeof ProfileUpdateService;
     private notificationService: typeof NotificationService;
 
     constructor() {
         this.profileService = ProfileService;
+        this.profileUpdateService = ProfileUpdateService;
         this.notificationService = NotificationService;
     }
 
@@ -152,8 +155,8 @@ export class ProfileController {
      */
     async updateUserProfile(req: Request, res: Response): Promise<void> {
         try {
-            const userId = req.user?.employeeId || req.user?.id;
-            const { profileData, requiresApproval } = req.body;
+            const userId = req.user?.id; // Use user ID from JWT token
+            const profileData = req.body;
 
             if (!userId || !profileData) {
                 res.status(400).json({
@@ -163,68 +166,15 @@ export class ProfileController {
                 return;
             }
 
-            logger.info('👤 [ProfileController] Update user profile', { 
-                userId,
-                requiresApproval: requiresApproval || false
-            });
+            logger.info('👤 [ProfileController] Update user profile', { userId });
 
-            // Validate profile data
-            const validationResult = await this.validateProfileData(profileData);
-            if (!validationResult.isValid) {
-                res.status(400).json({
-                    status: 'error',
-                    message: 'Invalid profile data',
-                    errors: validationResult.errors
-                });
-                return;
-            }
-
-            // Check if changes require approval
-            const needsApproval = requiresApproval || await this.profileService.requiresApproval(userId, profileData);
-
-            if (needsApproval) {
-                // Create approval workflow for profile changes
-                const approvalRequest = await ApprovalWorkflowService.createApprovalRequest(
-                    'profile_update',
-                    {
-                        userId,
-                        currentProfile: await this.profileService.getUserProfile(userId),
-                        newProfile: profileData,
-                        requestedBy: userId,
-                        reason: 'Profile update requiring approval'
-                    }
-                );
-
-                res.status(202).json({
-                    status: 'success',
-                    message: 'Profile update submitted for approval',
-                    data: { 
-                        approvalRequest,
-                        pendingChanges: profileData
-                    }
-                });
-                return;
-            }
-
-            // Update profile directly
-            const updatedProfile = await this.profileService.updateUserProfile(userId, profileData);
-
-            // Trigger real-time sync
-            await this.syncProfileRealTime(userId, updatedProfile);
-
-            // Send notification about profile update
-            await this.notificationService.createNotification({
-                userId,
-                title: 'Profile Updated',
-                message: 'Your profile has been updated successfully',
-                type: 'profile_update',
-                priority: 'low'
-            });
+            // Use the enhanced ProfileUpdateService which handles validation, notifications, and real-time updates
+            const updatedEmployee = await this.profileUpdateService.updateProfile(userId, profileData);
 
             res.status(200).json({
                 status: 'success',
                 message: 'Profile updated successfully',
-                data: { profile: updatedProfile }
+                data: { employee: updatedEmployee }
             });
         } catch (error) {
             logger.error('❌ [ProfileController] Update user profile error', {
@@ -721,6 +671,101 @@ export class ProfileController {
             });
         } catch (error) {
             logger.error('❌ [ProfileController] Update password error', {
+                error: (error as Error).message
+            });
+            res.status(400).json({
+                status: 'error',
+                message: (error as Error).message
+            });
+        }
+    }
+
+    /**
+     * Get profile update history for an employee
+     * GET /api/profile/update-history/:employeeId
+     */
+    async getProfileUpdateHistory(req: Request, res: Response): Promise<void> {
+        try {
+            const { employeeId } = req.params;
+            const { limit } = req.query;
+            const requesterId = req.user?.employeeId || req.user?.id;
+
+            if (!employeeId) {
+                res.status(400).json({
+                    status: 'error',
+                    message: 'Employee ID is required'
+                });
+                return;
+            }
+
+            // Check if requester has permission to view update history
+            // Only allow viewing own history or if requester is admin/hr/superadmin
+            const requesterRole = req.user?.role;
+            if (employeeId !== requesterId && !['admin', 'hr', 'superadmin'].includes(requesterRole)) {
+                res.status(403).json({
+                    status: 'error',
+                    message: 'Insufficient permissions to view profile update history'
+                });
+                return;
+            }
+
+            logger.info('📋 [ProfileController] Get profile update history', { 
+                employeeId, 
+                requesterId 
+            });
+
+            const history = await this.profileUpdateService.getProfileUpdateHistory(
+                employeeId,
+                limit ? parseInt(limit as string) : 10
+            );
+
+            res.status(200).json({
+                status: 'success',
+                data: { history, count: history.length }
+            });
+        } catch (error) {
+            logger.error('❌ [ProfileController] Get profile update history error', {
+                error: (error as Error).message
+            });
+            res.status(400).json({
+                status: 'error',
+                message: (error as Error).message
+            });
+        }
+    }
+
+    /**
+     * Get recent profile updates for administrators
+     * GET /api/profile/recent-updates
+     */
+    async getRecentProfileUpdates(req: Request, res: Response): Promise<void> {
+        try {
+            const { limit } = req.query;
+            const requesterRole = req.user?.role;
+
+            // Only allow administrators to view recent updates
+            if (!['admin', 'hr', 'superadmin'].includes(requesterRole)) {
+                res.status(403).json({
+                    status: 'error',
+                    message: 'Insufficient permissions to view recent profile updates'
+                });
+                return;
+            }
+
+            logger.info('📋 [ProfileController] Get recent profile updates', { 
+                requesterRole 
+            });
+
+            const updates = await this.profileUpdateService.getRecentProfileUpdates(
+                limit ? parseInt(limit as string) : 20
+            );
+
+            res.status(200).json({
+                status: 'success',
+                data: { updates, count: updates.length }
+            });
+        } catch (error) {
+            logger.error('❌ [ProfileController] Get recent profile updates error', {
                 error: (error as Error).message
             });
             res.status(400).json({
