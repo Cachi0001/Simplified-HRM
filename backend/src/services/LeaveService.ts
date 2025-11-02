@@ -2,6 +2,9 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import supabase from '../config/supabase';
 import logger from '../utils/logger';
 import { NotificationService } from './NotificationService';
+import { ComprehensiveNotificationService } from './ComprehensiveNotificationService';
+import { EmailService } from './EmailService';
+import db from '../config/database';
 
 export interface ILeaveRequest {
     id: string;
@@ -42,10 +45,17 @@ export interface RejectLeaveRequestData {
 export class LeaveService {
     private supabase: SupabaseClient;
     private notificationService: NotificationService;
+    private comprehensiveNotificationService: ComprehensiveNotificationService;
 
     constructor() {
         this.supabase = supabase.getClient();
         this.notificationService = new NotificationService();
+        const emailService = new EmailService(db);
+        this.comprehensiveNotificationService = new ComprehensiveNotificationService(
+            db,
+            this.notificationService,
+            emailService
+        );
     }
 
     /**
@@ -80,6 +90,21 @@ export class LeaveService {
                 endDate: data.end_date
             });
 
+            // Get employee role to determine approval level
+            const { data: employee, error: employeeError } = await this.supabase
+                .from('employees')
+                .select('role')
+                .eq('id', data.employee_id)
+                .single();
+
+            if (employeeError) {
+                logger.error('LeaveService: Failed to get employee role', { error: employeeError.message });
+                throw employeeError;
+            }
+
+            // Determine approval level based on employee role
+            const approvalLevel = this.determineApprovalLevel(employee.role);
+
             // Calculate working days
             const daysRequested = this.calculateWorkingDays(data.start_date, data.end_date);
 
@@ -94,6 +119,8 @@ export class LeaveService {
                     reason: data.reason,
                     notes: data.notes,
                     status: 'pending',
+                    approval_level: approvalLevel,
+                    requester_role: employee.role,
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
                 })
@@ -105,14 +132,94 @@ export class LeaveService {
                 throw error;
             }
 
-            // Send notifications to all admins, super-admins, and HR
-            await this.notifyApprovers(leaveRequest, 'new_leave_request');
+            // Send notifications to appropriate approvers based on approval level
+            await this.notifyApproversForApprovalLevel(leaveRequest, approvalLevel);
 
-            logger.info('LeaveService: Leave request created successfully', { leaveRequestId: leaveRequest.id });
+            logger.info('LeaveService: Leave request created successfully', { 
+                leaveRequestId: leaveRequest.id,
+                approvalLevel,
+                requesterRole: employee.role
+            });
             return leaveRequest;
         } catch (error) {
             logger.error('LeaveService: Create leave request failed', { error: (error as Error).message });
             throw error;
+        }
+    }
+
+    /**
+     * Determine approval level based on employee role
+     */
+    private determineApprovalLevel(role: string): string {
+        switch (role) {
+            case 'employee':
+            case 'teamlead':
+                return 'hr_admin';
+            case 'hr':
+            case 'admin':
+                return 'superadmin_only';
+            case 'superadmin':
+                return 'auto_approved';
+            default:
+                return 'hr_admin';
+        }
+    }
+
+    /**
+     * Notify appropriate approvers based on approval level using comprehensive notification service
+     */
+    private async notifyApproversForApprovalLevel(leaveRequest: ILeaveRequest, approvalLevel: string): Promise<void> {
+        try {
+            if (approvalLevel === 'auto_approved') {
+                logger.info('LeaveService: Request auto-approved, no notifications sent', {
+                    leaveRequestId: leaveRequest.id
+                });
+                return;
+            }
+
+            // Get requester information
+            const { data: employee, error: employeeError } = await this.supabase
+                .from('employees')
+                .select('full_name, role')
+                .eq('id', leaveRequest.employee_id)
+                .single();
+
+            if (employeeError) {
+                logger.error('LeaveService: Failed to get employee info for notifications', { 
+                    error: employeeError.message 
+                });
+                return;
+            }
+
+            // Prepare request data for notifications
+            const requestData = {
+                start_date: leaveRequest.start_date,
+                end_date: leaveRequest.end_date,
+                leave_type: leaveRequest.type,
+                reason: leaveRequest.reason,
+                days_requested: leaveRequest.days_requested
+            };
+
+            // Send comprehensive approval notifications
+            await this.comprehensiveNotificationService.sendApprovalNotifications(
+                leaveRequest.id,
+                'leave',
+                employee.role,
+                employee.full_name,
+                requestData
+            );
+
+            logger.info('LeaveService: Comprehensive approval notifications sent', {
+                leaveRequestId: leaveRequest.id,
+                requesterRole: employee.role,
+                approvalLevel
+            });
+
+        } catch (error) {
+            logger.error('LeaveService: Failed to send approval notifications', {
+                error: (error as Error).message,
+                leaveRequestId: leaveRequest.id
+            });
         }
     }
 
@@ -204,8 +311,7 @@ export class LeaveService {
                 .from('leave_requests')
                 .select(`
                     *,
-                    employee:employees!leave_requests_employee_id_fkey(id, full_name, email, department),
-                    approver:employees!leave_requests_approved_by_fkey(id, full_name, email)
+                    employee:employees!leave_requests_employee_id_fkey(id, full_name, email, department)
                 `);
 
             if (status) {

@@ -1,13 +1,23 @@
 import { Request, Response } from 'express';
-import ApprovalWorkflowService, { ApprovalAction, ApprovalDecision } from '../services/ApprovalWorkflowService';
+import { ApprovalWorkflowService, ApprovalAction, ApprovalDecision } from '../services/ApprovalWorkflowService';
 import { RequestNotificationService } from '../services/RequestNotificationService';
+import { NotificationService } from '../services/NotificationService';
+import { EmailService } from '../services/EmailService';
+import { Pool } from 'pg';
 import logger from '../utils/logger';
+
+// Import database connection
+import db from '../config/database';
 
 export class ApprovalWorkflowController {
     private requestNotificationService: RequestNotificationService;
+    private approvalWorkflowService: ApprovalWorkflowService;
 
     constructor() {
         this.requestNotificationService = new RequestNotificationService();
+        const notificationService = new NotificationService();
+        const emailService = new EmailService(db);
+        this.approvalWorkflowService = new ApprovalWorkflowService(db, notificationService, emailService);
     }
 
     /**
@@ -31,7 +41,7 @@ export class ApprovalWorkflowController {
                 requestId
             });
 
-            const workflow = await ApprovalWorkflowService.getApprovalWorkflow(requestId);
+            const workflow = await this.approvalWorkflowService.getApprovalHistory(requestId, requestType as 'leave' | 'purchase');
 
             res.status(200).json({
                 status: 'success',
@@ -83,11 +93,16 @@ export class ApprovalWorkflowController {
                 decision
             });
 
-            const result = await ApprovalWorkflowService.processApprovalStep(
+            const approvalDecision = decision === 'approved' 
+                ? { approved_by: approverId, approval_comments: notes }
+                : { rejected_by: approverId, rejection_reason: notes };
+
+            const result = await this.approvalWorkflowService.processApproval(
                 requestId,
-                decision,
+                requestType as 'leave' | 'purchase',
                 approverId,
-                notes
+                req.user?.role || 'employee',
+                approvalDecision
             );
 
             // Send notification about status change
@@ -102,9 +117,8 @@ export class ApprovalWorkflowController {
                 status: 'success',
                 message: `Request ${decision} successfully`,
                 data: { 
-                    workflow: result.workflow,
-                    newStatus: result.newStatus,
-                    isComplete: result.isComplete
+                    request: result,
+                    newStatus: result.status
                 }
             });
         } catch (error) {
@@ -149,7 +163,7 @@ export class ApprovalWorkflowController {
                 userRole
             });
 
-            const pendingApprovals = await ApprovalWorkflowService.getPendingApprovalsForUser(approverId);
+            const pendingApprovals = await this.approvalWorkflowService.getPendingRequestsForApprover(userRole);
 
             res.status(200).json({
                 status: 'success',
@@ -190,7 +204,7 @@ export class ApprovalWorkflowController {
                 requestId
             });
 
-            const history = await ApprovalWorkflowService.getApprovalHistory(requestId);
+            const history = await this.approvalWorkflowService.getApprovalHistory(requestId, requestType as 'leave' | 'purchase');
 
             res.status(200).json({
                 status: 'success',
@@ -409,7 +423,7 @@ export class ApprovalWorkflowController {
                     stepId: req.stepId,
                     decision: {
                         approverId,
-                        action: 'approve' as ApprovalAction,
+                        action: 'approved',
                         comments: notes
                     } as ApprovalDecision,
                     approverId,

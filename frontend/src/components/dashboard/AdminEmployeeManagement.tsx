@@ -33,50 +33,64 @@ export const AdminEmployeeManagement = ({ darkMode }: AdminEmployeeManagementPro
 
   // Fetch all employees
   const { data: employees = [], isLoading, error } = useQuery({
-    queryKey: ['employees-management', Date.now()], // Force fresh fetch for debugging
+    queryKey: ['employees-management'],
     queryFn: async () => {
       try {
-        console.log('Making API call to /employees...');
-        console.log('Auth token:', localStorage.getItem('accessToken') ? 'Present' : 'Missing');
-        const response = await api.get('/employees');
-        console.log('API Response received:', {
+        console.log('🔍 Making API call to /employees...');
+        console.log('🔑 Auth token:', localStorage.getItem('accessToken') ? 'Present' : 'Missing');
+        
+        const response = await api.get('/employees?limit=100');
+        console.log('📡 API Response received:', {
           status: response.status,
           statusText: response.statusText,
-          data: response.data,
-          headers: response.headers
+          dataKeys: Object.keys(response.data || {}),
+          dataType: typeof response.data,
+          isArray: Array.isArray(response.data)
         });
+        
+        // Log the actual structure
+        console.log('📊 Full response.data:', response.data);
       
-      // Handle different response structures
-      let employeesData = [];
-      if (response.data.data?.employees) {
-        employeesData = response.data.data.employees;
-      } else if (response.data.employees) {
-        employeesData = response.data.employees;
-      } else if (Array.isArray(response.data.data)) {
-        employeesData = response.data.data;
-      } else if (Array.isArray(response.data)) {
-        employeesData = response.data;
-      }
-      
-      console.log('Processed employees data:', employeesData);
-      
-      // Validate and normalize employee data
-      const normalizedEmployees = employeesData.filter((emp: any) => {
-        const hasId = emp && (emp.id || emp._id);
-        console.log('Employee validation:', { emp, hasId });
-        return hasId;
-      }).map((emp: any) => {
-        const normalized = {
-          id: emp.id || emp._id || '',
-          fullName: emp.full_name || emp.fullName || '',
-          email: emp.email || '',
-          phone: emp.phone || '',
-          department: emp.department || '',
-          role: emp.role || 'employee',
-          status: emp.status || 'pending',
-          hireDate: emp.hire_date || emp.hireDate || emp.created_at || emp.createdAt || new Date().toISOString(),
-          createdAt: emp.created_at || emp.createdAt || new Date().toISOString(),
-          profilePicture: emp.profile_picture || emp.profilePicture || undefined
+        // Handle different response structures
+        let employeesData = [];
+        if (response.data?.data && Array.isArray(response.data.data)) {
+          // Standard API format: { status: 'success', data: [...] }
+          employeesData = response.data.data;
+          console.log('✅ Using response.data.data format');
+        } else if (Array.isArray(response.data)) {
+          // Direct array format
+          employeesData = response.data;
+          console.log('✅ Using direct array format');
+        } else {
+          console.log('❌ Unexpected response format:', response.data);
+          employeesData = [];
+        }
+        
+        console.log('📋 Processed employees data:', {
+          count: employeesData.length,
+          firstEmployee: employeesData[0],
+          sample: employeesData.slice(0, 2)
+        });
+        
+        // Validate and normalize employee data
+        const normalizedEmployees = employeesData.filter((emp: any) => {
+          const hasId = emp && (emp.id || emp._id);
+          if (!hasId) {
+            console.log('⚠️ Employee missing ID:', emp);
+          }
+          return hasId;
+        }).map((emp: any) => {
+          const normalized = {
+            id: emp.id || emp._id || '',
+            fullName: emp.full_name || emp.fullName || '',
+            email: emp.email || '',
+            phone: emp.phone || '',
+            department: emp.department || '',
+            role: emp.role || 'employee',
+            status: emp.status || 'pending',
+            hireDate: emp.hire_date || emp.hireDate || emp.created_at || emp.createdAt || new Date().toISOString(),
+            createdAt: emp.created_at || emp.createdAt || new Date().toISOString(),
+            profilePicture: emp.profile_picture || emp.profilePicture || undefined
         };
         console.log('Normalized employee:', { original: emp, normalized });
         return normalized;
@@ -89,6 +103,15 @@ export const AdminEmployeeManagement = ({ darkMode }: AdminEmployeeManagementPro
         throw apiError;
       }
     },
+    retry: 1,
+    staleTime: 0, // Always fetch fresh data for debugging
+    onError: (error) => {
+      console.error('❌ Employee query failed:', error);
+      addToast('error', `Failed to load employees: ${error.message}`);
+    },
+    onSuccess: (data) => {
+      console.log('✅ Employee query succeeded:', { count: data?.length, data });
+    }
   });
 
   // Approve employee with role mutation
@@ -200,9 +223,10 @@ export const AdminEmployeeManagement = ({ darkMode }: AdminEmployeeManagementPro
   // Get role color styling
   const getRoleColor = (role: string) => {
     const colors = {
-      'super-admin': darkMode ? 'bg-red-900/30 text-red-400 border-red-700' : 'bg-red-100 text-red-800 border-red-300',
+      'superadmin': darkMode ? 'bg-red-900/30 text-red-400 border-red-700' : 'bg-red-100 text-red-800 border-red-300',
       'admin': darkMode ? 'bg-orange-900/30 text-orange-400 border-orange-700' : 'bg-orange-100 text-orange-800 border-orange-300',
       'hr': darkMode ? 'bg-blue-900/30 text-blue-400 border-blue-700' : 'bg-blue-100 text-blue-800 border-blue-300',
+      'teamlead': darkMode ? 'bg-purple-900/30 text-purple-400 border-purple-700' : 'bg-purple-100 text-purple-800 border-purple-300',
       'employee': darkMode ? 'bg-green-900/30 text-green-400 border-green-700' : 'bg-green-100 text-green-800 border-green-300'
     };
     return colors[role as keyof typeof colors] || (darkMode ? 'bg-gray-900/30 text-gray-400 border-gray-700' : 'bg-gray-100 text-gray-800 border-gray-300');
@@ -219,10 +243,12 @@ export const AdminEmployeeManagement = ({ darkMode }: AdminEmployeeManagementPro
 
   const getRoleIcon = (role: string) => {
     switch (role) {
-      case 'super-admin':
+      case 'superadmin':
       case 'admin':
         return Shield;
       case 'hr':
+        return Users;
+      case 'teamlead':
         return Users;
       default:
         return User;
@@ -251,6 +277,19 @@ export const AdminEmployeeManagement = ({ darkMode }: AdminEmployeeManagementPro
         <h2 className={`text-2xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
           Employee Management
         </h2>
+      </div>
+
+      {/* Debug Info */}
+      <div className={`mb-4 p-3 rounded border ${darkMode ? 'bg-gray-700 border-gray-600 text-gray-300' : 'bg-gray-50 border-gray-200 text-gray-700'}`}>
+        <div className="text-sm">
+          <strong>Debug Info:</strong><br/>
+          Loading: {isLoading ? 'Yes' : 'No'}<br/>
+          Error: {error ? error.message : 'None'}<br/>
+          Employees Count: {employees?.length || 0}<br/>
+          Employees Type: {Array.isArray(employees) ? 'Array' : typeof employees}<br/>
+          Filtered Count: {filteredEmployees?.length || 0}<br/>
+          Auth Token: {localStorage.getItem('accessToken') ? 'Present' : 'Missing'}
+        </div>
       </div>
 
       {/* Filters and Search */}

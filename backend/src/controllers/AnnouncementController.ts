@@ -1005,4 +1005,77 @@ export class AnnouncementController {
       throw error;
     }
   }
+
+  /**
+   * Mark announcement as read
+   * POST /api/announcements/:id/read
+   */
+  async markAsRead(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.id;
+
+      if (!userId) {
+        res.status(401).json({
+          status: 'error',
+          message: 'Authentication required'
+        });
+        return;
+      }
+
+      logger.info('✅ [AnnouncementController] Marking announcement as read', {
+        announcementId: id,
+        userId
+      });
+
+      const supabase = supabaseConfig.getClient();
+
+      // Check if announcement exists
+      const { data: announcement, error: announcementError } = await supabase
+        .from('announcements')
+        .select('id, title')
+        .eq('id', id)
+        .single();
+
+      if (announcementError || !announcement) {
+        res.status(404).json({
+          status: 'error',
+          message: 'Announcement not found'
+        });
+        return;
+      }
+
+      // Create or update read status
+      const { data: readStatus, error: readError } = await supabase
+        .from('announcement_read_status')
+        .upsert({
+          announcement_id: id,
+          user_id: userId,
+          read_at: new Date().toISOString()
+        }, {
+          onConflict: 'announcement_id,user_id'
+        })
+        .select()
+        .single();
+
+      if (readError) {
+        throw readError;
+      }
+
+      res.status(200).json({
+        status: 'success',
+        message: 'Announcement marked as read',
+        data: { readStatus }
+      });
+    } catch (error) {
+      logger.error('❌ [AnnouncementController] Mark as read error', {
+        error: (error as Error).message,
+        announcementId: req.params.id
+      });
+      res.status(500).json({
+        status: 'error',
+        message: 'Failed to mark announcement as read'
+      });
+    }
+  }
 }

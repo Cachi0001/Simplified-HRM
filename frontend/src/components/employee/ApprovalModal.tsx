@@ -48,6 +48,13 @@ export function ApprovalModal({
         icon: User
       },
       {
+        value: 'teamlead',
+        label: 'Team Lead',
+        description: 'Team leadership role with department task assignment permissions',
+        disabled: false,
+        icon: Users
+      },
+      {
         value: 'hr',
         label: 'HR',
         description: 'Human Resources role with employee management permissions',
@@ -78,7 +85,7 @@ export function ApprovalModal({
         }));
 
       case 'hr':
-        // HR can assign admin, employee (but not hr to avoid conflicts)
+        // HR can assign employee, teamlead, admin (but not hr to avoid conflicts)
         return baseRoles.filter(role => role.value !== 'hr');
 
       default:

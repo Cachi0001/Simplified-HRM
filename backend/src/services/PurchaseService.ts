@@ -2,6 +2,9 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import supabase from '../config/supabase';
 import logger from '../utils/logger';
 import { NotificationService } from './NotificationService';
+import { ComprehensiveNotificationService } from './ComprehensiveNotificationService';
+import { EmailService } from './EmailService';
+import db from '../config/database';
 
 export interface IPurchaseRequest {
     id: string;
@@ -55,10 +58,17 @@ export interface RejectPurchaseRequestData {
 export class PurchaseService {
     private supabase: SupabaseClient;
     private notificationService: NotificationService;
+    private comprehensiveNotificationService: ComprehensiveNotificationService;
 
     constructor() {
         this.supabase = supabase.getClient();
         this.notificationService = new NotificationService();
+        const emailService = new EmailService(db);
+        this.comprehensiveNotificationService = new ComprehensiveNotificationService(
+            db,
+            this.notificationService,
+            emailService
+        );
     }
 
     /**
@@ -71,6 +81,21 @@ export class PurchaseService {
                 itemName: data.item_name,
                 unitPrice: data.unit_price
             });
+
+            // Get employee role to determine approval level
+            const { data: employee, error: employeeError } = await this.supabase
+                .from('employees')
+                .select('role')
+                .eq('id', data.employee_id)
+                .single();
+
+            if (employeeError) {
+                logger.error('PurchaseService: Failed to get employee role', { error: employeeError.message });
+                throw employeeError;
+            }
+
+            // Determine approval level based on employee role
+            const approvalLevel = this.determineApprovalLevel(employee.role);
 
             const quantity = data.quantity || 1;
             const totalAmount = data.unit_price * quantity;
@@ -92,6 +117,8 @@ export class PurchaseService {
                     budget_code: data.budget_code,
                     expected_delivery_date: data.expected_delivery_date,
                     status: 'pending',
+                    approval_level: approvalLevel,
+                    requester_role: employee.role,
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
                 })
@@ -103,14 +130,98 @@ export class PurchaseService {
                 throw error;
             }
 
-            // Send notifications to all approvers
-            await this.notifyApprovers(purchaseRequest, 'new_purchase_request');
+            // Send notifications to appropriate approvers based on approval level
+            await this.notifyApproversForApprovalLevel(purchaseRequest, approvalLevel);
 
-            logger.info('PurchaseService: Purchase request created successfully', { purchaseRequestId: purchaseRequest.id });
+            logger.info('PurchaseService: Purchase request created successfully', { 
+                purchaseRequestId: purchaseRequest.id,
+                approvalLevel,
+                requesterRole: employee.role
+            });
             return purchaseRequest;
         } catch (error) {
             logger.error('PurchaseService: Create purchase request failed', { error: (error as Error).message });
             throw error;
+        }
+    }
+
+    /**
+     * Determine approval level based on employee role
+     */
+    private determineApprovalLevel(role: string): string {
+        switch (role) {
+            case 'employee':
+            case 'teamlead':
+                return 'hr_admin';
+            case 'hr':
+            case 'admin':
+                return 'superadmin_only';
+            case 'superadmin':
+                return 'auto_approved';
+            default:
+                return 'hr_admin';
+        }
+    }
+
+    /**
+     * Notify appropriate approvers based on approval level using comprehensive notification service
+     */
+    private async notifyApproversForApprovalLevel(purchaseRequest: IPurchaseRequest, approvalLevel: string): Promise<void> {
+        try {
+            if (approvalLevel === 'auto_approved') {
+                logger.info('PurchaseService: Request auto-approved, no notifications sent', {
+                    purchaseRequestId: purchaseRequest.id
+                });
+                return;
+            }
+
+            // Get requester information
+            const { data: employee, error: employeeError } = await this.supabase
+                .from('employees')
+                .select('full_name, role')
+                .eq('id', purchaseRequest.employee_id)
+                .single();
+
+            if (employeeError) {
+                logger.error('PurchaseService: Failed to get employee info for notifications', { 
+                    error: employeeError.message 
+                });
+                return;
+            }
+
+            // Prepare request data for notifications
+            const requestData = {
+                item_name: purchaseRequest.item_name,
+                description: purchaseRequest.description,
+                quantity: purchaseRequest.quantity,
+                unit_price: purchaseRequest.unit_price,
+                total_amount: purchaseRequest.total_amount,
+                vendor: purchaseRequest.vendor,
+                category: purchaseRequest.category,
+                urgency: purchaseRequest.urgency,
+                justification: purchaseRequest.justification
+            };
+
+            // Send comprehensive approval notifications
+            await this.comprehensiveNotificationService.sendApprovalNotifications(
+                purchaseRequest.id,
+                'purchase',
+                employee.role,
+                employee.full_name,
+                requestData
+            );
+
+            logger.info('PurchaseService: Comprehensive approval notifications sent', {
+                purchaseRequestId: purchaseRequest.id,
+                requesterRole: employee.role,
+                approvalLevel
+            });
+
+        } catch (error) {
+            logger.error('PurchaseService: Failed to send approval notifications', {
+                error: (error as Error).message,
+                purchaseRequestId: purchaseRequest.id
+            });
         }
     }
 
@@ -202,8 +313,7 @@ export class PurchaseService {
                 .from('purchase_requests')
                 .select(`
                     *,
-                    employee:employees!purchase_requests_employee_id_fkey(id, full_name, email, department),
-                    approver:employees!purchase_requests_approved_by_fkey(id, full_name, email)
+                    employee:employees!purchase_requests_employee_id_fkey(id, full_name, email, department)
                 `);
 
             if (status) {

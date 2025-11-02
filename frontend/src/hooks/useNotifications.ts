@@ -114,7 +114,23 @@ export function useNotifications(userId?: string): UseNotificationsReturn {
   }, [realtimeMarkAllAsRead]);
 
   const showToast = useCallback((notification: Go3netNotification) => {
-    // Show local notification
+    // Prevent duplicate toasts by checking if we've already shown this notification
+    const toastKey = `toast-shown-${notification.id}`;
+    const alreadyShown = sessionStorage.getItem(toastKey);
+    
+    if (alreadyShown) {
+      return; // Don't show duplicate toast
+    }
+
+    // Mark as shown to prevent duplicates
+    sessionStorage.setItem(toastKey, 'true');
+    
+    // Clear the flag after 5 seconds to allow re-showing if needed
+    setTimeout(() => {
+      sessionStorage.removeItem(toastKey);
+    }, 5000);
+
+    // Show local notification (this will trigger the toast display)
     notificationService.showLocalNotification(notification);
 
     // Show browser notification if permission granted

@@ -24,14 +24,22 @@ export const AdminLeaveRequests: React.FC<AdminLeaveRequestsProps> = ({ darkMode
   const queryClient = useQueryClient();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
+  
+  // Get current user to make query key unique
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const userId = currentUser?.id || currentUser?._id || 'anonymous';
 
-  // Fetch leave requests
+  // Fetch leave requests with unique query key to prevent conflicts
   const { data: leaveRequests = [], isLoading } = useQuery({
-    queryKey: ['admin-leave-requests'],
+    queryKey: ['admin-leave-requests', userId || 'anonymous'],
     queryFn: async () => {
       const response = await api.get('/leave-requests');
-      return response.data.data || response.data || [];
+      // Handle the nested data structure: response.data.data.leaveRequests
+      const data = response.data.data || response.data;
+      return Array.isArray(data) ? data : (data?.leaveRequests || []);
     },
+    staleTime: 30000, // Cache for 30 seconds to prevent excessive API calls
+    refetchOnWindowFocus: false, // Don't refetch when window regains focus
   });
 
   // Approve leave request
@@ -42,7 +50,7 @@ export const AdminLeaveRequests: React.FC<AdminLeaveRequestsProps> = ({ darkMode
     },
     onSuccess: () => {
       addToast('success', 'Leave request approved');
-      queryClient.invalidateQueries({ queryKey: ['admin-leave-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-leave-requests', userId] });
     },
     onError: (error: any) => {
       addToast('error', error.response?.data?.message || 'Failed to approve leave request');
@@ -57,7 +65,7 @@ export const AdminLeaveRequests: React.FC<AdminLeaveRequestsProps> = ({ darkMode
     },
     onSuccess: () => {
       addToast('success', 'Leave request rejected');
-      queryClient.invalidateQueries({ queryKey: ['admin-leave-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-leave-requests', userId] });
     },
     onError: (error: any) => {
       addToast('error', error.response?.data?.message || 'Failed to reject leave request');

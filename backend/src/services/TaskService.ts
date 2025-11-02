@@ -2,6 +2,7 @@ import { ITaskRepository } from '../repositories/interfaces/ITaskRepository';
 import { ITask, CreateTaskRequest, UpdateTaskRequest, TaskQuery } from '../models/SupabaseTask';
 import { EmailService } from './EmailService';
 import logger from '../utils/logger';
+import db from '../config/database';
 
 export class TaskService {
   constructor(private taskRepository: ITaskRepository) {}
@@ -70,7 +71,7 @@ export class TaskService {
 
       // Send task assignment notification email
       try {
-        const emailService = new EmailService();
+        const emailService = new EmailService(db);
         const employee = await this.taskRepository.getEmployeeById(taskData.assigneeId);
         if (employee && employee.email) {
           const employeeName = employee.full_name ?? employee.fullName ?? 'Team Member';
@@ -81,8 +82,7 @@ export class TaskService {
             employee.email,
             employeeName,
             taskTitle,
-            taskDescription,
-            dueDateValue
+            'System' // assignerName - should be updated to get actual assigner
           );
           logger.info('📧 Task assignment email sent', { assigneeId: taskData.assigneeId, taskId: task.id });
         } else {
@@ -238,7 +238,7 @@ export class TaskService {
 
       if (status === 'completed') {
         try {
-          const emailService = new EmailService();
+          const emailService = new EmailService(db);
           if (admin && admin.email && employee && employee.email) {
             const adminName = admin.full_name ?? admin.fullName ?? 'Administrator';
             const employeeName = employee.full_name ?? employee.fullName ?? 'Employee';

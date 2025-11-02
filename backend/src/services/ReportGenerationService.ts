@@ -6,6 +6,7 @@ import AttendanceAnalyticsService from './AttendanceAnalyticsService';
 import TaskCompletionAnalyticsService from './TaskCompletionAnalyticsService';
 import EmailTemplateService from './EmailTemplateService';
 import { EmailService } from './EmailService';
+import db from '../config/database';
 
 export type ReportType = 
     | 'performance_summary' 
@@ -88,7 +89,7 @@ export class ReportGenerationService {
         this.performanceService = PerformanceAnalyticsService;
         this.attendanceService = AttendanceAnalyticsService;
         this.taskService = TaskCompletionAnalyticsService;
-        this.emailService = new EmailService();
+        this.emailService = new EmailService(db);
     }
 
     /**

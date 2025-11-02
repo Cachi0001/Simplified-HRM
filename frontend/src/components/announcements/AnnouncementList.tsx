@@ -203,7 +203,7 @@ const AnnouncementList: React.FC<AnnouncementListProps> = ({
                     <option value="">All Priorities</option>
                     <option value="urgent">Urgent</option>
                     <option value="high">High</option>
-                    <option value="medium">Medium</option>
+                    <option value="normal">Normal</option>
                     <option value="low">Low</option>
                   </select>
                 </div>

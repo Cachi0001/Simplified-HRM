@@ -22,6 +22,22 @@ export function NotificationManager({
 
   useEffect(() => {
     const handleNewNotification = (notification: Go3netNotification) => {
+      // Prevent duplicate toasts across multiple NotificationManager instances
+      const toastKey = `notification-manager-${notification.id}`;
+      const alreadyHandled = sessionStorage.getItem(toastKey);
+      
+      if (alreadyHandled) {
+        return; // Don't handle duplicate notification
+      }
+
+      // Mark as handled to prevent duplicates
+      sessionStorage.setItem(toastKey, 'true');
+      
+      // Clear the flag after 10 seconds
+      setTimeout(() => {
+        sessionStorage.removeItem(toastKey);
+      }, 10000);
+
       setToasts(prev => {
         const exists = prev.find(t => t.id === notification.id);
         if (exists) return prev;

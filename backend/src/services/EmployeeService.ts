@@ -2,6 +2,7 @@ import { IEmployeeRepository } from '../repositories/interfaces/IEmployeeReposit
 import { IEmployee, CreateEmployeeRequest, UpdateEmployeeRequest, EmployeeQuery } from '../models/SupabaseEmployee';
 import { EmailService } from './EmailService';
 import logger from '../utils/logger';
+import db from '../config/database';
 
 export class EmployeeService {
   constructor(private employeeRepository: IEmployeeRepository) {}
@@ -282,7 +283,7 @@ export class EmployeeService {
       const mappedEmployee = this.mapEmployee(updatedEmployee);
 
       try {
-        const emailService = new EmailService();
+        const emailService = new EmailService(db);
         await emailService.sendApprovalConfirmation(mappedEmployee.email, mappedEmployee.fullName);
         logger.info('📧 [EmployeeService] Approval email sent', { email: mappedEmployee.email });
       } catch (emailError) {
@@ -324,11 +325,12 @@ export class EmployeeService {
       const mappedEmployee = this.mapEmployee(updatedEmployee);
 
       try {
-        const emailService = new EmailService();
+        const emailService = new EmailService(db);
         await emailService.sendDepartmentAssignmentNotification(
           mappedEmployee.email,
           mappedEmployee.fullName,
-          department
+          department,
+          'System Administrator'
         );
         logger.info('📧 Department assignment email sent', { employeeId: id, department });
       } catch (emailError) {

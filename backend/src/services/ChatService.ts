@@ -1201,6 +1201,88 @@ export class ChatService {
       throw error;
     }
   }
+
+  /**
+   * Get conversation history for administrators
+   */
+  async getConversationHistoryForAdmin(): Promise<any[]> {
+    try {
+      logger.info('ChatService: Getting conversation history for admin');
+
+      // Get all unique chat IDs from chat_messages since we don't have a chats table
+      const { data: chatIds, error: chatIdsError } = await this.supabase
+        .from('chat_messages')
+        .select('chat_id')
+        .order('timestamp', { ascending: false });
+
+      if (chatIdsError) {
+        throw new Error(`Failed to get chat IDs: ${chatIdsError.message}`);
+      }
+
+      // Get unique chat IDs and create conversation objects
+      const uniqueChatIds = [...new Set((chatIds || []).map(c => c.chat_id))];
+      
+      const conversations = uniqueChatIds.map(chatId => ({
+        id: chatId,
+        name: chatId.startsWith('dm_') ? 'Direct Message' : 'Group Chat',
+        type: chatId.startsWith('dm_') ? 'dm' : 'group',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        chat_participants: []
+      }));
+
+      // Process conversations to get participant names and latest message info
+      const processedConversations = await Promise.all(
+        (conversations || []).map(async (conversation) => {
+          // Get latest message for this conversation
+          const { data: latestMessage } = await this.supabase
+            .from('chat_messages')
+            .select('message, timestamp, sender_id')
+            .eq('chat_id', conversation.id)
+            .order('timestamp', { ascending: false })
+            .limit(1)
+            .single();
+
+          // Get message count
+          const { count: messageCount } = await this.supabase
+            .from('chat_messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('chat_id', conversation.id);
+
+          return {
+            id: conversation.id,
+            name: conversation.name,
+            type: conversation.type,
+            participantNames: [], // No participants data available from simplified structure
+            participantCount: 0,
+            messageCount: messageCount || 0,
+            lastMessage: latestMessage?.message || null,
+            lastMessageAt: latestMessage?.timestamp || conversation.updated_at,
+            lastMessageSender: null, // No sender info available
+            createdAt: conversation.created_at,
+            updatedAt: conversation.updated_at
+          };
+        })
+      );
+
+      // Sort by latest message timestamp
+      processedConversations.sort((a, b) => 
+        new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()
+      );
+
+      logger.info('ChatService: Conversation history retrieved for admin', { 
+        conversationCount: processedConversations.length 
+      });
+
+      return processedConversations;
+
+    } catch (error) {
+      logger.error('ChatService: Get conversation history for admin failed', { 
+        error: (error as Error).message 
+      });
+      throw error;
+    }
+  }
 }
 
 export default new ChatService();

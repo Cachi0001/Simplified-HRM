@@ -2,7 +2,7 @@ export interface Announcement {
   id: string;
   title: string;
   content: string;
-  priority: 'low' | 'medium' | 'high' | 'urgent';
+  priority: 'low' | 'normal' | 'high' | 'urgent';
   status: 'draft' | 'scheduled' | 'published' | 'expired' | 'archived';
   author_id: string;
   author_name?: string;
@@ -37,7 +37,7 @@ export interface AnnouncementTemplate {
   name: string;
   title_template: string;
   content_template: string;
-  default_priority: 'low' | 'medium' | 'high' | 'urgent';
+  default_priority: 'low' | 'normal' | 'high' | 'urgent';
   category?: string;
   created_by: string;
   creator_name?: string;
@@ -63,7 +63,7 @@ export interface AnnouncementReadStatus {
 export interface CreateAnnouncementRequest {
   title: string;
   content: string;
-  priority?: 'low' | 'medium' | 'high' | 'urgent';
+  priority?: 'low' | 'normal' | 'high' | 'urgent';
   scheduled_at?: Date;
   expires_at?: Date;
   target_type?: 'all' | 'departments' | 'roles' | 'users';
@@ -75,7 +75,7 @@ export interface CreateAnnouncementRequest {
 export interface UpdateAnnouncementRequest {
   title?: string;
   content?: string;
-  priority?: 'low' | 'medium' | 'high' | 'urgent';
+  priority?: 'low' | 'normal' | 'high' | 'urgent';
   status?: 'draft' | 'scheduled' | 'published' | 'expired' | 'archived';
   scheduled_at?: Date;
   expires_at?: Date;
@@ -108,6 +108,6 @@ export interface CreateTemplateRequest {
   name: string;
   title_template: string;
   content_template: string;
-  default_priority?: 'low' | 'medium' | 'high' | 'urgent';
+  default_priority?: 'low' | 'normal' | 'high' | 'urgent';
   category?: string;
 }

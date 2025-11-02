@@ -58,6 +58,7 @@ router.get('/groups/:groupId/members', (req, res) => chatController.getGroupMemb
  * Chat History
  */
 router.get('/history', (req, res) => chatController.getChatHistoryForUser(req, res));
+router.get('/conversation-history', (req, res) => chatController.getConversationHistory(req, res));
 
 /**
  * Typing Indicators (Redis-based)

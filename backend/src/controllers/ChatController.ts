@@ -1060,4 +1060,58 @@ export class ChatController {
       });
     }
   }
+
+  /**
+   * Get conversation history for administrators
+   * GET /api/chat/conversation-history
+   */
+  async getConversationHistory(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
+
+      if (!userId) {
+        res.status(401).json({
+          status: 'error',
+          message: 'User not authenticated'
+        });
+        return;
+      }
+
+      // Check if user has admin privileges
+      if (!['hr', 'admin', 'superadmin'].includes(userRole)) {
+        res.status(403).json({
+          status: 'error',
+          message: 'Insufficient permissions to access conversation history'
+        });
+        return;
+      }
+
+      logger.info('📜 [ChatController] Get conversation history for admin', { 
+        userId, 
+        userRole 
+      });
+
+      const conversations = await this.chatService.getConversationHistoryForAdmin();
+
+      res.status(200).json({
+        status: 'success',
+        data: {
+          conversations,
+          count: conversations.length
+        }
+      });
+
+    } catch (error) {
+      logger.error('❌ [ChatController] Get conversation history error', {
+        error: (error as Error).message,
+        userId: req.user?.id,
+        userRole: req.user?.role
+      });
+      res.status(500).json({
+        status: 'error',
+        message: 'Failed to get conversation history'
+      });
+    }
+  }
 }

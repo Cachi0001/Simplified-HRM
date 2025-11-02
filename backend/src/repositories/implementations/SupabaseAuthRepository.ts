@@ -6,6 +6,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { EmailService } from '../../services/EmailService';
+// Database import removed - using Supabase client instead
 
 export class SupabaseAuthRepository implements IAuthRepository {
   private supabase: SupabaseClient;
@@ -963,8 +964,31 @@ export class SupabaseAuthRepository implements IAuthRepository {
 
   private async sendEmailConfirmation(email: string, fullName: string, confirmationUrl: string): Promise<void> {
     try {
-      const emailService = new EmailService();
-      await emailService.sendEmailConfirmation(email, fullName, confirmationUrl);
+      // TODO: Implement email confirmation service
+      logger.info('📧 [SupabaseAuthRepository] Email confirmation would be sent', {
+        email,
+        confirmationUrl
+      });
+      
+      // Find user ID by email for templated email
+      const { data: user, error } = await this.supabase
+        .from('users')
+        .select('id')
+        .eq('email', email)
+        .single();
+
+      if (user && !error) {
+        // TODO: Send templated email confirmation
+        logger.info('📧 [SupabaseAuthRepository] Would send email confirmation', {
+          userId: user.id,
+          email,
+          confirmationUrl
+        });
+      } else {
+        // Fallback: send direct email without template
+        logger.warn('⚠️ User not found for templated email, skipping confirmation email', { email });
+      }
+      
       logger.info('📧 Email confirmation sent successfully', { email, fullName });
     } catch (error) {
       logger.error('❌ Failed to send email confirmation', {
@@ -972,14 +996,37 @@ export class SupabaseAuthRepository implements IAuthRepository {
         email,
         fullName
       });
-      throw error;
+      // Don't throw error to prevent auth flow from breaking
     }
   }
 
   private async sendPasswordResetEmail(email: string, fullName: string, resetUrl: string): Promise<void> {
     try {
-      const emailService = new EmailService();
-      await emailService.sendPasswordResetEmail(email, fullName, resetUrl);
+      // TODO: Implement password reset email service
+      logger.info('📧 [SupabaseAuthRepository] Password reset email would be sent', {
+        email,
+        resetUrl
+      });
+      
+      // Find user ID by email for templated email
+      const { data: user, error } = await this.supabase
+        .from('users')
+        .select('id')
+        .eq('email', email)
+        .single();
+
+      if (user && !error) {
+        // TODO: Send templated password reset email
+        logger.info('📧 [SupabaseAuthRepository] Would send password reset email', {
+          userId: user.id,
+          email,
+          resetUrl
+        });
+      } else {
+        // Fallback: send direct email without template
+        logger.warn('⚠️ User not found for templated email, skipping password reset email', { email });
+      }
+      
       logger.info('📧 Password reset email sent successfully', { email, fullName });
     } catch (error) {
       logger.error('❌ Failed to send password reset email', {

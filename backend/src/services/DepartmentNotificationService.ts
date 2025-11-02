@@ -4,6 +4,7 @@ import logger from '../utils/logger';
 import { NotificationService } from './NotificationService';
 import { EmailService } from './EmailService';
 import EmailTemplateService from './EmailTemplateService';
+import db from '../config/database';
 
 export interface DepartmentNotification {
     id: string;
@@ -58,7 +59,7 @@ export class DepartmentNotificationService {
     constructor() {
         this.supabase = supabase.getClient();
         this.notificationService = new NotificationService();
-        this.emailService = new EmailService();
+        this.emailService = new EmailService(db);
     }
 
     /**

@@ -261,6 +261,17 @@ api.interceptors.response.use(
 
     // CASE 1: Network errors (no response from server)
     if (!error.response) {
+      // Prevent duplicate network error messages
+      const networkErrorKey = `network-error-${Date.now()}`;
+      const recentNetworkError = sessionStorage.getItem('recent-network-error');
+      
+      if (recentNetworkError && (Date.now() - parseInt(recentNetworkError)) < 5000) {
+        // Don't show duplicate network error within 5 seconds
+        return Promise.reject(error);
+      }
+      
+      sessionStorage.setItem('recent-network-error', Date.now().toString());
+      
       // Check for specific network error types
       if (error.message.includes('Network Error') || error.message.includes('ERR_NETWORK')) {
         error.message = `🌐 No internet connection detected. Please check your network and try again. (Error ID: ${errorId})`;

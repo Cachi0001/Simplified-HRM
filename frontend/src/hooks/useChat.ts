@@ -30,6 +30,8 @@ export interface ChatMessage {
 export interface User {
   id: string;
   name: string;
+  full_name?: string;
+  fullName?: string;
   email: string;
   avatar?: string;
   role?: string;

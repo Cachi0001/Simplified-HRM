@@ -2,14 +2,31 @@ import { Router } from 'express';
 import { authenticateToken } from '../middleware/auth.middleware';
 import { PurchaseController } from '../controllers/PurchaseController';
 import { PurchaseService } from '../services/PurchaseService';
+import { ApprovalWorkflowService } from '../services/ApprovalWorkflowService';
+import { ComprehensiveNotificationService } from '../services/ComprehensiveNotificationService';
+import { NotificationService } from '../services/NotificationService';
+import { EmailService } from '../services/EmailService';
+import db from '../config/database';
 
 const router = Router();
 
+const emailService = new EmailService(db);
 const purchaseService = new PurchaseService();
-const purchaseController = new PurchaseController(purchaseService);
+const notificationService = new NotificationService();
+const approvalWorkflowService = new ApprovalWorkflowService(db, notificationService, emailService);
+const comprehensiveNotificationService = new ComprehensiveNotificationService(db, notificationService, emailService);
+const purchaseController = new PurchaseController(purchaseService, approvalWorkflowService, notificationService, emailService);
 
 // Protect all routes with authentication
 router.use(authenticateToken);
+
+/**
+ * General Purchase Request Management
+ */
+// Root route - returns all requests based on user role
+router.get('/', (req, res) => purchaseController.getAllPurchaseRequests(req, res));
+// Root POST route for creating requests
+router.post('/', (req, res) => purchaseController.createPurchaseRequest(req, res));
 
 /**
  * Employee Purchase Request Management

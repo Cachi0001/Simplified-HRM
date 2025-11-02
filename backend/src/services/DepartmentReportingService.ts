@@ -5,6 +5,7 @@ import DepartmentAnalyticsService from './DepartmentAnalyticsService';
 import ReportGenerationService from './ReportGenerationService';
 import EmailTemplateService from './EmailTemplateService';
 import { EmailService } from './EmailService';
+import db from '../config/database';
 
 export interface DepartmentReport {
     id: string;
@@ -56,7 +57,7 @@ export class DepartmentReportingService {
         this.supabase = supabase.getClient();
         this.analyticsService = DepartmentAnalyticsService;
         this.reportService = ReportGenerationService;
-        this.emailService = new EmailService();
+        this.emailService = new EmailService(db);
     }
 
     /**

@@ -4,6 +4,7 @@ import logger from '../utils/logger';
 import { NotificationService } from './NotificationService';
 import { EmailService } from './EmailService';
 import EmailTemplateService from './EmailTemplateService';
+import db from '../config/database';
 
 export type RequestType = 'leave' | 'purchase' | 'expense' | 'travel' | 'overtime' | 'profile_update' | 'settings_change' | 'task_assignment';
 export type NotificationEvent = 
@@ -46,7 +47,7 @@ export class RequestNotificationService {
     constructor() {
         this.supabase = supabase.getClient();
         this.notificationService = new NotificationService();
-        this.emailService = new EmailService();
+        this.emailService = new EmailService(db);
     }
 
     /**

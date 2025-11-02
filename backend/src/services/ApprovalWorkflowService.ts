@@ -3,6 +3,7 @@ import logger from '../utils/logger';
 import { canApproveRequest, determineApprovalLevel } from '../middleware/approvalValidation';
 import { NotificationService } from './NotificationService';
 import { EmailService } from './EmailService';
+import { ComprehensiveNotificationService } from './ComprehensiveNotificationService';
 
 export interface ApprovalAction {
     request_id: string;
@@ -23,11 +24,109 @@ export interface ApprovalDecision {
 }
 
 export class ApprovalWorkflowService {
+    private comprehensiveNotificationService: ComprehensiveNotificationService;
+
     constructor(
         private db: Pool,
         private notificationService: NotificationService,
         private emailService: EmailService
-    ) {}
+    ) {
+        this.comprehensiveNotificationService = new ComprehensiveNotificationService(
+            this.db,
+            this.notificationService,
+            this.emailService
+        );
+    }
+
+    /**
+     * Static method to get approval workflow for a request
+     */
+    static async getApprovalWorkflow(requestId: string): Promise<any> {
+        // Implementation for getting approval workflow
+        throw new Error('Method not implemented yet');
+    }
+
+    /**
+     * Static method to process approval step
+     */
+    static async processApprovalStep(
+        requestId: string,
+        decision: string,
+        approverId: string,
+        notes?: string
+    ): Promise<any> {
+        // Implementation for processing approval step
+        throw new Error('Method not implemented yet');
+    }
+
+    /**
+     * Static method to get pending approvals for user
+     */
+    static async getPendingApprovalsForUser(approverId: string): Promise<any[]> {
+        // Implementation for getting pending approvals
+        throw new Error('Method not implemented yet');
+    }
+
+    /**
+     * Static method to delegate approval
+     */
+    static async delegateApproval(
+        requestId: string,
+        delegateToId: string,
+        approverId: string,
+        reason?: string
+    ): Promise<any> {
+        // Implementation for delegating approval
+        throw new Error('Method not implemented yet');
+    }
+
+    /**
+     * Static method to escalate approval
+     */
+    static async escalateApproval(
+        requestId: string,
+        escalatedBy: string,
+        reason?: string
+    ): Promise<any> {
+        // Implementation for escalating approval
+        throw new Error('Method not implemented yet');
+    }
+
+    /**
+     * Static method to get approval statistics
+     */
+    static async getApprovalStatistics(options: {
+        startDate?: Date;
+        endDate?: Date;
+        requestType?: string;
+    }): Promise<any> {
+        // Implementation for getting approval statistics
+        throw new Error('Method not implemented yet');
+    }
+
+    /**
+     * Static method to bulk process approvals
+     */
+    static async bulkProcessApprovals(requests: any[]): Promise<any[]> {
+        // Implementation for bulk processing approvals
+        throw new Error('Method not implemented yet');
+    }
+
+    /**
+     * Static method to set workflow configuration
+     */
+    static async setWorkflowConfiguration(requestType: string, config: any): Promise<void> {
+        // Implementation for setting workflow configuration
+        throw new Error('Method not implemented yet');
+    }
+
+    /**
+     * Static method to get workflow configuration
+     */
+    static async getWorkflowConfiguration(requestType: string): Promise<any> {
+        // Implementation for getting workflow configuration
+        throw new Error('Method not implemented yet');
+    }
 
     /**
      * Process approval for leave or purchase request
@@ -120,7 +219,7 @@ export class ApprovalWorkflowService {
             this.sendApprovalNotifications(
                 updatedRequest,
                 requestType,
-                isApproval,
+                isApproval || false,
                 approverRole,
                 request.requester_user_id,
                 request.requester_name
@@ -279,7 +378,7 @@ export class ApprovalWorkflowService {
     }
 
     /**
-     * Send approval notifications
+     * Send approval notifications using comprehensive notification service
      */
     private async sendApprovalNotifications(
         request: any,
@@ -290,48 +389,48 @@ export class ApprovalWorkflowService {
         requesterName: string
     ): Promise<void> {
         try {
-            const action = isApproval ? 'approved' : 'rejected';
-            const notificationType = `${requestType}_request`;
+            const decision = isApproval ? 'approved' : 'rejected';
+            
+            // Get approver name
+            const approverQuery = `
+                SELECT u.full_name 
+                FROM users u 
+                JOIN employees e ON u.id = e.user_id 
+                WHERE e.role = $1 
+                LIMIT 1
+            `;
+            const approverResult = await this.db.query(approverQuery, [approverRole]);
+            const approverName = approverResult.rows[0]?.full_name || `${approverRole.toUpperCase()} User`;
 
-            // Notification to requester
-            await this.notificationService.createNotification({
-                userId: requesterUserId,
-                type: notificationType as any,
-                title: `${requestType.charAt(0).toUpperCase() + requestType.slice(1)} Request ${action.charAt(0).toUpperCase() + action.slice(1)}`,
-                message: `Your ${requestType} request has been ${action}`,
-                data: {
-                    request_id: request.id,
-                    request_type: requestType,
-                    action,
-                    approver_role: approverRole
-                },
-                action_url: `/dashboard/${requestType}-requests/${request.id}`
-            });
+            // Prepare request data for notifications
+            const requestData = requestType === 'leave' ? {
+                start_date: request.start_date,
+                end_date: request.end_date,
+                leave_type: request.type,
+                reason: request.reason
+            } : {
+                item_name: request.item_name,
+                amount: request.amount || request.estimated_cost || request.total_amount,
+                description: request.description,
+                urgency: request.urgency
+            };
 
-            // Email notification to requester
-            const emailTemplate = `${requestType}_request_${action}`;
-            await this.emailService.sendTemplatedEmail(
+            // Send approval decision notification
+            await this.comprehensiveNotificationService.sendApprovalDecisionNotifications(
+                request.id,
+                requestType,
+                decision,
+                approverName,
                 requesterUserId,
-                emailTemplate,
-                {
-                    requester_name: requesterName,
-                    request_id: request.id,
-                    approver_role: approverRole,
-                    comments: isApproval ? request.approval_comments : request.rejection_reason,
-                    ...(requestType === 'leave' ? {
-                        start_date: request.start_date,
-                        end_date: request.end_date,
-                        leave_type: request.type
-                    } : {
-                        item_name: request.item_name,
-                        amount: request.amount || request.estimated_cost
-                    })
-                }
+                requesterName,
+                isApproval ? request.approval_comments : request.rejection_reason,
+                requestData
             );
 
-            logger.info(`📧 [ApprovalWorkflow] Notifications sent for ${requestType} ${action}`, {
+            logger.info(`📧 [ApprovalWorkflow] Comprehensive notifications sent for ${requestType} ${decision}`, {
                 requestId: request.id,
-                requesterUserId
+                requesterUserId,
+                decision
             });
 
         } catch (error) {

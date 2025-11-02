@@ -3,13 +3,17 @@ import { useNavigate } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { AdminLeaveRequests } from '../components/dashboard/AdminLeaveRequests';
 import { AdminEmployeeManagement } from '../components/dashboard/AdminEmployeeManagement';
+import { AdminTasks } from '../components/dashboard/AdminTasks';
+import { AdminAttendance } from '../components/dashboard/AdminAttendance';
+import { AdminDepartments } from '../components/dashboard/AdminDepartments';
 import { BottomNavbar } from '../components/layout/BottomNavbar';
 import { DarkModeToggle } from '../components/ui/DarkModeToggle';
 import { NotificationBell } from '../components/dashboard/NotificationBell';
 import { NotificationManager } from '../components/notifications/NotificationManager';
 import Logo from '../components/ui/Logo';
-import { Clock, Users, FileText } from 'lucide-react';
+import { Clock, Users, FileText, CheckSquare, Building, Calendar } from 'lucide-react';
 import { useTokenValidation } from '../hooks/useTokenValidation';
+import { AnnouncementList } from '../components/announcements';
 
 export default function HRDashboard() {
   const navigate = useNavigate();
@@ -18,6 +22,7 @@ export default function HRDashboard() {
     return saved ? JSON.parse(saved) : false;
   });
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState('overview');
   const [stats] = useState({
     pendingLeaves: 0,
     pendingEmployees: 0,
@@ -38,8 +43,8 @@ export default function HRDashboard() {
         return;
       }
 
-      // Check if user is HR or Admin
-      if (user.role !== 'hr' && user.role !== 'admin') {
+      // Check if user is HR, Admin, or Superadmin
+      if (!['hr', 'admin', 'superadmin'].includes(user.role)) {
         navigate('/employee-dashboard');
         return;
       }
@@ -153,49 +158,170 @@ export default function HRDashboard() {
           </div>
         </div>
 
-        {/* Main Sections */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-          {/* Leave Requests - Takes up 2 columns on large screens */}
-          <div className="lg:col-span-2">
-            <AdminLeaveRequests darkMode={darkMode} />
-          </div>
-
-          {/* Quick Actions */}
-          <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-            <h2 className={`text-xl font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-              Quick Actions
-            </h2>
-            <div className="space-y-3">
-              <button
-                onClick={() => navigate('/dashboard')}
-                className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors"
-              >
-                👥 Employee Management
-              </button>
-              <button
-                onClick={() => navigate('/purchase-requests')}
-                className="w-full px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-colors"
-              >
-                🛒 Purchase Requests
-              </button>
-              <button
-                onClick={() => navigate('/tasks')}
-                className="w-full px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors"
-              >
-                ✓ Task Management
-              </button>
-              <button
-                onClick={() => navigate('/performance-metrics')}
-                className="w-full px-4 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-semibold transition-colors"
-              >
-                📊 Performance Metrics
-              </button>
-            </div>
+        {/* Navigation Tabs */}
+        <div className={`rounded-lg shadow-md mb-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+          <div className="flex flex-wrap border-b border-gray-200 dark:border-gray-700">
+            {[
+              { id: 'overview', label: 'Overview', icon: Users },
+              { id: 'employees', label: 'Employee Management', icon: Users },
+              { id: 'tasks', label: 'Task Management', icon: CheckSquare },
+              { id: 'departments', label: 'Departments', icon: Building },
+              { id: 'attendance', label: 'Attendance', icon: Calendar },
+              { id: 'leaves', label: 'Leave Requests', icon: Clock },
+              { id: 'announcements', label: 'Announcements', icon: FileText }
+            ].map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                    activeTab === tab.id
+                      ? darkMode
+                        ? 'border-blue-400 text-blue-400'
+                        : 'border-blue-500 text-blue-600'
+                      : darkMode
+                        ? 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <Icon className="w-4 h-4 mr-2" />
+                  {tab.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* Employee Management */}
-        <AdminEmployeeManagement darkMode={darkMode} />
+        {/* Tab Content */}
+        {activeTab === 'overview' && (
+          <div className="space-y-6">
+            {/* Welcome Section with Announcements */}
+            <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                    Welcome to HR Dashboard
+                  </h2>
+                  <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    Check out the latest announcements and manage your HR tasks
+                  </p>
+                </div>
+              </div>
+              
+              {/* Announcements Section */}
+              <div className="max-h-96 overflow-hidden">
+                <AnnouncementList
+                  announcements={[]}
+                  loading={false}
+                  darkMode={darkMode}
+                  canCreate={true}
+                  onCreateNew={() => {
+                    setActiveTab('announcements');
+                  }}
+                  onReaction={(announcementId, reactionType) => {
+                    console.log('Reaction:', announcementId, reactionType);
+                  }}
+                  onMarkAsRead={(announcementId) => {
+                    console.log('Mark as read:', announcementId);
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Quick Stats Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                      Pending Approvals
+                    </p>
+                    <p className={`text-2xl font-bold mt-1 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {stats.pendingEmployees}
+                    </p>
+                  </div>
+                  <div className="bg-blue-100 dark:bg-blue-900 p-3 rounded-lg">
+                    <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                </div>
+              </div>
+
+              <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                      Leave Requests
+                    </p>
+                    <p className={`text-2xl font-bold mt-1 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {stats.pendingLeaves}
+                    </p>
+                  </div>
+                  <div className="bg-yellow-100 dark:bg-yellow-900 p-3 rounded-lg">
+                    <Clock className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+                  </div>
+                </div>
+              </div>
+
+              <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                      Active Tasks
+                    </p>
+                    <p className={`text-2xl font-bold mt-1 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                      0
+                    </p>
+                  </div>
+                  <div className="bg-green-100 dark:bg-green-900 p-3 rounded-lg">
+                    <CheckSquare className="w-5 h-5 text-green-600 dark:text-green-400" />
+                  </div>
+                </div>
+              </div>
+
+              <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                      Departments
+                    </p>
+                    <p className={`text-2xl font-bold mt-1 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                      0
+                    </p>
+                  </div>
+                  <div className="bg-purple-100 dark:bg-purple-900 p-3 rounded-lg">
+                    <Building className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'employees' && <AdminEmployeeManagement darkMode={darkMode} />}
+        {activeTab === 'tasks' && <AdminTasks darkMode={darkMode} />}
+        {activeTab === 'departments' && <AdminDepartments darkMode={darkMode} />}
+        {activeTab === 'attendance' && <AdminAttendance darkMode={darkMode} />}
+        {activeTab === 'leaves' && <AdminLeaveRequests darkMode={darkMode} />}
+        {activeTab === 'announcements' && (
+          <div className={`rounded-lg shadow-md ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+            <AnnouncementList
+              announcements={[]}
+              loading={false}
+              darkMode={darkMode}
+              canCreate={true}
+              onCreateNew={() => {
+                console.log('Create new announcement');
+              }}
+              onReaction={(announcementId, reactionType) => {
+                console.log('Reaction:', announcementId, reactionType);
+              }}
+              onMarkAsRead={(announcementId) => {
+                console.log('Mark as read:', announcementId);
+              }}
+            />
+          </div>
+        )}
       </div>
 
       {/* Notification Manager */}

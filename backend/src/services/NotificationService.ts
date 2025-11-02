@@ -632,6 +632,280 @@ export class NotificationService {
       throw error;
     }
   }
+
+  /**
+   * Send batch notifications to multiple users
+   */
+  async sendBatchNotifications(notifications: CreateNotificationRequest[]): Promise<DatabaseNotification[]> {
+    try {
+      logger.info('NotificationService: Sending batch notifications', { count: notifications.length });
+
+      const results: DatabaseNotification[] = [];
+      const batchId = `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      // Process notifications in batches to avoid overwhelming the database
+      const batchSize = 50;
+      for (let i = 0; i < notifications.length; i += batchSize) {
+        const batch = notifications.slice(i, i + batchSize);
+        
+        const batchData = batch.map(notification => ({
+          user_id: notification.userId,
+          type: notification.type,
+          title: notification.title,
+          message: notification.message,
+          related_id: notification.relatedId || null,
+          action_url: notification.actionUrl || null,
+          data: notification.data || null,
+          batch_id: batchId,
+          priority: notification.priority || 'medium',
+          is_read: false,
+          created_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+        }));
+
+        const { data, error } = await this.supabase
+          .from('notifications')
+          .insert(batchData)
+          .select();
+
+        if (error) {
+          logger.error('NotificationService: Batch notification insert failed', { 
+            error: error.message,
+            batchIndex: i / batchSize
+          });
+          throw error;
+        }
+
+        results.push(...(data || []));
+      }
+
+      logger.info('NotificationService: Batch notifications sent successfully', { 
+        count: results.length,
+        batchId
+      });
+
+      return results;
+    } catch (error) {
+      logger.error('NotificationService: Send batch notifications failed', { 
+        error: (error as Error).message 
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Check for notification conflicts and prevent duplicates
+   */
+  async checkNotificationConflicts(
+    userId: string,
+    type: string,
+    relatedId?: string,
+    timeWindowMinutes: number = 5
+  ): Promise<boolean> {
+    try {
+      const timeWindow = new Date(Date.now() - timeWindowMinutes * 60 * 1000).toISOString();
+
+      let query = this.supabase
+        .from('notifications')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('type', type)
+        .gte('created_at', timeWindow);
+
+      if (relatedId) {
+        query = query.eq('related_id', relatedId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        logger.error('NotificationService: Check conflicts failed', { error: error.message });
+        return false; // Allow notification if check fails
+      }
+
+      const hasConflict = (data?.length || 0) > 0;
+      
+      if (hasConflict) {
+        logger.info('NotificationService: Notification conflict detected', {
+          userId,
+          type,
+          relatedId,
+          existingCount: data?.length
+        });
+      }
+
+      return hasConflict;
+    } catch (error) {
+      logger.error('NotificationService: Check notification conflicts failed', { 
+        error: (error as Error).message 
+      });
+      return false; // Allow notification if check fails
+    }
+  }
+
+  /**
+   * Create notification with conflict prevention
+   */
+  async createNotificationSafe(
+    request: CreateNotificationRequest,
+    preventDuplicates: boolean = true,
+    timeWindowMinutes: number = 5
+  ): Promise<DatabaseNotification | null> {
+    try {
+      if (preventDuplicates) {
+        const hasConflict = await this.checkNotificationConflicts(
+          request.userId,
+          request.type,
+          request.relatedId,
+          timeWindowMinutes
+        );
+
+        if (hasConflict) {
+          logger.info('NotificationService: Skipping duplicate notification', {
+            userId: request.userId,
+            type: request.type,
+            relatedId: request.relatedId
+          });
+          return null;
+        }
+      }
+
+      return await this.createNotification(request);
+    } catch (error) {
+      logger.error('NotificationService: Create safe notification failed', { 
+        error: (error as Error).message 
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get notification delivery statistics
+   */
+  async getNotificationStats(
+    startDate?: Date,
+    endDate?: Date,
+    userId?: string
+  ): Promise<any> {
+    try {
+      let query = this.supabase
+        .from('notifications')
+        .select('type, priority, is_read, created_at');
+
+      if (startDate) {
+        query = query.gte('created_at', startDate.toISOString());
+      }
+
+      if (endDate) {
+        query = query.lte('created_at', endDate.toISOString());
+      }
+
+      if (userId) {
+        query = query.eq('user_id', userId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        logger.error('NotificationService: Get stats failed', { error: error.message });
+        throw error;
+      }
+
+      // Calculate statistics
+      const stats = {
+        total: data?.length || 0,
+        read: data?.filter(n => n.is_read).length || 0,
+        unread: data?.filter(n => !n.is_read).length || 0,
+        byType: {} as Record<string, number>,
+        byPriority: {} as Record<string, number>
+      };
+
+      data?.forEach(notification => {
+        stats.byType[notification.type] = (stats.byType[notification.type] || 0) + 1;
+        stats.byPriority[notification.priority] = (stats.byPriority[notification.priority] || 0) + 1;
+      });
+
+      return stats;
+    } catch (error) {
+      logger.error('NotificationService: Get notification stats failed', { 
+        error: (error as Error).message 
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Update notification preferences for a user
+   */
+  async updateNotificationPreferences(
+    userId: string,
+    preferences: Record<string, { system: boolean; email: boolean; push: boolean }>
+  ): Promise<void> {
+    try {
+      logger.info('NotificationService: Updating notification preferences', { userId });
+
+      const updates = Object.entries(preferences).map(([type, prefs]) => ({
+        user_id: userId,
+        notification_type: type,
+        system_enabled: prefs.system,
+        email_enabled: prefs.email,
+        push_enabled: prefs.push,
+        updated_at: new Date().toISOString()
+      }));
+
+      const { error } = await this.supabase
+        .from('notification_preferences')
+        .upsert(updates, { onConflict: 'user_id,notification_type' });
+
+      if (error) {
+        logger.error('NotificationService: Update preferences failed', { error: error.message });
+        throw error;
+      }
+
+      logger.info('NotificationService: Notification preferences updated', { 
+        userId,
+        preferencesCount: updates.length
+      });
+    } catch (error) {
+      logger.error('NotificationService: Update notification preferences failed', { 
+        error: (error as Error).message 
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get notification preferences for a user
+   */
+  async getNotificationPreferences(userId: string): Promise<Record<string, any>> {
+    try {
+      const { data, error } = await this.supabase
+        .from('notification_preferences')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (error) {
+        logger.error('NotificationService: Get preferences failed', { error: error.message });
+        throw error;
+      }
+
+      const preferences: Record<string, any> = {};
+      data?.forEach(pref => {
+        preferences[pref.notification_type] = {
+          system: pref.system_enabled,
+          email: pref.email_enabled,
+          push: pref.push_enabled
+        };
+      });
+
+      return preferences;
+    } catch (error) {
+      logger.error('NotificationService: Get notification preferences failed', { 
+        error: (error as Error).message 
+      });
+      throw error;
+    }
+  }
 }
 
 export default new NotificationService();

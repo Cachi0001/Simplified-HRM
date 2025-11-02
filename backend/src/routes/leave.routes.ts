@@ -2,14 +2,31 @@ import { Router } from 'express';
 import { authenticateToken } from '../middleware/auth.middleware';
 import { LeaveController } from '../controllers/LeaveController';
 import { LeaveService } from '../services/LeaveService';
+import { ApprovalWorkflowService } from '../services/ApprovalWorkflowService';
+import { ComprehensiveNotificationService } from '../services/ComprehensiveNotificationService';
+import { NotificationService } from '../services/NotificationService';
+import { EmailService } from '../services/EmailService';
+import db from '../config/database';
 
 const router = Router();
 
+const emailService = new EmailService(db);
 const leaveService = new LeaveService();
-const leaveController = new LeaveController(leaveService);
+const notificationService = new NotificationService();
+const approvalWorkflowService = new ApprovalWorkflowService(db, notificationService, emailService);
+const comprehensiveNotificationService = new ComprehensiveNotificationService(db, notificationService, emailService);
+const leaveController = new LeaveController(leaveService, approvalWorkflowService, notificationService, emailService);
 
 // Protect all routes with authentication
 router.use(authenticateToken);
+
+/**
+ * General Leave Request Management
+ */
+// Root route - returns all requests based on user role
+router.get('/', (req, res) => leaveController.getAllLeaveRequests(req, res));
+// Root POST route for creating requests
+router.post('/', (req, res) => leaveController.createLeaveRequest(req, res));
 
 /**
  * Employee Leave Request Management

@@ -50,7 +50,8 @@ export function LeaveRequestsPage() {
     try {
       setLoading(true);
       const response = await api.get('/leave-requests');
-      const requests = response.data.data || response.data;
+      const data = response.data.data || response.data;
+      const requests = Array.isArray(data) ? data : (data?.leaveRequests || []);
       
       // Transform data to match our interface
       const transformedRequests = requests.map((req: any) => ({

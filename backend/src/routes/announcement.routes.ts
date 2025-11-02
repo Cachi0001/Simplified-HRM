@@ -41,4 +41,7 @@ router.post('/:id/publish', (req, res) => announcementController.publishAnnounce
 // POST /api/announcements/:id/archive - Archive an announcement
 router.post('/:id/archive', (req, res) => announcementController.archiveAnnouncement(req, res));
 
+// POST /api/announcements/:id/read - Mark announcement as read
+router.post('/:id/read', (req, res) => announcementController.markAsRead(req, res));
+
 export default router;

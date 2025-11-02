@@ -174,7 +174,7 @@ export class EmailService {
     /**
      * Send raw email
      */
-    private async sendEmail(options: {
+    public async sendEmail(options: {
         to: string;
         subject: string;
         html: string;
@@ -459,4 +459,131 @@ export class EmailService {
             // Don't throw here as this is async notification
         }
     }
-}
+
+    /**
+     * Send approval confirmation email
+     */
+    async sendApprovalConfirmation(email: string, fullName: string): Promise<void> {
+        try {
+            await this.sendEmail({
+                to: email,
+                subject: 'Account Approved - Welcome to Go3net!',
+                html: `
+                    <h2>Welcome to Go3net, ${fullName}!</h2>
+                    <p>Your account has been approved and you can now access the system.</p>
+                    <p>You can log in at: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/auth</p>
+                `,
+                text: `Welcome to Go3net, ${fullName}! Your account has been approved and you can now access the system.`
+            });
+
+            logger.info('📧 Approval confirmation email sent', { email, fullName });
+        } catch (error) {
+            logger.error('❌ Failed to send approval confirmation email', {
+                error: (error as Error).message,
+                email,
+                fullName
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Send task notification email
+     */
+    async sendTaskNotification(
+        assigneeEmail: string,
+        assigneeName: string,
+        taskTitle: string,
+        assignerName: string
+    ): Promise<void> {
+        try {
+            await this.sendEmail({
+                to: assigneeEmail,
+                subject: 'New Task Assigned',
+                html: `
+                    <h2>New Task Assigned</h2>
+                    <p>Hello ${assigneeName},</p>
+                    <p>You have been assigned a new task: <strong>${taskTitle}</strong></p>
+                    <p>Assigned by: ${assignerName}</p>
+                    <p>Please log in to view the details: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/tasks</p>
+                `,
+                text: `New task assigned: ${taskTitle} by ${assignerName}. Please log in to view details.`
+            });
+
+            logger.info('📧 Task notification email sent', { assigneeEmail, taskTitle });
+        } catch (error) {
+            logger.error('❌ Failed to send task notification email', {
+                error: (error as Error).message,
+                assigneeEmail,
+                taskTitle
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Send task completion notification email
+     */
+    async sendTaskCompletionNotification(
+        assignerEmail: string,
+        assignerName: string,
+        taskTitle: string,
+        completedByName: string
+    ): Promise<void> {
+        try {
+            await this.sendEmail({
+                to: assignerEmail,
+                subject: 'Task Completed',
+                html: `
+                    <h2>Task Completed</h2>
+                    <p>Hello ${assignerName},</p>
+                    <p>The task <strong>${taskTitle}</strong> has been completed by ${completedByName}.</p>
+                    <p>Please log in to review: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/tasks</p>
+                `,
+                text: `Task completed: ${taskTitle} by ${completedByName}. Please log in to review.`
+            });
+
+            logger.info('📧 Task completion notification email sent', { assignerEmail, taskTitle });
+        } catch (error) {
+            logger.error('❌ Failed to send task completion notification email', {
+                error: (error as Error).message,
+                assignerEmail,
+                taskTitle
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Send department assignment notification email
+     */
+    async sendDepartmentAssignmentNotification(
+        employeeEmail: string,
+        employeeName: string,
+        departmentName: string,
+        assignerName: string
+    ): Promise<void> {
+        try {
+            await this.sendEmail({
+                to: employeeEmail,
+                subject: 'Department Assignment Update',
+                html: `
+                    <h2>Department Assignment Update</h2>
+                    <p>Hello ${employeeName},</p>
+                    <p>You have been assigned to the <strong>${departmentName}</strong> department.</p>
+                    <p>Updated by: ${assignerName}</p>
+                    <p>Please log in to view your updated profile: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/settings</p>
+                `,
+                text: `You have been assigned to the ${departmentName} department by ${assignerName}.`
+            });
+
+            logger.info('📧 Department assignment notification email sent', { employeeEmail, departmentName });
+        } catch (error) {
+            logger.error('❌ Failed to send department assignment notification email', {
+                error: (error as Error).message,
+                employeeEmail,
+                departmentName
+            });
+            throw error;
+        }
+    }}

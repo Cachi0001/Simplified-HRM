@@ -5,6 +5,7 @@ import NotificationService from './NotificationService';
 import { getWebSocketService } from './WebSocketService';
 import { EmailService } from './EmailService';
 import ProfileUpdateEmailTemplateService from './ProfileUpdateEmailTemplateService';
+import db from '../config/database';
 
 export interface ProfileUpdateData {
   fullName?: string;
@@ -489,7 +490,7 @@ export class ProfileUpdateService {
         adminEmails.length
       );
 
-      const emailService = new EmailService();
+      const emailService = new EmailService(db);
       for (const email of adminEmails) {
         await emailService.sendEmail({
           to: email,
