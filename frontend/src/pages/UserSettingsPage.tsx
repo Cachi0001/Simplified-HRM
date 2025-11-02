@@ -60,6 +60,8 @@ export default function UserSettingsPage({ darkMode: initialDarkMode = false }: 
     dateOfBirth: '',
   });
 
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
@@ -145,6 +147,43 @@ export default function UserSettingsPage({ darkMode: initialDarkMode = false }: 
       ...prev,
       [name]: value
     }));
+
+    // Clear error for this field when user starts typing
+    if (formErrors[name]) {
+      setFormErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
+
+    // Real-time validation for specific fields
+    if (name === 'email' && value) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(value)) {
+        setFormErrors(prev => ({
+          ...prev,
+          email: 'Please enter a valid email address'
+        }));
+      }
+    }
+
+    if (name === 'dateOfBirth' && value) {
+      const dob = new Date(value);
+      const today = new Date();
+      const age = today.getFullYear() - dob.getFullYear();
+      
+      if (dob > today) {
+        setFormErrors(prev => ({
+          ...prev,
+          dateOfBirth: 'Date of birth cannot be in the future'
+        }));
+      } else if (age < 16 || age > 100) {
+        setFormErrors(prev => ({
+          ...prev,
+          dateOfBirth: 'Age must be between 16 and 100 years'
+        }));
+      }
+    }
   };
 
   // Handle password form changes
@@ -181,11 +220,58 @@ export default function UserSettingsPage({ darkMode: initialDarkMode = false }: 
     }
   };
 
+  // Validate profile data
+  const validateProfileData = () => {
+    const errors: string[] = [];
+
+    // Required fields
+    if (!formData.fullName?.trim()) {
+      errors.push('Full name is required');
+    } else if (formData.fullName.trim().length < 2) {
+      errors.push('Full name must be at least 2 characters');
+    } else if (formData.fullName.length > 100) {
+      errors.push('Full name cannot exceed 100 characters');
+    }
+
+    if (!formData.email?.trim()) {
+      errors.push('Email is required');
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email)) {
+        errors.push('Please enter a valid email address');
+      }
+    }
+
+    // Optional field validations
+    if (formData.phone && formData.phone.trim()) {
+      const phoneRegex = /^[\+]?[1-9][\d\s\-\(\)]{7,15}$/;
+      if (!phoneRegex.test(formData.phone.replace(/[\s\-\(\)]/g, ''))) {
+        errors.push('Please enter a valid phone number');
+      }
+    }
+
+    if (formData.dateOfBirth) {
+      const dob = new Date(formData.dateOfBirth);
+      const today = new Date();
+      const age = today.getFullYear() - dob.getFullYear();
+      
+      if (dob > today) {
+        errors.push('Date of birth cannot be in the future');
+      } else if (age < 16 || age > 100) {
+        errors.push('Age must be between 16 and 100 years');
+      }
+    }
+
+    return errors;
+  };
+
   // Save profile changes
   const handleSaveProfile = async () => {
     try {
-      if (!formData.fullName || !formData.email) {
-        addToast('error', 'Name and email are required');
+      // Validate form data
+      const validationErrors = validateProfileData();
+      if (validationErrors.length > 0) {
+        addToast('error', validationErrors[0]); // Show first error
         return;
       }
 
@@ -214,7 +300,7 @@ export default function UserSettingsPage({ darkMode: initialDarkMode = false }: 
       localStorage.setItem('currentUser', JSON.stringify(updatedUser));
       setCurrentUser(updatedUser);
 
-      addToast('success', 'Profile updated successfully!');
+      addToast('success', 'Profile updated successfully! Administrators have been notified of your changes.');
     } catch (error: any) {
       console.error('[UserSettings] Error saving profile:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Failed to update profile';
@@ -386,7 +472,7 @@ export default function UserSettingsPage({ darkMode: initialDarkMode = false }: 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                        Full Name
+                        Full Name *
                       </label>
                       <Input
                         name="fullName"
@@ -395,12 +481,16 @@ export default function UserSettingsPage({ darkMode: initialDarkMode = false }: 
                         placeholder="Enter your full name"
                         disabled={userRole === 'admin'}
                         darkMode={darkMode}
+                        className={formErrors.fullName ? 'border-red-500' : ''}
                       />
+                      {formErrors.fullName && (
+                        <p className="text-red-500 text-sm mt-1">{formErrors.fullName}</p>
+                      )}
                     </div>
 
                     <div>
                       <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                        Email
+                        Email *
                       </label>
                       <Input
                         name="email"
@@ -410,7 +500,11 @@ export default function UserSettingsPage({ darkMode: initialDarkMode = false }: 
                         placeholder="your.email@company.com"
                         disabled={userRole === 'admin'}
                         darkMode={darkMode}
+                        className={formErrors.email ? 'border-red-500' : ''}
                       />
+                      {formErrors.email && (
+                        <p className="text-red-500 text-sm mt-1">{formErrors.email}</p>
+                      )}
                     </div>
 
                     <div>
@@ -437,7 +531,11 @@ export default function UserSettingsPage({ darkMode: initialDarkMode = false }: 
                         value={formData.dateOfBirth}
                         onChange={handleFormChange}
                         darkMode={darkMode}
+                        className={formErrors.dateOfBirth ? 'border-red-500' : ''}
                       />
+                      {formErrors.dateOfBirth && (
+                        <p className="text-red-500 text-sm mt-1">{formErrors.dateOfBirth}</p>
+                      )}
                     </div>
 
                     <div>
