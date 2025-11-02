@@ -10,7 +10,11 @@ import {
   MoreVertical,
   Shield,
   Users,
-  Building
+  Building,
+  UserX,
+  Cake,
+  Phone,
+  Briefcase
 } from 'lucide-react';
 
 interface Employee {
@@ -23,6 +27,10 @@ interface Employee {
   hireDate: string;
   createdAt: string;
   profilePicture?: string;
+  dateOfBirth?: string;
+  phone?: string;
+  address?: string;
+  position?: string;
 }
 
 interface EmployeeCardProps {
@@ -31,7 +39,9 @@ interface EmployeeCardProps {
   onApprove?: (employeeId: string) => void;
   onReject?: (employeeId: string) => void;
   onEdit?: (employeeId: string) => void;
+  onDeactivate?: (employeeId: string) => void;
   darkMode?: boolean;
+  isHighlighted?: boolean;
 }
 
 export function EmployeeCard({
@@ -40,7 +50,9 @@ export function EmployeeCard({
   onApprove,
   onReject,
   onEdit,
-  darkMode = false
+  onDeactivate,
+  darkMode = false,
+  isHighlighted = false
 }: EmployeeCardProps) {
   const [showActions, setShowActions] = useState(false);
 
@@ -78,14 +90,19 @@ export function EmployeeCard({
   const canApprove = employee.status === 'pending' && ['hr', 'admin', 'super-admin'].includes(currentUserRole);
   const canEdit = ['admin', 'super-admin'].includes(currentUserRole) ||
     (currentUserRole === 'hr' && !['admin', 'super-admin'].includes(employee.role));
+  const canDeactivate = employee.status === 'active' && ['admin', 'super-admin'].includes(currentUserRole);
 
   const RoleIcon = getRoleIcon(employee.role);
 
   return (
     <div className={`rounded-lg border p-6 transition-all duration-200 hover:shadow-md ${
-      darkMode 
-        ? 'bg-gray-800 border-gray-700 hover:border-gray-600' 
-        : 'bg-white border-gray-200 hover:border-gray-300'
+      isHighlighted 
+        ? darkMode 
+          ? 'bg-blue-900/20 border-blue-500 shadow-lg shadow-blue-500/20' 
+          : 'bg-blue-50 border-blue-300 shadow-lg shadow-blue-200/50'
+        : darkMode 
+          ? 'bg-gray-800 border-gray-700 hover:border-gray-600' 
+          : 'bg-white border-gray-200 hover:border-gray-300'
     }`}>
       {/* Header with Avatar and Actions */}
       <div className="flex items-start justify-between mb-4">
@@ -179,6 +196,18 @@ export function EmployeeCard({
                     </button>
                   </>
                 )}
+                {canDeactivate && (
+                  <button
+                    onClick={() => {
+                      onDeactivate?.(employee.id);
+                      setShowActions(false);
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm flex items-center space-x-2 text-orange-600 hover:bg-orange-50 dark:text-orange-400 dark:hover:bg-orange-900/20 transition-colors"
+                  >
+                    <UserX className="h-4 w-4" />
+                    <span>Deactivate</span>
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -196,15 +225,41 @@ export function EmployeeCard({
         </div>
       </div>
 
-      {/* Department */}
-      {employee.department && (
-        <div className="flex items-center space-x-1 mb-3">
-          <Building className={`h-4 w-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
-          <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-            {employee.department}
-          </span>
-        </div>
-      )}
+      {/* Employee Details */}
+      <div className="space-y-2 mb-3">
+        {employee.department && (
+          <div className="flex items-center space-x-1">
+            <Building className={`h-4 w-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+            <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+              {employee.department}
+            </span>
+          </div>
+        )}
+        {employee.position && (
+          <div className="flex items-center space-x-1">
+            <Briefcase className={`h-4 w-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+            <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+              {employee.position}
+            </span>
+          </div>
+        )}
+        {employee.dateOfBirth && (
+          <div className="flex items-center space-x-1">
+            <Cake className={`h-4 w-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+            <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+              Born: {new Date(employee.dateOfBirth).toLocaleDateString()}
+            </span>
+          </div>
+        )}
+        {employee.phone && (
+          <div className="flex items-center space-x-1">
+            <Phone className={`h-4 w-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+            <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+              {employee.phone}
+            </span>
+          </div>
+        )}
+      </div>
 
       {/* Join Date and Last Active */}
       <div className="space-y-2">

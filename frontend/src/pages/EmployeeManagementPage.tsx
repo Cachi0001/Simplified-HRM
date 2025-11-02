@@ -10,10 +10,11 @@ import { EmployeeCard } from '../components/employee/EmployeeCard';
 import { ApprovalModal } from '../components/employee/ApprovalModal';
 import Logo from '../components/ui/Logo';
 import api from '../lib/api';
+import { io, Socket } from 'socket.io-client';
 
 interface Employee {
   id: string;
-  name: string;
+  fullName: string;
   email: string;
   role: 'employee' | 'hr' | 'admin' | 'super-admin';
   status: 'active' | 'pending' | 'rejected';
@@ -21,6 +22,10 @@ interface Employee {
   hireDate: string;
   createdAt: string;
   profilePicture?: string;
+  dateOfBirth?: string;
+  phone?: string;
+  address?: string;
+  position?: string;
 }
 
 interface EmployeeManagementPageProps {
@@ -43,6 +48,8 @@ export default function EmployeeManagementPage() {
   });
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
+  const [highlightedEmployeeId, setHighlightedEmployeeId] = useState<string | null>(null);
+  const [socket, setSocket] = useState<Socket | null>(null);
 
   const { addToast } = useToast();
   const queryClient = useQueryClient();
@@ -69,6 +76,81 @@ export default function EmployeeManagementPage() {
     } catch (err) {
       console.error('Error getting current user:', err);
       setError('Failed to load user data');
+    }
+  }, []);
+
+  // WebSocket connection for real-time updates
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const token = authService.getToken();
+    if (!token) return;
+
+    const socketInstance = io(import.meta.env.VITE_API_URL || 'http://localhost:3000', {
+      auth: { token },
+      transports: ['websocket', 'polling']
+    });
+
+    socketInstance.on('connect', () => {
+      console.log('Connected to WebSocket for employee management');
+      socketInstance.emit('authenticate', { 
+        userId: currentUser.id, 
+        token 
+      });
+    });
+
+    socketInstance.on('authenticated', (data) => {
+      if (data.success) {
+        console.log('WebSocket authenticated for employee management');
+      }
+    });
+
+    // Listen for profile updates
+    socketInstance.on('profile_updated', (data) => {
+      console.log('Profile updated:', data);
+      // Refresh employee data
+      queryClient.invalidateQueries({ queryKey: ['employees-management'] });
+      
+      // Highlight the updated employee
+      if (data.employeeId) {
+        setHighlightedEmployeeId(data.employeeId);
+        // Remove highlight after 5 seconds
+        setTimeout(() => {
+          setHighlightedEmployeeId(null);
+        }, 5000);
+      }
+    });
+
+    // Listen for employee status changes
+    socketInstance.on('employee_status_changed', (data) => {
+      console.log('Employee status changed:', data);
+      // Refresh employee data
+      queryClient.invalidateQueries({ queryKey: ['employees-management'] });
+      
+      // Show toast notification
+      addToast('info', `Employee ${data.employeeName} status changed to ${data.status}`);
+    });
+
+    setSocket(socketInstance);
+
+    return () => {
+      socketInstance.disconnect();
+    };
+  }, [currentUser, queryClient, addToast]);
+
+  // Check for highlighted employee from URL params
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const highlightId = urlParams.get('highlight');
+    if (highlightId) {
+      setHighlightedEmployeeId(highlightId);
+      // Remove highlight after 5 seconds
+      setTimeout(() => {
+        setHighlightedEmployeeId(null);
+        // Clean up URL
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+      }, 5000);
     }
   }, []);
 
@@ -137,6 +219,45 @@ export default function EmployeeManagementPage() {
       const message = error.response?.data?.message || 'Failed to reject employee';
       addToast('error', message);
       throw error;
+    }
+  };
+
+  // Handle employee deactivation
+  const handleDeactivateEmployee = async (employeeId: string) => {
+    try {
+      const employee = employees.find((emp: Employee) => emp.id === employeeId);
+      if (!employee) {
+        addToast('error', 'Employee not found');
+        return;
+      }
+
+      const confirmed = window.confirm(
+        `Are you sure you want to deactivate ${employee.fullName}? This will change their status to pending.`
+      );
+
+      if (!confirmed) return;
+
+      const response = await api.patch(`/employees/${employeeId}/deactivate`);
+
+      if (response.data?.status === 'success') {
+        addToast('success', `${employee.fullName} has been deactivated`);
+        // Invalidate and refetch the employees data
+        queryClient.invalidateQueries({ queryKey: ['employees-management'] });
+        
+        // Broadcast the status change via WebSocket
+        if (socket) {
+          socket.emit('employee_status_changed', {
+            employeeId,
+            employeeName: employee.fullName,
+            status: 'pending',
+            changedBy: currentUser.id
+          });
+        }
+      }
+    } catch (error: any) {
+      console.error('Failed to deactivate employee:', error);
+      const message = error.response?.data?.message || 'Failed to deactivate employee';
+      addToast('error', message);
     }
   };
 
@@ -403,7 +524,9 @@ export default function EmployeeManagementPage() {
                   onEdit={(employeeId) => {
                     addToast('info', 'Edit functionality will be implemented in a future task');
                   }}
+                  onDeactivate={handleDeactivateEmployee}
                   darkMode={darkMode}
+                  isHighlighted={employee.id === highlightedEmployeeId}
                 />
               ))}
             </div>
