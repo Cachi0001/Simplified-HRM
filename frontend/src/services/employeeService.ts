@@ -69,7 +69,7 @@ export class EmployeeService {
   // Update current user's profile
   async updateMyProfile(data: Partial<CreateEmployeeRequest>): Promise<Employee> {
     try {
-      const response = await api.put('/employees/me', data);
+      const response = await api.put('/profile', data);
       return response.data.data.employee;
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Failed to update profile');
