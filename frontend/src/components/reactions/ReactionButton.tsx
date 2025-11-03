@@ -24,7 +24,7 @@ interface ReactionButtonProps {
 }
 
 const ReactionButton: React.FC<ReactionButtonProps> = ({
-  reactions,
+  reactions = {},
   userReaction,
   onReactionSelect,
   darkMode = false,
@@ -73,7 +73,7 @@ const ReactionButton: React.FC<ReactionButtonProps> = ({
   const sizeClasses = getSizeClasses();
 
   // Check if there are any reactions to display
-  const hasReactions = Object.values(reactions).some(count => count && count > 0);
+  const hasReactions = reactions && Object.values(reactions).some(count => count && count > 0);
 
   return (
     <div className="relative flex items-center gap-2">

@@ -742,88 +742,135 @@ export class AnnouncementController {
         return;
       }
 
-      // Upsert reaction (replace existing reaction or create new one)
-      const { data: reaction, error: reactionError } = await supabase
-        .from('announcement_reactions')
-        .upsert({
-          announcement_id: id,
-          user_id: userId,
-          reaction_type: reaction_type
-        }, {
-          onConflict: 'announcement_id,user_id'
-        })
-        .select()
-        .single();
+      // Use toggle function for proper single reaction per user behavior
+      const { data: toggleResult, error: reactionError } = await supabase
+        .rpc('toggle_announcement_reaction', {
+          p_user_id: userId,
+          p_announcement_id: id,
+          p_reaction_type: reaction_type
+        });
 
       if (reactionError) {
-        logger.error('Reaction upsert error', { error: reactionError });
+        logger.error('Reaction toggle error', { error: reactionError });
         throw reactionError;
       }
 
-      // Get updated reaction summary for WhatsApp-like response
-      const { data: reactionSummary, error: summaryError } = await supabase
-        .from('announcement_reaction_summary')
-        .select('reaction_type, count')
-        .eq('announcement_id', id);
-
-      if (summaryError) {
-        logger.error('Failed to get reaction summary', { error: summaryError });
+      if (!toggleResult) {
+        throw new Error('No data returned from reaction toggle');
       }
 
-      // Get users who reacted with each type
-      const { data: reactionUsers, error: usersError } = await supabase
-        .from('announcement_reactions')
-        .select(`
-          reaction_type,
-          created_at,
-          users!announcement_reactions_user_id_fkey (
-            id,
-            full_name,
-            email
-          )
-        `)
-        .eq('announcement_id', id)
-        .order('created_at', { ascending: false });
+      // Parse the JSON result
+      const reactionResult = typeof toggleResult === 'string' ? JSON.parse(toggleResult) : toggleResult;
 
-      if (usersError) {
-        logger.error('Failed to get reaction users', { error: usersError });
-      }
-
-      // Format response like WhatsApp
-      const reactionData = {
-        summary: {} as { [key: string]: number },
-        users: {} as { [key: string]: any[] },
-        totalReactions: 0
-      };
-
-      if (reactionSummary) {
-        reactionSummary.forEach((item: any) => {
-          reactionData.summary[item.reaction_type] = item.count;
-          reactionData.totalReactions += item.count;
+      // Get detailed reaction information
+      const { data: detailedReactions, error: detailsError } = await supabase
+        .rpc('get_announcement_reactions_detailed', {
+          p_announcement_id: id,
+          p_requesting_user_id: userId
         });
+
+      if (detailsError) {
+        logger.error('Failed to get detailed reactions', { error: detailsError });
       }
 
-      if (reactionUsers) {
-        const groupedUsers: { [key: string]: any[] } = {};
-        reactionUsers.forEach((item: any) => {
-          if (!groupedUsers[item.reaction_type]) {
-            groupedUsers[item.reaction_type] = [];
+      // Parse detailed reactions
+      const reactionData = detailedReactions ? 
+        (typeof detailedReactions === 'string' ? JSON.parse(detailedReactions) : detailedReactions) :
+        { summary: {}, total_reactions: 0, reactions_by_type: {}, user_reaction: { has_reaction: false } };
+
+      // Send notification to announcement author (only when reaction is added, not removed or updated)
+      try {
+        if (announcement.author_id !== employee.id && reactionResult.action === 'added') {
+          const { data: author, error: authorError } = await supabase
+            .from('employees')
+            .select('id, full_name, email, user_id')
+            .eq('id', announcement.author_id)
+            .single();
+
+          const { data: reactor, error: reactorError } = await supabase
+            .from('employees')
+            .select('id, full_name, email')
+            .eq('id', employee.id)
+            .single();
+
+          if (!authorError && author && !reactorError && reactor) {
+            // Create notification for the author
+            const reactionEmoji = reaction_type === 'like' ? '👍' : 
+                                 reaction_type === 'love' ? '❤️' : 
+                                 reaction_type === 'laugh' ? '😂' : 
+                                 reaction_type === 'wow' ? '😮' : 
+                                 reaction_type === 'sad' ? '😢' : 
+                                 reaction_type === 'angry' ? '😡' : reaction_type;
+
+            await supabase
+              .from('notifications')
+              .insert({
+                user_id: author.id,
+                title: `${reactionEmoji} Reaction to your announcement`,
+                message: `${reactor.full_name} reacted to your announcement "${announcement.title}"`,
+                type: 'reaction',
+                data: {
+                  announcementId: announcement.id,
+                  reactionType: reaction_type,
+                  reactorId: reactor.id,
+                  reactorName: reactor.full_name
+                },
+                related_id: announcement.id
+              });
+
+            logger.info('📢 [AnnouncementController] Reaction notification sent', {
+              authorId: author.id,
+              reactorId: reactor.id,
+              announcementId: announcement.id,
+              reactionType: reaction_type
+            });
+
+            // Send email notification for reaction
+            try {
+              const { EmailService } = await import('../services/EmailService');
+              const emailService = new EmailService(supabase as any);
+              
+              await emailService.sendReactionNotification(
+                author.email,
+                author.full_name,
+                reactor.full_name,
+                announcement.title,
+                reaction_type
+              );
+              
+              logger.info('📧 [AnnouncementController] Reaction email notification sent', {
+                authorEmail: author.email,
+                reactorName: reactor.full_name,
+                reactionType: reaction_type
+              });
+            } catch (emailError) {
+              logger.error('❌ [AnnouncementController] Failed to send reaction email', {
+                error: emailError,
+                authorId: author.id,
+                reactorId: reactor.id
+              });
+              // Don't fail the reaction if email fails
+            }
           }
-          groupedUsers[item.reaction_type].push({
-            id: item.users?.id,
-            name: item.users?.full_name,
-            email: item.users?.email,
-            reacted_at: item.created_at
-          });
-        });
-        reactionData.users = groupedUsers;
+        }
+      } catch (notificationError) {
+        logger.error('Failed to send reaction notification', { error: notificationError });
+        // Don't fail the reaction if notification fails
       }
+
+      // Create appropriate response message based on action
+      const actionMessages = {
+        'added': 'Reaction added successfully',
+        'updated': 'Reaction updated successfully', 
+        'removed': 'Reaction removed successfully'
+      };
 
       res.status(200).json({
         status: 'success',
-        message: 'Reaction added successfully',
+        message: actionMessages[reactionResult.action as keyof typeof actionMessages] || 'Reaction processed successfully',
         data: {
-          reaction,
+          action: reactionResult.action,
+          reaction_type: reactionResult.reaction_type,
           reactions: reactionData
         }
       });
@@ -1208,8 +1255,28 @@ export class AnnouncementController {
         totalEmployees: employees.length
       });
 
-      // TODO: Send email notifications here
-      // TODO: Send push notifications here
+      // Send email notifications
+      try {
+        const { EmailService } = await import('../services/EmailService');
+        const emailService = new EmailService(supabase as any); // Pass supabase as db connection
+        
+        await emailService.sendAnnouncementNotification(
+          announcement,
+          author?.full_name || 'Admin',
+          validEmployees
+        );
+        
+        logger.info('📧 [AnnouncementController] Email notifications sent', {
+          announcementId: announcement.id,
+          emailCount: validEmployees.length
+        });
+      } catch (emailError) {
+        logger.error('❌ [AnnouncementController] Failed to send email notifications', {
+          error: emailError,
+          announcementId: announcement.id
+        });
+        // Don't fail the notification process if emails fail
+      }
 
     } catch (error) {
       logger.error('❌ [AnnouncementController] Failed to notify users', {

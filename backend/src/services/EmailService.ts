@@ -649,4 +649,211 @@ export class EmailService {
             });
             throw error;
         }
-    }}
+    }
+
+    /**
+     * Send announcement notification email to all employees
+     */
+    async sendAnnouncementNotification(
+        announcement: any,
+        authorName: string,
+        employees: any[]
+    ): Promise<void> {
+        try {
+            const announcementUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard`;
+            
+            const emailPromises = employees.map(async (employee) => {
+                try {
+                    const emailHtml = `
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                            <meta charset="utf-8">
+                            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                            <title>New Announcement - Go3Net HR System</title>
+                            <style>
+                                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                                .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+                                .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+                                .announcement-box { background: white; padding: 20px; border-left: 4px solid #4CAF50; margin: 20px 0; border-radius: 5px; }
+                                .priority-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; text-transform: uppercase; }
+                                .priority-high { background: #ff6b6b; color: white; }
+                                .priority-medium { background: #4ecdc4; color: white; }
+                                .priority-low { background: #95e1d3; color: #333; }
+                                .priority-urgent { background: #ff3838; color: white; }
+                                .button { display: inline-block; background: #4CAF50; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+                                .footer { text-align: center; margin-top: 20px; color: #666; font-size: 14px; }
+                            </style>
+                        </head>
+                        <body>
+                            <div class="container">
+                                <div class="header">
+                                    <h1>📢 New Announcement</h1>
+                                    <p>Go3Net HR Management System</p>
+                                </div>
+                                <div class="content">
+                                    <h2>Hello ${employee.full_name},</h2>
+                                    <p>A new announcement has been published:</p>
+                                    
+                                    <div class="announcement-box">
+                                        <div style="margin-bottom: 10px;">
+                                            <span class="priority-badge priority-${announcement.priority}">${announcement.priority}</span>
+                                        </div>
+                                        <h3 style="margin: 0 0 15px 0; color: #333;">${announcement.title}</h3>
+                                        <p style="margin: 0; color: #666; line-height: 1.6;">${announcement.content}</p>
+                                        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee; font-size: 14px; color: #888;">
+                                            <strong>From:</strong> ${authorName}<br>
+                                            <strong>Published:</strong> ${new Date().toLocaleDateString()}
+                                        </div>
+                                    </div>
+                                    
+                                    <div style="text-align: center;">
+                                        <a href="${announcementUrl}" class="button">View in Dashboard</a>
+                                    </div>
+                                    
+                                    <p style="font-size: 14px; color: #666;">
+                                        You can view all announcements and react to them in your dashboard.
+                                    </p>
+                                    
+                                    <p>Best regards,<br>Go3Net HR Team</p>
+                                </div>
+                                <div class="footer">
+                                    <p>This is an automated message from Go3Net HR Management System</p>
+                                </div>
+                            </div>
+                        </body>
+                        </html>
+                    `;
+
+                    await this.sendEmail({
+                        to: employee.email,
+                        subject: `📢 New Announcement: ${announcement.title}`,
+                        html: emailHtml,
+                        text: `New Announcement: ${announcement.title}\n\n${announcement.content}\n\nFrom: ${authorName}\n\nView in dashboard: ${announcementUrl}`
+                    });
+
+                    logger.info('📧 Announcement email sent', { 
+                        employeeEmail: employee.email, 
+                        announcementId: announcement.id 
+                    });
+                } catch (error) {
+                    logger.error('❌ Failed to send announcement email to employee', {
+                        error: (error as Error).message,
+                        employeeEmail: employee.email,
+                        announcementId: announcement.id
+                    });
+                }
+            });
+
+            await Promise.allSettled(emailPromises);
+
+            logger.info('📧 Announcement notification emails processed', {
+                announcementId: announcement.id,
+                employeeCount: employees.length
+            });
+
+        } catch (error) {
+            logger.error('❌ Failed to send announcement notification emails', {
+                error: (error as Error).message,
+                announcementId: announcement.id
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Send reaction notification email
+     */
+    async sendReactionNotification(
+        authorEmail: string,
+        authorName: string,
+        reactorName: string,
+        announcementTitle: string,
+        reactionType: string
+    ): Promise<void> {
+        try {
+            const reactionEmoji = reactionType === 'like' ? '👍' : 
+                                 reactionType === 'love' ? '❤️' : 
+                                 reactionType === 'laugh' ? '😂' : 
+                                 reactionType === 'wow' ? '😮' : 
+                                 reactionType === 'sad' ? '😢' : 
+                                 reactionType === 'angry' ? '😡' : reactionType;
+
+            const dashboardUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard`;
+
+            const emailHtml = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="utf-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Reaction to Your Announcement - Go3Net HR System</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+                        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+                        .reaction-box { background: white; padding: 20px; border-left: 4px solid #4CAF50; margin: 20px 0; border-radius: 5px; text-align: center; }
+                        .reaction-emoji { font-size: 48px; margin: 10px 0; }
+                        .button { display: inline-block; background: #4CAF50; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+                        .footer { text-align: center; margin-top: 20px; color: #666; font-size: 14px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="header">
+                            <h1>${reactionEmoji} Someone reacted to your announcement!</h1>
+                            <p>Go3Net HR Management System</p>
+                        </div>
+                        <div class="content">
+                            <h2>Hello ${authorName},</h2>
+                            <p>Great news! Someone reacted to your announcement.</p>
+                            
+                            <div class="reaction-box">
+                                <div class="reaction-emoji">${reactionEmoji}</div>
+                                <h3 style="margin: 10px 0; color: #333;">${reactorName} reacted to:</h3>
+                                <p style="font-style: italic; color: #666;">"${announcementTitle}"</p>
+                            </div>
+                            
+                            <div style="text-align: center;">
+                                <a href="${dashboardUrl}" class="button">View Your Announcements</a>
+                            </div>
+                            
+                            <p style="font-size: 14px; color: #666;">
+                                You can see all reactions and engagement on your announcements in the dashboard.
+                            </p>
+                            
+                            <p>Best regards,<br>Go3Net HR Team</p>
+                        </div>
+                        <div class="footer">
+                            <p>This is an automated message from Go3Net HR Management System</p>
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `;
+
+            await this.sendEmail({
+                to: authorEmail,
+                subject: `${reactionEmoji} ${reactorName} reacted to your announcement`,
+                html: emailHtml,
+                text: `${reactorName} reacted ${reactionEmoji} to your announcement "${announcementTitle}". View in dashboard: ${dashboardUrl}`
+            });
+
+            logger.info('📧 Reaction notification email sent', { 
+                authorEmail, 
+                reactorName, 
+                reactionType 
+            });
+        } catch (error) {
+            logger.error('❌ Failed to send reaction notification email', {
+                error: (error as Error).message,
+                authorEmail,
+                reactorName,
+                reactionType
+            });
+            throw error;
+        }
+    }
+}

@@ -29,7 +29,8 @@ class AnnouncementService {
     }
 
     const data = await response.json();
-    return data.data || data;
+    // Handle different response structures from backend
+    return data.data?.announcement || data.data || data.announcement || data;
   }
 
   // Announcement CRUD operations

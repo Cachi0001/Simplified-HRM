@@ -86,9 +86,28 @@ const AnnouncementCard: React.FC<AnnouncementCardProps> = ({
     try {
       setLoadingReactions(true);
       const response = await announcementService.getReactions(announcement.id);
-      setReactionData(response.data);
+      
+      // Ensure the response has the expected structure
+      const reactionData = response.data || response;
+      
+      // Initialize with default structure if data is missing
+      const normalizedData: ReactionData = {
+        summary: reactionData?.summary || {},
+        users: reactionData?.users || {},
+        totalReactions: reactionData?.totalReactions || 0,
+        reactionStrings: reactionData?.reactionStrings || {}
+      };
+      
+      setReactionData(normalizedData);
     } catch (error) {
       console.error('Failed to load reactions:', error);
+      // Set empty reaction data on error
+      setReactionData({
+        summary: {},
+        users: {},
+        totalReactions: 0,
+        reactionStrings: {}
+      });
     } finally {
       setLoadingReactions(false);
     }
@@ -97,12 +116,22 @@ const AnnouncementCard: React.FC<AnnouncementCardProps> = ({
   const handleReaction = async (reactionType: string) => {
     try {
       // Optimistically update UI
-      const newReactionData = { ...reactionData };
-      if (newReactionData) {
-        newReactionData.summary[reactionType] = (newReactionData.summary[reactionType] || 0) + 1;
-        newReactionData.totalReactions += 1;
-        setReactionData(newReactionData);
+      let newReactionData = reactionData ? { ...reactionData } : {
+        summary: {},
+        users: {},
+        totalReactions: 0,
+        reactionStrings: {}
+      };
+
+      // Ensure summary exists and is properly initialized
+      if (!newReactionData.summary) {
+        newReactionData.summary = {};
       }
+
+      // Update the reaction count
+      newReactionData.summary[reactionType] = (newReactionData.summary[reactionType] || 0) + 1;
+      newReactionData.totalReactions = (newReactionData.totalReactions || 0) + 1;
+      setReactionData(newReactionData);
 
       // Call the API
       await announcementService.addReaction(announcement.id, reactionType);

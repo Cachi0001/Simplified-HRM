@@ -90,56 +90,48 @@ export class LeaveService {
                 endDate: data.end_date
             });
 
-            // Get employee role to determine approval level
+            // Use database function to create leave request with proper JSON handling
+            const { data: result, error } = await this.supabase
+                .rpc('create_leave_request', {
+                    p_employee_id: data.employee_id,
+                    p_type: data.type,
+                    p_start_date: data.start_date,
+                    p_end_date: data.end_date,
+                    p_reason: data.reason || null,
+                    p_notes: data.notes || null
+                });
+
+            if (error) {
+                logger.error('LeaveService: Failed to create leave request', { error: error.message });
+                throw new Error(`Failed to create leave request: ${error.message}`);
+            }
+
+            if (!result) {
+                throw new Error('No data returned from leave request creation');
+            }
+
+            // Parse the JSON result
+            const leaveRequest = typeof result === 'string' ? JSON.parse(result) : result;
+
+            // Get employee role for notifications
             const { data: employee, error: employeeError } = await this.supabase
                 .from('employees')
-                .select('role')
+                .select('role, full_name')
                 .eq('id', data.employee_id)
                 .single();
 
             if (employeeError) {
-                logger.error('LeaveService: Failed to get employee role', { error: employeeError.message });
-                throw employeeError;
+                logger.warn('LeaveService: Could not get employee details for notifications', { error: employeeError.message });
+            } else {
+                // Send notifications to appropriate approvers
+                await this.notifyApproversForApprovalLevel(leaveRequest, employee.role);
             }
-
-            // Determine approval level based on employee role
-            const approvalLevel = this.determineApprovalLevel(employee.role);
-
-            // Calculate working days
-            const daysRequested = this.calculateWorkingDays(data.start_date, data.end_date);
-
-            const { data: leaveRequest, error } = await this.supabase
-                .from('leave_requests')
-                .insert({
-                    employee_id: data.employee_id,
-                    type: data.type,
-                    start_date: data.start_date,
-                    end_date: data.end_date,
-                    days_requested: daysRequested,
-                    reason: data.reason,
-                    notes: data.notes,
-                    status: 'pending',
-                    approval_level: approvalLevel,
-                    requester_role: employee.role,
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                })
-                .select()
-                .single();
-
-            if (error) {
-                logger.error('LeaveService: Failed to create leave request', { error: error.message });
-                throw error;
-            }
-
-            // Send notifications to appropriate approvers based on approval level
-            await this.notifyApproversForApprovalLevel(leaveRequest, approvalLevel);
 
             logger.info('LeaveService: Leave request created successfully', { 
                 leaveRequestId: leaveRequest.id,
-                approvalLevel,
-                requesterRole: employee.role
+                requesterRole: employee?.role
             });
+            
             return leaveRequest;
         } catch (error) {
             logger.error('LeaveService: Create leave request failed', { error: (error as Error).message });
@@ -166,17 +158,10 @@ export class LeaveService {
     }
 
     /**
-     * Notify appropriate approvers based on approval level using comprehensive notification service
+     * Notify appropriate approvers based on employee role using comprehensive notification service
      */
-    private async notifyApproversForApprovalLevel(leaveRequest: ILeaveRequest, approvalLevel: string): Promise<void> {
+    private async notifyApproversForApprovalLevel(leaveRequest: ILeaveRequest, employeeRole: string): Promise<void> {
         try {
-            if (approvalLevel === 'auto_approved') {
-                logger.info('LeaveService: Request auto-approved, no notifications sent', {
-                    leaveRequestId: leaveRequest.id
-                });
-                return;
-            }
-
             // Get requester information
             const { data: employee, error: employeeError } = await this.supabase
                 .from('employees')
@@ -197,7 +182,7 @@ export class LeaveService {
                 end_date: leaveRequest.end_date,
                 leave_type: leaveRequest.type,
                 reason: leaveRequest.reason,
-                days_requested: leaveRequest.days_requested
+                days_requested: leaveRequest.days_requested || this.calculateWorkingDays(leaveRequest.start_date, leaveRequest.end_date)
             };
 
             // Send comprehensive approval notifications
@@ -211,8 +196,7 @@ export class LeaveService {
 
             logger.info('LeaveService: Comprehensive approval notifications sent', {
                 leaveRequestId: leaveRequest.id,
-                requesterRole: employee.role,
-                approvalLevel
+                requesterRole: employee.role
             });
 
         } catch (error) {
@@ -228,22 +212,29 @@ export class LeaveService {
      */
     async getLeaveRequestById(id: string): Promise<ILeaveRequest | null> {
         try {
-            const { data, error } = await this.supabase
-                .from('leave_requests')
-                .select(`
-                    *,
-                    employee:employees!leave_requests_employee_id_fkey(id, full_name, email),
-                    approver:employees!leave_requests_approved_by_fkey(id, full_name, email)
-                `)
-                .eq('id', id)
-                .single();
+            const { data: result, error } = await this.supabase
+                .rpc('get_leave_request_by_id', {
+                    p_request_id: id
+                });
 
-            if (error && error.code !== 'PGRST116') {
+            if (error) {
                 logger.error('LeaveService: Failed to get leave request', { error: error.message });
                 throw error;
             }
 
-            return data || null;
+            if (!result) {
+                return null;
+            }
+
+            // Parse the JSON result
+            const leaveRequest = typeof result === 'string' ? JSON.parse(result) : result;
+            
+            // Check if error was returned from function
+            if (leaveRequest.error) {
+                return null;
+            }
+
+            return leaveRequest;
         } catch (error) {
             logger.error('LeaveService: Get leave request failed', { error: (error as Error).message });
             throw error;
@@ -255,21 +246,24 @@ export class LeaveService {
      */
     async getEmployeeLeaveRequests(employeeId: string): Promise<ILeaveRequest[]> {
         try {
-            const { data, error } = await this.supabase
-                .from('leave_requests')
-                .select(`
-                    *,
-                    approver:employees!leave_requests_approved_by_fkey(id, full_name, email)
-                `)
-                .eq('employee_id', employeeId)
-                .order('created_at', { ascending: false });
+            const { data: result, error } = await this.supabase
+                .rpc('get_employee_leave_requests', {
+                    p_employee_id: employeeId
+                });
 
             if (error) {
                 logger.error('LeaveService: Failed to get employee leave requests', { error: error.message });
                 throw error;
             }
 
-            return data || [];
+            if (!result) {
+                return [];
+            }
+
+            // Parse the JSON result
+            const leaveRequests = typeof result === 'string' ? JSON.parse(result) : result;
+            
+            return Array.isArray(leaveRequests) ? leaveRequests : [];
         } catch (error) {
             logger.error('LeaveService: Get employee leave requests failed', { error: (error as Error).message });
             throw error;
@@ -307,25 +301,24 @@ export class LeaveService {
      */
     async getAllLeaveRequests(status?: string): Promise<ILeaveRequest[]> {
         try {
-            let query = this.supabase
-                .from('leave_requests')
-                .select(`
-                    *,
-                    employee:employees!leave_requests_employee_id_fkey(id, full_name, email, department)
-                `);
-
-            if (status) {
-                query = query.eq('status', status);
-            }
-
-            const { data, error } = await query.order('created_at', { ascending: false });
+            const { data: result, error } = await this.supabase
+                .rpc('get_all_leave_requests', {
+                    p_status: status || null
+                });
 
             if (error) {
                 logger.error('LeaveService: Failed to get all leave requests', { error: error.message });
                 throw error;
             }
 
-            return data || [];
+            if (!result) {
+                return [];
+            }
+
+            // Parse the JSON result
+            const leaveRequests = typeof result === 'string' ? JSON.parse(result) : result;
+            
+            return Array.isArray(leaveRequests) ? leaveRequests : [];
         } catch (error) {
             logger.error('LeaveService: Get all leave requests failed', { error: (error as Error).message });
             throw error;
@@ -339,31 +332,34 @@ export class LeaveService {
         try {
             logger.info('LeaveService: Approving leave request', { leaveRequestId, approvedBy: data.approved_by });
 
-            const { data: updatedRequest, error } = await this.supabase
-                .from('leave_requests')
-                .update({
-                    status: 'approved',
-                    approved_by: data.approved_by,
-                    approved_at: new Date().toISOString(),
-                    notes: data.notes,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', leaveRequestId)
-                .select(`
-                    *,
-                    employee:employees!leave_requests_employee_id_fkey(id, full_name, email),
-                    approver:employees!leave_requests_approved_by_fkey(id, full_name, email)
-                `)
-                .single();
+            const { data: result, error } = await this.supabase
+                .rpc('update_leave_request_status', {
+                    p_request_id: leaveRequestId,
+                    p_status: 'approved',
+                    p_approved_by: data.approved_by,
+                    p_approval_comments: data.notes || null
+                });
 
             if (error) {
                 logger.error('LeaveService: Failed to approve leave request', { error: error.message });
                 throw error;
             }
 
+            if (!result) {
+                throw new Error('No data returned from leave request approval');
+            }
+
+            // Parse the JSON result
+            const updatedRequest = typeof result === 'string' ? JSON.parse(result) : result;
+            
+            // Check if error was returned from function
+            if (updatedRequest.error) {
+                throw new Error(updatedRequest.error);
+            }
+
             // Notify the employee about approval
             await this.notificationService.createNotification({
-                userId: updatedRequest.employee.id,
+                userId: updatedRequest.employee_id,
                 type: 'leave',
                 title: 'Leave Request Approved',
                 message: `Your ${updatedRequest.type} leave request from ${updatedRequest.start_date} to ${updatedRequest.end_date} has been approved.`,
@@ -386,31 +382,34 @@ export class LeaveService {
         try {
             logger.info('LeaveService: Rejecting leave request', { leaveRequestId, approvedBy: data.approved_by });
 
-            const { data: updatedRequest, error } = await this.supabase
-                .from('leave_requests')
-                .update({
-                    status: 'rejected',
-                    approved_by: data.approved_by,
-                    approved_at: new Date().toISOString(),
-                    rejection_reason: data.rejection_reason,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', leaveRequestId)
-                .select(`
-                    *,
-                    employee:employees!leave_requests_employee_id_fkey(id, full_name, email),
-                    approver:employees!leave_requests_approved_by_fkey(id, full_name, email)
-                `)
-                .single();
+            const { data: result, error } = await this.supabase
+                .rpc('update_leave_request_status', {
+                    p_request_id: leaveRequestId,
+                    p_status: 'rejected',
+                    p_approved_by: data.approved_by,
+                    p_rejection_reason: data.rejection_reason
+                });
 
             if (error) {
                 logger.error('LeaveService: Failed to reject leave request', { error: error.message });
                 throw error;
             }
 
+            if (!result) {
+                throw new Error('No data returned from leave request rejection');
+            }
+
+            // Parse the JSON result
+            const updatedRequest = typeof result === 'string' ? JSON.parse(result) : result;
+            
+            // Check if error was returned from function
+            if (updatedRequest.error) {
+                throw new Error(updatedRequest.error);
+            }
+
             // Notify the employee about rejection
             await this.notificationService.createNotification({
-                userId: updatedRequest.employee.id,
+                userId: updatedRequest.employee_id,
                 type: 'leave',
                 title: 'Leave Request Rejected',
                 message: `Your ${updatedRequest.type} leave request from ${updatedRequest.start_date} to ${updatedRequest.end_date} has been rejected. Reason: ${data.rejection_reason}`,

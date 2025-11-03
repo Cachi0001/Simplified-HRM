@@ -82,62 +82,54 @@ export class PurchaseService {
                 unitPrice: data.unit_price
             });
 
-            // Get employee role to determine approval level
+            // Use database function to create purchase request with proper data formatting
+            const { data: result, error } = await this.supabase
+                .rpc('create_purchase_request', {
+                    p_employee_id: data.employee_id,
+                    p_item_name: data.item_name,
+                    p_description: data.description || null,
+                    p_quantity: data.quantity || 1,
+                    p_unit_price: data.unit_price,
+                    p_vendor: data.vendor || null,
+                    p_category: data.category || null,
+                    p_urgency: data.urgency || 'normal',
+                    p_justification: data.justification || null,
+                    p_notes: data.notes || null,
+                    p_budget_code: data.budget_code || null,
+                    p_expected_delivery_date: data.expected_delivery_date || null
+                });
+
+            if (error) {
+                logger.error('PurchaseService: Failed to create purchase request', { error: error.message });
+                throw new Error(`Failed to create purchase request: ${error.message}`);
+            }
+
+            if (!result) {
+                throw new Error('No data returned from purchase request creation');
+            }
+
+            // Parse the JSON result
+            const purchaseRequest = typeof result === 'string' ? JSON.parse(result) : result;
+
+            // Get employee role for notifications
             const { data: employee, error: employeeError } = await this.supabase
                 .from('employees')
-                .select('role')
+                .select('role, full_name')
                 .eq('id', data.employee_id)
                 .single();
 
             if (employeeError) {
-                logger.error('PurchaseService: Failed to get employee role', { error: employeeError.message });
-                throw employeeError;
+                logger.warn('PurchaseService: Could not get employee details for notifications', { error: employeeError.message });
+            } else {
+                // Send notifications to appropriate approvers
+                await this.notifyApproversForApprovalLevel(purchaseRequest, employee.role);
             }
-
-            // Determine approval level based on employee role
-            const approvalLevel = this.determineApprovalLevel(employee.role);
-
-            const quantity = data.quantity || 1;
-            const totalAmount = data.unit_price * quantity;
-
-            const { data: purchaseRequest, error } = await this.supabase
-                .from('purchase_requests')
-                .insert({
-                    employee_id: data.employee_id,
-                    item_name: data.item_name,
-                    description: data.description,
-                    quantity,
-                    unit_price: data.unit_price,
-                    total_amount: totalAmount,
-                    vendor: data.vendor,
-                    category: data.category,
-                    urgency: data.urgency || 'normal',
-                    justification: data.justification,
-                    notes: data.notes,
-                    budget_code: data.budget_code,
-                    expected_delivery_date: data.expected_delivery_date,
-                    status: 'pending',
-                    approval_level: approvalLevel,
-                    requester_role: employee.role,
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                })
-                .select()
-                .single();
-
-            if (error) {
-                logger.error('PurchaseService: Failed to create purchase request', { error: error.message });
-                throw error;
-            }
-
-            // Send notifications to appropriate approvers based on approval level
-            await this.notifyApproversForApprovalLevel(purchaseRequest, approvalLevel);
 
             logger.info('PurchaseService: Purchase request created successfully', { 
                 purchaseRequestId: purchaseRequest.id,
-                approvalLevel,
-                requesterRole: employee.role
+                requesterRole: employee?.role
             });
+            
             return purchaseRequest;
         } catch (error) {
             logger.error('PurchaseService: Create purchase request failed', { error: (error as Error).message });
@@ -164,17 +156,10 @@ export class PurchaseService {
     }
 
     /**
-     * Notify appropriate approvers based on approval level using comprehensive notification service
+     * Notify appropriate approvers based on employee role using comprehensive notification service
      */
-    private async notifyApproversForApprovalLevel(purchaseRequest: IPurchaseRequest, approvalLevel: string): Promise<void> {
+    private async notifyApproversForApprovalLevel(purchaseRequest: IPurchaseRequest, employeeRole: string): Promise<void> {
         try {
-            if (approvalLevel === 'auto_approved') {
-                logger.info('PurchaseService: Request auto-approved, no notifications sent', {
-                    purchaseRequestId: purchaseRequest.id
-                });
-                return;
-            }
-
             // Get requester information
             const { data: employee, error: employeeError } = await this.supabase
                 .from('employees')
@@ -193,12 +178,12 @@ export class PurchaseService {
             const requestData = {
                 item_name: purchaseRequest.item_name,
                 description: purchaseRequest.description,
-                quantity: purchaseRequest.quantity,
+                quantity: purchaseRequest.quantity || 1,
                 unit_price: purchaseRequest.unit_price,
                 total_amount: purchaseRequest.total_amount,
                 vendor: purchaseRequest.vendor,
                 category: purchaseRequest.category,
-                urgency: purchaseRequest.urgency,
+                urgency: purchaseRequest.urgency || 'normal',
                 justification: purchaseRequest.justification
             };
 
@@ -213,8 +198,7 @@ export class PurchaseService {
 
             logger.info('PurchaseService: Comprehensive approval notifications sent', {
                 purchaseRequestId: purchaseRequest.id,
-                requesterRole: employee.role,
-                approvalLevel
+                requesterRole: employee.role
             });
 
         } catch (error) {
@@ -230,22 +214,29 @@ export class PurchaseService {
      */
     async getPurchaseRequestById(id: string): Promise<IPurchaseRequest | null> {
         try {
-            const { data, error } = await this.supabase
-                .from('purchase_requests')
-                .select(`
-                    *,
-                    employee:employees!purchase_requests_employee_id_fkey(id, full_name, email),
-                    approver:employees!purchase_requests_approved_by_fkey(id, full_name, email)
-                `)
-                .eq('id', id)
-                .single();
+            const { data: result, error } = await this.supabase
+                .rpc('get_purchase_request_by_id', {
+                    p_request_id: id
+                });
 
-            if (error && error.code !== 'PGRST116') {
+            if (error) {
                 logger.error('PurchaseService: Failed to get purchase request', { error: error.message });
                 throw error;
             }
 
-            return data || null;
+            if (!result) {
+                return null;
+            }
+
+            // Parse the JSON result
+            const purchaseRequest = typeof result === 'string' ? JSON.parse(result) : result;
+            
+            // Check if error was returned from function
+            if (purchaseRequest.error) {
+                return null;
+            }
+
+            return purchaseRequest;
         } catch (error) {
             logger.error('PurchaseService: Get purchase request failed', { error: (error as Error).message });
             throw error;
@@ -257,21 +248,24 @@ export class PurchaseService {
      */
     async getEmployeePurchaseRequests(employeeId: string): Promise<IPurchaseRequest[]> {
         try {
-            const { data, error } = await this.supabase
-                .from('purchase_requests')
-                .select(`
-                    *,
-                    approver:employees!purchase_requests_approved_by_fkey(id, full_name, email)
-                `)
-                .eq('employee_id', employeeId)
-                .order('created_at', { ascending: false });
+            const { data: result, error } = await this.supabase
+                .rpc('get_employee_purchase_requests', {
+                    p_employee_id: employeeId
+                });
 
             if (error) {
                 logger.error('PurchaseService: Failed to get employee purchase requests', { error: error.message });
                 throw error;
             }
 
-            return data || [];
+            if (!result) {
+                return [];
+            }
+
+            // Parse the JSON result
+            const purchaseRequests = typeof result === 'string' ? JSON.parse(result) : result;
+            
+            return Array.isArray(purchaseRequests) ? purchaseRequests : [];
         } catch (error) {
             logger.error('PurchaseService: Get employee purchase requests failed', { error: (error as Error).message });
             throw error;
@@ -309,25 +303,24 @@ export class PurchaseService {
      */
     async getAllPurchaseRequests(status?: string): Promise<IPurchaseRequest[]> {
         try {
-            let query = this.supabase
-                .from('purchase_requests')
-                .select(`
-                    *,
-                    employee:employees!purchase_requests_employee_id_fkey(id, full_name, email, department)
-                `);
-
-            if (status) {
-                query = query.eq('status', status);
-            }
-
-            const { data, error } = await query.order('created_at', { ascending: false });
+            const { data: result, error } = await this.supabase
+                .rpc('get_all_purchase_requests', {
+                    p_status: status || null
+                });
 
             if (error) {
                 logger.error('PurchaseService: Failed to get all purchase requests', { error: error.message });
                 throw error;
             }
 
-            return data || [];
+            if (!result) {
+                return [];
+            }
+
+            // Parse the JSON result
+            const purchaseRequests = typeof result === 'string' ? JSON.parse(result) : result;
+            
+            return Array.isArray(purchaseRequests) ? purchaseRequests : [];
         } catch (error) {
             logger.error('PurchaseService: Get all purchase requests failed', { error: (error as Error).message });
             throw error;
@@ -341,32 +334,35 @@ export class PurchaseService {
         try {
             logger.info('PurchaseService: Approving purchase request', { purchaseRequestId, approvedBy: data.approved_by });
 
-            const { data: updatedRequest, error } = await this.supabase
-                .from('purchase_requests')
-                .update({
-                    status: 'approved',
-                    approved_by: data.approved_by,
-                    approved_at: new Date().toISOString(),
-                    notes: data.notes,
-                    budget_code: data.budget_code,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', purchaseRequestId)
-                .select(`
-                    *,
-                    employee:employees!purchase_requests_employee_id_fkey(id, full_name, email),
-                    approver:employees!purchase_requests_approved_by_fkey(id, full_name, email)
-                `)
-                .single();
+            const { data: result, error } = await this.supabase
+                .rpc('update_purchase_request_status', {
+                    p_request_id: purchaseRequestId,
+                    p_status: 'approved',
+                    p_approved_by: data.approved_by,
+                    p_approval_comments: data.notes || null,
+                    p_budget_code: data.budget_code || null
+                });
 
             if (error) {
                 logger.error('PurchaseService: Failed to approve purchase request', { error: error.message });
                 throw error;
             }
 
+            if (!result) {
+                throw new Error('No data returned from purchase request approval');
+            }
+
+            // Parse the JSON result
+            const updatedRequest = typeof result === 'string' ? JSON.parse(result) : result;
+            
+            // Check if error was returned from function
+            if (updatedRequest.error) {
+                throw new Error(updatedRequest.error);
+            }
+
             // Notify the employee about approval
             await this.notificationService.createNotification({
-                userId: updatedRequest.employee.id,
+                userId: updatedRequest.employee_id,
                 type: 'purchase',
                 title: 'Purchase Request Approved',
                 message: `Your purchase request for "${updatedRequest.item_name}" (${updatedRequest.total_amount}) has been approved.`,
@@ -389,31 +385,34 @@ export class PurchaseService {
         try {
             logger.info('PurchaseService: Rejecting purchase request', { purchaseRequestId, approvedBy: data.approved_by });
 
-            const { data: updatedRequest, error } = await this.supabase
-                .from('purchase_requests')
-                .update({
-                    status: 'rejected',
-                    approved_by: data.approved_by,
-                    approved_at: new Date().toISOString(),
-                    rejection_reason: data.rejection_reason,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', purchaseRequestId)
-                .select(`
-                    *,
-                    employee:employees!purchase_requests_employee_id_fkey(id, full_name, email),
-                    approver:employees!purchase_requests_approved_by_fkey(id, full_name, email)
-                `)
-                .single();
+            const { data: result, error } = await this.supabase
+                .rpc('update_purchase_request_status', {
+                    p_request_id: purchaseRequestId,
+                    p_status: 'rejected',
+                    p_approved_by: data.approved_by,
+                    p_rejection_reason: data.rejection_reason
+                });
 
             if (error) {
                 logger.error('PurchaseService: Failed to reject purchase request', { error: error.message });
                 throw error;
             }
 
+            if (!result) {
+                throw new Error('No data returned from purchase request rejection');
+            }
+
+            // Parse the JSON result
+            const updatedRequest = typeof result === 'string' ? JSON.parse(result) : result;
+            
+            // Check if error was returned from function
+            if (updatedRequest.error) {
+                throw new Error(updatedRequest.error);
+            }
+
             // Notify the employee about rejection
             await this.notificationService.createNotification({
-                userId: updatedRequest.employee.id,
+                userId: updatedRequest.employee_id,
                 type: 'purchase',
                 title: 'Purchase Request Rejected',
                 message: `Your purchase request for "${updatedRequest.item_name}" has been rejected. Reason: ${data.rejection_reason}`,
