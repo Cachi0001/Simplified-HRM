@@ -121,7 +121,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Update the create_purchase_request function with corrected parameter order and new fields
+-- Drop existing create_purchase_request function to avoid conflicts
+DROP FUNCTION IF EXISTS create_purchase_request;
+
+-- Create the create_purchase_request function with corrected parameter order and new fields
 CREATE OR REPLACE FUNCTION create_purchase_request(
     p_employee_id UUID,
     p_item_name TEXT,
