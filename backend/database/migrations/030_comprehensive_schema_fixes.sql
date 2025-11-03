@@ -312,9 +312,107 @@ GRANT EXECUTE ON FUNCTION update_leave_request_status(UUID, TEXT, UUID, TEXT, TE
 GRANT EXECUTE ON FUNCTION create_purchase_request(UUID, TEXT, NUMERIC, TEXT, INTEGER, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, DATE, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_purchase_requests(UUID) TO authenticated;
 
+-- Create missing functions for leave requests that are called by the service but don't exist
+
+-- Create function to get leave request by ID
+CREATE OR REPLACE FUNCTION get_leave_request_by_id(p_request_id UUID)
+RETURNS JSON AS $
+DECLARE
+    result_record RECORD;
+BEGIN
+    SELECT 
+        lr.*,
+        e.full_name as employee_name,
+        e.email as employee_email,
+        e.department
+    INTO result_record
+    FROM leave_requests lr
+    LEFT JOIN employees e ON lr.employee_id = e.id
+    WHERE lr.id = p_request_id;
+    
+    IF NOT FOUND THEN
+        RETURN json_build_object('error', 'Leave request not found');
+    END IF;
+    
+    RETURN row_to_json(result_record);
+END;
+$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Create function to get employee leave requests
+CREATE OR REPLACE FUNCTION get_employee_leave_requests(p_employee_id UUID)
+RETURNS JSON AS $
+DECLARE
+    result_json JSON;
+BEGIN
+    SELECT json_agg(
+        json_build_object(
+            'id', lr.id,
+            'employee_id', lr.employee_id,
+            'type', lr.type,
+            'start_date', lr.start_date,
+            'end_date', lr.end_date,
+            'reason', lr.reason,
+            'notes', lr.notes,
+            'status', lr.status,
+            'created_at', lr.created_at,
+            'updated_at', lr.updated_at,
+            'employee_name', e.full_name,
+            'employee_email', e.email,
+            'department', e.department
+        ) ORDER BY lr.created_at DESC
+    )
+    INTO result_json
+    FROM leave_requests lr
+    LEFT JOIN employees e ON lr.employee_id = e.id
+    WHERE lr.employee_id = p_employee_id;
+    
+    RETURN COALESCE(result_json, '[]'::json);
+END;
+$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Create function to get all leave requests with optional status filter
+CREATE OR REPLACE FUNCTION get_all_leave_requests(p_status TEXT DEFAULT NULL)
+RETURNS JSON AS $
+DECLARE
+    result_json JSON;
+BEGIN
+    SELECT json_agg(
+        json_build_object(
+            'id', lr.id,
+            'employee_id', lr.employee_id,
+            'type', lr.type,
+            'start_date', lr.start_date,
+            'end_date', lr.end_date,
+            'reason', lr.reason,
+            'notes', lr.notes,
+            'status', lr.status,
+            'created_at', lr.created_at,
+            'updated_at', lr.updated_at,
+            'employee_name', e.full_name,
+            'employee_email', e.email,
+            'department', e.department
+        ) ORDER BY lr.created_at DESC
+    )
+    INTO result_json
+    FROM leave_requests lr
+    LEFT JOIN employees e ON lr.employee_id = e.id
+    WHERE (p_status IS NULL OR lr.status = p_status);
+    
+    RETURN COALESCE(result_json, '[]'::json);
+END;
+$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant execute permissions for the new leave functions
+GRANT EXECUTE ON FUNCTION get_leave_request_by_id(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_employee_leave_requests(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_all_leave_requests(TEXT) TO authenticated;
+
 -- Add comments for documentation
 COMMENT ON FUNCTION create_leave_request IS 'Creates a new leave request with proper validation and JSON response';
 COMMENT ON FUNCTION get_leave_requests IS 'Retrieves leave requests with employee details';
+COMMENT ON FUNCTION get_leave_request_by_id IS 'Retrieves a leave request by ID with employee details';
+COMMENT ON FUNCTION get_employee_leave_requests IS 'Retrieves all leave requests for a specific employee';
+COMMENT ON FUNCTION get_all_leave_requests IS 'Retrieves all leave requests with optional status filter';
 COMMENT ON FUNCTION update_leave_request_status IS 'Updates leave request status with proper JSON response';
 COMMENT ON FUNCTION create_purchase_request IS 'Creates a new purchase request with all required fields and proper JSON response';
 COMMENT ON FUNCTION get_purchase_requests IS 'Retrieves purchase requests with employee details and all fields';

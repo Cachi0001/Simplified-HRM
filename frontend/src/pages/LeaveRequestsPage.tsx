@@ -5,31 +5,26 @@ import { authService } from '../services/authService';
 import { useToast } from '../components/ui/Toast';
 import { useTheme } from '../contexts/ThemeContext';
 import api from '../lib/api';
-
-interface LeaveRequest {
-  id: string;
-  userId: string; // Use consistent userId pattern
-  startDate: string;
-  endDate: string;
-  reason: string;
-  status: 'pending' | 'approved' | 'rejected';
-  createdAt: string;
-  updatedAt: string;
-  employeeName?: string;
-  type?: string;
-  daysRequested?: number;
-}
+import { 
+  LeaveRequest, 
+  CreateLeaveRequestData, 
+  LeaveRequestFormData,
+  LeaveRequestResponse,
+  transformToBackendFormat,
+  transformFromBackendFormat
+} from '../types/leave';
 
 export function LeaveRequestsPage() {
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isCreating, setIsCreating] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<LeaveRequestFormData>({
     startDate: '',
     endDate: '',
     reason: '',
-    type: 'annual' // Add leave type
+    type: 'annual',
+    notes: ''
   });
 
   const navigate = useNavigate();
@@ -50,28 +45,21 @@ export function LeaveRequestsPage() {
     try {
       setLoading(true);
       const response = await api.get('/leave-requests');
-      const data = response.data.data || response.data;
-      const requests = Array.isArray(data) ? data : (data?.leaveRequests || []);
+      const apiResponse = response.data as LeaveRequestResponse;
       
-      // Transform data to match our interface
-      const transformedRequests = requests.map((req: any) => ({
-        id: req.id || req._id,
-        userId: req.user_id || req.employee_id,
-        startDate: req.start_date || req.startDate,
-        endDate: req.end_date || req.endDate,
-        reason: req.reason,
-        status: req.status,
-        type: req.type || 'annual',
-        daysRequested: req.days_requested || req.daysRequested,
-        createdAt: req.created_at || req.createdAt,
-        updatedAt: req.updated_at || req.updatedAt,
-        employeeName: req.employee_name || req.employeeName
-      }));
+      if (apiResponse.status === 'error') {
+        throw new Error(apiResponse.message || 'Failed to fetch leave requests');
+      }
+      
+      const requests = apiResponse.data?.leaveRequests || [];
+      
+      // Transform data using the proper transformation function
+      const transformedRequests = requests.map(transformFromBackendFormat);
       
       setLeaveRequests(transformedRequests);
     } catch (error: any) {
       console.error('Error fetching leave requests:', error);
-      addToast('error', 'Failed to fetch leave requests');
+      addToast('error', error.message || 'Failed to fetch leave requests');
     } finally {
       setLoading(false);
     }
@@ -80,8 +68,8 @@ export function LeaveRequestsPage() {
   const handleCreateLeaveRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.startDate || !formData.endDate || !formData.reason) {
-      addToast('error', 'Please fill all fields');
+    if (!formData.startDate || !formData.endDate || !formData.reason || !formData.type) {
+      addToast('error', 'Please fill all required fields');
       return;
     }
 
@@ -91,37 +79,34 @@ export function LeaveRequestsPage() {
     }
 
     try {
-      // Transform data to match backend expectations
-      const requestData = {
-        start_date: formData.startDate,
-        end_date: formData.endDate,
-        reason: formData.reason,
-        type: formData.type
-      };
+      // Transform form data to backend format
+      const requestData = transformToBackendFormat(formData);
+      // Employee ID will be set by the backend from the authenticated user
       
       const response = await api.post('/leave-requests', requestData);
-      const newRequest = response.data.data || response.data;
+      const apiResponse = response.data as LeaveRequestResponse;
       
-      // Transform response to match our interface
-      const transformedRequest = {
-        id: newRequest.id || newRequest._id,
-        userId: newRequest.user_id || newRequest.employee_id,
-        startDate: newRequest.start_date || newRequest.startDate,
-        endDate: newRequest.end_date || newRequest.endDate,
-        reason: newRequest.reason,
-        status: newRequest.status,
-        type: newRequest.type,
-        createdAt: newRequest.created_at || newRequest.createdAt,
-        updatedAt: newRequest.updated_at || newRequest.updatedAt
-      };
+      if (apiResponse.status === 'error') {
+        throw new Error(apiResponse.message || 'Failed to create leave request');
+      }
       
+      const newRequest = apiResponse.data?.leaveRequest;
+      if (!newRequest) {
+        throw new Error('No leave request data returned');
+      }
+      
+      // Transform response and add to list
+      const transformedRequest = transformFromBackendFormat(newRequest);
       setLeaveRequests([transformedRequest, ...leaveRequests]);
-      setFormData({ startDate: '', endDate: '', reason: '', type: 'annual' });
+      
+      // Reset form
+      setFormData({ startDate: '', endDate: '', reason: '', type: 'annual', notes: '' });
       setIsCreating(false);
       addToast('success', 'Leave request created successfully');
     } catch (error: any) {
       console.error('Error creating leave request:', error);
-      addToast('error', error.response?.data?.message || 'Failed to create leave request');
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to create leave request';
+      addToast('error', errorMessage);
     }
   };
 
@@ -252,7 +237,7 @@ export function LeaveRequestsPage() {
               </div>
               <div>
                 <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                  Reason
+                  Reason *
                 </label>
                 <textarea
                   value={formData.reason}
@@ -262,9 +247,25 @@ export function LeaveRequestsPage() {
                       ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
                       : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
                   }`}
-                  rows={4}
+                  rows={3}
                   placeholder="Enter reason for leave..."
                   required
+                />
+              </div>
+              <div>
+                <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Additional Notes
+                </label>
+                <textarea
+                  value={formData.notes || ''}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    darkMode 
+                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                  }`}
+                  rows={2}
+                  placeholder="Any additional information (optional)..."
                 />
               </div>
               <div className="flex gap-2">
@@ -278,7 +279,7 @@ export function LeaveRequestsPage() {
                   type="button"
                   onClick={() => {
                     setIsCreating(false);
-                    setFormData({ startDate: '', endDate: '', reason: '', type: 'annual' });
+                    setFormData({ startDate: '', endDate: '', reason: '', type: 'annual', notes: '' });
                   }}
                   className={`flex-1 px-4 py-2 rounded-lg transition font-medium ${
                     darkMode 
@@ -344,11 +345,11 @@ export function LeaveRequestsPage() {
                   <div>
                     <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Period</p>
                     <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                      {new Date(request.startDate).toLocaleDateString()} -{' '}
-                      {new Date(request.endDate).toLocaleDateString()}
-                      {request.daysRequested && (
+                      {new Date(request.start_date).toLocaleDateString()} -{' '}
+                      {new Date(request.end_date).toLocaleDateString()}
+                      {request.days_requested && (
                         <span className={`ml-2 text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                          ({request.daysRequested} days)
+                          ({request.days_requested} days)
                         </span>
                       )}
                     </p>
@@ -362,7 +363,7 @@ export function LeaveRequestsPage() {
                   <div>
                     <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Submitted</p>
                     <p className={`text-sm ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                      {new Date(request.createdAt).toLocaleDateString()}
+                      {new Date(request.created_at).toLocaleDateString()}
                     </p>
                   </div>
                 </div>
