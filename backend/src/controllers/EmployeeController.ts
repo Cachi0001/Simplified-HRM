@@ -579,10 +579,10 @@ export class EmployeeController {
       }
 
       // Validate status
-      if (!status || !['active', 'pending', 'rejected'].includes(status)) {
+      if (!status || !['active', 'inactive', 'pending', 'rejected', 'terminated'].includes(status)) {
         res.status(400).json({
           status: 'error',
-          message: 'Invalid status. Must be active, pending, or rejected'
+          message: 'Invalid status. Must be active, inactive, pending, rejected, or terminated'
         });
         return;
       }

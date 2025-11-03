@@ -4,6 +4,7 @@ import logger from '../utils/logger';
 import { NotificationService } from './NotificationService';
 import { ComprehensiveNotificationService } from './ComprehensiveNotificationService';
 import { EmailService } from './EmailService';
+import { PermissionService, UserContext } from './PermissionService';
 import db from '../config/database';
 
 export interface IPurchaseRequest {
@@ -410,6 +411,123 @@ export class PurchaseService {
     }
 
     /**
+     * Get purchase requests based on user role and permissions
+     */
+    async getPurchaseRequestsForUser(user: UserContext, status?: string): Promise<IPurchaseRequest[]> {
+        try {
+            logger.info('PurchaseService: Getting purchase requests for user', { 
+                userId: user.id, 
+                userRole: user.role,
+                status 
+            });
+
+            let purchaseRequests: IPurchaseRequest[];
+
+            // Check if user can view all requests
+            if (PermissionService.canViewAllRequests(user)) {
+                PermissionService.logPermissionCheck('view_all_purchase_requests', user, true);
+                purchaseRequests = await this.getAllPurchaseRequests(status);
+            } else {
+                PermissionService.logPermissionCheck('view_all_purchase_requests', user, false);
+                // Regular users see only their own requests
+                purchaseRequests = await this.getEmployeePurchaseRequests(user.employeeId);
+                
+                // Filter by status if provided
+                if (status) {
+                    purchaseRequests = purchaseRequests.filter(req => req.status === status);
+                }
+            }
+
+            // Add permission flags to each request
+            const requestsWithPermissions = purchaseRequests.map(request => ({
+                ...request,
+                canDelete: PermissionService.canDeleteRequest(user, request.employee_id),
+                canEdit: PermissionService.canEditRequest(user, request.employee_id, request.status),
+                canApprove: PermissionService.canApproveRequests(user) && request.status === 'pending'
+            }));
+
+            logger.info('PurchaseService: Returning purchase requests with permissions', { 
+                count: requestsWithPermissions.length,
+                userRole: user.role 
+            });
+
+            return requestsWithPermissions;
+        } catch (error) {
+            logger.error('PurchaseService: Get purchase requests for user failed', { 
+                error: (error as Error).message,
+                userId: user.id,
+                userRole: user.role
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Check if user can perform action on purchase request
+     */
+    async validatePurchaseRequestAction(
+        user: UserContext, 
+        requestId: string, 
+        action: 'view' | 'edit' | 'delete' | 'approve' | 'reject'
+    ): Promise<{ allowed: boolean; request?: IPurchaseRequest; reason?: string }> {
+        try {
+            // Get the request first
+            const request = await this.getPurchaseRequestById(requestId);
+            if (!request) {
+                return { allowed: false, reason: 'Purchase request not found' };
+            }
+
+            let allowed = false;
+            let reason = '';
+
+            switch (action) {
+                case 'view':
+                    allowed = PermissionService.canViewAllRequests(user) || 
+                             request.employee_id === user.employeeId;
+                    reason = allowed ? '' : 'You can only view your own purchase requests';
+                    break;
+
+                case 'edit':
+                    allowed = PermissionService.canEditRequest(user, request.employee_id, request.status);
+                    reason = allowed ? '' : 'You cannot edit this purchase request';
+                    break;
+
+                case 'delete':
+                    allowed = PermissionService.canDeleteRequest(user, request.employee_id);
+                    reason = allowed ? '' : 'You cannot delete this purchase request';
+                    break;
+
+                case 'approve':
+                case 'reject':
+                    allowed = PermissionService.canApproveRequests(user) && request.status === 'pending';
+                    reason = allowed ? '' : 'You do not have permission to approve/reject purchase requests';
+                    break;
+
+                default:
+                    allowed = false;
+                    reason = 'Invalid action';
+            }
+
+            PermissionService.logPermissionCheck(
+                `${action}_purchase_request`, 
+                user, 
+                allowed, 
+                { requestId, requestOwnerId: request.employee_id, requestStatus: request.status }
+            );
+
+            return { allowed, request, reason };
+        } catch (error) {
+            logger.error('PurchaseService: Validate purchase request action failed', { 
+                error: (error as Error).message,
+                userId: user.id,
+                requestId,
+                action
+            });
+            throw error;
+        }
+    }
+
+    /**
      * Approve a purchase request
      */
     async approvePurchaseRequest(purchaseRequestId: string, data: ApprovePurchaseRequestData): Promise<IPurchaseRequest> {
@@ -538,6 +656,30 @@ export class PurchaseService {
             return updatedRequest;
         } catch (error) {
             logger.error('PurchaseService: Cancel purchase request failed', { error: (error as Error).message });
+            throw error;
+        }
+    }
+
+    /**
+     * Delete a purchase request (with permission validation already done)
+     */
+    async deletePurchaseRequest(purchaseRequestId: string): Promise<void> {
+        try {
+            logger.info('PurchaseService: Deleting purchase request', { purchaseRequestId });
+
+            const { error } = await this.supabase
+                .from('purchase_requests')
+                .delete()
+                .eq('id', purchaseRequestId);
+
+            if (error) {
+                logger.error('PurchaseService: Failed to delete purchase request', { error: error.message });
+                throw error;
+            }
+
+            logger.info('PurchaseService: Purchase request deleted successfully', { purchaseRequestId });
+        } catch (error) {
+            logger.error('PurchaseService: Delete purchase request failed', { error: (error as Error).message });
             throw error;
         }
     }

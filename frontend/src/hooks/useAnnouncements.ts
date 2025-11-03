@@ -39,9 +39,10 @@ export const useAnnouncements = (initialFilters: AnnouncementFilters = {}) => {
     
     try {
       const data = await announcementService.getTemplates();
-      setTemplates(data);
+      setTemplates(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Failed to fetch templates:', err);
+      setTemplates([]); // Set empty array on error
     }
   }, [canCreate]);
 

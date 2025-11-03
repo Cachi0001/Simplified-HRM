@@ -25,11 +25,23 @@ export class NotificationService {
         type: request.type
       });
 
+      // Validate and sanitize notification type
+      const validTypes = ['info', 'success', 'warning', 'error', 'leave_request', 'purchase_request', 'announcement', 'employee_update', 'system_alert'];
+      let notificationType = request.type;
+      
+      if (!validTypes.includes(notificationType)) {
+        logger.warn('NotificationService: Invalid notification type, using fallback', {
+          originalType: request.type,
+          fallbackType: 'info'
+        });
+        notificationType = 'info';
+      }
+
       const { data, error } = await this.supabase
         .from('notifications')
         .insert({
           user_id: request.userId,
-          type: request.type,
+          type: notificationType,
           title: request.title,
           message: request.message,
           related_id: request.relatedId || null,
@@ -42,7 +54,11 @@ export class NotificationService {
         .single();
 
       if (error) {
-        logger.error('NotificationService: Failed to create notification', { error: error.message });
+        logger.error('NotificationService: Failed to create notification', { 
+          error: error.message,
+          originalType: request.type,
+          sanitizedType: notificationType
+        });
         throw error;
       }
 

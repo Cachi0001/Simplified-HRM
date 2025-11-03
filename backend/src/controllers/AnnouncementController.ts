@@ -174,7 +174,7 @@ export class AnnouncementController {
         .from('announcements')
         .select(`
           id, title, content, priority, status, target_audience, scheduled_for, created_at, updated_at,
-          employees!announcements_author_id_fkey (
+          employees!fk_announcements_author (
             full_name,
             email
           )
@@ -247,7 +247,7 @@ export class AnnouncementController {
         .from('announcements')
         .select(`
           id, title, content, priority, status, target_audience, scheduled_for, created_at, updated_at,
-          employees!announcements_author_id_fkey (
+          employees!fk_announcements_author (
             full_name,
             email
           )
@@ -501,7 +501,7 @@ export class AnnouncementController {
         .from('announcements')
         .select(`
           id, title, content, priority, status, target_audience, scheduled_for, created_at, updated_at,
-          employees!announcements_author_id_fkey (
+          employees!fk_announcements_author (
             full_name,
             email
           )
@@ -1376,6 +1376,49 @@ export class AnnouncementController {
       res.status(500).json({
         status: 'error',
         message: 'Failed to mark announcement as read'
+      });
+    }
+  }
+
+  /**
+   * Get announcement templates
+   * GET /api/announcements/templates
+   */
+  async getTemplates(req: Request, res: Response): Promise<void> {
+    try {
+      const supabase = supabaseConfig.getClient();
+
+      logger.info('📋 [AnnouncementController] Getting announcement templates', {
+        userId: req.user?.id
+      });
+
+      const { data: templates, error } = await supabase
+        .from('announcement_templates')
+        .select('*')
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) {
+        throw error;
+      }
+
+      res.status(200).json({
+        status: 'success',
+        data: {
+          templates: templates || []
+        }
+      });
+    } catch (error) {
+      logger.error('❌ [AnnouncementController] Get templates error', {
+        error: (error as Error).message,
+        userId: req.user?.id
+      });
+      res.status(500).json({
+        status: 'error',
+        message: 'Failed to fetch announcement templates',
+        data: {
+          templates: []
+        }
       });
     }
   }

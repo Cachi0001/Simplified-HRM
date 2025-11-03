@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { authService } from '../services/authService';
 import { AdminLeaveRequests } from '../components/dashboard/AdminLeaveRequests';
 import { AdminEmployeeManagement } from '../components/dashboard/AdminEmployeeManagement';
@@ -11,9 +12,10 @@ import { DarkModeToggle } from '../components/ui/DarkModeToggle';
 import { NotificationBell } from '../components/dashboard/NotificationBell';
 import { NotificationManager } from '../components/notifications/NotificationManager';
 import Logo from '../components/ui/Logo';
-import { Clock, Users, FileText, CheckSquare, Building, Calendar } from 'lucide-react';
+import { Clock, Users, FileText, CheckSquare, Building, Calendar, AlertCircle, TrendingUp, MessageSquare, Plus } from 'lucide-react';
 import { useTokenValidation } from '../hooks/useTokenValidation';
 import { AnnouncementList } from '../components/announcements';
+import api from '../lib/api';
 
 export default function HRDashboard() {
   const navigate = useNavigate();
@@ -23,11 +25,7 @@ export default function HRDashboard() {
   });
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('overview');
-  const [stats, setStats] = useState({
-    pendingLeaves: 0,
-    pendingEmployees: 0,
-    pendingPurchases: 0
-  });
+  const [selectedTimeRange, setSelectedTimeRange] = useState('30');
 
   // Save dark mode preference
   useEffect(() => {
@@ -64,6 +62,34 @@ export default function HRDashboard() {
     }
   });
 
+  // Fetch dashboard stats
+  const { data: stats, isLoading: statsLoading, error: statsError } = useQuery({
+    queryKey: ['dashboard-stats', selectedTimeRange],
+    queryFn: async () => {
+      const response = await api.get(`/dashboard/stats?timeRange=${selectedTimeRange}`);
+      return response.data.data;
+    },
+    enabled: !!currentUser,
+    refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
+    staleTime: 2 * 60 * 1000, // Consider data stale after 2 minutes
+    cacheTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+  });
+
+  // Fetch announcements
+  const { data: announcements, isLoading: announcementsLoading } = useQuery({
+    queryKey: ['dashboard-announcements'],
+    queryFn: async () => {
+      const response = await api.get('/announcements?limit=5');
+      return response.data.data?.announcements || [];
+    },
+    enabled: !!currentUser,
+    staleTime: 5 * 60 * 1000, // Consider data stale after 5 minutes
+    cacheTime: 15 * 60 * 1000, // Keep in cache for 15 minutes
+    retry: 2,
+  });
+
   // Initialize push notifications
   useEffect(() => {
     if (currentUser) {
@@ -71,6 +97,10 @@ export default function HRDashboard() {
       console.log('Initializing push notifications for HR dashboard:', userId);
     }
   }, [currentUser]);
+
+  const handleCreateAnnouncement = () => {
+    navigate('/announcements');
+  };
 
   if (!currentUser) {
     return (
@@ -107,56 +137,117 @@ export default function HRDashboard() {
       </header>
 
       <div className="container mx-auto px-4 py-6">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                  Pending Approvals
-                </p>
-                <p className={`text-3xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  {stats.pendingEmployees}
-                </p>
-              </div>
-              <div className="bg-blue-100 dark:bg-blue-900 p-3 rounded-lg">
-                <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-              </div>
-            </div>
-          </div>
-
-          <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                  Pending Leave Requests
-                </p>
-                <p className={`text-3xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  {stats.pendingLeaves}
-                </p>
-              </div>
-              <div className="bg-yellow-100 dark:bg-yellow-900 p-3 rounded-lg">
-                <Clock className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
-              </div>
-            </div>
-          </div>
-
-          <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                  Pending Purchases
-                </p>
-                <p className={`text-3xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  {stats.pendingPurchases}
-                </p>
-              </div>
-              <div className="bg-purple-100 dark:bg-purple-900 p-3 rounded-lg">
-                <FileText className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-              </div>
-            </div>
-          </div>
+        {/* Time Range Selector */}
+        <div className="mb-6">
+          <select
+            value={selectedTimeRange}
+            onChange={(e) => setSelectedTimeRange(e.target.value)}
+            className={`px-3 py-2 rounded-md border ${darkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
+          >
+            <option value="7">Last 7 days</option>
+            <option value="30">Last 30 days</option>
+            <option value="90">Last 90 days</option>
+          </select>
         </div>
+
+        {/* Loading State */}
+        {statsLoading && (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <span className="ml-2">Loading dashboard data...</span>
+          </div>
+        )}
+
+        {/* Error State */}
+        {statsError && (
+          <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
+            <div className="flex">
+              <AlertCircle className="h-5 w-5 text-red-400" />
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">Failed to load dashboard</h3>
+                <p className="text-sm text-red-700 mt-1">Please try refreshing the page</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Stats Cards */}
+        {stats && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    Total Employees
+                  </p>
+                  <p className={`text-3xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                    {stats.totalEmployees || 0}
+                  </p>
+                  <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    {stats.activeEmployees || 0} active
+                  </p>
+                </div>
+                <div className="bg-blue-100 dark:bg-blue-900 p-3 rounded-lg">
+                  <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                </div>
+              </div>
+            </div>
+
+            <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    Leave Requests
+                  </p>
+                  <p className={`text-3xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                    {stats.pendingLeaves || 0}
+                  </p>
+                  <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    {stats.totalLeaves || 0} total
+                  </p>
+                </div>
+                <div className="bg-yellow-100 dark:bg-yellow-900 p-3 rounded-lg">
+                  <Clock className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
+                </div>
+              </div>
+            </div>
+
+            <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    Purchase Requests
+                  </p>
+                  <p className={`text-3xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                    {stats.pendingPurchases || 0}
+                  </p>
+                  <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    {stats.totalPurchases || 0} total
+                  </p>
+                </div>
+                <div className="bg-purple-100 dark:bg-purple-900 p-3 rounded-lg">
+                  <FileText className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                </div>
+              </div>
+            </div>
+
+            <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    Departments
+                  </p>
+                  <p className={`text-3xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                    {stats.totalDepartments || 0}
+                  </p>
+                </div>
+                <div className="bg-green-100 dark:bg-green-900 p-3 rounded-lg">
+                  <Building className="w-6 h-6 text-green-600 dark:text-green-400" />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Navigation Tabs */}
         <div className={`rounded-lg shadow-md mb-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
@@ -209,23 +300,91 @@ export default function HRDashboard() {
                 </div>
               </div>
               
-              {/* Announcements Section */}
-              <div className="max-h-96 overflow-hidden">
-                <AnnouncementList
-                  announcements={[]}
-                  loading={false}
-                  darkMode={darkMode}
-                  canCreate={true}
-                  onCreateNew={() => {
-                    setActiveTab('announcements');
-                  }}
-                  onReaction={(announcementId, reactionType) => {
-                    console.log('Reaction:', announcementId, reactionType);
-                  }}
-                  onMarkAsRead={(announcementId) => {
-                    console.log('Mark as read:', announcementId);
-                  }}
-                />
+              {/* Recent Announcements */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                      Recent Announcements
+                    </h3>
+                    <button
+                      onClick={handleCreateAnnouncement}
+                      className="flex items-center px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Create
+                    </button>
+                  </div>
+                  {announcementsLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                    </div>
+                  ) : announcements && announcements.length > 0 ? (
+                    <div className="space-y-3">
+                      {announcements.slice(0, 3).map((announcement: any) => (
+                        <div key={announcement.id} className={`p-4 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
+                          <h4 className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                            {announcement.title}
+                          </h4>
+                          <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                            By {announcement.author_name} • {new Date(announcement.created_at).toLocaleDateString()}
+                          </p>
+                          <p className={`text-sm mt-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            {announcement.content.substring(0, 100)}...
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className={`text-center py-8 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                      <MessageSquare className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p>No announcements yet</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Recent Activities */}
+                <div>
+                  <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                    Recent Activities
+                  </h3>
+                  {stats?.recentActivities && stats.recentActivities.length > 0 ? (
+                    <div className="space-y-3">
+                      {stats.recentActivities.slice(0, 5).map((activity: any) => (
+                        <div key={activity.id} className={`p-3 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <h4 className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                                {activity.title}
+                              </h4>
+                              <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                {activity.description}
+                              </p>
+                              <p className={`text-xs mt-1 ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+                                {new Date(activity.timestamp).toLocaleString()}
+                              </p>
+                            </div>
+                            {activity.status && (
+                              <span className={`px-2 py-1 text-xs rounded-full ${
+                                activity.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                activity.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                activity.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {activity.status}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className={`text-center py-8 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                      <TrendingUp className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p>No recent activities</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 

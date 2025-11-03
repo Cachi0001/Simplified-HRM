@@ -3,6 +3,7 @@ import { PurchaseService } from '../services/PurchaseService';
 import { ApprovalWorkflowService } from '../services/ApprovalWorkflowService';
 import { NotificationService } from '../services/NotificationService';
 import { EmailService } from '../services/EmailService';
+import { PermissionService } from '../services/PermissionService';
 import { validateApprovalPermissions, ApprovalValidationRequest } from '../middleware/approvalValidation';
 import logger from '../utils/logger';
 
@@ -162,47 +163,20 @@ export class PurchaseController {
     async getAllPurchaseRequests(req: Request, res: Response): Promise<void> {
         try {
             const { status } = req.query;
-            const userRole = req.user?.role;
-            const employeeId = req.user?.employeeId || req.user?.id;
+            const user = PermissionService.createUserContext(req.user);
 
-            logger.info('🔍 [PurchaseController] Get purchase requests', { 
-                userRole, 
-                employeeId, 
-                userObject: req.user,
-                isAuthorized: ['superadmin', 'admin', 'hr'].includes(userRole)
+            logger.info('🔍 [PurchaseController] Get purchase requests with permission service', { 
+                userId: user.id,
+                userRole: user.role,
+                status
             });
 
-            let purchaseRequests;
+            // Use the new role-based method from PurchaseService
+            const purchaseRequests = await this.purchaseService.getPurchaseRequestsForUser(user, status as string);
 
-            // Role-based access control - be more permissive for superadmin variations
-            const authorizedRoles = ['superadmin', 'super-admin', 'admin', 'hr'];
-            if (authorizedRoles.includes(userRole)) {
-                // Admin roles can see all requests
-                logger.info('🔓 [PurchaseController] User authorized for all requests', { userRole });
-                purchaseRequests = await this.purchaseService.getAllPurchaseRequests(status as string);
-            } else {
-                // Regular employees see only their own requests
-                logger.info('👤 [PurchaseController] User limited to own requests', { userRole, employeeId });
-                
-                if (!employeeId) {
-                    res.status(400).json({
-                        status: 'error',
-                        message: 'Employee ID is required for non-admin users'
-                    });
-                    return;
-                }
-                
-                purchaseRequests = await this.purchaseService.getEmployeePurchaseRequests(employeeId);
-                
-                // Filter by status if provided
-                if (status) {
-                    purchaseRequests = purchaseRequests.filter(req => req.status === status);
-                }
-            }
-
-            logger.info('✅ [PurchaseController] Returning purchase requests', { 
+            logger.info('✅ [PurchaseController] Returning purchase requests with permissions', { 
                 count: purchaseRequests.length,
-                userRole 
+                userRole: user.role 
             });
 
             res.status(200).json({
@@ -552,6 +526,72 @@ export class PurchaseController {
                 error: (error as Error).message
             });
             res.status(400).json({
+                status: 'error',
+                message: (error as Error).message
+            });
+        }
+    }
+
+    /**
+     * Delete a purchase request (with permission validation)
+     * DELETE /api/purchase/:id
+     */
+    async deletePurchaseRequest(req: Request, res: Response): Promise<void> {
+        try {
+            const { id } = req.params;
+            const user = PermissionService.createUserContext(req.user);
+
+            if (!id) {
+                res.status(400).json({
+                    status: 'error',
+                    message: 'Purchase request ID is required'
+                });
+                return;
+            }
+
+            logger.info('🗑️ [PurchaseController] Delete purchase request', { 
+                requestId: id, 
+                userId: user.id, 
+                userRole: user.role 
+            });
+
+            // Validate permission to delete
+            const validation = await this.purchaseService.validatePurchaseRequestAction(user, id, 'delete');
+            
+            if (!validation.allowed) {
+                logger.warn('🚫 [PurchaseController] Delete permission denied', {
+                    requestId: id,
+                    userId: user.id,
+                    userRole: user.role,
+                    reason: validation.reason
+                });
+
+                res.status(403).json({
+                    status: 'error',
+                    message: validation.reason || 'You do not have permission to delete this purchase request'
+                });
+                return;
+            }
+
+            // Perform the deletion
+            await this.purchaseService.deletePurchaseRequest(id);
+
+            logger.info('✅ [PurchaseController] Purchase request deleted successfully', { 
+                requestId: id, 
+                userId: user.id 
+            });
+
+            res.status(200).json({
+                status: 'success',
+                message: 'Purchase request deleted successfully'
+            });
+        } catch (error) {
+            logger.error('❌ [PurchaseController] Delete purchase request error', {
+                error: (error as Error).message,
+                requestId: req.params.id,
+                userId: req.user?.id
+            });
+            res.status(500).json({
                 status: 'error',
                 message: (error as Error).message
             });

@@ -4,7 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { useToast } from '../components/ui/Toast';
 import { useTheme } from '../contexts/ThemeContext';
-import { LoadingButton } from '../components/ui/LoadingButton';
+import LoadingButton from '../components/ui/LoadingButton';
 import { ConfirmationDialog } from '../components/ui/ConfirmationDialog';
 import api from '../lib/api';
 import { 
@@ -53,7 +53,7 @@ export function LeaveRequestsPage() {
   const fetchLeaveRequests = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/leave-requests');
+      const response = await api.get('/leave');
       const apiResponse = response.data as LeaveRequestResponse;
       
       if (apiResponse.status === 'error') {
@@ -94,7 +94,7 @@ export function LeaveRequestsPage() {
       const requestData = transformToBackendFormat(formData);
       // Employee ID will be set by the backend from the authenticated user
       
-      const response = await api.post('/leave-requests', requestData);
+      const response = await api.post('/leave', requestData);
       const apiResponse = response.data as LeaveRequestResponse;
       
       if (apiResponse.status === 'error') {
@@ -134,7 +134,7 @@ export function LeaveRequestsPage() {
   const handleDeleteConfirm = async () => {
     try {
       setDeleting(true);
-      await api.delete(`/leave-requests/${deleteConfirm.requestId}`);
+      await api.delete(`/leave/${deleteConfirm.requestId}`);
       setLeaveRequests(leaveRequests.filter(req => req.id !== deleteConfirm.requestId));
       addToast('success', 'Leave request deleted successfully');
       setDeleteConfirm({ isOpen: false, requestId: '', requestName: '' });

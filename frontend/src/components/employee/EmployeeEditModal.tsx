@@ -91,8 +91,7 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
         setError(result.error || 'Failed to update employee');
       }
     } catch (error) {
-      console.error('Failed to update employee:', error);
-      setError('Failed to update employee. Please try again.');
+      handleError(error, 'update employee fields');
     } finally {
       setLoading(false);
     }
@@ -114,8 +113,7 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
         setError(result.error || 'Failed to update employee status');
       }
     } catch (error) {
-      console.error('Failed to update employee status:', error);
-      setError('Failed to update employee status. Please try again.');
+      handleError(error, 'update employee status');
     } finally {
       setLoading(false);
     }
@@ -132,6 +130,13 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
   };
 
   if (!isOpen || !employee) return null;
+
+  // Add error boundary for the modal
+  const handleError = (error: any, context: string) => {
+    console.error(`EmployeeEditModal ${context}:`, error);
+    const errorMessage = error?.response?.data?.message || error?.message || `Failed to ${context}`;
+    setError(errorMessage);
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -256,7 +261,7 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
                     }`}
                   >
                     <option value="">Select Department</option>
-                    {departments.map(dept => (
+                    {Array.isArray(departments) && departments.map(dept => (
                       <option key={dept.id} value={dept.id}>
                         {dept.name}
                       </option>

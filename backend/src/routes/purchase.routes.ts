@@ -36,6 +36,7 @@ router.get('/my-requests', (req, res) => purchaseController.getMyPurchaseRequest
 router.get('/stats', (req, res) => purchaseController.getPurchaseStats(req, res));
 router.get('/:id', (req, res) => purchaseController.getPurchaseRequest(req, res));
 router.put('/:id', (req, res) => purchaseController.updatePurchaseRequest(req, res));
+router.delete('/:id', (req, res) => purchaseController.deletePurchaseRequest(req, res));
 router.put('/:id/cancel', (req, res) => purchaseController.cancelPurchaseRequest(req, res));
 
 /**

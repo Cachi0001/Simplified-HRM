@@ -11,7 +11,7 @@ export interface DepartmentNotification {
     departmentId: string;
     title: string;
     message: string;
-    type: 'announcement' | 'alert' | 'reminder' | 'update' | 'urgent';
+    type: 'announcement' | 'system' | 'message' | 'task';
     priority: 'low' | 'medium' | 'high' | 'urgent';
     createdBy: string;
     createdAt: Date;
@@ -226,7 +226,7 @@ export class DepartmentNotificationService {
                 departmentId,
                 title: '📋 New Task Assignment',
                 message: `A new task "${taskTitle}" has been assigned to your department.${dueDate ? ` Due: ${dueDate.toLocaleDateString()}` : ''}`,
-                type: 'alert',
+                type: 'task',
                 priority: priority === 'high' ? 'high' : 'medium',
                 createdBy: assignedBy,
                 recipients: { all: true },
@@ -286,7 +286,7 @@ export class DepartmentNotificationService {
                 departmentId,
                 title: '⚠️ Department Performance Alert',
                 message: alertMessages[alertType],
-                type: 'alert',
+                type: 'system',
                 priority: 'high',
                 createdBy,
                 recipients: { 

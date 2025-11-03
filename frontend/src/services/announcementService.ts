@@ -113,7 +113,13 @@ class AnnouncementService {
 
   // Template operations
   async getTemplates(): Promise<AnnouncementTemplate[]> {
-    return this.request<AnnouncementTemplate[]>('/announcements/templates');
+    try {
+      const response = await this.request<{ templates: AnnouncementTemplate[] }>('/announcements/templates');
+      return response.templates || [];
+    } catch (error) {
+      console.error('Failed to fetch templates:', error);
+      return []; // Return empty array on error to prevent crashes
+    }
   }
 
   async createTemplate(data: CreateTemplateRequest): Promise<AnnouncementTemplate> {

@@ -202,7 +202,7 @@ export class CheckoutMonitoringService {
                         userId: employee.id,
                         title: 'Checkout Reminder',
                         message: 'Don\'t forget to check out at the end of your workday (6:00 PM)',
-                        type: 'checkout_reminder',
+                        type: 'system',
                         priority: 'medium'
                     });
                 }
@@ -232,7 +232,7 @@ export class CheckoutMonitoringService {
                 message: status === 'missed_checkout'
                     ? 'You missed your checkout time today. Please ensure to check out on time.'
                     : 'You checked out late today. Please try to check out on time.',
-                type: status,
+                type: 'system',
                 priority: 'high'
             });
 
@@ -242,7 +242,7 @@ export class CheckoutMonitoringService {
                     userId: employee.manager_id,
                     title: `Employee ${status === 'missed_checkout' ? 'Missed' : 'Late'} Checkout`,
                     message,
-                    type: status,
+                    type: 'system',
                     priority: 'medium',
                     relatedId: employee.id
                 });
@@ -260,7 +260,7 @@ export class CheckoutMonitoringService {
                     userId: hrUser.id,
                     title: `Employee ${status === 'missed_checkout' ? 'Missed' : 'Late'} Checkout`,
                     message: `${message} - Department: ${employee.department?.name || 'Unknown'}`,
-                    type: status,
+                    type: 'system',
                     priority: 'medium',
                     relatedId: employee.id
                 });

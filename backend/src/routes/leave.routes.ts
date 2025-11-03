@@ -36,6 +36,7 @@ router.get('/my-requests', (req, res) => leaveController.getMyLeaveRequests(req,
 router.get('/stats', (req, res) => leaveController.getLeaveStats(req, res));
 router.get('/:id', (req, res) => leaveController.getLeaveRequest(req, res));
 router.put('/:id', (req, res) => leaveController.updateLeaveRequest(req, res));
+router.delete('/:id', (req, res) => leaveController.deleteLeaveRequest(req, res));
 router.put('/:id/cancel', (req, res) => leaveController.cancelLeaveRequest(req, res));
 
 /**

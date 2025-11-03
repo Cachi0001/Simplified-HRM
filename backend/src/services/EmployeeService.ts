@@ -515,13 +515,16 @@ export class EmployeeService {
         reason 
       });
 
-      // Call the database function
-      const result = await db.query(
-        'SELECT update_employee_status_with_role($1, $2, $3, $4) as result',
-        [employeeId, newStatus, changedById, updaterRole]
-      );
+      // Use the new safe database function
+      const { data, error } = await this.employeeRepository.supabase.rpc('update_employee_status', {
+        p_employee_id: employeeId,
+        p_status: newStatus,
+        p_requester_id: changedById
+      });
 
-      const data = result.rows[0]?.result;
+      if (error) {
+        throw new Error(`Database error: ${error.message}`);
+      }
 
       if (!data || !data.success) {
         throw new Error(data?.error || 'Failed to update employee status');
@@ -529,6 +532,7 @@ export class EmployeeService {
 
       logger.info('EmployeeService: Employee status updated successfully', { 
         employeeId,
+        newStatus,
         result: data
       });
 
@@ -537,6 +541,52 @@ export class EmployeeService {
       logger.error('EmployeeService: Error updating employee status', { 
         error: (error as Error).message,
         employeeId 
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Update employee manager using safe database function
+   */
+  async updateEmployeeManager(
+    employeeId: string,
+    managerId: string | null,
+    requesterId: string
+  ): Promise<any> {
+    try {
+      logger.info('EmployeeService: Updating employee manager', {
+        employeeId,
+        managerId,
+        requesterId
+      });
+
+      // Use the new safe database function
+      const { data, error } = await this.employeeRepository.supabase.rpc('update_employee_manager', {
+        p_employee_id: employeeId,
+        p_manager_id: managerId,
+        p_requester_id: requesterId
+      });
+
+      if (error) {
+        throw new Error(`Database error: ${error.message}`);
+      }
+
+      if (!data || !data.success) {
+        throw new Error(data?.error || 'Failed to update employee manager');
+      }
+
+      logger.info('EmployeeService: Employee manager updated successfully', {
+        employeeId,
+        managerId,
+        result: data
+      });
+
+      return data;
+    } catch (error) {
+      logger.error('EmployeeService: Error updating employee manager', {
+        error: (error as Error).message,
+        employeeId
       });
       throw error;
     }

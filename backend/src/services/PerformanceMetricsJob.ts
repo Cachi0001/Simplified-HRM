@@ -329,7 +329,7 @@ export class PerformanceMetricsJob {
             for (const admin of admins || []) {
                 await this.notificationService.createNotification({
                     userId: admin.id,
-                    type: 'alert',
+                    type: 'system',
                     title: 'Performance Calculation Complete',
                     message
                 });

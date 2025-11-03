@@ -3,6 +3,7 @@ import { LeaveService } from '../services/LeaveService';
 import { ApprovalWorkflowService } from '../services/ApprovalWorkflowService';
 import { NotificationService } from '../services/NotificationService';
 import { EmailService } from '../services/EmailService';
+import { PermissionService } from '../services/PermissionService';
 import { validateApprovalPermissions, ApprovalValidationRequest } from '../middleware/approvalValidation';
 import logger from '../utils/logger';
 
@@ -144,47 +145,20 @@ export class LeaveController {
     async getAllLeaveRequests(req: Request, res: Response): Promise<void> {
         try {
             const { status } = req.query;
-            const userRole = req.user?.role;
-            const employeeId = req.user?.employeeId || req.user?.id;
+            const user = PermissionService.createUserContext(req.user);
 
-            logger.info('🔍 [LeaveController] Get leave requests', { 
-                userRole, 
-                employeeId, 
-                userObject: req.user,
-                isAuthorized: ['superadmin', 'admin', 'hr'].includes(userRole)
+            logger.info('🔍 [LeaveController] Get leave requests with permission service', { 
+                userId: user.id,
+                userRole: user.role,
+                status
             });
 
-            let leaveRequests;
+            // Use the new role-based method from LeaveService
+            const leaveRequests = await this.leaveService.getLeaveRequestsForUser(user, status as string);
 
-            // Role-based access control - be more permissive for superadmin variations
-            const authorizedRoles = ['superadmin', 'super-admin', 'admin', 'hr'];
-            if (authorizedRoles.includes(userRole)) {
-                // Admin roles can see all requests
-                logger.info('🔓 [LeaveController] User authorized for all requests', { userRole });
-                leaveRequests = await this.leaveService.getAllLeaveRequests(status as string);
-            } else {
-                // Regular employees see only their own requests
-                logger.info('👤 [LeaveController] User limited to own requests', { userRole, employeeId });
-                
-                if (!employeeId) {
-                    res.status(400).json({
-                        status: 'error',
-                        message: 'Employee ID is required for non-admin users'
-                    });
-                    return;
-                }
-                
-                leaveRequests = await this.leaveService.getEmployeeLeaveRequests(employeeId);
-                
-                // Filter by status if provided
-                if (status) {
-                    leaveRequests = leaveRequests.filter(req => req.status === status);
-                }
-            }
-
-            logger.info('✅ [LeaveController] Returning leave requests', { 
+            logger.info('✅ [LeaveController] Returning leave requests with permissions', { 
                 count: leaveRequests.length,
-                userRole 
+                userRole: user.role 
             });
 
             res.status(200).json({
@@ -300,12 +274,16 @@ export class LeaveController {
                 data: { leaveRequest: approvedRequest }
             });
         } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
             logger.error('❌ [LeaveController] Approve leave request error', {
-                error: (error as Error).message
+                error: errorMessage,
+                stack: error instanceof Error ? error.stack : undefined,
+                requestId: req.params.id,
+                approverId: req.user?.employeeId || req.user?.id
             });
             res.status(400).json({
                 status: 'error',
-                message: (error as Error).message
+                message: errorMessage || 'Failed to approve leave request'
             });
         }
     }
@@ -349,12 +327,16 @@ export class LeaveController {
                 data: { leaveRequest: rejectedRequest }
             });
         } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
             logger.error('❌ [LeaveController] Reject leave request error', {
-                error: (error as Error).message
+                error: errorMessage,
+                stack: error instanceof Error ? error.stack : undefined,
+                requestId: req.params.id,
+                approverId: req.user?.employeeId || req.user?.id
             });
             res.status(400).json({
                 status: 'error',
-                message: (error as Error).message
+                message: errorMessage || 'Failed to reject leave request'
             });
         }
     }
@@ -516,6 +498,72 @@ export class LeaveController {
                 error: (error as Error).message
             });
             res.status(400).json({
+                status: 'error',
+                message: (error as Error).message
+            });
+        }
+    }
+
+    /**
+     * Delete a leave request (with permission validation)
+     * DELETE /api/leave/:id
+     */
+    async deleteLeaveRequest(req: Request, res: Response): Promise<void> {
+        try {
+            const { id } = req.params;
+            const user = PermissionService.createUserContext(req.user);
+
+            if (!id) {
+                res.status(400).json({
+                    status: 'error',
+                    message: 'Leave request ID is required'
+                });
+                return;
+            }
+
+            logger.info('🗑️ [LeaveController] Delete leave request', { 
+                requestId: id, 
+                userId: user.id, 
+                userRole: user.role 
+            });
+
+            // Validate permission to delete
+            const validation = await this.leaveService.validateLeaveRequestAction(user, id, 'delete');
+            
+            if (!validation.allowed) {
+                logger.warn('🚫 [LeaveController] Delete permission denied', {
+                    requestId: id,
+                    userId: user.id,
+                    userRole: user.role,
+                    reason: validation.reason
+                });
+
+                res.status(403).json({
+                    status: 'error',
+                    message: validation.reason || 'You do not have permission to delete this leave request'
+                });
+                return;
+            }
+
+            // Perform the deletion
+            await this.leaveService.deleteLeaveRequest(id);
+
+            logger.info('✅ [LeaveController] Leave request deleted successfully', { 
+                requestId: id, 
+                userId: user.id 
+            });
+
+            res.status(200).json({
+                status: 'success',
+                message: 'Leave request deleted successfully'
+            });
+        } catch (error) {
+            logger.error('❌ [LeaveController] Delete leave request error', {
+                error: (error as Error).message,
+                requestId: req.params.id,
+                userId: req.user?.id
+            });
+            res.status(500).json({
                 status: 'error',
                 message: (error as Error).message
             });

@@ -4,6 +4,7 @@ import logger from '../utils/logger';
 import { NotificationService } from './NotificationService';
 import { ComprehensiveNotificationService } from './ComprehensiveNotificationService';
 import { EmailService } from './EmailService';
+import { PermissionService, UserContext } from './PermissionService';
 import db from '../config/database';
 
 export interface ILeaveRequest {
@@ -382,6 +383,123 @@ export class LeaveService {
     }
 
     /**
+     * Get leave requests based on user role and permissions
+     */
+    async getLeaveRequestsForUser(user: UserContext, status?: string): Promise<ILeaveRequest[]> {
+        try {
+            logger.info('LeaveService: Getting leave requests for user', { 
+                userId: user.id, 
+                userRole: user.role,
+                status 
+            });
+
+            let leaveRequests: ILeaveRequest[];
+
+            // Check if user can view all requests
+            if (PermissionService.canViewAllRequests(user)) {
+                PermissionService.logPermissionCheck('view_all_leave_requests', user, true);
+                leaveRequests = await this.getAllLeaveRequests(status);
+            } else {
+                PermissionService.logPermissionCheck('view_all_leave_requests', user, false);
+                // Regular users see only their own requests
+                leaveRequests = await this.getEmployeeLeaveRequests(user.employeeId);
+                
+                // Filter by status if provided
+                if (status) {
+                    leaveRequests = leaveRequests.filter(req => req.status === status);
+                }
+            }
+
+            // Add permission flags to each request
+            const requestsWithPermissions = leaveRequests.map(request => ({
+                ...request,
+                canDelete: PermissionService.canDeleteRequest(user, request.employee_id),
+                canEdit: PermissionService.canEditRequest(user, request.employee_id, request.status),
+                canApprove: PermissionService.canApproveRequests(user) && request.status === 'pending'
+            }));
+
+            logger.info('LeaveService: Returning leave requests with permissions', { 
+                count: requestsWithPermissions.length,
+                userRole: user.role 
+            });
+
+            return requestsWithPermissions;
+        } catch (error) {
+            logger.error('LeaveService: Get leave requests for user failed', { 
+                error: (error as Error).message,
+                userId: user.id,
+                userRole: user.role
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Check if user can perform action on leave request
+     */
+    async validateLeaveRequestAction(
+        user: UserContext, 
+        requestId: string, 
+        action: 'view' | 'edit' | 'delete' | 'approve' | 'reject'
+    ): Promise<{ allowed: boolean; request?: ILeaveRequest; reason?: string }> {
+        try {
+            // Get the request first
+            const request = await this.getLeaveRequestById(requestId);
+            if (!request) {
+                return { allowed: false, reason: 'Leave request not found' };
+            }
+
+            let allowed = false;
+            let reason = '';
+
+            switch (action) {
+                case 'view':
+                    allowed = PermissionService.canViewAllRequests(user) || 
+                             request.employee_id === user.employeeId;
+                    reason = allowed ? '' : 'You can only view your own leave requests';
+                    break;
+
+                case 'edit':
+                    allowed = PermissionService.canEditRequest(user, request.employee_id, request.status);
+                    reason = allowed ? '' : 'You cannot edit this leave request';
+                    break;
+
+                case 'delete':
+                    allowed = PermissionService.canDeleteRequest(user, request.employee_id);
+                    reason = allowed ? '' : 'You cannot delete this leave request';
+                    break;
+
+                case 'approve':
+                case 'reject':
+                    allowed = PermissionService.canApproveRequests(user) && request.status === 'pending';
+                    reason = allowed ? '' : 'You do not have permission to approve/reject leave requests';
+                    break;
+
+                default:
+                    allowed = false;
+                    reason = 'Invalid action';
+            }
+
+            PermissionService.logPermissionCheck(
+                `${action}_leave_request`, 
+                user, 
+                allowed, 
+                { requestId, requestOwnerId: request.employee_id, requestStatus: request.status }
+            );
+
+            return { allowed, request, reason };
+        } catch (error) {
+            logger.error('LeaveService: Validate leave request action failed', { 
+                error: (error as Error).message,
+                userId: user.id,
+                requestId,
+                action
+            });
+            throw error;
+        }
+    }
+
+    /**
      * Approve a leave request
      */
     async approveLeaveRequest(leaveRequestId: string, data: ApproveLeaveRequestData): Promise<ILeaveRequest> {
@@ -509,6 +627,30 @@ export class LeaveService {
             return updatedRequest;
         } catch (error) {
             logger.error('LeaveService: Cancel leave request failed', { error: (error as Error).message });
+            throw error;
+        }
+    }
+
+    /**
+     * Delete a leave request (with permission validation already done)
+     */
+    async deleteLeaveRequest(leaveRequestId: string): Promise<void> {
+        try {
+            logger.info('LeaveService: Deleting leave request', { leaveRequestId });
+
+            const { error } = await this.supabase
+                .from('leave_requests')
+                .delete()
+                .eq('id', leaveRequestId);
+
+            if (error) {
+                logger.error('LeaveService: Failed to delete leave request', { error: error.message });
+                throw error;
+            }
+
+            logger.info('LeaveService: Leave request deleted successfully', { leaveRequestId });
+        } catch (error) {
+            logger.error('LeaveService: Delete leave request failed', { error: (error as Error).message });
             throw error;
         }
     }

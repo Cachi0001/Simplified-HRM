@@ -744,14 +744,14 @@ export class RequestNotificationService {
     /**
      * Map request type to notification type
      */
-    private mapRequestTypeToNotificationType(requestType: RequestType): 'leave' | 'purchase' | 'task' {
+    private mapRequestTypeToNotificationType(requestType: RequestType): 'leave_request' | 'purchase_request' | 'info' {
         switch (requestType) {
             case 'leave':
-                return 'leave';
+                return 'leave_request';
             case 'purchase':
-                return 'purchase';
+                return 'purchase_request';
             default:
-                return 'task';
+                return 'info';
         }
     }
 

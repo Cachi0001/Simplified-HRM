@@ -55,20 +55,22 @@ const hasStatusCodeText = (value?: string) => {
   return /status\s*(code|error)/i.test(value);
 };
 
-// Backend API base URL with enhanced logging and fallback handling
+// Backend API base URL with enhanced domain detection and go3net.com support
 const API_BASE_URL = (() => {
   // Check if we're in production mode
   const isProduction = import.meta.env.PROD;
   
-  // Get environment variables with fallbacks - use direct URLs without relying on proxy
-  const devApiUrl = 'http://localhost:3000/api';
-  const prodApiUrl = 'https://go3nethrm-backend.vercel.app/api';
+  // Get environment variables with fallbacks
+  const devApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+  const prodApiUrl = import.meta.env.VITE_API_URL_PROD || 'https://go3nethrm-backend.vercel.app/api';
+  const customApiUrl = import.meta.env.VITE_API_URL_CUSTOM || 'https://go3nethrm-backend.vercel.app/api';
 
   // Log API configuration for debugging
   console.log(`API Configuration:
     - Environment: ${isProduction ? 'Production' : 'Development'}
     - Dev API URL: ${devApiUrl}
     - Prod API URL: ${prodApiUrl}
+    - Custom API URL: ${customApiUrl}
   `);
 
   // Use production URL in production, localhost URL in development
@@ -78,31 +80,34 @@ const API_BASE_URL = (() => {
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
 
-    // Automatic environment detection based on hostname
+    // Enhanced domain detection including go3net.com
     const isVercelDeployment = hostname.includes('vercel.app');
-    const isCustomDomain = hostname.includes('go3nethrm.com');
+    const isGo3nethrm = hostname.includes('go3nethrm.com');
+    const isGo3net = hostname.includes('go3net.com');
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
 
-    // If we're on Vercel or custom domain but using localhost API, switch to production API
-    if ((isVercelDeployment || isCustomDomain) && baseUrl.includes('localhost')) {
-      console.log('Detected production deployment but using localhost API - switching to production API');
+    // Domain-specific API URL selection
+    if (isGo3net) {
+      console.log('Detected go3net.com domain - using custom API URL');
+      baseUrl = customApiUrl;
+    } else if (isVercelDeployment || isGo3nethrm) {
+      console.log('Detected production deployment - using production API');
       baseUrl = prodApiUrl;
-    }
-
-    // If we're on localhost but using production API in dev mode, switch to localhost API
-    if (isLocalhost && !isProduction && baseUrl.includes('vercel.app')) {
-      console.log('Detected localhost in development mode but using production API - switching to localhost API');
+    } else if (isLocalhost && !isProduction) {
+      console.log('Detected localhost in development mode - using development API');
       baseUrl = devApiUrl;
+    } else if ((isVercelDeployment || isGo3nethrm || isGo3net) && baseUrl.includes('localhost')) {
+      console.log('Detected production deployment but using localhost API - switching to production API');
+      baseUrl = isGo3net ? customApiUrl : prodApiUrl;
     }
 
     // Special case for preview deployments
     if (isVercelDeployment && hostname !== 'go3nethrm.vercel.app') {
       console.log('Detected Vercel preview deployment');
-      // We still use the production API for preview deployments
       baseUrl = prodApiUrl;
     }
 
-    console.log(`Final API URL: ${baseUrl} (Host: ${hostname})`);
+    console.log(`Final API URL: ${baseUrl} (Host: ${hostname}, Domain: ${isGo3net ? 'go3net.com' : isGo3nethrm ? 'go3nethrm.com' : 'other'})`);
   }
 
   // Ensure no trailing slash to prevent double slash issues

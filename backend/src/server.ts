@@ -22,6 +22,7 @@ import { createServer } from 'http';
 import helmet from 'helmet';
 import jwt from 'jsonwebtoken';
 import logger from './utils/logger';
+import DomainValidator from './utils/domainValidator';
 import authRoutes from './routes/auth.routes';
 import employeeRoutes from './routes/employee.routes';
 import attendanceRoutes from './routes/attendance.routes';
@@ -45,6 +46,8 @@ import roleManagementRoutes from './routes/roleManagement';
 import typingIndicatorRoutes from './routes/typingIndicators';
 import conversationHistoryRoutes from './routes/conversationHistory.routes';
 import roleRoutes from './routes/roleRoutes';
+import dashboardRoutes from './routes/dashboard.routes';
+import domainRoutes from './routes/domain.routes';
 import CheckoutMonitoringService from './services/CheckoutMonitoringService';
 import JobScheduler from './services/JobScheduler';
 import supabaseConfig from './config/supabase';
@@ -98,14 +101,18 @@ async function initializeDatabase() {
   }
 }
 
-// Security middleware (optimized for serverless)
+// Security middleware (optimized for serverless with go3net.com support)
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
+      defaultSrc: ["'self'", "https://go3net.com", "https://*.go3net.com", "https://go3nethrm.com", "https://*.go3nethrm.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://go3net.com", "https://*.go3net.com"],
+      scriptSrc: ["'self'", "https://go3net.com", "https://*.go3net.com"],
+      imgSrc: ["'self'", "data:", "https:", "https://go3net.com", "https://*.go3net.com"],
+      connectSrc: ["'self'", "https://go3net.com", "https://*.go3net.com", "https://go3nethrm-backend.vercel.app", "wss://go3net.com", "wss://*.go3net.com"],
+      fontSrc: ["'self'", "https://go3net.com", "https://*.go3net.com"],
+      frameSrc: ["'self'", "https://go3net.com", "https://*.go3net.com"],
+      frameAncestors: ["'self'", "https://go3net.com", "https://*.go3net.com"]
     },
   },
   crossOriginEmbedderPolicy: false,
@@ -114,34 +121,29 @@ app.use(helmet({
 app.use((req: Request, res: Response, next: NextFunction) => {
   const origin = req.headers.origin;
 
-  // Define allowed origins - be more permissive for debugging
-  const allowedOrigins = [
-    'https://go3nethrm.vercel.app',
-    'https://go3nethrm.com',
-    'https://www.go3nethrm.com',
-    'https://www.go3nethr.com',
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'http://127.0.0.1:5173',
-    'http://127.0.0.1:3000'
-  ];
-
-  // Check if origin is allowed (more permissive matching)
-  const isAllowedOrigin = !origin || allowedOrigins.some(allowed => {
-    const cleanOrigin = origin.replace(/^https?:\/\//, '').toLowerCase();
-    const cleanAllowed = allowed.replace(/^https?:\/\//, '').toLowerCase();
-    return cleanOrigin === cleanAllowed || cleanOrigin.endsWith('.' + cleanAllowed);
-  });
+  // Use domain validator for enhanced security and logging
+  const validationResult = DomainValidator.getValidationDetails(origin || '');
+  const isAllowedOrigin = !origin || validationResult.isValid;
 
   if (isAllowedOrigin) {
     res.header('Access-Control-Allow-Origin', origin || '*');
     res.header('Vary', 'Origin');
+    
+    // Log successful CORS validation for go3net.com domains
+    if (origin && origin.includes('go3net.com')) {
+      logger.info('✅ CORS: go3net.com domain allowed', {
+        origin,
+        domain: validationResult.domain,
+        subdomain: validationResult.subdomain,
+        timestamp: new Date().toISOString()
+      });
+    }
   } else {
-    // Log rejected origins for debugging
-    // CORS: Rejected origin (reduced logging)
+    // Enhanced logging for rejected origins
     logger.warn('❌ CORS: Rejected origin', {
       origin,
-      allowedOrigins,
+      reason: validationResult.reason,
+      domain: validationResult.domain,
       timestamp: new Date().toISOString()
     });
   }
@@ -201,6 +203,8 @@ app.use('/api/role-management', roleManagementRoutes);
 app.use('/api/typing-indicators', typingIndicatorRoutes);
 app.use('/api/conversation-history', conversationHistoryRoutes);
 app.use('/api/roles', roleRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/domain', domainRoutes);
 
 // Debug endpoint to check current user
 app.get('/api/debug/user', async (req: Request, res: Response) => {

@@ -4,7 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { useToast } from '../components/ui/Toast';
 import { useTheme } from '../contexts/ThemeContext';
-import { LoadingButton } from '../components/ui/LoadingButton';
+import LoadingButton from '../components/ui/LoadingButton';
 import { ConfirmationDialog } from '../components/ui/ConfirmationDialog';
 import api from '../lib/api';
 import { 
@@ -57,7 +57,7 @@ export function PurchaseRequestsPage() {
   const fetchPurchaseRequests = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/purchase-requests');
+      const response = await api.get('/purchase');
       const apiResponse = response.data as PurchaseRequestResponse;
       
       if (apiResponse.status === 'error') {
@@ -82,7 +82,7 @@ export function PurchaseRequestsPage() {
     e.preventDefault();
 
     if (!formData.itemName || !formData.description || formData.quantity <= 0 || formData.unitPrice <= 0) {
-      addToast('error', 'Please fill all required fields correctly');
+      addToast('error', 'Please fill all required fields correctly. Unit price must be greater than 0.');
       return;
     }
 
@@ -93,7 +93,7 @@ export function PurchaseRequestsPage() {
       const requestData = transformToBackendFormat(formData);
       // Employee ID will be set by the backend from the authenticated user
       
-      const response = await api.post('/purchase-requests', requestData);
+      const response = await api.post('/purchase', requestData);
       const apiResponse = response.data as PurchaseRequestResponse;
       
       if (apiResponse.status === 'error') {
@@ -143,7 +143,7 @@ export function PurchaseRequestsPage() {
   const handleDeleteConfirm = async () => {
     try {
       setDeleting(true);
-      await api.delete(`/purchase-requests/${deleteConfirm.requestId}`);
+      await api.delete(`/purchase/${deleteConfirm.requestId}`);
       setPurchaseRequests(purchaseRequests.filter(req => req.id !== deleteConfirm.requestId));
       addToast('success', 'Purchase request deleted successfully');
       setDeleteConfirm({ isOpen: false, requestId: '', requestName: '' });
@@ -306,7 +306,7 @@ export function PurchaseRequestsPage() {
                   </span>
                   <input
                     type="number"
-                    min="0"
+                    min="0.01"
                     step="0.01"
                     value={formData.unitPrice}
                     onChange={(e) =>

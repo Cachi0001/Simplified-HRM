@@ -40,7 +40,7 @@ export const AdminLeaveRequests: React.FC<AdminLeaveRequestsProps> = ({ darkMode
   const { data: leaveRequests = [], isLoading } = useQuery({
     queryKey: ['admin-leave-requests', userId || 'anonymous'],
     queryFn: async () => {
-      const response = await api.get('/leave-requests');
+      const response = await api.get('/leave');
       // Handle the nested data structure: response.data.data.leaveRequests
       const data = response.data.data || response.data;
       return Array.isArray(data) ? data : (data?.leaveRequests || []);
@@ -52,7 +52,7 @@ export const AdminLeaveRequests: React.FC<AdminLeaveRequestsProps> = ({ darkMode
   // Approve leave request
   const approveMutation = useMutation({
     mutationFn: async (requestId: string) => {
-      const response = await api.put(`/leave-requests/${requestId}/approve`, {
+      const response = await api.put(`/leave/${requestId}/approve`, {
         approval_comments: 'Approved from dashboard'
       });
       return response.data;
@@ -70,7 +70,7 @@ export const AdminLeaveRequests: React.FC<AdminLeaveRequestsProps> = ({ darkMode
   // Reject leave request
   const rejectMutation = useMutation({
     mutationFn: async (requestId: string) => {
-      const response = await api.put(`/leave-requests/${requestId}/reject`, {
+      const response = await api.put(`/leave/${requestId}/reject`, {
         approved_by: userId,
         rejection_reason: 'Rejected from dashboard'
       });
