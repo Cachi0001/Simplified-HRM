@@ -556,9 +556,9 @@ export class EmployeeController {
       });
     }
   }
-}  /**
-   
-* Update employee status (for management roles only)
+
+  /**
+   * Update employee status (for management roles only)
    * PUT /api/employees/:id/status
    */
   async updateEmployeeStatus(req: Request, res: Response): Promise<void> {

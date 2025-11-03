@@ -141,8 +141,8 @@ export class LeaveService {
                 }
             }
 
-            if (employeeError) {
-                logger.warn('LeaveService: Could not get employee details for notifications', { error: employeeError.message });
+            if (employeeError || !employee) {
+                logger.warn('LeaveService: Could not get employee details for notifications', { error: employeeError?.message });
             } else {
                 // Send notifications to appropriate approvers
                 await this.notifyApproversForApprovalLevel(leaveRequest, employee.role);

@@ -92,7 +92,7 @@ export class AnnouncementController {
       const { data: announcement, error: insertError } = await supabase
         .from('announcements')
         .insert(insertData)
-        .select('id, title, content, priority, status, target_audience, scheduled_for, created_at')
+        .select('id, title, content, priority, status, target_audience, scheduled_for, created_at, author_id')
         .single();
 
       if (insertError) {

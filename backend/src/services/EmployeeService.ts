@@ -3,6 +3,7 @@ import { IEmployee, CreateEmployeeRequest, UpdateEmployeeRequest, EmployeeQuery 
 import { EmailService } from './EmailService';
 import logger from '../utils/logger';
 import db from '../config/database';
+import supabaseConfig from '../config/supabase';
 
 export class EmployeeService {
   constructor(private employeeRepository: IEmployeeRepository) {}
@@ -494,7 +495,7 @@ export class EmployeeService {
       throw error;
     }
   }
-}
+
   /**
    * Update employee status using database function
    */
@@ -515,18 +516,12 @@ export class EmployeeService {
       });
 
       // Call the database function
-      const { data, error } = await db
-        .rpc('update_employee_status_with_role', {
-          p_employee_id: employeeId,
-          p_new_status: newStatus,
-          p_updated_by: changedById,
-          p_updater_role: updaterRole
-        });
+      const result = await db.query(
+        'SELECT update_employee_status_with_role($1, $2, $3, $4) as result',
+        [employeeId, newStatus, changedById, updaterRole]
+      );
 
-      if (error) {
-        logger.error('EmployeeService: Database error updating employee status', { error });
-        throw new Error(error.message || 'Failed to update employee status');
-      }
+      const data = result.rows[0]?.result;
 
       if (!data || !data.success) {
         throw new Error(data?.error || 'Failed to update employee status');
@@ -558,25 +553,25 @@ export class EmployeeService {
       });
 
       // Call the database function
-      const { data, error } = await db
-        .rpc('get_employee_status_history', {
-          p_employee_id: employeeId,
-          p_user_role: userRole
-        });
+      const result = await db.query(
+        'SELECT get_employee_status_history($1, $2) as result',
+        [employeeId, userRole]
+      );
 
-      if (error) {
-        logger.error('EmployeeService: Database error getting employee status history', { error });
-        throw new Error(error.message || 'Failed to get employee status history');
+      const data = result.rows[0]?.result;
+      
+      if (!data || !data.success) {
+        throw new Error(data?.error || 'Failed to get employee status history');
       }
 
-      const history = data || [];
+      const history = data.history || [];
 
       logger.info('EmployeeService: Employee status history retrieved successfully', { 
         employeeId,
         historyCount: history.length
       });
 
-      return history.map((item: any) => item.history_data);
+      return history;
     } catch (error) {
       logger.error('EmployeeService: Error getting employee status history', { 
         error: (error as Error).message,
@@ -604,7 +599,7 @@ export class EmployeeService {
       });
 
       // Call the database function
-      const { data, error } = await db
+      const { data, error } = await supabaseConfig.getClient()
         .rpc('get_all_employees_for_management', {
           p_requester_role: userRole,
           p_requester_id: requesterId
@@ -660,7 +655,7 @@ export class EmployeeService {
       });
 
       // Call the database function
-      const { data, error } = await db
+      const { data, error } = await supabaseConfig.getClient()
         .rpc('update_employee_fields', {
           p_employee_id: employeeId,
           p_updated_by: updatedById,

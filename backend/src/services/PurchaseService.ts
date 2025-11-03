@@ -139,8 +139,8 @@ export class PurchaseService {
                 }
             }
 
-            if (employeeError) {
-                logger.warn('PurchaseService: Could not get employee details for notifications', { error: employeeError.message });
+            if (employeeError || !employee) {
+                logger.warn('PurchaseService: Could not get employee details for notifications', { error: employeeError?.message });
             } else {
                 // Send notifications to appropriate approvers
                 await this.notifyApproversForApprovalLevel(purchaseRequest, employee.role);
