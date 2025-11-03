@@ -1,24 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit2, Clock, CheckCircle, XCircle, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Plus, Trash2, Clock, CheckCircle, XCircle, AlertCircle, ArrowLeft } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { useToast } from '../components/ui/Toast';
 import { useTheme } from '../contexts/ThemeContext';
+import { LoadingButton } from '../components/ui/LoadingButton';
+import { ConfirmationDialog } from '../components/ui/ConfirmationDialog';
 import api from '../lib/api';
 import { 
   PurchaseRequest, 
-  CreatePurchaseRequestData, 
   PurchaseRequestFormData,
   PurchaseRequestResponse,
   transformToBackendFormat,
   transformFromBackendFormat
 } from '../types/purchase';
+import { safeString, safeNumber, formatCurrency, safeDateFormat } from '../utils/safeFormatting';
 
 export function PurchaseRequestsPage() {
   const [purchaseRequests, setPurchaseRequests] = useState<PurchaseRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; requestId: string; requestName: string }>({
+    isOpen: false,
+    requestId: '',
+    requestName: ''
+  });
+  const [deleting, setDeleting] = useState(false);
   const [formData, setFormData] = useState<PurchaseRequestFormData>({
     itemName: '',
     description: '',
@@ -78,6 +87,8 @@ export function PurchaseRequestsPage() {
     }
 
     try {
+      setSubmitting(true);
+      
       // Transform form data to backend format
       const requestData = transformToBackendFormat(formData);
       // Employee ID will be set by the backend from the authenticated user
@@ -116,21 +127,31 @@ export function PurchaseRequestsPage() {
       console.error('Error creating purchase request:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Failed to create purchase request';
       addToast('error', errorMessage);
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handleDeletePurchaseRequest = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this purchase request?')) {
-      return;
-    }
+  const handleDeleteClick = (request: PurchaseRequest) => {
+    setDeleteConfirm({
+      isOpen: true,
+      requestId: request.id,
+      requestName: `${safeString(request.item_name, 'Purchase request')} - ${formatCurrency(request.total_amount)}`
+    });
+  };
 
+  const handleDeleteConfirm = async () => {
     try {
-      await api.delete(`/purchase-requests/${id}`);
-      setPurchaseRequests(purchaseRequests.filter(req => req.id !== id));
+      setDeleting(true);
+      await api.delete(`/purchase-requests/${deleteConfirm.requestId}`);
+      setPurchaseRequests(purchaseRequests.filter(req => req.id !== deleteConfirm.requestId));
       addToast('success', 'Purchase request deleted successfully');
+      setDeleteConfirm({ isOpen: false, requestId: '', requestName: '' });
     } catch (error: any) {
       console.error('Error deleting purchase request:', error);
       addToast('error', 'Failed to delete purchase request');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -367,7 +388,7 @@ export function PurchaseRequestsPage() {
                     ? 'bg-gray-600 border-gray-600 text-gray-300'
                     : 'bg-gray-100 border-gray-300 text-gray-700'
                     }`}>
-                    ₦{(formData.unitPrice * formData.quantity).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                    {formatCurrency(formData.unitPrice * formData.quantity)}
                   </div>
                 </div>
               </div>
@@ -388,12 +409,14 @@ export function PurchaseRequestsPage() {
                 />
               </div>
               <div className="flex gap-3 pt-4">
-                <button
+                <LoadingButton
                   type="submit"
+                  loading={submitting}
                   className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-all duration-200 font-medium shadow-md hover:shadow-lg"
+                  loadingText="Submitting..."
                 >
                   Submit Request
-                </button>
+                </LoadingButton>
                 <button
                   type="button"
                   onClick={() => {
@@ -470,9 +493,9 @@ export function PurchaseRequestsPage() {
                       </span>
                     )}
                   </div>
-                  {(currentUser?.role !== 'admin' && currentUser?.role !== 'hr' && request.status === 'pending') && (
+                  {(currentUser?.id === request.employee_id && request.status === 'pending') && (
                     <button
-                      onClick={() => handleDeletePurchaseRequest(request.id)}
+                      onClick={() => handleDeleteClick(request)}
                       className={`transition-colors duration-200 ${darkMode ? 'text-red-400 hover:text-red-300' : 'text-red-600 hover:text-red-800'
                         }`}
                       title="Delete request"
@@ -490,7 +513,7 @@ export function PurchaseRequestsPage() {
                     </p>
                     <p className={`text-lg font-semibold transition-colors duration-200 ${darkMode ? 'text-white' : 'text-gray-900'
                       }`}>
-                      {request.item_name}
+                      {safeString(request.item_name, 'No item name')}
                     </p>
                   </div>
 
@@ -501,7 +524,7 @@ export function PurchaseRequestsPage() {
                     </p>
                     <p className={`text-sm line-clamp-3 transition-colors duration-200 ${darkMode ? 'text-gray-300' : 'text-gray-700'
                       }`}>
-                      {request.description}
+                      {safeString(request.description, 'No description provided')}
                     </p>
                   </div>
 
@@ -513,7 +536,7 @@ export function PurchaseRequestsPage() {
                       </p>
                       <p className={`text-sm font-semibold transition-colors duration-200 ${darkMode ? 'text-white' : 'text-gray-900'
                         }`}>
-                        {request.quantity}
+                        {safeNumber(request.quantity, 0)}
                       </p>
                     </div>
                     <div>
@@ -523,7 +546,7 @@ export function PurchaseRequestsPage() {
                       </p>
                       <p className={`text-sm font-semibold transition-colors duration-200 ${darkMode ? 'text-green-400' : 'text-green-600'
                         }`}>
-                        ₦{request.total_amount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                        {formatCurrency(request.total_amount)}
                       </p>
                     </div>
                   </div>
@@ -535,7 +558,7 @@ export function PurchaseRequestsPage() {
                     </p>
                     <p className={`text-sm transition-colors duration-200 ${darkMode ? 'text-gray-300' : 'text-gray-700'
                       }`}>
-                      {new Date(request.created_at).toLocaleDateString('en-NG', {
+                      {safeDateFormat(request.created_at, {
                         year: 'numeric',
                         month: 'short',
                         day: 'numeric'
@@ -548,6 +571,18 @@ export function PurchaseRequestsPage() {
           </div>
         )}
       </div>
+
+      <ConfirmationDialog
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, requestId: '', requestName: '' })}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Purchase Request"
+        message={`Are you sure you want to delete this purchase request: ${deleteConfirm.requestName}? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        type="danger"
+        loading={deleting}
+      />
     </div>
   );
 }

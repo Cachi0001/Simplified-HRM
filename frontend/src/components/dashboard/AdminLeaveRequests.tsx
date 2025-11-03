@@ -5,14 +5,21 @@ import { useToast } from '../ui/Toast';
 import { Check, X, Clock, ChevronDown } from 'lucide-react';
 
 interface LeaveRequest {
-  _id: string;
+  id: string;
+  _id?: string; // For backward compatibility
   employee_id: string;
-  employeeName?: string;
+  employee_name?: string;
+  employeeName?: string; // For backward compatibility
+  employee_email?: string;
+  department?: string;
+  type: string;
   start_date: string;
   end_date: string;
   reason: string;
+  notes?: string;
   status: 'pending' | 'approved' | 'rejected';
   created_at: string;
+  updated_at: string;
 }
 
 interface AdminLeaveRequestsProps {
@@ -45,7 +52,9 @@ export const AdminLeaveRequests: React.FC<AdminLeaveRequestsProps> = ({ darkMode
   // Approve leave request
   const approveMutation = useMutation({
     mutationFn: async (requestId: string) => {
-      const response = await api.put(`/leave-requests/${requestId}`, { status: 'approved' });
+      const response = await api.put(`/leave-requests/${requestId}/approve`, {
+        approval_comments: 'Approved from dashboard'
+      });
       return response.data;
     },
     onSuccess: () => {
@@ -53,6 +62,7 @@ export const AdminLeaveRequests: React.FC<AdminLeaveRequestsProps> = ({ darkMode
       queryClient.invalidateQueries({ queryKey: ['admin-leave-requests', userId] });
     },
     onError: (error: any) => {
+      console.error('Approve error:', error);
       addToast('error', error.response?.data?.message || 'Failed to approve leave request');
     }
   });
@@ -60,7 +70,10 @@ export const AdminLeaveRequests: React.FC<AdminLeaveRequestsProps> = ({ darkMode
   // Reject leave request
   const rejectMutation = useMutation({
     mutationFn: async (requestId: string) => {
-      const response = await api.put(`/leave-requests/${requestId}`, { status: 'rejected' });
+      const response = await api.put(`/leave-requests/${requestId}/reject`, {
+        approved_by: userId,
+        rejection_reason: 'Rejected from dashboard'
+      });
       return response.data;
     },
     onSuccess: () => {
@@ -68,6 +81,7 @@ export const AdminLeaveRequests: React.FC<AdminLeaveRequestsProps> = ({ darkMode
       queryClient.invalidateQueries({ queryKey: ['admin-leave-requests', userId] });
     },
     onError: (error: any) => {
+      console.error('Reject error:', error);
       addToast('error', error.response?.data?.message || 'Failed to reject leave request');
     }
   });
@@ -148,7 +162,7 @@ export const AdminLeaveRequests: React.FC<AdminLeaveRequestsProps> = ({ darkMode
         <div className="space-y-3">
           {filteredRequests.map((request: LeaveRequest) => (
             <div
-              key={request._id}
+              key={request.id || request._id}
               className={`border rounded-lg overflow-hidden transition-all ${
                 darkMode
                   ? 'border-gray-700 bg-gray-700/50'
@@ -157,7 +171,7 @@ export const AdminLeaveRequests: React.FC<AdminLeaveRequestsProps> = ({ darkMode
             >
               {/* Request Header */}
               <button
-                onClick={() => setExpandedId(expandedId === request._id ? null : request._id)}
+                onClick={() => setExpandedId(expandedId === (request.id || request._id) ? null : (request.id || request._id))}
                 className={`w-full p-4 flex items-center justify-between hover:opacity-80 transition-opacity ${
                   darkMode ? 'hover:bg-gray-600' : 'hover:bg-gray-100'
                 }`}
@@ -174,9 +188,16 @@ export const AdminLeaveRequests: React.FC<AdminLeaveRequestsProps> = ({ darkMode
                   </div>
                   <div className="text-left">
                     <p className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                      {request.employeeName || 'Unknown'}
+                      {request.employee_name || request.employeeName || 'Unknown Employee'}
                     </p>
+                    {request.employee_email && (
+                      <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+                        {request.employee_email}
+                        {request.department && ` • ${request.department}`}
+                      </p>
+                    )}
                     <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                      {request.type && `${request.type.charAt(0).toUpperCase() + request.type.slice(1)} Leave • `}
                       {formatDate(request.start_date)} - {formatDate(request.end_date)} ({getDaysDuration(request.start_date, request.end_date)} days)
                     </p>
                   </div>
@@ -185,12 +206,12 @@ export const AdminLeaveRequests: React.FC<AdminLeaveRequestsProps> = ({ darkMode
                   {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
                 </span>
                 <ChevronDown
-                  className={`w-5 h-5 transition-transform ${expandedId === request._id ? 'rotate-180' : ''}`}
+                  className={`w-5 h-5 transition-transform ${expandedId === (request.id || request._id) ? 'rotate-180' : ''}`}
                 />
               </button>
 
               {/* Request Details */}
-              {expandedId === request._id && (
+              {expandedId === (request.id || request._id) && (
                 <div className={`border-t p-4 ${darkMode ? 'border-gray-600 bg-gray-600/30' : 'border-gray-200 bg-gray-100'}`}>
                   <div className="mb-4">
                     <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
@@ -204,14 +225,14 @@ export const AdminLeaveRequests: React.FC<AdminLeaveRequestsProps> = ({ darkMode
                   {request.status === 'pending' && (
                     <div className="flex gap-3 mt-4">
                       <button
-                        onClick={() => approveMutation.mutate(request._id)}
+                        onClick={() => approveMutation.mutate(request.id || request._id)}
                         disabled={approveMutation.isPending}
                         className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
                       >
                         ✓ Approve
                       </button>
                       <button
-                        onClick={() => rejectMutation.mutate(request._id)}
+                        onClick={() => rejectMutation.mutate(request.id || request._id)}
                         disabled={rejectMutation.isPending}
                         className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
                       >

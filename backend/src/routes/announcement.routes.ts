@@ -44,4 +44,13 @@ router.post('/:id/archive', (req, res) => announcementController.archiveAnnounce
 // POST /api/announcements/:id/read - Mark announcement as read
 router.post('/:id/read', (req, res) => announcementController.markAsRead(req, res));
 
+// GET /api/announcements/templates - Get announcement templates (temporary fix)
+router.get('/templates', (req, res) => {
+  // Temporary response to prevent 404 errors
+  res.status(200).json({
+    status: 'success',
+    data: []
+  });
+});
+
 export default router;

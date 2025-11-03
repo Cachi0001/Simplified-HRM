@@ -145,17 +145,47 @@ export class LeaveController {
         try {
             const { status } = req.query;
             const userRole = req.user?.role;
+            const employeeId = req.user?.employeeId || req.user?.id;
 
-            // Check if user has permission to view all requests
-            if (!['super-admin', 'admin', 'hr'].includes(userRole)) {
-                res.status(403).json({
-                    status: 'error',
-                    message: 'Insufficient permissions'
-                });
-                return;
+            logger.info('🔍 [LeaveController] Get leave requests', { 
+                userRole, 
+                employeeId, 
+                userObject: req.user,
+                isAuthorized: ['superadmin', 'admin', 'hr'].includes(userRole)
+            });
+
+            let leaveRequests;
+
+            // Role-based access control - be more permissive for superadmin variations
+            const authorizedRoles = ['superadmin', 'super-admin', 'admin', 'hr'];
+            if (authorizedRoles.includes(userRole)) {
+                // Admin roles can see all requests
+                logger.info('🔓 [LeaveController] User authorized for all requests', { userRole });
+                leaveRequests = await this.leaveService.getAllLeaveRequests(status as string);
+            } else {
+                // Regular employees see only their own requests
+                logger.info('👤 [LeaveController] User limited to own requests', { userRole, employeeId });
+                
+                if (!employeeId) {
+                    res.status(400).json({
+                        status: 'error',
+                        message: 'Employee ID is required for non-admin users'
+                    });
+                    return;
+                }
+                
+                leaveRequests = await this.leaveService.getEmployeeLeaveRequests(employeeId);
+                
+                // Filter by status if provided
+                if (status) {
+                    leaveRequests = leaveRequests.filter(req => req.status === status);
+                }
             }
 
-            const leaveRequests = await this.leaveService.getAllLeaveRequests(status as string);
+            logger.info('✅ [LeaveController] Returning leave requests', { 
+                count: leaveRequests.length,
+                userRole 
+            });
 
             res.status(200).json({
                 status: 'success',
@@ -163,9 +193,12 @@ export class LeaveController {
             });
         } catch (error) {
             logger.error('❌ [LeaveController] Get all leave requests error', {
-                error: (error as Error).message
+                error: (error as Error).message,
+                stack: (error as Error).stack,
+                userRole: req.user?.role,
+                employeeId: req.user?.employeeId || req.user?.id
             });
-            res.status(400).json({
+            res.status(500).json({
                 status: 'error',
                 message: (error as Error).message
             });

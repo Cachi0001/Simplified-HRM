@@ -1,24 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit2, Clock, CheckCircle, XCircle, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Plus, Trash2, Clock, CheckCircle, XCircle, AlertCircle, ArrowLeft } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { useToast } from '../components/ui/Toast';
 import { useTheme } from '../contexts/ThemeContext';
+import { LoadingButton } from '../components/ui/LoadingButton';
+import { ConfirmationDialog } from '../components/ui/ConfirmationDialog';
 import api from '../lib/api';
 import { 
   LeaveRequest, 
-  CreateLeaveRequestData, 
   LeaveRequestFormData,
   LeaveRequestResponse,
   transformToBackendFormat,
   transformFromBackendFormat
 } from '../types/leave';
+import { safeString, safeNumber, safeDateFormat } from '../utils/safeFormatting';
 
 export function LeaveRequestsPage() {
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; requestId: string; requestName: string }>({
+    isOpen: false,
+    requestId: '',
+    requestName: ''
+  });
+  const [deleting, setDeleting] = useState(false);
   const [formData, setFormData] = useState<LeaveRequestFormData>({
     startDate: '',
     endDate: '',
@@ -79,6 +88,8 @@ export function LeaveRequestsPage() {
     }
 
     try {
+      setSubmitting(true);
+      
       // Transform form data to backend format
       const requestData = transformToBackendFormat(formData);
       // Employee ID will be set by the backend from the authenticated user
@@ -107,21 +118,31 @@ export function LeaveRequestsPage() {
       console.error('Error creating leave request:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Failed to create leave request';
       addToast('error', errorMessage);
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handleDeleteLeaveRequest = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this leave request?')) {
-      return;
-    }
+  const handleDeleteClick = (request: LeaveRequest) => {
+    setDeleteConfirm({
+      isOpen: true,
+      requestId: request.id,
+      requestName: `${safeString(request.type, 'Leave')} leave from ${safeDateFormat(request.start_date)} to ${safeDateFormat(request.end_date)}`
+    });
+  };
 
+  const handleDeleteConfirm = async () => {
     try {
-      await api.delete(`/leave-requests/${id}`);
-      setLeaveRequests(leaveRequests.filter(req => req.id !== id));
+      setDeleting(true);
+      await api.delete(`/leave-requests/${deleteConfirm.requestId}`);
+      setLeaveRequests(leaveRequests.filter(req => req.id !== deleteConfirm.requestId));
       addToast('success', 'Leave request deleted successfully');
+      setDeleteConfirm({ isOpen: false, requestId: '', requestName: '' });
     } catch (error: any) {
       console.error('Error deleting leave request:', error);
       addToast('error', 'Failed to delete leave request');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -269,12 +290,14 @@ export function LeaveRequestsPage() {
                 />
               </div>
               <div className="flex gap-2">
-                <button
+                <LoadingButton
                   type="submit"
+                  loading={submitting}
                   className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition font-medium"
+                  loadingText="Submitting..."
                 >
                   Submit Request
-                </button>
+                </LoadingButton>
                 <button
                   type="button"
                   onClick={() => {
@@ -316,14 +339,14 @@ export function LeaveRequestsPage() {
               >
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex items-center gap-2">
-                    {getStatusIcon(request.status)}
-                    <span className={getStatusBadge(request.status)}>
-                      {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                    {getStatusIcon(safeString(request.status, 'pending'))}
+                    <span className={getStatusBadge(safeString(request.status, 'pending'))}>
+                      {safeString(request.status, 'pending').charAt(0).toUpperCase() + safeString(request.status, 'pending').slice(1)}
                     </span>
                   </div>
-                  {currentUser?.role === 'admin' || currentUser?.role === 'hr' ? null : (
+                  {(currentUser?.id === request.employee_id && request.status === 'pending') && (
                     <button
-                      onClick={() => handleDeleteLeaveRequest(request.id)}
+                      onClick={() => handleDeleteClick(request)}
                       className="text-red-600 hover:text-red-800 transition"
                       title="Delete request"
                     >
@@ -337,10 +360,10 @@ export function LeaveRequestsPage() {
                     <div>
                       <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Employee</p>
                       <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                        {request.employee_name}
+                        {safeString(request.employee_name, 'Unknown Employee')}
                         {request.department && (
                           <span className={`ml-2 text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                            ({request.department})
+                            ({safeString(request.department, 'Unknown Department')})
                           </span>
                         )}
                       </p>
@@ -351,7 +374,7 @@ export function LeaveRequestsPage() {
                     <div>
                       <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Type</p>
                       <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                        {request.type.charAt(0).toUpperCase() + request.type.slice(1)} Leave
+                        {safeString(request.type, 'leave').charAt(0).toUpperCase() + safeString(request.type, 'leave').slice(1)} Leave
                       </p>
                     </div>
                   )}
@@ -359,11 +382,10 @@ export function LeaveRequestsPage() {
                   <div>
                     <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Period</p>
                     <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                      {new Date(request.start_date).toLocaleDateString()} -{' '}
-                      {new Date(request.end_date).toLocaleDateString()}
+                      {safeDateFormat(request.start_date)} - {safeDateFormat(request.end_date)}
                       {request.days_requested && (
                         <span className={`ml-2 text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                          ({request.days_requested} days)
+                          ({safeNumber(request.days_requested, 0)} days)
                         </span>
                       )}
                     </p>
@@ -371,13 +393,13 @@ export function LeaveRequestsPage() {
 
                   <div>
                     <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Reason</p>
-                    <p className={`text-sm line-clamp-3 ${darkMode ? 'text-gray-300' : 'text-gray-900'}`}>{request.reason}</p>
+                    <p className={`text-sm line-clamp-3 ${darkMode ? 'text-gray-300' : 'text-gray-900'}`}>{safeString(request.reason, 'No reason provided')}</p>
                   </div>
 
                   <div>
                     <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Submitted</p>
                     <p className={`text-sm ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                      {new Date(request.created_at).toLocaleDateString()}
+                      {safeDateFormat(request.created_at)}
                     </p>
                   </div>
                 </div>
@@ -386,6 +408,18 @@ export function LeaveRequestsPage() {
           </div>
         )}
       </div>
+
+      <ConfirmationDialog
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, requestId: '', requestName: '' })}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Leave Request"
+        message={`Are you sure you want to delete this leave request: ${deleteConfirm.requestName}? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        type="danger"
+        loading={deleting}
+      />
     </div>
   );
 }

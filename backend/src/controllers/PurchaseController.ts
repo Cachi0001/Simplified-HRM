@@ -163,17 +163,47 @@ export class PurchaseController {
         try {
             const { status } = req.query;
             const userRole = req.user?.role;
+            const employeeId = req.user?.employeeId || req.user?.id;
 
-            // Check if user has permission to view all requests
-            if (!['super-admin', 'admin', 'hr'].includes(userRole)) {
-                res.status(403).json({
-                    status: 'error',
-                    message: 'Insufficient permissions'
-                });
-                return;
+            logger.info('🔍 [PurchaseController] Get purchase requests', { 
+                userRole, 
+                employeeId, 
+                userObject: req.user,
+                isAuthorized: ['superadmin', 'admin', 'hr'].includes(userRole)
+            });
+
+            let purchaseRequests;
+
+            // Role-based access control - be more permissive for superadmin variations
+            const authorizedRoles = ['superadmin', 'super-admin', 'admin', 'hr'];
+            if (authorizedRoles.includes(userRole)) {
+                // Admin roles can see all requests
+                logger.info('🔓 [PurchaseController] User authorized for all requests', { userRole });
+                purchaseRequests = await this.purchaseService.getAllPurchaseRequests(status as string);
+            } else {
+                // Regular employees see only their own requests
+                logger.info('👤 [PurchaseController] User limited to own requests', { userRole, employeeId });
+                
+                if (!employeeId) {
+                    res.status(400).json({
+                        status: 'error',
+                        message: 'Employee ID is required for non-admin users'
+                    });
+                    return;
+                }
+                
+                purchaseRequests = await this.purchaseService.getEmployeePurchaseRequests(employeeId);
+                
+                // Filter by status if provided
+                if (status) {
+                    purchaseRequests = purchaseRequests.filter(req => req.status === status);
+                }
             }
 
-            const purchaseRequests = await this.purchaseService.getAllPurchaseRequests(status as string);
+            logger.info('✅ [PurchaseController] Returning purchase requests', { 
+                count: purchaseRequests.length,
+                userRole 
+            });
 
             res.status(200).json({
                 status: 'success',
@@ -181,9 +211,12 @@ export class PurchaseController {
             });
         } catch (error) {
             logger.error('❌ [PurchaseController] Get all purchase requests error', {
-                error: (error as Error).message
+                error: (error as Error).message,
+                stack: (error as Error).stack,
+                userRole: req.user?.role,
+                employeeId: req.user?.employeeId || req.user?.id
             });
-            res.status(400).json({
+            res.status(500).json({
                 status: 'error',
                 message: (error as Error).message
             });
