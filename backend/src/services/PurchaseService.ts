@@ -72,6 +72,32 @@ export class PurchaseService {
     }
 
     /**
+     * Validate and normalize urgency value to match database constraint
+     */
+    private validateUrgency(urgency?: string): string {
+        const validUrgencies = ['low', 'medium', 'high'];
+        
+        if (!urgency) return 'medium';
+        
+        // Normalize the input
+        const normalizedUrgency = urgency.toLowerCase().trim();
+        
+        // Map common variations to valid values
+        const urgencyMap: { [key: string]: string } = {
+            'urgent': 'high',
+            'critical': 'high',
+            'normal': 'medium',
+            'standard': 'medium',
+            'routine': 'low',
+            'low': 'low',
+            'medium': 'medium',
+            'high': 'high'
+        };
+        
+        return urgencyMap[normalizedUrgency] || 'medium';
+    }
+
+    /**
      * Create a new purchase request
      */
     async createPurchaseRequest(data: CreatePurchaseRequestData): Promise<IPurchaseRequest> {
@@ -92,7 +118,7 @@ export class PurchaseService {
                     p_quantity: data.quantity || 1,
                     p_vendor: data.vendor || null,
                     p_category: data.category || null,
-                    p_urgency: data.urgency || 'medium',
+                    p_urgency: this.validateUrgency(data.urgency),
                     p_justification: data.justification || null,
                     p_notes: data.notes || null,
                     p_budget_code: data.budget_code || null,

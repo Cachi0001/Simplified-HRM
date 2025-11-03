@@ -1,48 +1,74 @@
 const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
 const path = require('path');
+require('dotenv').config();
 
-// Load environment variables
-require('dotenv').config({ path: path.resolve(__dirname, '.env') });
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 async function runMigration() {
   try {
-    console.log('🚀 Starting leave request JSON coercion fix migration...');
+    console.log('Running migration 038_fix_employee_management_function.sql...');
+    
+    const migrationPath = path.join(__dirname, '../database/migrations/038_fix_employee_management_function.sql');
+    const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
+    
+    const { data, error } = await supabase.rpc('exec', {
+      sql: migrationSQL
+    });
 
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment variables');
+    if (error) {
+      console.error('Migration error:', error);
+      
+      // Try alternative approach - execute SQL directly
+      console.log('Trying direct SQL execution...');
+      const { data: directData, error: directError } = await supabase
+        .from('_migrations')
+        .select('*')
+        .limit(1);
+        
+      if (directError && directError.code === '42P01') {
+        console.log('No migrations table found, executing SQL via RPC...');
+        
+        // Split the migration into individual statements
+        const statements = migrationSQL
+          .split(';')
+          .map(s => s.trim())
+          .filter(s => s.length > 0 && !s.startsWith('--'));
+          
+        for (const statement of statements) {
+          if (statement.trim()) {
+            console.log('Executing:', statement.substring(0, 100) + '...');
+            const { error: stmtError } = await supabase.rpc('exec', { sql: statement });
+            if (stmtError) {
+              console.error('Statement error:', stmtError);
+            }
+          }
+        }
+      }
+    } else {
+      console.log('✅ Migration completed successfully');
     }
+    
+    // Test the function
+    console.log('\nTesting the fixed function...');
+    const { data: testData, error: testError } = await supabase
+      .rpc('get_all_employees_for_management', {
+        p_requester_role: 'admin',
+        p_requester_id: '00000000-0000-0000-0000-000000000000'
+      });
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Read the migration file
-    const migrationPath = path.join(__dirname, 'database/migrations/028_fix_leave_request_json_coercion.sql');
-    const sql = fs.readFileSync(migrationPath, 'utf-8');
-
-    console.log('📝 Migration SQL loaded successfully');
-    console.log('');
-    console.log('⚠️  IMPORTANT: This migration needs to be run manually in Supabase SQL Editor');
-    console.log('');
-    console.log('Instructions:');
-    console.log('1. Go to https://app.supabase.com');
-    console.log('2. Navigate to your project');
-    console.log('3. Go to SQL Editor');
-    console.log('4. Click "New Query"');
-    console.log('5. Copy and paste the SQL below');
-    console.log('6. Click "Run"');
-    console.log('');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log(sql);
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('');
-    console.log('✅ After running the SQL, the leave request JSON coercion issue will be fixed');
-
+    if (testError) {
+      console.error('Test error:', testError);
+    } else {
+      console.log('✅ Function test successful!');
+      console.log('Result:', JSON.stringify(testData, null, 2));
+    }
+    
   } catch (error) {
-    console.error('❌ Migration failed:', error);
-    process.exit(1);
+    console.error('Migration script error:', error);
   }
 }
 

@@ -27,6 +27,7 @@ router.put('/me', (req, res) => employeeController.updateMyProfile(req, res));
 router.get('/pending', requireRole(['admin', 'hr', 'superadmin']), (req, res) => employeeController.getPendingApprovals(req, res));
 router.get('/stats', requireRole(['admin', 'hr', 'superadmin']), (req, res) => employeeController.getEmployeeStats(req, res));
 router.get('/approvals/history', requireRole(['admin', 'hr', 'superadmin']), (req, res) => employeeController.getApprovalHistory(req, res));
+router.get('/management', requireRole(['admin', 'hr', 'super-admin', 'superadmin']), (req, res) => employeeController.getEmployeesForManagement(req, res));
 
 router.post('/', requireRole(['admin', 'superadmin']), (req, res) => employeeController.createEmployee(req, res));
 router.get('/', requireRole(['admin', 'hr', 'super-admin', 'superadmin']), (req, res) => employeeController.getAllEmployees(req, res));
@@ -43,8 +44,7 @@ router.post('/:id/reject', requireRole(['admin', 'hr', 'superadmin']), (req, res
 router.post('/:id/update-role', requireRole(['admin', 'super-admin']), (req, res) => employeeController.updateRole(req, res));
 router.post('/:id/department', requireRole(['admin', 'hr', 'super-admin']), (req, res) => employeeController.assignDepartment(req, res));
 
-// Employee management endpoints
-router.get('/management', requireRole(['admin', 'hr', 'super-admin', 'superadmin']), (req, res) => employeeController.getEmployeesForManagement(req, res));
+// Employee management endpoints (moved /management above to static routes section)
 router.put('/:id/status', requireRole(['admin', 'hr', 'super-admin', 'superadmin']), (req, res) => employeeController.updateEmployeeStatus(req, res));
 router.put('/:id/fields', requireRole(['admin', 'hr', 'super-admin', 'superadmin']), (req, res) => employeeController.updateEmployeeFields(req, res));
 router.get('/:id/status-history', requireRole(['admin', 'hr', 'super-admin', 'superadmin']), (req, res) => employeeController.getEmployeeStatusHistory(req, res));

@@ -333,6 +333,20 @@ export function LeaveRequestsPage() {
                 </div>
 
                 <div className="space-y-3">
+                  {request.employee_name && (
+                    <div>
+                      <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Employee</p>
+                      <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                        {request.employee_name}
+                        {request.department && (
+                          <span className={`ml-2 text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                            ({request.department})
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  )}
+                  
                   {request.type && (
                     <div>
                       <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Type</p>

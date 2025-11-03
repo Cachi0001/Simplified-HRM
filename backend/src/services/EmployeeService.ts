@@ -598,30 +598,110 @@ export class EmployeeService {
         filters: { statusFilter, roleFilter, departmentFilter }
       });
 
-      // Call the database function
-      const { data, error } = await supabaseConfig.getClient()
-        .rpc('get_all_employees_for_management', {
-          p_requester_role: userRole,
-          p_requester_id: requesterId
-        });
+      // Validate requester role
+      const authorizedRoles = ['superadmin', 'super-admin', 'admin', 'hr'];
+      if (!authorizedRoles.includes(userRole)) {
+        throw new Error('Insufficient permissions to access employee management');
+      }
+
+      // Use direct Supabase query instead of the problematic database function
+      let query = supabaseConfig.getClient()
+        .from('employees')
+        .select(`
+          id,
+          user_id,
+          full_name,
+          email,
+          phone,
+          department_id,
+          position,
+          role,
+          status,
+          hire_date,
+          salary,
+          manager_id,
+          profile_picture,
+          avatar,
+          address,
+          date_of_birth,
+          work_type,
+          work_days,
+          performance_score,
+          created_at,
+          updated_at
+        `)
+        .order('created_at', { ascending: false });
+
+      // Apply filters if provided
+      if (statusFilter) {
+        query = query.eq('status', statusFilter);
+      }
+      if (roleFilter) {
+        query = query.eq('role', roleFilter);
+      }
+      if (departmentFilter) {
+        query = query.eq('department_id', departmentFilter);
+      }
+
+      const { data: employees, error } = await query;
 
       if (error) {
         logger.error('EmployeeService: Database error getting employees for management', { error });
         throw new Error(error.message || 'Failed to get employees for management');
       }
 
-      if (!data || !data.success) {
-        throw new Error(data?.error || 'Failed to get employees for management');
-      }
+      // Get department and manager names separately to avoid relationship conflicts
+      const departmentIds = [...new Set(employees?.map(emp => emp.department_id).filter(Boolean))];
+      const managerIds = [...new Set(employees?.map(emp => emp.manager_id).filter(Boolean))];
+      
+      // Fetch departments
+      const { data: departments } = await supabaseConfig.getClient()
+        .from('departments')
+        .select('id, name')
+        .in('id', departmentIds);
+      
+      // Fetch managers
+      const { data: managers } = await supabaseConfig.getClient()
+        .from('employees')
+        .select('id, full_name')
+        .in('id', managerIds);
+      
+      // Create lookup maps
+      const departmentMap = new Map(departments?.map(d => [d.id, d.name]) || []);
+      const managerMap = new Map(managers?.map(m => [m.id, m.full_name]) || []);
 
-      const employees = data.employees || [];
+      // Transform the data to match expected format
+      const transformedEmployees = (employees || []).map((emp: any) => ({
+        id: emp.id,
+        user_id: emp.user_id,
+        full_name: emp.full_name,
+        email: emp.email,
+        phone: emp.phone,
+        department: departmentMap.get(emp.department_id) || 'No Department',
+        department_id: emp.department_id,
+        position: emp.position,
+        role: emp.role,
+        status: emp.status,
+        hire_date: emp.hire_date,
+        salary: emp.salary,
+        manager_name: managerMap.get(emp.manager_id) || 'No Manager',
+        manager_id: emp.manager_id,
+        profile_picture_url: emp.profile_picture || emp.avatar,
+        address: emp.address,
+        date_of_birth: emp.date_of_birth,
+        work_type: emp.work_type,
+        work_days: emp.work_days,
+        performance_score: emp.performance_score,
+        created_at: emp.created_at,
+        updated_at: emp.updated_at
+      }));
 
       logger.info('EmployeeService: Employees for management retrieved successfully', { 
         userRole,
-        employeeCount: employees.length
+        employeeCount: transformedEmployees.length
       });
 
-      return employees;
+      return transformedEmployees;
     } catch (error) {
       logger.error('EmployeeService: Error getting employees for management', { 
         error: (error as Error).message,
