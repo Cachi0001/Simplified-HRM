@@ -5,33 +5,30 @@ import { authService } from '../services/authService';
 import { useToast } from '../components/ui/Toast';
 import { useTheme } from '../contexts/ThemeContext';
 import api from '../lib/api';
-
-interface PurchaseRequest {
-  id: string;
-  userId: string; // Use consistent userId pattern
-  itemName: string;
-  description: string;
-  quantity: number;
-  estimatedCost: number;
-  totalAmount?: number;
-  urgency?: 'low' | 'medium' | 'high';
-  status: 'pending' | 'approved' | 'rejected' | 'purchased';
-  createdAt: string;
-  updatedAt: string;
-  employeeName?: string;
-}
+import { 
+  PurchaseRequest, 
+  CreatePurchaseRequestData, 
+  PurchaseRequestFormData,
+  PurchaseRequestResponse,
+  transformToBackendFormat,
+  transformFromBackendFormat
+} from '../types/purchase';
 
 export function PurchaseRequestsPage() {
   const [purchaseRequests, setPurchaseRequests] = useState<PurchaseRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isCreating, setIsCreating] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<PurchaseRequestFormData>({
     itemName: '',
     description: '',
     quantity: 1,
-    estimatedCost: 0,
-    urgency: 'medium' as 'low' | 'medium' | 'high'
+    unitPrice: 0,
+    urgency: 'normal',
+    vendor: '',
+    category: '',
+    justification: '',
+    notes: ''
   });
 
   const navigate = useNavigate();
@@ -52,29 +49,21 @@ export function PurchaseRequestsPage() {
     try {
       setLoading(true);
       const response = await api.get('/purchase-requests');
-      const data = response.data.data || response.data;
-      const requests = Array.isArray(data) ? data : (data?.purchaseRequests || []);
-
-      // Transform data to match our interface
-      const transformedRequests = requests.map((req: any) => ({
-        id: req.id || req._id,
-        userId: req.user_id || req.employee_id,
-        itemName: req.item_name || req.itemName,
-        description: req.description,
-        quantity: req.quantity,
-        estimatedCost: req.estimated_cost || req.estimatedCost,
-        totalAmount: req.total_amount || req.totalAmount,
-        urgency: req.urgency || 'medium',
-        status: req.status,
-        createdAt: req.created_at || req.createdAt,
-        updatedAt: req.updated_at || req.updatedAt,
-        employeeName: req.employee_name || req.employeeName
-      }));
-
+      const apiResponse = response.data as PurchaseRequestResponse;
+      
+      if (apiResponse.status === 'error') {
+        throw new Error(apiResponse.message || 'Failed to fetch purchase requests');
+      }
+      
+      const requests = apiResponse.data?.purchaseRequests || [];
+      
+      // Transform data using the proper transformation function
+      const transformedRequests = requests.map(transformFromBackendFormat);
+      
       setPurchaseRequests(transformedRequests);
     } catch (error: any) {
       console.error('Error fetching purchase requests:', error);
-      addToast('error', 'Failed to fetch purchase requests');
+      addToast('error', error.message || 'Failed to fetch purchase requests');
     } finally {
       setLoading(false);
     }
@@ -83,45 +72,50 @@ export function PurchaseRequestsPage() {
   const handleCreatePurchaseRequest = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.itemName || !formData.description || formData.quantity <= 0 || formData.estimatedCost <= 0) {
-      addToast('error', 'Please fill all fields correctly');
+    if (!formData.itemName || !formData.description || formData.quantity <= 0 || formData.unitPrice <= 0) {
+      addToast('error', 'Please fill all required fields correctly');
       return;
     }
 
     try {
-      // Transform data to match backend expectations
-      const requestData = {
-        item_name: formData.itemName,
-        description: formData.description,
-        quantity: formData.quantity,
-        estimated_cost: formData.estimatedCost,
-        urgency: formData.urgency
-      };
-
+      // Transform form data to backend format
+      const requestData = transformToBackendFormat(formData);
+      // Employee ID will be set by the backend from the authenticated user
+      
       const response = await api.post('/purchase-requests', requestData);
-      const newRequest = response.data.data || response.data;
-
-      // Transform response to match our interface
-      const transformedRequest = {
-        id: newRequest.id || newRequest._id,
-        userId: newRequest.user_id || newRequest.employee_id,
-        itemName: newRequest.item_name || newRequest.itemName,
-        description: newRequest.description,
-        quantity: newRequest.quantity,
-        estimatedCost: newRequest.estimated_cost || newRequest.estimatedCost,
-        urgency: newRequest.urgency,
-        status: newRequest.status,
-        createdAt: newRequest.created_at || newRequest.createdAt,
-        updatedAt: newRequest.updated_at || newRequest.updatedAt
-      };
-
+      const apiResponse = response.data as PurchaseRequestResponse;
+      
+      if (apiResponse.status === 'error') {
+        throw new Error(apiResponse.message || 'Failed to create purchase request');
+      }
+      
+      const newRequest = apiResponse.data?.purchaseRequest;
+      if (!newRequest) {
+        throw new Error('No purchase request data returned');
+      }
+      
+      // Transform response and add to list
+      const transformedRequest = transformFromBackendFormat(newRequest);
       setPurchaseRequests([transformedRequest, ...purchaseRequests]);
-      setFormData({ itemName: '', description: '', quantity: 1, estimatedCost: 0, urgency: 'medium' });
+      
+      // Reset form
+      setFormData({ 
+        itemName: '', 
+        description: '', 
+        quantity: 1, 
+        unitPrice: 0, 
+        urgency: 'normal',
+        vendor: '',
+        category: '',
+        justification: '',
+        notes: ''
+      });
       setIsCreating(false);
       addToast('success', 'Purchase request created successfully');
     } catch (error: any) {
       console.error('Error creating purchase request:', error);
-      addToast('error', error.response?.data?.message || 'Failed to create purchase request');
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to create purchase request';
+      addToast('error', errorMessage);
     }
   };
 
@@ -170,10 +164,12 @@ export function PurchaseRequestsPage() {
   const getUrgencyBadge = (urgency: string) => {
     const baseClass = 'px-2 py-1 rounded text-xs font-medium';
     switch (urgency) {
-      case 'high':
+      case 'urgent':
         return `${baseClass} ${darkMode ? 'bg-red-900 text-red-200' : 'bg-red-100 text-red-800'}`;
-      case 'medium':
-        return `${baseClass} ${darkMode ? 'bg-yellow-900 text-yellow-200' : 'bg-yellow-100 text-yellow-800'}`;
+      case 'high':
+        return `${baseClass} ${darkMode ? 'bg-orange-900 text-orange-200' : 'bg-orange-100 text-orange-800'}`;
+      case 'normal':
+        return `${baseClass} ${darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800'}`;
       case 'low':
         return `${baseClass} ${darkMode ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-800'}`;
       default:
@@ -280,7 +276,7 @@ export function PurchaseRequestsPage() {
               <div>
                 <label className={`block text-sm font-medium mb-1 transition-colors duration-200 ${darkMode ? 'text-gray-300' : 'text-gray-700'
                   }`}>
-                  Estimated Cost (₦)
+                  Unit Price (₦) *
                 </label>
                 <div className="relative">
                   <span className={`absolute left-3 top-3 text-lg font-semibold transition-colors duration-200 ${darkMode ? 'text-gray-400' : 'text-gray-500'
@@ -291,9 +287,9 @@ export function PurchaseRequestsPage() {
                     type="number"
                     min="0"
                     step="0.01"
-                    value={formData.estimatedCost}
+                    value={formData.unitPrice}
                     onChange={(e) =>
-                      setFormData({ ...formData, estimatedCost: parseFloat(e.target.value) || 0 })
+                      setFormData({ ...formData, unitPrice: parseFloat(e.target.value) || 0 })
                     }
                     className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${darkMode
                       ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
@@ -312,17 +308,84 @@ export function PurchaseRequestsPage() {
                   </label>
                   <select
                     value={formData.urgency}
-                    onChange={(e) => setFormData({ ...formData, urgency: e.target.value as 'low' | 'medium' | 'high' })}
+                    onChange={(e) => setFormData({ ...formData, urgency: e.target.value as 'low' | 'normal' | 'high' | 'urgent' })}
                     className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${darkMode
                       ? 'bg-gray-700 border-gray-600 text-white'
                       : 'bg-white border-gray-300 text-gray-900'
                       }`}
                   >
                     <option value="low">Low Priority</option>
-                    <option value="medium">Medium Priority</option>
+                    <option value="normal">Normal Priority</option>
                     <option value="high">High Priority</option>
+                    <option value="urgent">Urgent</option>
                   </select>
                 </div>
+                <div>
+                  <label className={`block text-sm font-medium mb-1 transition-colors duration-200 ${darkMode ? 'text-gray-300' : 'text-gray-700'
+                    }`}>
+                    Vendor (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.vendor || ''}
+                    onChange={(e) =>
+                      setFormData({ ...formData, vendor: e.target.value })
+                    }
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${darkMode
+                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                      }`}
+                    placeholder="e.g., Office Depot"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className={`block text-sm font-medium mb-1 transition-colors duration-200 ${darkMode ? 'text-gray-300' : 'text-gray-700'
+                    }`}>
+                    Category (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.category || ''}
+                    onChange={(e) =>
+                      setFormData({ ...formData, category: e.target.value })
+                    }
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${darkMode
+                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                      }`}
+                    placeholder="e.g., Office Supplies"
+                  />
+                </div>
+                <div>
+                  <label className={`block text-sm font-medium mb-1 transition-colors duration-200 ${darkMode ? 'text-gray-300' : 'text-gray-700'
+                    }`}>
+                    Total Amount
+                  </label>
+                  <div className={`px-4 py-2 border rounded-lg transition-all duration-200 ${darkMode
+                    ? 'bg-gray-600 border-gray-600 text-gray-300'
+                    : 'bg-gray-100 border-gray-300 text-gray-700'
+                    }`}>
+                    ₦{(formData.unitPrice * formData.quantity).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label className={`block text-sm font-medium mb-1 transition-colors duration-200 ${darkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>
+                  Justification (Optional)
+                </label>
+                <textarea
+                  value={formData.justification || ''}
+                  onChange={(e) => setFormData({ ...formData, justification: e.target.value })}
+                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${darkMode
+                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                    }`}
+                  rows={2}
+                  placeholder="Business justification for this purchase..."
+                />
               </div>
               <div className="flex gap-3 pt-4">
                 <button
@@ -335,7 +398,17 @@ export function PurchaseRequestsPage() {
                   type="button"
                   onClick={() => {
                     setIsCreating(false);
-                    setFormData({ itemName: '', description: '', quantity: 1, estimatedCost: 0, urgency: 'medium' });
+                    setFormData({ 
+                      itemName: '', 
+                      description: '', 
+                      quantity: 1, 
+                      unitPrice: 0, 
+                      urgency: 'normal',
+                      vendor: '',
+                      category: '',
+                      justification: '',
+                      notes: ''
+                    });
                   }}
                   className={`flex-1 px-6 py-3 rounded-lg transition-all duration-200 font-medium shadow-md hover:shadow-lg ${darkMode
                     ? 'bg-gray-600 text-white hover:bg-gray-500'
@@ -417,7 +490,7 @@ export function PurchaseRequestsPage() {
                     </p>
                     <p className={`text-lg font-semibold transition-colors duration-200 ${darkMode ? 'text-white' : 'text-gray-900'
                       }`}>
-                      {request.itemName}
+                      {request.item_name}
                     </p>
                   </div>
 
@@ -446,11 +519,11 @@ export function PurchaseRequestsPage() {
                     <div>
                       <p className={`text-sm font-medium transition-colors duration-200 ${darkMode ? 'text-gray-400' : 'text-gray-500'
                         }`}>
-                        Est. Cost
+                        Total Amount
                       </p>
                       <p className={`text-sm font-semibold transition-colors duration-200 ${darkMode ? 'text-green-400' : 'text-green-600'
                         }`}>
-                        ₦{request.estimatedCost.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                        ₦{request.total_amount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
                       </p>
                     </div>
                   </div>
@@ -462,7 +535,7 @@ export function PurchaseRequestsPage() {
                     </p>
                     <p className={`text-sm transition-colors duration-200 ${darkMode ? 'text-gray-300' : 'text-gray-700'
                       }`}>
-                      {new Date(request.createdAt).toLocaleDateString('en-NG', {
+                      {new Date(request.created_at).toLocaleDateString('en-NG', {
                         year: 'numeric',
                         month: 'short',
                         day: 'numeric'
