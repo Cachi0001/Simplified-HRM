@@ -31,7 +31,7 @@ export const EmployeeManagementPage: React.FC = () => {
 
   // Modal and selection states
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [managingEmployee, setManagingEmployee] = useState<Employee | null>(null);
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
 
   // Highlighting from notifications
@@ -95,11 +95,14 @@ export const EmployeeManagementPage: React.FC = () => {
 
       const [employeesData, departmentsData] = await Promise.all([
         employeeService.getAllEmployees(),
-        employeeService.getDepartments()
+        employeeService.getDepartments().catch(err => {
+          console.error('Failed to load departments:', err);
+          return []; // Return empty array if departments fail to load
+        })
       ]);
 
       setEmployees(employeesData);
-      setDepartments(departmentsData);
+      setDepartments(departmentsData || []);
     } catch (err) {
       setError('Failed to load employee data. Please try again.');
       console.error('Error loading data:', err);
@@ -134,26 +137,22 @@ export const EmployeeManagementPage: React.FC = () => {
     setFilteredEmployees(filtered);
   };
 
-  const handleEditEmployee = (employee: Employee) => {
-    setEditingEmployee(employee);
+  const handleManageEmployeeStatus = (employee: Employee) => {
+    setManagingEmployee(employee);
     setShowEditModal(true);
   };
 
-  const handleSaveEmployee = async (updatedEmployee: Employee) => {
-    try {
-      await employeeService.updateEmployee(updatedEmployee.id, updatedEmployee);
+  const handleEmployeeUpdate = (updatedEmployee: Employee) => {
+    // Update local state with the updated employee data
+    setEmployees(prev =>
+      prev.map(emp => emp.id === updatedEmployee.id ? updatedEmployee : emp)
+    );
 
-      // Update local state
-      setEmployees(prev =>
-        prev.map(emp => emp.id === updatedEmployee.id ? updatedEmployee : emp)
-      );
-
-      setShowEditModal(false);
-      setEditingEmployee(null);
-    } catch (err) {
-      console.error('Error updating employee:', err);
-      // Handle error (show toast, etc.)
-    }
+    setShowEditModal(false);
+    setManagingEmployee(null);
+    
+    // Show success message
+    console.log('Employee updated successfully');
   };
 
   const handleSelectEmployee = (employeeId: string, selected: boolean) => {
@@ -306,7 +305,8 @@ export const EmployeeManagementPage: React.FC = () => {
                 employee={employee}
                 darkMode={darkMode}
                 isHighlighted={highlightedEmployeeId === employee.id}
-                onEdit={handleEditEmployee}
+                onStatusManage={handleManageEmployeeStatus}
+                currentUserRole={user?.role || 'employee'}
                 onSelect={handleSelectEmployee}
                 isSelected={selectedEmployees.includes(employee.id)}
               />
@@ -315,15 +315,15 @@ export const EmployeeManagementPage: React.FC = () => {
         )}
       </div>
 
-      {/* Edit Modal */}
+      {/* Status Management Modal */}
       <EmployeeEditModal
-        employee={editingEmployee}
+        employee={managingEmployee}
         isOpen={showEditModal}
         onClose={() => {
           setShowEditModal(false);
-          setEditingEmployee(null);
+          setManagingEmployee(null);
         }}
-        onSave={handleSaveEmployee}
+        onSave={handleEmployeeUpdate}
         darkMode={darkMode}
       />
     </div>

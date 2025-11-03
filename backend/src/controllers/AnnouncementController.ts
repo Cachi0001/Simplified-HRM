@@ -13,8 +13,9 @@ export class AnnouncementController {
       const userId = req.user?.id;
       const userRole = req.user?.role;
 
-      // Check if user has permission to create announcements
-      if (!['superadmin', 'admin', 'hr'].includes(userRole)) {
+      // Check if user has permission to create announcements - support both superadmin formats
+      const authorizedRoles = ['superadmin', 'super-admin', 'admin', 'hr'];
+      if (!authorizedRoles.includes(userRole)) {
         res.status(403).json({
           status: 'error',
           message: 'You do not have permission to create announcements'
@@ -104,10 +105,21 @@ export class AnnouncementController {
       // Send notifications to all users only if status is published
       if (status === 'published') {
         try {
-          await this.notifyAllUsers(announcement, author);
+          const { error: notificationError } = await supabase
+            .rpc('create_announcement_notifications', {
+              p_announcement_id: announcement.id,
+              p_author_id: announcement.author_id,
+              p_title: announcement.title,
+              p_content: announcement.content
+            });
+          
+          if (notificationError) {
+            logger.warn('Failed to send announcement notifications', { error: notificationError.message });
+          } else {
+            logger.info('Announcement notifications sent successfully', { announcementId: announcement.id });
+          }
         } catch (notifyError) {
-          logger.error('Failed to send notifications', { error: notifyError });
-          // Don't fail the announcement creation if notifications fail
+          logger.warn('Error sending announcement notifications', { error: (notifyError as Error).message });
         }
       }
 
@@ -145,13 +157,15 @@ export class AnnouncementController {
       const status = req.query.status as string;
       const priority = req.query.priority as string;
       const target_audience = req.query.target_audience as string;
+      const userRole = req.user?.role;
 
       logger.info('📢 [AnnouncementController] Getting announcements', {
         limit,
         offset,
         status,
         priority,
-        target_audience
+        target_audience,
+        userRole
       });
 
       const supabase = supabaseConfig.getClient();
@@ -166,10 +180,16 @@ export class AnnouncementController {
           )
         `);
 
-      // Apply filters
+      // Role-based filtering: regular users only see published, admins see all
+      const canViewAll = ['super-admin', 'superadmin', 'admin', 'hr'].includes(userRole);
+      
       if (status) {
         query = query.eq('status', status);
+      } else if (!canViewAll) {
+        // Regular users can only see published announcements
+        query = query.eq('status', 'published');
       }
+      
       if (priority) {
         query = query.eq('priority', priority);
       }

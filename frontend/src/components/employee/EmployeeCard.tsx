@@ -1,23 +1,25 @@
 import React from 'react';
-import { User, Mail, Phone, MapPin, Calendar, Edit, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Calendar, Settings, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { Employee } from '../../services/employeeService';
 
 interface EmployeeCardProps {
   employee: Employee;
   darkMode: boolean;
   isHighlighted: boolean;
-  onEdit: (employee: Employee) => void;
+  onStatusManage: (employee: Employee) => void;
   onSelect: (employeeId: string, selected: boolean) => void;
   isSelected: boolean;
+  currentUserRole: string;
 }
 
 export const EmployeeCard: React.FC<EmployeeCardProps> = ({
   employee,
   darkMode,
   isHighlighted,
-  onEdit,
+  onStatusManage,
   onSelect,
-  isSelected
+  isSelected,
+  currentUserRole
 }) => {
   const getRoleColor = (role: string) => {
     switch (role) {
@@ -80,7 +82,7 @@ export const EmployeeCard: React.FC<EmployeeCardProps> = ({
           : ''
         }
       `}
-      onClick={() => onEdit(employee)}
+      onClick={() => onStatusManage(employee)}
     >
       {/* Selection Checkbox */}
       <div className="absolute top-4 right-4">
@@ -182,25 +184,38 @@ export const EmployeeCard: React.FC<EmployeeCardProps> = ({
         )}
       </div>
 
-      {/* Edit Button */}
+      {/* Status Management Button */}
       <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onEdit(employee);
-          }}
-          className={`
+        {['superadmin', 'super-admin', 'admin', 'hr'].includes(currentUserRole) ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onStatusManage(employee);
+            }}
+            className={`
+              w-full flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium
+              ${darkMode 
+                ? 'bg-orange-600 hover:bg-orange-700 text-white' 
+                : 'bg-orange-600 hover:bg-orange-700 text-white'
+              }
+              transition-colors duration-200
+            `}
+          >
+            <Settings className="h-4 w-4 mr-2" />
+            Manage Status
+          </button>
+        ) : (
+          <div className={`
             w-full flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium
             ${darkMode 
-              ? 'bg-blue-600 hover:bg-blue-700 text-white' 
-              : 'bg-blue-600 hover:bg-blue-700 text-white'
+              ? 'bg-gray-600 text-gray-400 cursor-not-allowed' 
+              : 'bg-gray-200 text-gray-500 cursor-not-allowed'
             }
-            transition-colors duration-200
-          `}
-        >
-          <Edit className="h-4 w-4 mr-2" />
-          Edit Profile
-        </button>
+          `}>
+            <User className="h-4 w-4 mr-2" />
+            View Only
+          </div>
+        )}
       </div>
 
       {/* Highlight Effect */}

@@ -556,4 +556,230 @@ export class EmployeeController {
       });
     }
   }
+}  /**
+   
+* Update employee status (for management roles only)
+   * PUT /api/employees/:id/status
+   */
+  async updateEmployeeStatus(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { status, reason } = req.body;
+      const changedById = req.user?.id;
+      const userRole = req.user?.role;
+
+      // Validate user has permission to update employee status
+      const authorizedRoles = ['superadmin', 'super-admin', 'admin', 'hr'];
+      if (!authorizedRoles.includes(userRole)) {
+        res.status(403).json({
+          status: 'error',
+          message: 'Insufficient permissions to update employee status'
+        });
+        return;
+      }
+
+      // Validate status
+      if (!status || !['active', 'pending', 'rejected'].includes(status)) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Invalid status. Must be active, pending, or rejected'
+        });
+        return;
+      }
+
+      // Validate employee ID is a proper UUID
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(id)) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Invalid employee ID format'
+        });
+        return;
+      }
+
+      logger.info('EmployeeController: Update employee status', { 
+        employeeId: id, 
+        newStatus: status, 
+        changedBy: changedById,
+        userRole,
+        reason 
+      });
+
+      // Call database function to update status
+      const result = await this.employeeService.updateEmployeeStatus(id, status, changedById, userRole, reason);
+
+      res.status(200).json(result);
+    } catch (error) {
+      logger.error('EmployeeController: Update employee status error', { 
+        error: (error as Error).message,
+        employeeId: req.params.id 
+      });
+      res.status(400).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
+
+  /**
+   * Get employee status change history
+   * GET /api/employees/:id/status-history
+   */
+  async getEmployeeStatusHistory(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const userRole = req.user?.role;
+
+      // Validate user has permission to view employee history
+      const authorizedRoles = ['superadmin', 'super-admin', 'admin', 'hr'];
+      if (!authorizedRoles.includes(userRole)) {
+        res.status(403).json({
+          status: 'error',
+          message: 'Insufficient permissions to view employee history'
+        });
+        return;
+      }
+
+      // Validate employee ID is a proper UUID
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(id)) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Invalid employee ID format'
+        });
+        return;
+      }
+
+      logger.info('EmployeeController: Get employee status history', { 
+        employeeId: id, 
+        requestedBy: req.user?.id,
+        userRole 
+      });
+
+      const history = await this.employeeService.getEmployeeStatusHistory(id, userRole);
+
+      res.status(200).json({
+        status: 'success',
+        data: history
+      });
+    } catch (error) {
+      logger.error('EmployeeController: Get employee status history error', { 
+        error: (error as Error).message,
+        employeeId: req.params.id 
+      });
+      res.status(400).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
+
+  /**
+   * Get employees for management (with restrictions)
+   * GET /api/employees/management
+   */
+  async getEmployeesForManagement(req: Request, res: Response): Promise<void> {
+    try {
+      const userRole = req.user?.role;
+      const statusFilter = req.query.status as string;
+      const roleFilter = req.query.role as string;
+      const departmentFilter = req.query.department as string;
+
+      // Validate user has permission to access employee management
+      const authorizedRoles = ['superadmin', 'super-admin', 'admin', 'hr'];
+      if (!authorizedRoles.includes(userRole)) {
+        res.status(403).json({
+          status: 'error',
+          message: 'Access denied. Only SuperAdmin, Admin, and HR can access employee management.'
+        });
+        return;
+      }
+
+      logger.info('EmployeeController: Get employees for management', { 
+        requestedBy: req.user?.id,
+        userRole,
+        filters: { statusFilter, roleFilter, departmentFilter }
+      });
+
+      const employees = await this.employeeService.getEmployeesForManagement(
+        userRole,
+        req.user?.id || '',
+        statusFilter, 
+        roleFilter, 
+        departmentFilter
+      );
+
+      res.status(200).json({
+        status: 'success',
+        data: employees
+      });
+    } catch (error) {
+      logger.error('EmployeeController: Get employees for management error', { 
+        error: (error as Error).message,
+        requestedBy: req.user?.id 
+      });
+      res.status(400).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
+
+  /**
+   * Update employee non-personal fields (for management roles only)
+   * PUT /api/employees/:id/fields
+   */
+  async updateEmployeeFields(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { department_id, position, role, manager_id, salary } = req.body;
+      const userRole = req.user?.role;
+      const userId = req.user?.id;
+
+      // Validate user has permission to update employee fields
+      const authorizedRoles = ['superadmin', 'super-admin', 'admin', 'hr'];
+      if (!authorizedRoles.includes(userRole)) {
+        res.status(403).json({
+          status: 'error',
+          message: 'Insufficient permissions to update employee fields'
+        });
+        return;
+      }
+
+      // Validate employee ID is a proper UUID
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(id)) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Invalid employee ID format'
+        });
+        return;
+      }
+
+      logger.info('EmployeeController: Update employee fields', { 
+        employeeId: id, 
+        fields: { department_id, position, role, manager_id, salary },
+        updatedBy: userId,
+        userRole 
+      });
+
+      const result = await this.employeeService.updateEmployeeFields(
+        id, 
+        { department_id, position, role, manager_id, salary },
+        userId,
+        userRole
+      );
+
+      res.status(200).json(result);
+    } catch (error) {
+      logger.error('EmployeeController: Update employee fields error', { 
+        error: (error as Error).message,
+        employeeId: req.params.id 
+      });
+      res.status(400).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
 }

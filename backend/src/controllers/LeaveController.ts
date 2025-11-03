@@ -181,8 +181,9 @@ export class LeaveController {
             const userRole = req.user?.role;
             const userId = req.user?.id;
 
-            // Check if user has permission to approve requests
-            if (!['superadmin', 'super-admin', 'admin', 'hr'].includes(userRole)) {
+            // Check if user has permission to approve requests - support both superadmin formats
+            const authorizedRoles = ['superadmin', 'super-admin', 'admin', 'hr'];
+            if (!authorizedRoles.includes(userRole)) {
                 res.status(403).json({
                     status: 'error',
                     message: 'Insufficient permissions'
@@ -190,9 +191,18 @@ export class LeaveController {
                 return;
             }
 
+            // Validate userId is a proper UUID
+            if (!userId || !this.isValidUUID(userId)) {
+                res.status(400).json({
+                    status: 'error',
+                    message: 'Invalid user ID format'
+                });
+                return;
+            }
+
             logger.info('📋 [LeaveController] Get pending leave requests', { userRole, userId });
 
-            // Use the new role-based filtering to exclude own requests
+            // Use the enhanced role-based filtering with employee info
             const pendingRequests = await this.leaveService.getPendingLeaveRequestsForRole(userRole, userId);
 
             res.status(200).json({
@@ -208,6 +218,14 @@ export class LeaveController {
                 message: (error as Error).message
             });
         }
+    }
+
+    /**
+     * Validate UUID format
+     */
+    private isValidUUID(uuid: string): boolean {
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        return uuidRegex.test(uuid);
     }
 
     /**

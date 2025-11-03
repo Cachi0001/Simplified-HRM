@@ -43,6 +43,12 @@ router.post('/:id/reject', requireRole(['admin', 'hr', 'superadmin']), (req, res
 router.post('/:id/update-role', requireRole(['admin', 'super-admin']), (req, res) => employeeController.updateRole(req, res));
 router.post('/:id/department', requireRole(['admin', 'hr', 'super-admin']), (req, res) => employeeController.assignDepartment(req, res));
 
+// Employee management endpoints
+router.get('/management', requireRole(['admin', 'hr', 'super-admin', 'superadmin']), (req, res) => employeeController.getEmployeesForManagement(req, res));
+router.put('/:id/status', requireRole(['admin', 'hr', 'super-admin', 'superadmin']), (req, res) => employeeController.updateEmployeeStatus(req, res));
+router.put('/:id/fields', requireRole(['admin', 'hr', 'super-admin', 'superadmin']), (req, res) => employeeController.updateEmployeeFields(req, res));
+router.get('/:id/status-history', requireRole(['admin', 'hr', 'super-admin', 'superadmin']), (req, res) => employeeController.getEmployeeStatusHistory(req, res));
+
 // Bulk operations
 router.post('/bulk-update', requireRole(['admin', 'hr', 'super-admin', 'superadmin']), (req, res) => employeeController.bulkUpdateEmployees(req, res));
 

@@ -81,11 +81,13 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
               `}
             >
               <option value="">All Departments</option>
-              {departments.map((dept) => (
+              {departments && departments.length > 0 ? departments.map((dept) => (
                 <option key={dept.id} value={dept.name}>
                   {dept.name}
                 </option>
-              ))}
+              )) : (
+                <option value="" disabled>No departments available</option>
+              )}
             </select>
           </div>
         </div>

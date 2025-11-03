@@ -23,7 +23,7 @@ export default function HRDashboard() {
   });
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('overview');
-  const [stats] = useState({
+  const [stats, setStats] = useState({
     pendingLeaves: 0,
     pendingEmployees: 0,
     pendingPurchases: 0

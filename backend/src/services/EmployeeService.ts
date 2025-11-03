@@ -495,3 +495,204 @@ export class EmployeeService {
     }
   }
 }
+  /**
+   * Update employee status using database function
+   */
+  async updateEmployeeStatus(
+    employeeId: string, 
+    newStatus: string, 
+    changedById: string, 
+    updaterRole: string,
+    reason?: string
+  ): Promise<any> {
+    try {
+      logger.info('EmployeeService: Updating employee status', { 
+        employeeId, 
+        newStatus, 
+        changedById,
+        updaterRole,
+        reason 
+      });
+
+      // Call the database function
+      const { data, error } = await db
+        .rpc('update_employee_status_with_role', {
+          p_employee_id: employeeId,
+          p_new_status: newStatus,
+          p_updated_by: changedById,
+          p_updater_role: updaterRole
+        });
+
+      if (error) {
+        logger.error('EmployeeService: Database error updating employee status', { error });
+        throw new Error(error.message || 'Failed to update employee status');
+      }
+
+      if (!data || !data.success) {
+        throw new Error(data?.error || 'Failed to update employee status');
+      }
+
+      logger.info('EmployeeService: Employee status updated successfully', { 
+        employeeId,
+        result: data
+      });
+
+      return data;
+    } catch (error) {
+      logger.error('EmployeeService: Error updating employee status', { 
+        error: (error as Error).message,
+        employeeId 
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get employee status change history
+   */
+  async getEmployeeStatusHistory(employeeId: string, userRole: string): Promise<any[]> {
+    try {
+      logger.info('EmployeeService: Getting employee status history', { 
+        employeeId, 
+        userRole 
+      });
+
+      // Call the database function
+      const { data, error } = await db
+        .rpc('get_employee_status_history', {
+          p_employee_id: employeeId,
+          p_user_role: userRole
+        });
+
+      if (error) {
+        logger.error('EmployeeService: Database error getting employee status history', { error });
+        throw new Error(error.message || 'Failed to get employee status history');
+      }
+
+      const history = data || [];
+
+      logger.info('EmployeeService: Employee status history retrieved successfully', { 
+        employeeId,
+        historyCount: history.length
+      });
+
+      return history.map((item: any) => item.history_data);
+    } catch (error) {
+      logger.error('EmployeeService: Error getting employee status history', { 
+        error: (error as Error).message,
+        employeeId 
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get employees for management with restrictions
+   */
+  async getEmployeesForManagement(
+    userRole: string,
+    requesterId: string,
+    statusFilter?: string,
+    roleFilter?: string,
+    departmentFilter?: string
+  ): Promise<any[]> {
+    try {
+      logger.info('EmployeeService: Getting employees for management', { 
+        userRole,
+        requesterId,
+        filters: { statusFilter, roleFilter, departmentFilter }
+      });
+
+      // Call the database function
+      const { data, error } = await db
+        .rpc('get_all_employees_for_management', {
+          p_requester_role: userRole,
+          p_requester_id: requesterId
+        });
+
+      if (error) {
+        logger.error('EmployeeService: Database error getting employees for management', { error });
+        throw new Error(error.message || 'Failed to get employees for management');
+      }
+
+      if (!data || !data.success) {
+        throw new Error(data?.error || 'Failed to get employees for management');
+      }
+
+      const employees = data.employees || [];
+
+      logger.info('EmployeeService: Employees for management retrieved successfully', { 
+        userRole,
+        employeeCount: employees.length
+      });
+
+      return employees;
+    } catch (error) {
+      logger.error('EmployeeService: Error getting employees for management', { 
+        error: (error as Error).message,
+        userRole 
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Update employee non-personal fields using database function
+   */
+  async updateEmployeeFields(
+    employeeId: string,
+    fields: {
+      department_id?: string;
+      position?: string;
+      role?: string;
+      manager_id?: string;
+      salary?: number;
+    },
+    updatedById: string,
+    updaterRole: string
+  ): Promise<any> {
+    try {
+      logger.info('EmployeeService: Updating employee fields', { 
+        employeeId, 
+        fields,
+        updatedById,
+        updaterRole 
+      });
+
+      // Call the database function
+      const { data, error } = await db
+        .rpc('update_employee_fields', {
+          p_employee_id: employeeId,
+          p_updated_by: updatedById,
+          p_updater_role: updaterRole,
+          p_department_id: fields.department_id || null,
+          p_position: fields.position || null,
+          p_role: fields.role || null,
+          p_manager_id: fields.manager_id || null,
+          p_salary: fields.salary || null
+        });
+
+      if (error) {
+        logger.error('EmployeeService: Database error updating employee fields', { error });
+        throw new Error(error.message || 'Failed to update employee fields');
+      }
+
+      if (!data || !data.success) {
+        throw new Error(data?.error || 'Failed to update employee fields');
+      }
+
+      logger.info('EmployeeService: Employee fields updated successfully', { 
+        employeeId,
+        result: data
+      });
+
+      return data;
+    } catch (error) {
+      logger.error('EmployeeService: Error updating employee fields', { 
+        error: (error as Error).message,
+        employeeId 
+      });
+      throw error;
+    }
+  }
+}
