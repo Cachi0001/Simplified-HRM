@@ -389,6 +389,7 @@ export default function HRDashboard() {
             </div>
 
             {/* Quick Stats Grid */}
+            {stats && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
                 <div className="flex items-center justify-between">
@@ -397,7 +398,7 @@ export default function HRDashboard() {
                       Pending Approvals
                     </p>
                     <p className={`text-2xl font-bold mt-1 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                      {stats.pendingEmployees}
+                      {stats.pendingEmployees || 0}
                     </p>
                   </div>
                   <div className="bg-blue-100 dark:bg-blue-900 p-3 rounded-lg">
@@ -413,7 +414,7 @@ export default function HRDashboard() {
                       Leave Requests
                     </p>
                     <p className={`text-2xl font-bold mt-1 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                      {stats.pendingLeaves}
+                      {stats.pendingLeaves || 0}
                     </p>
                   </div>
                   <div className="bg-yellow-100 dark:bg-yellow-900 p-3 rounded-lg">
@@ -454,6 +455,7 @@ export default function HRDashboard() {
                 </div>
               </div>
             </div>
+            )}
           </div>
         )}
 

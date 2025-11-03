@@ -27,6 +27,7 @@ import { ProtectedRoute } from './src/components/auth/ProtectedRoute';
 import ApiConnectionTest from './src/components/ApiConnectionTest';
 import { FloatingChatWidget } from './src/components/chat/FloatingChatWidget';
 import { ChatDemo } from './src/components/demo/ChatDemo';
+import ErrorBoundary from './src/components/ErrorBoundary';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -152,17 +153,19 @@ function AppContent() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <ToastProvider>
-          <BrowserRouter>
-            <AuthProvider>
-              <AppContent />
-            </AuthProvider>
-          </BrowserRouter>
-        </ToastProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <ToastProvider>
+            <BrowserRouter>
+              <AuthProvider>
+                <AppContent />
+              </AuthProvider>
+            </BrowserRouter>
+          </ToastProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

@@ -11,6 +11,9 @@ router.use(authenticateToken);
 // GET /api/announcements - Get all announcements
 router.get('/', (req, res) => announcementController.getAnnouncements(req, res));
 
+// GET /api/announcements/templates - Get announcement templates (must be before /:id route)
+router.get('/templates', (req, res) => announcementController.getTemplates(req, res));
+
 // GET /api/announcements/:id - Get specific announcement
 router.get('/:id', (req, res) => announcementController.getAnnouncement(req, res));
 
@@ -43,8 +46,5 @@ router.post('/:id/archive', (req, res) => announcementController.archiveAnnounce
 
 // POST /api/announcements/:id/read - Mark announcement as read
 router.post('/:id/read', (req, res) => announcementController.markAsRead(req, res));
-
-// GET /api/announcements/templates - Get announcement templates
-router.get('/templates', (req, res) => announcementController.getTemplates(req, res));
 
 export default router;

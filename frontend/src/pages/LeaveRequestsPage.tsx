@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Clock, CheckCircle, XCircle, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Plus, Trash2, Clock, CheckCircle, XCircle, AlertCircle, ArrowLeft, Check, X } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { useToast } from '../components/ui/Toast';
@@ -28,6 +28,10 @@ export function LeaveRequestsPage() {
     requestName: ''
   });
   const [deleting, setDeleting] = useState(false);
+  const [approving, setApproving] = useState<string | null>(null);
+  const [rejecting, setRejecting] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [showRejectModal, setShowRejectModal] = useState<string | null>(null);
   const [formData, setFormData] = useState<LeaveRequestFormData>({
     startDate: '',
     endDate: '',
@@ -144,6 +148,76 @@ export function LeaveRequestsPage() {
     } finally {
       setDeleting(false);
     }
+  };
+
+  const handleApprove = async (requestId: string) => {
+    try {
+      setApproving(requestId);
+      await api.put(`/leave/${requestId}/approve`, {
+        notes: 'Approved via dashboard'
+      });
+      
+      // Update the request status locally
+      setLeaveRequests(prev => 
+        prev.map(req => 
+          req.id === requestId 
+            ? { ...req, status: 'approved', approved_by: currentUser?.id, approved_at: new Date().toISOString() }
+            : req
+        )
+      );
+      
+      addToast('success', 'Leave request approved successfully');
+    } catch (error: any) {
+      console.error('Error approving leave request:', error);
+      const errorMessage = error.response?.data?.message || 'Failed to approve leave request';
+      addToast('error', errorMessage);
+    } finally {
+      setApproving(null);
+    }
+  };
+
+  const handleRejectClick = (requestId: string) => {
+    setShowRejectModal(requestId);
+    setRejectReason('');
+  };
+
+  const handleRejectConfirm = async () => {
+    if (!showRejectModal || !rejectReason.trim()) {
+      addToast('error', 'Please provide a reason for rejection');
+      return;
+    }
+
+    try {
+      setRejecting(showRejectModal);
+      await api.put(`/leave/${showRejectModal}/reject`, {
+        rejection_reason: rejectReason
+      });
+      
+      // Update the request status locally
+      setLeaveRequests(prev => 
+        prev.map(req => 
+          req.id === showRejectModal 
+            ? { ...req, status: 'rejected', rejected_by: currentUser?.id, rejected_at: new Date().toISOString(), rejection_reason: rejectReason }
+            : req
+        )
+      );
+      
+      addToast('success', 'Leave request rejected');
+      setShowRejectModal(null);
+      setRejectReason('');
+    } catch (error: any) {
+      console.error('Error rejecting leave request:', error);
+      const errorMessage = error.response?.data?.message || 'Failed to reject leave request';
+      addToast('error', errorMessage);
+    } finally {
+      setRejecting(null);
+    }
+  };
+
+  const canApproveReject = (request: LeaveRequest) => {
+    return currentUser && 
+           ['hr', 'admin', 'superadmin'].includes(currentUser.role) && 
+           request.status === 'pending';
   };
 
   const getStatusIcon = (status: string) => {
@@ -344,6 +418,45 @@ export function LeaveRequestsPage() {
                       {safeString(request.status, 'pending').charAt(0).toUpperCase() + safeString(request.status, 'pending').slice(1)}
                     </span>
                   </div>
+                  {/* Approve/Reject buttons for HR/Admin/SuperAdmin */}
+                  {canApproveReject(request) && (
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => handleApprove(request.id)}
+                        disabled={approving === request.id}
+                        className={`p-2 rounded-lg transition-colors duration-200 ${
+                          darkMode 
+                            ? 'bg-green-900 text-green-400 hover:bg-green-800 disabled:bg-gray-700 disabled:text-gray-500' 
+                            : 'bg-green-100 text-green-600 hover:bg-green-200 disabled:bg-gray-100 disabled:text-gray-400'
+                        }`}
+                        title="Approve request"
+                      >
+                        {approving === request.id ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                        ) : (
+                          <Check className="h-4 w-4" />
+                        )}
+                      </button>
+                      <button
+                        onClick={() => handleRejectClick(request.id)}
+                        disabled={rejecting === request.id}
+                        className={`p-2 rounded-lg transition-colors duration-200 ${
+                          darkMode 
+                            ? 'bg-red-900 text-red-400 hover:bg-red-800 disabled:bg-gray-700 disabled:text-gray-500' 
+                            : 'bg-red-100 text-red-600 hover:bg-red-200 disabled:bg-gray-100 disabled:text-gray-400'
+                        }`}
+                        title="Reject request"
+                      >
+                        {rejecting === request.id ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                        ) : (
+                          <X className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Delete button for request owner */}
                   {(currentUser?.id === request.employee_id && request.status === 'pending') && (
                     <button
                       onClick={() => handleDeleteClick(request)}
@@ -420,6 +533,59 @@ export function LeaveRequestsPage() {
         type="danger"
         loading={deleting}
       />
+
+      {/* Reject Reason Modal */}
+      {showRejectModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className={`max-w-md w-full mx-4 rounded-lg shadow-lg ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+            <div className="p-6">
+              <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                Reject Leave Request
+              </h3>
+              <p className={`text-sm mb-4 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                Please provide a reason for rejecting this leave request:
+              </p>
+              <textarea
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="Enter rejection reason..."
+                className={`w-full p-3 border rounded-lg resize-none ${
+                  darkMode 
+                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                }`}
+                rows={4}
+              />
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  onClick={() => {
+                    setShowRejectModal(null);
+                    setRejectReason('');
+                  }}
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    darkMode 
+                      ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleRejectConfirm}
+                  disabled={!rejectReason.trim() || rejecting === showRejectModal}
+                  className={`px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                    darkMode 
+                      ? 'bg-red-600 text-white hover:bg-red-700' 
+                      : 'bg-red-600 text-white hover:bg-red-700'
+                  }`}
+                >
+                  {rejecting === showRejectModal ? 'Rejecting...' : 'Reject Request'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
