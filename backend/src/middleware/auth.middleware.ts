@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import logger from '../utils/logger';
 import { RoleHierarchyService } from '../services/RoleHierarchyService';
+import DomainValidator from '../utils/domainValidator';
 
 declare global {
   namespace Express {
@@ -21,6 +22,34 @@ export interface JwtPayload {
 
 export const authenticateToken = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
+    // Validate origin domain for enhanced security
+    const origin = req.headers.origin;
+    if (origin) {
+      const validationResult = DomainValidator.getValidationDetails(origin);
+      if (!validationResult.isValid) {
+        logger.warn('Authentication attempt from invalid domain:', {
+          origin,
+          reason: validationResult.reason,
+          ip: req.ip,
+          userAgent: req.headers['user-agent']
+        });
+        res.status(403).json({
+          status: 'error',
+          message: 'Access denied from this domain'
+        });
+        return;
+      }
+      
+      // Log successful domain validation for go3net.com
+      if (origin.includes('go3net.com')) {
+        logger.info('Authentication from go3net.com domain:', {
+          origin,
+          domain: validationResult.domain,
+          subdomain: validationResult.subdomain
+        });
+      }
+    }
+
     const authHeader = req.headers.authorization;
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 

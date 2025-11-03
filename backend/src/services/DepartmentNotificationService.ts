@@ -1,7 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import supabase from '../config/supabase';
 import logger from '../utils/logger';
-import { NotificationService } from './NotificationService';
+import NotificationService from './NotificationService';
 import { EmailService } from './EmailService';
 import EmailTemplateService from './EmailTemplateService';
 import db from '../config/database';
@@ -53,13 +53,31 @@ export interface DepartmentBroadcast {
 
 export class DepartmentNotificationService {
     private supabase: SupabaseClient;
-    private notificationService: NotificationService;
+    private notificationService: typeof NotificationService;
     private emailService: EmailService;
 
     constructor() {
         this.supabase = supabase.getClient();
-        this.notificationService = new NotificationService();
+        this.notificationService = NotificationService;
         this.emailService = new EmailService(db);
+    }
+
+    /**
+     * Map department notification type to database notification type
+     */
+    private mapNotificationType(type: 'announcement' | 'system' | 'message' | 'task'): 'announcement' | 'alert' | 'update' | 'task' {
+        switch (type) {
+            case 'announcement':
+                return 'announcement';
+            case 'system':
+                return 'alert';
+            case 'message':
+                return 'update';
+            case 'task':
+                return 'task';
+            default:
+                return 'update';
+        }
     }
 
     /**
@@ -545,7 +563,7 @@ export class DepartmentNotificationService {
                     userId: recipient.id,
                     title: notification.title,
                     message: notification.message,
-                    type: notification.type,
+                    type: this.mapNotificationType(notification.type),
                     priority: notification.priority,
                     metadata: {
                         departmentNotificationId: notification.id,

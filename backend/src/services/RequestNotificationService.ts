@@ -1,7 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import supabase from '../config/supabase';
 import logger from '../utils/logger';
-import { NotificationService } from './NotificationService';
+import NotificationService from './NotificationService';
 import { EmailService } from './EmailService';
 import EmailTemplateService from './EmailTemplateService';
 import db from '../config/database';
@@ -41,12 +41,12 @@ export interface RequestNotificationData {
 
 export class RequestNotificationService {
     private supabase: SupabaseClient;
-    private notificationService: NotificationService;
+    private notificationService: typeof NotificationService;
     private emailService: EmailService;
 
     constructor() {
         this.supabase = supabase.getClient();
-        this.notificationService = new NotificationService();
+        this.notificationService = NotificationService;
         this.emailService = new EmailService(db);
     }
 
@@ -744,14 +744,14 @@ export class RequestNotificationService {
     /**
      * Map request type to notification type
      */
-    private mapRequestTypeToNotificationType(requestType: RequestType): 'leave_request' | 'purchase_request' | 'info' {
+    private mapRequestTypeToNotificationType(requestType: RequestType): 'leave_request' | 'purchase_request' | 'update' {
         switch (requestType) {
             case 'leave':
                 return 'leave_request';
             case 'purchase':
                 return 'purchase_request';
             default:
-                return 'info';
+                return 'update';
         }
     }
 

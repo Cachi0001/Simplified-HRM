@@ -34,7 +34,7 @@ export class NotificationService {
           originalType: request.type,
           fallbackType: 'info'
         });
-        notificationType = 'info';
+        notificationType = 'update';
       }
 
       const { data, error } = await this.supabase

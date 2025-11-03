@@ -2,7 +2,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import supabase from '../config/supabase';
 import logger from '../utils/logger';
 import PerformanceAnalyticsService from './PerformanceAnalyticsService';
-import { NotificationService } from './NotificationService';
+import NotificationService from './NotificationService';
 
 export interface PerformanceJobConfig {
     enabled: boolean;
@@ -23,13 +23,13 @@ export interface JobExecutionResult {
 export class PerformanceMetricsJob {
     private supabase: SupabaseClient;
     private performanceService: typeof PerformanceAnalyticsService;
-    private notificationService: NotificationService;
+    private notificationService: typeof NotificationService;
     private config: PerformanceJobConfig;
 
     constructor(config?: Partial<PerformanceJobConfig>) {
         this.supabase = supabase.getClient();
         this.performanceService = PerformanceAnalyticsService;
-        this.notificationService = new NotificationService();
+        this.notificationService = NotificationService;
         
         this.config = {
             enabled: true,
@@ -329,7 +329,7 @@ export class PerformanceMetricsJob {
             for (const admin of admins || []) {
                 await this.notificationService.createNotification({
                     userId: admin.id,
-                    type: 'system',
+                    type: 'alert',
                     title: 'Performance Calculation Complete',
                     message
                 });

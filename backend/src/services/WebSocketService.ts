@@ -4,6 +4,7 @@ import Redis from 'ioredis';
 import jwt from 'jsonwebtoken';
 import logger from '../utils/logger';
 import supabaseConfig from '../config/supabase';
+import DomainValidator from '../utils/domainValidator';
 
 export class WebSocketService {
   private io: SocketIOServer;
@@ -12,18 +13,36 @@ export class WebSocketService {
   private subClient: Redis;
 
   constructor(server: HttpServer) {
-    // Initialize Socket.IO
+    // Initialize Socket.IO with enhanced CORS support for go3net.com
     this.io = new SocketIOServer(server, {
       cors: {
         origin: [
+          // Development domains
           "http://localhost:5173",
+          "http://localhost:3000",
+          "http://127.0.0.1:5173",
+          "http://127.0.0.1:3000",
+          
+          // Production domains
           "https://go3nethrm.vercel.app",
-          "https://go3nethrm.com"
+          "https://go3nethrm.com",
+          "https://www.go3nethrm.com",
+          
+          // go3net.com domains (primary custom domain)
+          "https://go3net.com",
+          "https://www.go3net.com",
+          "https://app.go3net.com",
+          "https://admin.go3net.com",
+          "https://api.go3net.com",
+          "https://hr.go3net.com",
+          "https://hrm.go3net.com"
         ],
-        methods: ["GET", "POST"],
-        credentials: true
+        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        credentials: true,
+        allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"]
       },
-      transports: ['websocket', 'polling']
+      transports: ['websocket', 'polling'],
+      allowEIO3: true // Allow Engine.IO v3 clients for better compatibility
     });
 
     // Initialize Redis clients
@@ -40,7 +59,26 @@ export class WebSocketService {
 
   private setupSocketHandlers() {
     this.io.on('connection', (socket) => {
-      logger.info('👤 User connected:', socket.id);
+      // Validate origin domain for security
+      const origin = socket.handshake.headers.origin;
+      const validationResult = DomainValidator.getValidationDetails(origin || '');
+      
+      if (!validationResult.isValid) {
+        logger.warn('❌ WebSocket connection from invalid origin:', {
+          origin,
+          reason: validationResult.reason,
+          socketId: socket.id
+        });
+        socket.disconnect(true);
+        return;
+      }
+      
+      logger.info('👤 User connected from valid domain:', {
+        socketId: socket.id,
+        origin,
+        domain: validationResult.domain,
+        subdomain: validationResult.subdomain
+      });
 
       // Handle user authentication and room joining
       socket.on('authenticate', async (data: { userId: string, token: string }) => {

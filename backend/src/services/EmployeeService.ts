@@ -516,7 +516,8 @@ export class EmployeeService {
       });
 
       // Use the new safe database function
-      const { data, error } = await this.employeeRepository.supabase.rpc('update_employee_status', {
+      const supabase = supabaseConfig.getClient();
+      const { data, error } = await supabase.rpc('update_employee_status', {
         p_employee_id: employeeId,
         p_status: newStatus,
         p_requester_id: changedById
@@ -562,7 +563,8 @@ export class EmployeeService {
       });
 
       // Use the new safe database function
-      const { data, error } = await this.employeeRepository.supabase.rpc('update_employee_manager', {
+      const supabase = supabaseConfig.getClient();
+      const { data, error } = await supabase.rpc('update_employee_manager', {
         p_employee_id: employeeId,
         p_manager_id: managerId,
         p_requester_id: requesterId
