@@ -4,9 +4,10 @@ import React from 'react';
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label: string;
   id: string;
+  darkMode?: boolean; // Accept darkMode but don't pass it to DOM
 }
 
-export const Input: React.FC<InputProps> = ({ label, id, className = "", ...props }) => {
+export const Input: React.FC<InputProps> = ({ label, id, className = "", darkMode, ...props }) => {
   return (
     <div>
       <label htmlFor={id} className="block text-sm font-medium text-gray-300">

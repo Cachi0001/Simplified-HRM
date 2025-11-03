@@ -114,11 +114,32 @@ export class LeaveService {
             const leaveRequest = typeof result === 'string' ? JSON.parse(result) : result;
 
             // Get employee role for notifications
-            const { data: employee, error: employeeError } = await this.supabase
-                .from('employees')
-                .select('role, full_name')
-                .eq('id', data.employee_id)
-                .single();
+            // First try to get by the actual employee_id returned from the function
+            let employee = null;
+            let employeeError = null;
+            
+            if (leaveRequest.employee_id) {
+                const result = await this.supabase
+                    .from('employees')
+                    .select('role, full_name')
+                    .eq('id', leaveRequest.employee_id)
+                    .single();
+                employee = result.data;
+                employeeError = result.error;
+            }
+            
+            // If that fails, try with the original input (might be user_id)
+            if (!employee && data.employee_id) {
+                const result = await this.supabase
+                    .from('employees')
+                    .select('role, full_name')
+                    .eq('user_id', data.employee_id)
+                    .single();
+                if (!result.error) {
+                    employee = result.data;
+                    employeeError = null;
+                }
+            }
 
             if (employeeError) {
                 logger.warn('LeaveService: Could not get employee details for notifications', { error: employeeError.message });
@@ -292,6 +313,41 @@ export class LeaveService {
             return data || [];
         } catch (error) {
             logger.error('LeaveService: Get pending leave requests failed', { error: (error as Error).message });
+            throw error;
+        }
+    }
+
+    /**
+     * Get pending leave requests for a specific role (excludes own requests)
+     */
+    async getPendingLeaveRequestsForRole(userRole: string, userId: string): Promise<ILeaveRequest[]> {
+        try {
+            logger.info('LeaveService: Getting pending requests for role', { userRole, userId });
+
+            const { data: result, error } = await this.supabase
+                .rpc('get_pending_requests_for_role', {
+                    p_user_role: userRole,
+                    p_user_id: userId,
+                    p_request_type: 'leave'
+                });
+
+            if (error) {
+                logger.error('LeaveService: Failed to get role-based pending requests', { error: error.message });
+                throw error;
+            }
+
+            if (!result) {
+                return [];
+            }
+
+            // Parse the JSON results
+            const requests = Array.isArray(result) ? result : [result];
+            return requests.map(item => {
+                const requestData = typeof item.request_data === 'string' ? JSON.parse(item.request_data) : item.request_data;
+                return requestData;
+            });
+        } catch (error) {
+            logger.error('LeaveService: Get role-based pending requests failed', { error: (error as Error).message });
             throw error;
         }
     }

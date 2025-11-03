@@ -5,9 +5,10 @@ import Logo from './Logo';
 interface CardProps {
   children: React.ReactNode;
   className?: string;
+  darkMode?: boolean; // Accept darkMode but don't use it (for compatibility)
 }
 
-export const Card: React.FC<CardProps> = ({ children, className }) => {
+export const Card: React.FC<CardProps> = ({ children, className, darkMode }) => {
   return (
     <div className={`bg-secondary rounded-lg shadow-xl p-8 ${className}`}>
       {children}

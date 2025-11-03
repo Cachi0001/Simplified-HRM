@@ -87,12 +87,12 @@ export class PurchaseService {
                 .rpc('create_purchase_request', {
                     p_employee_id: data.employee_id,
                     p_item_name: data.item_name,
+                    p_unit_price: data.unit_price,
                     p_description: data.description || null,
                     p_quantity: data.quantity || 1,
-                    p_unit_price: data.unit_price,
                     p_vendor: data.vendor || null,
                     p_category: data.category || null,
-                    p_urgency: data.urgency || 'normal',
+                    p_urgency: data.urgency || 'medium',
                     p_justification: data.justification || null,
                     p_notes: data.notes || null,
                     p_budget_code: data.budget_code || null,
@@ -112,11 +112,32 @@ export class PurchaseService {
             const purchaseRequest = typeof result === 'string' ? JSON.parse(result) : result;
 
             // Get employee role for notifications
-            const { data: employee, error: employeeError } = await this.supabase
-                .from('employees')
-                .select('role, full_name')
-                .eq('id', data.employee_id)
-                .single();
+            // First try to get by the actual employee_id returned from the function
+            let employee = null;
+            let employeeError = null;
+            
+            if (purchaseRequest.employee_id) {
+                const result = await this.supabase
+                    .from('employees')
+                    .select('role, full_name')
+                    .eq('id', purchaseRequest.employee_id)
+                    .single();
+                employee = result.data;
+                employeeError = result.error;
+            }
+            
+            // If that fails, try with the original input (might be user_id)
+            if (!employee && data.employee_id) {
+                const result = await this.supabase
+                    .from('employees')
+                    .select('role, full_name')
+                    .eq('user_id', data.employee_id)
+                    .single();
+                if (!result.error) {
+                    employee = result.data;
+                    employeeError = null;
+                }
+            }
 
             if (employeeError) {
                 logger.warn('PurchaseService: Could not get employee details for notifications', { error: employeeError.message });
@@ -294,6 +315,41 @@ export class PurchaseService {
             return data || [];
         } catch (error) {
             logger.error('PurchaseService: Get pending purchase requests failed', { error: (error as Error).message });
+            throw error;
+        }
+    }
+
+    /**
+     * Get pending purchase requests for a specific role (excludes own requests)
+     */
+    async getPendingPurchaseRequestsForRole(userRole: string, userId: string): Promise<IPurchaseRequest[]> {
+        try {
+            logger.info('PurchaseService: Getting pending requests for role', { userRole, userId });
+
+            const { data: result, error } = await this.supabase
+                .rpc('get_pending_requests_for_role', {
+                    p_user_role: userRole,
+                    p_user_id: userId,
+                    p_request_type: 'purchase'
+                });
+
+            if (error) {
+                logger.error('PurchaseService: Failed to get role-based pending requests', { error: error.message });
+                throw error;
+            }
+
+            if (!result) {
+                return [];
+            }
+
+            // Parse the JSON results
+            const requests = Array.isArray(result) ? result : [result];
+            return requests.map(item => {
+                const requestData = typeof item.request_data === 'string' ? JSON.parse(item.request_data) : item.request_data;
+                return requestData;
+            });
+        } catch (error) {
+            logger.error('PurchaseService: Get role-based pending requests failed', { error: (error as Error).message });
             throw error;
         }
     }

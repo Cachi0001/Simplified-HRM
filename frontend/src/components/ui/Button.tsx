@@ -3,9 +3,18 @@ import React from 'react';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   isLoading?: boolean;
+  darkMode?: boolean; // Accept darkMode but don't pass it to DOM
+  variant?: string; // Accept variant but don't pass it to DOM
 }
 
-export const Button: React.FC<ButtonProps> = ({ children, className, isLoading = false, ...props }) => {
+export const Button: React.FC<ButtonProps> = ({ 
+  children, 
+  className, 
+  isLoading = false, 
+  darkMode, // Extract darkMode to prevent it from being passed to DOM
+  variant, // Extract variant to prevent it from being passed to DOM
+  ...props 
+}) => {
   return (
     <button
       {...props}

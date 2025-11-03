@@ -179,9 +179,10 @@ export class LeaveController {
     async getPendingLeaveRequests(req: Request, res: Response): Promise<void> {
         try {
             const userRole = req.user?.role;
+            const userId = req.user?.id;
 
             // Check if user has permission to approve requests
-            if (!['superadmin', 'admin', 'hr'].includes(userRole)) {
+            if (!['superadmin', 'super-admin', 'admin', 'hr'].includes(userRole)) {
                 res.status(403).json({
                     status: 'error',
                     message: 'Insufficient permissions'
@@ -189,10 +190,10 @@ export class LeaveController {
                 return;
             }
 
-            logger.info('📋 [LeaveController] Get pending leave requests', { userRole });
+            logger.info('📋 [LeaveController] Get pending leave requests', { userRole, userId });
 
-            // Use the enhanced approval workflow service to get role-specific pending requests
-            const pendingRequests = await this.approvalWorkflowService.getPendingRequestsForApprover(userRole, 'leave');
+            // Use the new role-based filtering to exclude own requests
+            const pendingRequests = await this.leaveService.getPendingLeaveRequestsForRole(userRole, userId);
 
             res.status(200).json({
                 status: 'success',

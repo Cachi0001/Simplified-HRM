@@ -197,6 +197,7 @@ export class PurchaseController {
     async getPendingPurchaseRequests(req: Request, res: Response): Promise<void> {
         try {
             const userRole = req.user?.role;
+            const userId = req.user?.id;
 
             // Check if user has permission to approve requests
             if (!['superadmin', 'admin', 'hr'].includes(userRole)) {
@@ -207,10 +208,10 @@ export class PurchaseController {
                 return;
             }
 
-            logger.info('📋 [PurchaseController] Get pending purchase requests', { userRole });
+            logger.info('📋 [PurchaseController] Get pending purchase requests', { userRole, userId });
 
-            // Use the enhanced approval workflow service to get role-specific pending requests
-            const pendingRequests = await this.approvalWorkflowService.getPendingRequestsForApprover(userRole, 'purchase');
+            // Use the new role-based filtering to exclude own requests
+            const pendingRequests = await this.purchaseService.getPendingPurchaseRequestsForRole(userRole, userId);
 
             res.status(200).json({
                 status: 'success',
