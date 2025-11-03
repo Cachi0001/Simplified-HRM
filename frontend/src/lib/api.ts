@@ -439,6 +439,7 @@ export interface User {
   role: 'superadmin' | 'admin' | 'employee' | 'hr' | 'teamlead';
   status?: 'active' | 'inactive' | 'pending';
   emailVerified: boolean;
+  employeeId?: string; // Optional employee ID for linking
   createdAt: string;
   updatedAt: string;
 }

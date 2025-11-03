@@ -64,8 +64,8 @@ const ReactionButton: React.FC<ReactionButtonProps> = ({
         };
       default: // md
         return {
-          addButton: 'p-2 text-sm',
-          icon: 'w-4 h-4'
+          addButton: 'p-1.5 text-sm',
+          icon: 'w-3.5 h-3.5'
         };
     }
   };

@@ -72,7 +72,7 @@ export function ApprovalModal({
 
     // Apply permissions based on current user role
     switch (currentUserRole) {
-      case 'super-admin':
+      case 'superadmin':
         // SuperAdmin can assign all roles
         return baseRoles;
 
@@ -126,7 +126,7 @@ export function ApprovalModal({
 
   const getRoleColor = (role: string) => {
     const colors = {
-      'super-admin': darkMode ? 'bg-red-900/30 text-red-400 border-red-700' : 'bg-red-100 text-red-800 border-red-300',
+      'superadmin': darkMode ? 'bg-red-900/30 text-red-400 border-red-700' : 'bg-red-100 text-red-800 border-red-300',
       'admin': darkMode ? 'bg-orange-900/30 text-orange-400 border-orange-700' : 'bg-orange-100 text-orange-800 border-orange-300',
       'hr': darkMode ? 'bg-blue-900/30 text-blue-400 border-blue-700' : 'bg-blue-100 text-blue-800 border-blue-300',
       'employee': darkMode ? 'bg-green-900/30 text-green-400 border-green-700' : 'bg-green-100 text-green-800 border-green-300'
@@ -136,20 +136,26 @@ export function ApprovalModal({
 
   if (!isOpen) return null;
 
+  // Check if current user can approve this employee
+  const canApproveEmployee = () => {
+    // Only superadmin can approve superadmin employees
+    if (employee.role === 'superadmin' && currentUserRole !== 'superadmin') {
+      return false;
+    }
+    return true;
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className={`w-full max-w-lg rounded-lg shadow-xl ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+      <div className={`w-full max-w-md rounded-lg shadow-xl ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
         } border`}>
         {/* Header */}
-        <div className={`flex items-center justify-between p-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'
+        <div className={`flex items-center justify-between p-3 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'
           }`}>
           <div>
-            <h2 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-              Employee Approval
+            <h2 className={`text-base font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+              Approve Employee
             </h2>
-            <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-              Review and approve registration
-            </p>
           </div>
           <button
             onClick={onClose}
@@ -163,34 +169,34 @@ export function ApprovalModal({
         </div>
 
         {/* Employee Info */}
-        <div className="p-4">
-          <div className="flex items-center space-x-3 mb-4">
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${darkMode ? 'bg-gray-700' : 'bg-gray-100'
+        <div className="p-3">
+          <div className="flex items-center space-x-2 mb-3">
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${darkMode ? 'bg-gray-700' : 'bg-gray-100'
               }`}>
-              {employee.profilePicture ? (
-                <img
-                  src={employee.profilePicture}
-                  alt={employee.fullName}
-                  className="w-12 h-12 rounded-full object-cover"
-                />
-              ) : (
-                <User className={`h-6 w-6 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
-              )}
+              <User className={`h-4 w-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
             </div>
             <div>
-              <h3 className={`text-base font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+              <h3 className={`text-sm font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                 {employee.fullName}
               </h3>
-              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+              <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                 {employee.email}
               </p>
-              <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border mt-1 ${getRoleColor(employee.role)}`}>
-                Current: {employee.role.charAt(0).toUpperCase() + employee.role.slice(1)}
-              </div>
             </div>
           </div>
 
-          {!showRejectForm ? (
+          {!canApproveEmployee() ? (
+            /* Restriction Message */
+            <div className={`p-4 rounded-lg border ${darkMode ? 'bg-red-900/20 border-red-800 text-red-300' : 'bg-red-50 border-red-200 text-red-700'}`}>
+              <div className="flex items-center">
+                <AlertCircle className="h-5 w-5 mr-2" />
+                <span className="font-medium">Access Restricted</span>
+              </div>
+              <p className="text-sm mt-1">
+                Only superadmin users can approve or reject superadmin employee registrations.
+              </p>
+            </div>
+          ) : !showRejectForm ? (
             <>
               {/* Role Selection */}
               <div className="mb-4">

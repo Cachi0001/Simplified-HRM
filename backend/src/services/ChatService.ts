@@ -731,12 +731,27 @@ export class ChatService {
         const otherUserId = userIds.find((id: string) => id !== userId);
         
         if (otherUserId) {
-          // Get other user's info
-          const { data: otherUser } = await this.supabase
-            .from('users')
-            .select('full_name, email')
-            .eq('id', otherUserId)
+          // Get other user's info from employees table first, then fallback to users
+          let otherUser = null;
+          
+          // Try employees table first
+          const { data: employee } = await this.supabase
+            .from('employees')
+            .select('full_name, email, user_id')
+            .eq('user_id', otherUserId)
             .single();
+          
+          if (employee) {
+            otherUser = employee;
+          } else {
+            // Fallback to users table
+            const { data: user } = await this.supabase
+              .from('users')
+              .select('full_name, email')
+              .eq('id', otherUserId)
+              .single();
+            otherUser = user;
+          }
 
           // Get unread count
           const unreadCount = await this.getChatUnreadCount(userId, chatId);
@@ -1222,23 +1237,14 @@ export class ChatService {
       // Get unique chat IDs and create conversation objects
       const uniqueChatIds = [...new Set((chatIds || []).map(c => c.chat_id))];
       
-      const conversations = uniqueChatIds.map(chatId => ({
-        id: chatId,
-        name: chatId.startsWith('dm_') ? 'Direct Message' : 'Group Chat',
-        type: chatId.startsWith('dm_') ? 'dm' : 'group',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        chat_participants: []
-      }));
-
       // Process conversations to get participant names and latest message info
       const processedConversations = await Promise.all(
-        (conversations || []).map(async (conversation) => {
+        uniqueChatIds.map(async (chatId) => {
           // Get latest message for this conversation
           const { data: latestMessage } = await this.supabase
             .from('chat_messages')
             .select('message, timestamp, sender_id')
-            .eq('chat_id', conversation.id)
+            .eq('chat_id', chatId)
             .order('timestamp', { ascending: false })
             .limit(1)
             .single();
@@ -1247,20 +1253,66 @@ export class ChatService {
           const { count: messageCount } = await this.supabase
             .from('chat_messages')
             .select('*', { count: 'exact', head: true })
-            .eq('chat_id', conversation.id);
+            .eq('chat_id', chatId);
+
+          // Get participant names for DM chats
+          let participantNames: string[] = [];
+          let conversationName = 'Unknown Conversation';
+          
+          if (chatId.startsWith('dm_')) {
+            // Extract user IDs from DM chat ID format: dm_userId1_userId2
+            const userIds = chatId.replace('dm_', '').split('_');
+            
+            // Get participant names from employees table
+            const { data: participants } = await this.supabase
+              .from('employees')
+              .select('user_id, full_name, email')
+              .in('user_id', userIds);
+
+            if (participants && participants.length > 0) {
+              participantNames = participants.map(p => p.full_name || p.email || 'Unknown User');
+              conversationName = participantNames.join(' & ');
+            } else {
+              // Fallback to users table if employees not found
+              const { data: users } = await this.supabase
+                .from('users')
+                .select('id, full_name, email')
+                .in('id', userIds);
+              
+              if (users && users.length > 0) {
+                participantNames = users.map(u => u.full_name || u.email || 'Unknown User');
+                conversationName = participantNames.join(' & ');
+              }
+            }
+          } else {
+            // For group chats, try to get group name
+            conversationName = 'Group Chat';
+          }
+
+          // Get sender name for latest message
+          let lastMessageSender = null;
+          if (latestMessage?.sender_id) {
+            const { data: sender } = await this.supabase
+              .from('employees')
+              .select('full_name, email')
+              .eq('user_id', latestMessage.sender_id)
+              .single();
+            
+            lastMessageSender = sender?.full_name || sender?.email || 'Unknown User';
+          }
 
           return {
-            id: conversation.id,
-            name: conversation.name,
-            type: conversation.type,
-            participantNames: [], // No participants data available from simplified structure
-            participantCount: 0,
+            id: chatId,
+            name: conversationName,
+            type: chatId.startsWith('dm_') ? 'dm' : 'group',
+            participantNames: participantNames,
+            participantCount: participantNames.length,
             messageCount: messageCount || 0,
             lastMessage: latestMessage?.message || null,
-            lastMessageAt: latestMessage?.timestamp || conversation.updated_at,
-            lastMessageSender: null, // No sender info available
-            createdAt: conversation.created_at,
-            updatedAt: conversation.updated_at
+            lastMessageAt: latestMessage?.timestamp || new Date().toISOString(),
+            lastMessageSender: lastMessageSender,
+            createdAt: new Date().toISOString(),
+            updatedAt: latestMessage?.timestamp || new Date().toISOString()
           };
         })
       );

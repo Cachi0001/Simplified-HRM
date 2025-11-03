@@ -77,11 +77,11 @@ const ReactionDisplay: React.FC<ReactionDisplayProps> = ({
         };
       default: // md
         return {
-          container: 'gap-2',
-          reaction: 'p-2',
-          emoji: 'text-base',
-          count: 'text-sm',
-          icon: 'w-4 h-4'
+          container: 'gap-1.5',
+          reaction: 'p-1.5',
+          emoji: 'text-sm',
+          count: 'text-xs',
+          icon: 'w-3.5 h-3.5'
         };
     }
   };

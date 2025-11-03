@@ -46,6 +46,7 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
 
     req.user = {
       id: decoded.sub,
+      employeeId: decoded.sub, // Alias for backward compatibility
       email: decoded.email,
       role: decoded.role
     };

@@ -16,7 +16,7 @@ import ChatPage from './src/pages/ChatPage';
 import { LeaveRequestsPage } from './src/pages/LeaveRequestsPage';
 import { PurchaseRequestsPage } from './src/pages/PurchaseRequestsPage';
 import { NotificationsPage } from './src/pages/NotificationsPage';
-import EmployeeManagementPage from './src/pages/EmployeeManagementPage';
+import { EmployeeManagementPage } from './src/pages/EmployeeManagementPage';
 import PerformanceMetrics from './src/pages/PerformanceMetrics';
 import Header from './src/components/layout/Header';
 import Footer from './src/components/layout/Footer';
@@ -52,6 +52,7 @@ function AppContent() {
                          location.pathname.startsWith('/purchase-requests') ||
                          location.pathname.startsWith('/notifications') ||
                          location.pathname.startsWith('/admin/employees') ||
+                         location.pathname.startsWith('/employee-management') ||
                          location.pathname.startsWith('/performance-metrics') ||
                          location.pathname.startsWith('/chat');
 
@@ -126,6 +127,11 @@ function AppContent() {
             </ProtectedRoute>
           } />
           <Route path="/admin/employees" element={
+            <ProtectedRoute>
+              <EmployeeManagementPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/employee-management" element={
             <ProtectedRoute>
               <EmployeeManagementPage />
             </ProtectedRoute>

@@ -76,7 +76,7 @@ export class ProfileService {
                     position,
                     hire_date,
                     profile_picture_url,
-                    department:departments(id, name),
+                    department:departments!employees_department_id_fkey(id, name),
                     manager:employees!employees_manager_id_fkey(id, full_name)
                 `)
                 .eq('id', userId)
@@ -431,7 +431,7 @@ export class ProfileService {
                     email,
                     position,
                     profile_picture_url,
-                    department:departments(id, name)
+                    department:departments!employees_department_id_fkey(id, name)
                 `)
                 .eq('status', 'active')
                 .ilike('full_name', `%${options.query}%`);

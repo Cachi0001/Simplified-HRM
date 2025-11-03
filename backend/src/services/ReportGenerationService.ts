@@ -415,7 +415,7 @@ export class ReportGenerationService {
         // Get employees to analyze
         let employeeQuery = this.supabase
             .from('employees')
-            .select('id, full_name, department_id, departments(name)')
+            .select('id, full_name, department_id, departments!employees_department_id_fkey(name)')
             .eq('status', 'active');
 
         if (departmentId) {

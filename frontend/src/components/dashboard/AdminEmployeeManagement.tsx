@@ -279,18 +279,7 @@ export const AdminEmployeeManagement = ({ darkMode }: AdminEmployeeManagementPro
         </h2>
       </div>
 
-      {/* Debug Info */}
-      <div className={`mb-4 p-3 rounded border ${darkMode ? 'bg-gray-700 border-gray-600 text-gray-300' : 'bg-gray-50 border-gray-200 text-gray-700'}`}>
-        <div className="text-sm">
-          <strong>Debug Info:</strong><br/>
-          Loading: {isLoading ? 'Yes' : 'No'}<br/>
-          Error: {error ? error.message : 'None'}<br/>
-          Employees Count: {employees?.length || 0}<br/>
-          Employees Type: {Array.isArray(employees) ? 'Array' : typeof employees}<br/>
-          Filtered Count: {filteredEmployees?.length || 0}<br/>
-          Auth Token: {localStorage.getItem('accessToken') ? 'Present' : 'Missing'}
-        </div>
-      </div>
+
 
       {/* Filters and Search */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -349,37 +338,14 @@ export const AdminEmployeeManagement = ({ darkMode }: AdminEmployeeManagementPro
         </div>
       </div>
 
-      {/* Debug Info */}
-      <div className="mb-4 p-4 bg-yellow-100 border border-yellow-300 rounded">
-        <h4 className="font-bold">Debug Info:</h4>
-        <p>Loading: {isLoading ? 'Yes' : 'No'}</p>
-        <p>Error: {error ? JSON.stringify(error) : 'None'}</p>
-        <p>API Base URL: {api.defaults.baseURL}</p>
-        <p>Raw employees count: {employees?.length || 0}</p>
-        <p>Filtered employees count: {filteredEmployees?.length || 0}</p>
-        <p>Search term: "{searchTerm}"</p>
-        <p>Filter role: {filterRole}</p>
-        <p>Filter status: {filterStatus}</p>
-        <details>
-          <summary>Raw employees data:</summary>
-          <pre className="text-xs overflow-auto max-h-32">
-            {JSON.stringify(employees, null, 2)}
-          </pre>
-        </details>
-        <details>
-          <summary>Filtered employees data:</summary>
-          <pre className="text-xs overflow-auto max-h-32">
-            {JSON.stringify(filteredEmployees, null, 2)}
-          </pre>
-        </details>
-      </div>
+
 
       {/* Employee List */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[600px] overflow-y-auto">
         {filteredEmployees.length === 0 ? (
           <div className={`col-span-full text-center py-8 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
             <p>No employees found</p>
-            <p className="text-sm mt-2">Check the debug info above to see what's happening</p>
+            <p className="text-sm mt-2">Try adjusting your filters</p>
           </div>
         ) : (
           filteredEmployees.map((employee: Employee) => (

@@ -36,6 +36,7 @@ export interface User {
   avatar?: string;
   role?: string;
   status: 'online' | 'offline' | 'away';
+  employeeId?: string; // Optional employee ID for linking
 }
 
 export function useChat() {

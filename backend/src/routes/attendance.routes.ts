@@ -4,24 +4,21 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 import { Router } from 'express';
 import { AttendanceController } from '../controllers/AttendanceController';
-import { AttendanceService } from '../services/AttendanceService';
-import { SupabaseAttendanceRepository } from '../repositories/implementations/SupabaseAttendanceRepository';
-import { authenticateToken, requireRole } from '../middleware/auth.middleware';
+import { authenticateToken } from '../middleware/auth.middleware';
 
 const router = Router();
+const attendanceController = new AttendanceController();
 
-const attendanceRepository = new SupabaseAttendanceRepository();
-const attendanceService = new AttendanceService(attendanceRepository);
-const attendanceController = new AttendanceController(attendanceService);
-
+// Protect all routes with authentication
 router.use(authenticateToken);
 
-router.post('/checkin', (req, res) => attendanceController.checkIn(req, res));
-router.post('/checkout', (req, res) => attendanceController.checkOut(req, res));
-router.get('/status', (req, res) => attendanceController.getCurrentStatus(req, res));
+/**
+ * Attendance Management
+ */
+router.post('/check-in', (req, res) => attendanceController.checkIn(req, res));
+router.post('/check-out', (req, res) => attendanceController.checkOut(req, res));
+router.get('/current-status', (req, res) => attendanceController.getCurrentStatus(req, res));
 router.get('/history', (req, res) => attendanceController.getAttendanceHistory(req, res));
-
-router.get('/employee/:employeeId', requireRole(['admin']), (req, res) => attendanceController.getEmployeeAttendance(req, res));
-router.get('/report', requireRole(['admin', 'employee']), (req, res) => attendanceController.getAttendanceReport(req, res));
+router.get('/stats', (req, res) => attendanceController.getAttendanceStats(req, res));
 
 export default router;

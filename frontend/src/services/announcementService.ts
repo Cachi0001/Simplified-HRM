@@ -81,17 +81,21 @@ class AnnouncementService {
   }
 
   // Reaction operations
-  async addReaction(announcementId: string, reactionType: string): Promise<void> {
-    await this.request(`/announcements/${announcementId}/reactions`, {
+  async addReaction(announcementId: string, reactionType: string): Promise<any> {
+    return this.request(`/announcements/${announcementId}/reactions`, {
       method: 'POST',
       body: JSON.stringify({ reaction_type: reactionType }),
     });
   }
 
-  async removeReaction(announcementId: string, reactionType: string): Promise<void> {
-    await this.request(`/announcements/${announcementId}/reactions/${reactionType}`, {
+  async removeReaction(announcementId: string): Promise<void> {
+    await this.request(`/announcements/${announcementId}/reactions`, {
       method: 'DELETE',
     });
+  }
+
+  async getReactions(announcementId: string): Promise<any> {
+    return this.request(`/announcements/${announcementId}/reactions`);
   }
 
   // Read status

@@ -292,10 +292,10 @@ export class EmployeeController {
         return;
       }
 
-      if (!['admin', 'employee', 'hr', 'super-admin'].includes(role)) {
+      if (!['admin', 'employee', 'hr', 'super-admin', 'superadmin', 'teamlead'].includes(role)) {
         res.status(400).json({
           status: 'error',
-          message: 'Invalid role. Must be admin, employee, hr, or super-admin'
+          message: 'Invalid role. Must be admin, employee, hr, super-admin, superadmin, or teamlead'
         });
         return;
       }
@@ -314,6 +314,14 @@ export class EmployeeController {
         approverName,
         reason
       );
+
+      // Send approval email (handled by service layer)
+      try {
+        await this.employeeService.sendApprovalNotification(result.email, result.full_name, role);
+      } catch (emailError) {
+        logger.error('Failed to send approval email', { employeeId: id, error: emailError });
+        // Don't fail the approval if email fails
+      }
 
       res.status(200).json({
         status: 'success',
@@ -344,10 +352,10 @@ export class EmployeeController {
         return;
       }
 
-      if (!['admin', 'employee', 'hr', 'super-admin'].includes(role)) {
+      if (!['admin', 'employee', 'hr', 'super-admin', 'superadmin', 'teamlead'].includes(role)) {
         res.status(400).json({
           status: 'error',
-          message: 'Invalid role. Must be admin, employee, hr, or super-admin'
+          message: 'Invalid role. Must be admin, employee, hr, super-admin, superadmin, or teamlead'
         });
         return;
       }
@@ -459,6 +467,92 @@ export class EmployeeController {
       res.status(400).json({
         status: 'error',
         message: (error as Error).message
+      });
+    }
+  }
+
+  async bulkUpdateEmployees(req: Request, res: Response): Promise<void> {
+    try {
+      const { updates } = req.body;
+      const currentUserRole = req.user?.role;
+      const currentUserId = req.user?.id;
+
+      if (!updates || !Array.isArray(updates)) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Updates array is required'
+        });
+        return;
+      }
+
+      if (!currentUserRole) {
+        res.status(401).json({
+          status: 'error',
+          message: 'Authentication required'
+        });
+        return;
+      }
+
+      logger.info('EmployeeController: Bulk update employees', { count: updates.length });
+
+      const results = {
+        success: [] as string[],
+        failed: [] as { id: string; error: string }[]
+      };
+
+      // Process each update
+      for (const update of updates) {
+        try {
+          const { employeeId, updates: employeeUpdates } = update;
+          
+          if (!employeeId) {
+            results.failed.push({ id: 'unknown', error: 'Employee ID is required' });
+            continue;
+          }
+
+          await this.employeeService.updateEmployee(employeeId, employeeUpdates, currentUserRole, currentUserId);
+          results.success.push(employeeId);
+        } catch (error) {
+          results.failed.push({ 
+            id: update.employeeId || 'unknown', 
+            error: (error as Error).message 
+          });
+        }
+      }
+
+      res.status(200).json({
+        status: 'success',
+        message: `Bulk update completed. ${results.success.length} successful, ${results.failed.length} failed.`,
+        data: results
+      });
+    } catch (error) {
+      logger.error('EmployeeController: Bulk update error', { error: (error as Error).message });
+      res.status(500).json({
+        status: 'error',
+        message: 'Failed to perform bulk update'
+      });
+    }
+  }
+
+
+
+  async getEmployeesForTasks(req: Request, res: Response): Promise<void> {
+    try {
+      const userRole = req.user?.role;
+
+      logger.info('EmployeeController: Get employees for tasks', { userRole });
+
+      const employees = await this.employeeService.getEmployeesForTasks(userRole);
+
+      res.status(200).json({
+        status: 'success',
+        data: employees
+      });
+    } catch (error) {
+      logger.error('EmployeeController: Get employees for tasks error', { error: (error as Error).message });
+      res.status(500).json({
+        status: 'error',
+        message: 'Failed to get employees for tasks'
       });
     }
   }

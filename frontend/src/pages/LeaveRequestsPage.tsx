@@ -174,7 +174,7 @@ export function LeaveRequestsPage() {
             </Link>
             <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Leave Requests</h1>
           </div>
-          {!isCreating && (
+          {!isCreating && currentUser?.role !== 'superadmin' && (
             <button
               onClick={() => setIsCreating(true)}
               className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"

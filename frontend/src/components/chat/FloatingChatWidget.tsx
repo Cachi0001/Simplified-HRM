@@ -348,43 +348,123 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
     }
   };
 
+  // Helper function to get current user ID
+  const getCurrentUserId = () => {
+    try {
+      // Try multiple possible keys for user data
+      const possibleKeys = ['user', 'currentUser', 'authUser', 'userData'];
+
+      for (const key of possibleKeys) {
+        const storedData = localStorage.getItem(key);
+        if (storedData) {
+          try {
+            const parsed = JSON.parse(storedData);
+            if (parsed && (parsed.id || parsed.userId || parsed.user_id)) {
+              return parsed.id || parsed.userId || parsed.user_id;
+            }
+          } catch (parseError) {
+            continue;
+          }
+        }
+      }
+
+      // Try to extract from JWT token
+      const token = localStorage.getItem('accessToken');
+      if (token) {
+        try {
+          const base64Url = token.split('.')[1];
+          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+          const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+          }).join(''));
+
+          const decoded = JSON.parse(jsonPayload);
+          if (decoded && (decoded.id || decoded.userId || decoded.user_id || decoded.sub)) {
+            return decoded.id || decoded.userId || decoded.user_id || decoded.sub;
+          }
+        } catch (tokenError) {
+          // Silent fail
+        }
+      }
+    } catch (error) {
+      console.error('Failed to get current user ID:', error);
+    }
+    return null;
+  };
+
   // For DMs, show available users to chat with in WhatsApp style (moved from announcements)
   const getDisplayItems = (): ExtendedChat[] => {
     if (activeTab === 'dms') {
-      // Sort chats by latest message timestamp (WhatsApp style) - moved from announcements
+      const currentUserId = getCurrentUserId();
+      
+      // Get existing chats
       const filteredChats = chats.filter(chat => {
         if (searchQuery && !chat.name?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
         return true;
       });
 
-      // Sort by latest message timestamp, with unread chats prioritized
-      return filteredChats
-        .map(chat => {
-          // Get latest message for this chat
-          const chatMessages = messages[chat.id] || [];
-          const latestMessage = chatMessages.length > 0 
-            ? chatMessages[chatMessages.length - 1] 
-            : null;
+      // Transform existing chats
+      const existingChats = filteredChats.map(chat => {
+        const chatMessages = messages[chat.id] || [];
+        const latestMessage = chatMessages.length > 0 
+          ? chatMessages[chatMessages.length - 1] 
+          : null;
 
-          return {
-            ...chat,
-            lastMessage: latestMessage?.content || chat.lastMessage || 'No messages yet',
-            lastMessageTime: latestMessage?.timestamp 
-              ? formatWhatsAppTime(latestMessage.timestamp)
-              : chat.lastMessageTime || '',
-            // Add sort priority: unread messages first, then by timestamp
-            sortTimestamp: latestMessage?.timestamp || chat.createdAt || '1970-01-01T00:00:00Z',
-            hasUnread: chat.unreadCount > 0
-          };
-        })
-        .sort((a, b) => {
+        return {
+          ...chat,
+          lastMessage: latestMessage?.content || chat.lastMessage || 'No messages yet',
+          lastMessageTime: latestMessage?.timestamp 
+            ? formatWhatsAppTime(latestMessage.timestamp)
+            : chat.lastMessageTime || '',
+          sortTimestamp: latestMessage?.timestamp || chat.createdAt || '1970-01-01T00:00:00Z',
+          hasUnread: chat.unreadCount > 0,
+          isUser: false,
+          userData: undefined
+        };
+      });
+
+      // Transform users for chat list (exclude current user)
+      const transformedUsers = (users || []).filter(user => {
+        // Exclude current user from DM list
+        return user.id !== currentUserId && user.employeeId !== currentUserId;
+      }).filter(user => {
+        // Apply search filter
+        if (searchQuery && !user.name?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+        return true;
+      }).filter(user => {
+        // Exclude users who already have existing chats
+        return !existingChats.some(chat => 
+          chat.userData?.id === user.id || 
+          chat.userData?.employeeId === user.employeeId ||
+          chat.name === user.name
+        );
+      }).map(user => ({
+        id: `user-${user.id}`,
+        name: user.name,
+        type: 'dm' as const,
+        lastMessage: 'Start a conversation',
+        lastMessageTime: '',
+        unreadCount: 0,
+        userData: user,
+        isUser: true,
+        sortTimestamp: '1970-01-01T00:00:00Z',
+        hasUnread: false
+      }));
+
+      // Combine and sort: existing chats first (by activity), then available users (alphabetically)
+      const combinedItems = [
+        ...existingChats.sort((a, b) => {
           // First sort by unread status (unread chats first)
           if (a.hasUnread && !b.hasUnread) return -1;
           if (!a.hasUnread && b.hasUnread) return 1;
           
           // Then sort by latest message timestamp (newest first)
           return new Date(b.sortTimestamp).getTime() - new Date(a.sortTimestamp).getTime();
-        });
+        }),
+        ...transformedUsers.sort((a, b) => a.name.localeCompare(b.name))
+      ];
+
+      return combinedItems;
     } else if (activeTab === 'history') {
       // For history tab, show conversation history as chat items
       return conversationHistory.filter(conversation => {
@@ -494,7 +574,7 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
 
       await sendChatMessage(selectedChat.id, content);
       
-      // Trigger message indicator for current user
+      // Trigger message indicator for current user (only for actual sent messages)
       const currentUserId = getCurrentUserId();
       if (currentUserId) {
         handleMessageSent(currentUserId, selectedChat.id);
@@ -507,50 +587,6 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
     } finally {
       setIsSending(false);
     }
-  };
-
-  // Helper function to get current user ID
-  const getCurrentUserId = () => {
-    try {
-      // Try multiple possible keys for user data
-      const possibleKeys = ['user', 'currentUser', 'authUser', 'userData'];
-
-      for (const key of possibleKeys) {
-        const storedData = localStorage.getItem(key);
-        if (storedData) {
-          try {
-            const parsed = JSON.parse(storedData);
-            if (parsed && (parsed.id || parsed.userId || parsed.user_id)) {
-              return parsed.id || parsed.userId || parsed.user_id;
-            }
-          } catch (parseError) {
-            continue;
-          }
-        }
-      }
-
-      // Try to extract from JWT token
-      const token = localStorage.getItem('accessToken');
-      if (token) {
-        try {
-          const base64Url = token.split('.')[1];
-          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-          const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
-            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-          }).join(''));
-
-          const decoded = JSON.parse(jsonPayload);
-          if (decoded && (decoded.id || decoded.userId || decoded.user_id || decoded.sub)) {
-            return decoded.id || decoded.userId || decoded.user_id || decoded.sub;
-          }
-        } catch (tokenError) {
-          // Silent fail
-        }
-      }
-    } catch (error) {
-      console.error('Failed to get current user ID:', error);
-    }
-    return null;
   };
 
   // Helper function to get current user's role
@@ -1144,46 +1180,56 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                   </div>
                 )}
 
-                {/* Message Input */}
-                <div className={`p-4 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'} flex-shrink-0`}>
-                  <div className="flex items-center gap-2">
-                    <input
-                      ref={inputRef}
-                      type="text"
-                      value={messageInput}
-                      onChange={(e) => {
-                        setMessageInput(e.target.value);
-                        handleTypingChange(e.target.value);
-                      }}
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          handleSendMessage();
-                        }
-                      }}
-                      placeholder="Type a message..."
-                      disabled={isSending}
-                      className={`flex-1 px-4 py-2 rounded-full border text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${darkMode
-                        ? 'bg-gray-800 border-gray-600 text-white placeholder-gray-400'
-                        : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500'
-                        } ${isSending ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    />
-                    <button
-                      onClick={handleSendMessage}
-                      disabled={!messageInput.trim() || isSending}
-                      className={`p-2 rounded-full transition-colors ${messageInput.trim() && !isSending
-                        ? 'bg-blue-500 hover:bg-blue-600 text-white'
-                        : 'bg-gray-300 dark:bg-gray-600 text-gray-500 cursor-not-allowed'
-                        }`}
-                    >
-                      {isSending ? (
-                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      ) : (
-                        <Send className="w-5 h-5" />
-                      )}
-                    </button>
+                {/* Message Input - Restrict only for history tab for admin/superadmin/hr */}
+                {activeTab === 'history' && ['admin', 'superadmin', 'hr'].includes(getCurrentUserRole()) ? (
+                  /* Message restriction for history tab only */
+                  <div className={`p-4 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'} flex-shrink-0`}>
+                    <div className={`text-center text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      You can view conversation history but cannot send messages in archived chats.
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  /* Normal message input for DMs and other tabs */
+                  <div className={`p-4 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'} flex-shrink-0`}>
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={inputRef}
+                        type="text"
+                        value={messageInput}
+                        onChange={(e) => {
+                          setMessageInput(e.target.value);
+                          handleTypingChange(e.target.value);
+                        }}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSendMessage();
+                          }
+                        }}
+                        placeholder="Type a message..."
+                        disabled={isSending}
+                        className={`flex-1 px-4 py-2 rounded-full border text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${darkMode
+                          ? 'bg-gray-800 border-gray-600 text-white placeholder-gray-400'
+                          : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500'
+                          } ${isSending ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      />
+                      <button
+                        onClick={handleSendMessage}
+                        disabled={!messageInput.trim() || isSending}
+                        className={`p-2 rounded-full transition-colors ${messageInput.trim() && !isSending
+                          ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                          : 'bg-gray-300 dark:bg-gray-600 text-gray-500 cursor-not-allowed'
+                          }`}
+                      >
+                        {isSending ? (
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                          <Send className="w-5 h-5" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               /* Default view - show welcome message */

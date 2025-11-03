@@ -60,7 +60,7 @@ export class EmployeeService {
 
   async getAllEmployees(query?: EmployeeQuery, currentUserRole?: string): Promise<{ employees: IEmployee[]; total: number; page: number; limit: number }> {
     try {
-      logger.info('EmployeeService: Getting all employees', { role: currentUserRole });
+
 
       // Admin and HR can see all employees regardless of status
       // Regular employees and others can only see active employees
@@ -81,7 +81,7 @@ export class EmployeeService {
 
   async searchEmployees(query: string, currentUserRole?: string): Promise<IEmployee[]> {
     try {
-      logger.info('EmployeeService: Searching employees', { query, role: currentUserRole });
+
 
       if (currentUserRole === 'admin') {
         query = query;
@@ -97,7 +97,7 @@ export class EmployeeService {
 
   async getEmployeesForChat(currentUserId: string): Promise<any[]> {
     try {
-      logger.info('EmployeeService: Getting employees for chat', { currentUserId });
+
 
       const employees = await this.employeeRepository.getEmployeesForChat(currentUserId);
       return employees.map(emp => ({
@@ -441,6 +441,54 @@ export class EmployeeService {
       return history || [];
     } catch (error) {
       logger.error('EmployeeService: Get approval history failed', { 
+        error: (error as Error).message 
+      });
+      throw error;
+    }
+  }
+
+  async sendApprovalNotification(email: string, employeeName: string, role: string): Promise<void> {
+    try {
+      logger.info('EmployeeService: Sending approval notification', { email, role });
+
+      const emailService = new EmailService(db);
+      await emailService.sendApprovalEmail(email, employeeName, role);
+
+      logger.info('EmployeeService: Approval notification sent successfully', { email });
+    } catch (error) {
+      logger.error('EmployeeService: Send approval notification failed', { 
+        error: (error as Error).message,
+        email 
+      });
+      throw error;
+    }
+  }
+
+
+
+  async getEmployeesForTasks(currentUserRole?: string): Promise<IEmployee[]> {
+    try {
+      logger.info('EmployeeService: Getting employees for tasks', { currentUserRole });
+
+      // Get all active employees except superadmin
+      const query: EmployeeQuery = {
+        status: 'active',
+        limit: 1000 // Get all employees
+      };
+
+      const result = await this.getAllEmployees(query, currentUserRole);
+      
+      // Filter out superadmin users
+      const filteredEmployees = result.employees.filter(emp => emp.role !== 'superadmin');
+
+      logger.info('EmployeeService: Employees for tasks retrieved', { 
+        totalCount: result.employees.length,
+        filteredCount: filteredEmployees.length 
+      });
+
+      return filteredEmployees;
+    } catch (error) {
+      logger.error('EmployeeService: Get employees for tasks failed', { 
         error: (error as Error).message 
       });
       throw error;

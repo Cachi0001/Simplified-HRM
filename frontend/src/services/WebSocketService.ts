@@ -102,7 +102,7 @@ class WebSocketService {
     });
 
     this.socket.on('new_message', (messageData) => {
-      console.log('📨 New message received:', messageData);
+
 
       // Handle different message data formats from server
       const currentUserId = this.getCurrentUserId();
@@ -118,13 +118,6 @@ class WebSocketService {
         isOwn: String(messageData.senderId || messageData.sender_id) === String(currentUserId),
         status: 'delivered'
       };
-
-      console.log('📨 Processed message:', {
-        originalData: messageData,
-        processedMessage: message,
-        currentUserId,
-        isOwn: message.isOwn
-      });
 
       // Notify message handlers for this chat
       const handler = this.messageHandlers.get(message.chatId);
@@ -151,7 +144,7 @@ class WebSocketService {
     });
 
     this.socket.on('message_sent', (data) => {
-      console.log('✅ Message sent confirmation:', data);
+
       // Handle message sent confirmation
       // This could be used to update message status in UI
     });

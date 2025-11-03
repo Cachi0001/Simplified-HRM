@@ -5,7 +5,7 @@ export interface Employee {
   userId?: string;
   email: string;
   fullName: string;
-  role: 'employee' | 'hr' | 'admin' | 'super-admin';
+  role: 'employee' | 'hr' | 'admin' | 'superadmin';
   department?: string;
   position?: string;
   phone?: string;

@@ -172,6 +172,69 @@ export class EmailService {
     }
 
     /**
+     * Send employee approval email
+     */
+    async sendApprovalEmail(email: string, employeeName: string, role: string): Promise<void> {
+        try {
+            const loginUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/auth`;
+            const emailHtml = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="utf-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Account Approved - Go3Net HR System</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+                        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+                        .button { display: inline-block; background: #4CAF50; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+                        .footer { text-align: center; margin-top: 20px; color: #666; font-size: 14px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="header">
+                            <h1>🎉 Account Approved!</h1>
+                            <p>Welcome to Go3Net HR Management System</p>
+                        </div>
+                        <div class="content">
+                            <h2>Hello ${employeeName},</h2>
+                            <p>Great news! Your employee account has been approved and activated.</p>
+                            <div style="background: #e8f5e8; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                                <strong>Account Details:</strong><br>
+                                📧 Email: ${email}<br>
+                                👤 Role: ${role.charAt(0).toUpperCase() + role.slice(1)}<br>
+                                ✅ Status: Active
+                            </div>
+                            <p>You can now access the HR system using your registered email and password.</p>
+                            <div style="text-align: center;">
+                                <a href="${loginUrl}" class="button">Login to Your Account</a>
+                            </div>
+                            <p>If you have any questions or need assistance, please contact your HR department.</p>
+                            <p>Best regards,<br>Go3Net HR Team</p>
+                        </div>
+                        <div class="footer">
+                            <p>This is an automated message from Go3Net HR Management System</p>
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `;
+            await this.sendEmail({
+                to: email,
+                subject: '🎉 Your Go3Net Account Has Been Approved!',
+                html: emailHtml
+            });
+            logger.info('Approval email sent successfully', { email, role });
+        } catch (error) {
+            logger.error('Failed to send approval email', { email, error });
+            throw error;
+        }
+    }
+
+    /**
      * Send raw email
      */
     public async sendEmail(options: {

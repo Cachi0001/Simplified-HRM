@@ -4,7 +4,7 @@ export interface IUser {
   email: string;
   password: string;
   fullName: string;
-  role: 'admin' | 'employee' | 'hr' | 'super-admin';
+  role: 'admin' | 'employee' | 'hr' | 'superadmin';
   emailVerified: boolean;
   passwordHash: string;
   emailVerificationToken?: string;
@@ -30,7 +30,7 @@ export interface CreateUserRequest {
   email: string;
   password: string;
   fullName: string;
-  role?: 'admin' | 'employee' | 'hr' | 'super-admin';
+  role?: 'admin' | 'employee' | 'hr' | 'superadmin';
 }
 
 export interface LoginRequest {

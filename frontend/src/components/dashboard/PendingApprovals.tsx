@@ -19,9 +19,15 @@ const fetchPending = async (): Promise<Employee[]> => {
     
     // Filter out admin users and the current admin user
     const currentUser = authService.getCurrentUserFromStorage();
-    const filteredEmployees = employees.filter((emp: any) => 
-      emp.role === 'employee' && emp.email !== currentUser?.email
-    );
+    const filteredEmployees = employees.filter((emp: any) => {
+      // Don't show current user
+      if (emp.email === currentUser?.email) return false;
+      
+      // Only superadmin can see superadmin pending approvals
+      if (emp.role === 'superadmin' && currentUser?.role !== 'superadmin') return false;
+      
+      return true;
+    });
     
     return filteredEmployees;
   } catch (error) {

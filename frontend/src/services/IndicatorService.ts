@@ -49,7 +49,7 @@ export class IndicatorService implements IndicatorServiceInterface {
       
       this.timers.set(userId, timer);
       
-      console.log('✨ Indicator activated for user:', userId);
+
     } catch (error) {
       console.error('❌ Failed to activate indicator for user:', userId, error);
     }
@@ -67,7 +67,7 @@ export class IndicatorService implements IndicatorServiceInterface {
       
       if (wasActive) {
         this.notifyListeners();
-        console.log('💫 Indicator deactivated for user:', userId);
+
       }
     } catch (error) {
       console.error('❌ Failed to deactivate indicator for user:', userId, error);
@@ -115,7 +115,7 @@ export class IndicatorService implements IndicatorServiceInterface {
    */
   updateConfig(newConfig: Partial<IndicatorConfig>): void {
     this.config = { ...this.config, ...newConfig };
-    console.log('⚙️ Indicator config updated:', this.config);
+
   }
 
   /**

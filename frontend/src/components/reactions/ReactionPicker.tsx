@@ -27,6 +27,7 @@ const ReactionPicker: React.FC<ReactionPickerProps> = ({
   position = 'top'
 }) => {
   const [hoveredReaction, setHoveredReaction] = useState<string | null>(null);
+  const [pickerPosition, setPickerPosition] = useState<'left' | 'center' | 'right'>('center');
   const pickerRef = useRef<HTMLDivElement>(null);
 
   // Close picker when clicking outside
@@ -57,15 +58,44 @@ const ReactionPicker: React.FC<ReactionPickerProps> = ({
     };
   }, [onClose]);
 
+  // Adjust position based on viewport boundaries
+  useEffect(() => {
+    if (pickerRef.current) {
+      const rect = pickerRef.current.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      
+      if (rect.left < 10) {
+        setPickerPosition('left');
+      } else if (rect.right > viewportWidth - 10) {
+        setPickerPosition('right');
+      } else {
+        setPickerPosition('center');
+      }
+    }
+  }, []);
+
   const handleReactionClick = (reactionType: string) => {
     onReactionSelect(reactionType);
     onClose();
   };
 
+  const getPositionClasses = () => {
+    const baseClasses = `absolute z-50 ${position === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'}`;
+    
+    switch (pickerPosition) {
+      case 'left':
+        return `${baseClasses} left-0`;
+      case 'right':
+        return `${baseClasses} right-0`;
+      default:
+        return `${baseClasses} left-1/2 transform -translate-x-1/2`;
+    }
+  };
+
   return (
     <div
       ref={pickerRef}
-      className={`absolute z-50 ${position === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'} left-1/2 transform -translate-x-1/2`}
+      className={getPositionClasses()}
     >
       {/* Tooltip for hovered reaction */}
       {hoveredReaction && (

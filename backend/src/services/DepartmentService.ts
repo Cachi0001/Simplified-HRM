@@ -123,11 +123,7 @@ export class DepartmentService {
         try {
             const { data, error } = await this.supabase
                 .from('departments')
-                .select(`
-                    *,
-                    team_lead:employees!departments_team_lead_id_fkey(id, full_name, email),
-                    creator:employees!departments_created_by_fkey(id, full_name, email)
-                `)
+                .select('*')
                 .order('name', { ascending: true });
 
             if (error) {

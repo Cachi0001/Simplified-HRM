@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { Clock, User, AlertCircle, CheckCircle, Calendar, Eye } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Clock, User, AlertCircle, CheckCircle, Calendar, Eye, MessageCircle } from 'lucide-react';
 import { Announcement } from '../../types/announcement';
 import { ReactionButton } from '../reactions';
+import { announcementService } from '../../services/announcementService';
 
 interface AnnouncementCardProps {
   announcement: Announcement;
@@ -9,6 +10,13 @@ interface AnnouncementCardProps {
   onMarkAsRead?: (announcementId: string) => void;
   darkMode?: boolean;
   currentUserId?: string;
+}
+
+interface ReactionData {
+  summary: { [key: string]: number };
+  users: { [key: string]: any[] };
+  totalReactions: number;
+  reactionStrings: { [key: string]: string };
 }
 
 const AnnouncementCard: React.FC<AnnouncementCardProps> = ({
@@ -19,6 +27,9 @@ const AnnouncementCard: React.FC<AnnouncementCardProps> = ({
   currentUserId
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [reactionData, setReactionData] = useState<ReactionData | null>(null);
+  const [showReactionDetails, setShowReactionDetails] = useState(false);
+  const [loadingReactions, setLoadingReactions] = useState(false);
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -66,9 +77,47 @@ const AnnouncementCard: React.FC<AnnouncementCardProps> = ({
     }
   };
 
-  const handleReaction = (reactionType: string) => {
-    if (onReaction) {
-      onReaction(announcement.id, reactionType);
+  // Load reactions when component mounts
+  useEffect(() => {
+    loadReactions();
+  }, [announcement.id]);
+
+  const loadReactions = async () => {
+    try {
+      setLoadingReactions(true);
+      const response = await announcementService.getReactions(announcement.id);
+      setReactionData(response.data);
+    } catch (error) {
+      console.error('Failed to load reactions:', error);
+    } finally {
+      setLoadingReactions(false);
+    }
+  };
+
+  const handleReaction = async (reactionType: string) => {
+    try {
+      // Optimistically update UI
+      const newReactionData = { ...reactionData };
+      if (newReactionData) {
+        newReactionData.summary[reactionType] = (newReactionData.summary[reactionType] || 0) + 1;
+        newReactionData.totalReactions += 1;
+        setReactionData(newReactionData);
+      }
+
+      // Call the API
+      await announcementService.addReaction(announcement.id, reactionType);
+      
+      // Reload reactions to get accurate data
+      await loadReactions();
+      
+      // Call parent handler if provided
+      if (onReaction) {
+        onReaction(announcement.id, reactionType);
+      }
+    } catch (error) {
+      console.error('Failed to add reaction:', error);
+      // Reload reactions to revert optimistic update
+      await loadReactions();
     }
   };
 
@@ -151,17 +200,72 @@ const AnnouncementCard: React.FC<AnnouncementCardProps> = ({
         </div>
       )}
 
+      {/* WhatsApp-like Reaction Summary */}
+      {reactionData && reactionData.totalReactions > 0 && (
+        <div className={`mb-3 p-2 rounded-lg ${darkMode ? 'bg-gray-750' : 'bg-gray-50'}`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {/* Reaction emojis with counts */}
+              <div className="flex items-center gap-1">
+                {Object.entries(reactionData.summary).map(([type, count]) => (
+                  <div key={type} className="flex items-center gap-1">
+                    <span className="text-lg">
+                      {type === 'like' ? '👍' : 
+                       type === 'love' ? '❤️' : 
+                       type === 'laugh' ? '😂' : 
+                       type === 'wow' ? '😮' : 
+                       type === 'sad' ? '😢' : 
+                       type === 'angry' ? '😡' : type}
+                    </span>
+                    <span className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      {count}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                {reactionData.totalReactions} reaction{reactionData.totalReactions !== 1 ? 's' : ''}
+              </span>
+            </div>
+            
+            {/* Toggle reaction details */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowReactionDetails(!showReactionDetails);
+              }}
+              className={`text-sm ${darkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'}`}
+            >
+              {showReactionDetails ? 'Hide' : 'Show'} details
+            </button>
+          </div>
+
+          {/* WhatsApp-like reaction details */}
+          {showReactionDetails && (
+            <div className="mt-3 space-y-2">
+              {Object.entries(reactionData.reactionStrings || {}).map(([type, message]) => (
+                <div key={type} className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  <MessageCircle className="w-3 h-3 inline mr-2" />
+                  {message}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Reactions and Stats */}
       <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-4">
           {/* Reaction Component */}
           <div onClick={(e) => e.stopPropagation()}>
             <ReactionButton
-              reactions={announcement.reaction_counts || {}}
+              reactions={reactionData?.summary || announcement.reaction_counts || {}}
               userReaction={announcement.user_reaction}
               onReactionSelect={handleReaction}
               darkMode={darkMode}
               size="sm"
+              disabled={loadingReactions}
             />
           </div>
 

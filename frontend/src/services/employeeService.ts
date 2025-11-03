@@ -1,152 +1,125 @@
-import api, { Employee, EmployeeQuery } from '../lib/api';
+import api from '../lib/api';
 
-export interface CreateEmployeeRequest {
+export interface Employee {
+  id: string;
+  user_id: string;
   email: string;
-  fullName: string;
-  role: 'admin' | 'employee';
-  department?: string;
-  position?: string;
-  phone?: string;
-  address?: string;
+  full_name: string;
+  role: 'superadmin' | 'admin' | 'hr' | 'teamlead' | 'employee';
+  department: string;
+  department_id: string;
+  position: string;
+  phone: string;
+  address: string;
+  date_of_birth: string;
+  hire_date: string;
+  profile_picture: string;
+  status: 'active' | 'pending' | 'rejected';
+  work_type: 'onsite' | 'remote' | 'hybrid';
+  work_days: string[];
+  salary: number;
+  manager_id: string;
+  profile_updated_at: string;
+  created_at: string;
+  updated_at: string;
 }
 
-export interface UpdateEmployeeRequest {
-  fullName?: string;
-  email?: string;
-  department?: string;
-  position?: string;
-  phone?: string;
-  address?: string;
-  dateOfBirth?: string;
-  status?: 'active' | 'inactive';
+export interface Department {
+  id: string;
+  name: string;
+  description: string;
 }
 
-export class EmployeeService {
-  private static instance: EmployeeService;
+export interface BulkUpdate {
+  employeeId: string;
+  updates: Partial<Employee>;
+}
 
-  public static getInstance(): EmployeeService {
-    if (!EmployeeService.instance) {
-      EmployeeService.instance = new EmployeeService();
-    }
-    return EmployeeService.instance;
-  }
+export interface BulkUpdateResult {
+  success: string[];
+  failed: { id: string; error: string }[];
+}
 
-  // Get all employees with optional filtering
-  async getAllEmployees(query?: EmployeeQuery): Promise<{
-    employees: Employee[];
-    total: number;
-    page: number;
-    limit: number;
-  }> {
+class EmployeeService {
+  async getAllEmployees(): Promise<Employee[]> {
     try {
-      const response = await api.get('/employees', { params: query });
-      return response.data.data;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to fetch employees');
+      const response = await api.get('/employees');
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Failed to fetch employees:', error);
+      throw new Error('Failed to fetch employees');
     }
   }
 
-  // Get employee by ID
-  async getEmployeeById(id: string): Promise<Employee> {
+  async getEmployee(id: string): Promise<Employee> {
     try {
       const response = await api.get(`/employees/${id}`);
-      return response.data.data.employee;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to fetch employee');
+      return response.data.data;
+    } catch (error) {
+      console.error(`Failed to fetch employee ${id}:`, error);
+      throw new Error('Failed to fetch employee');
     }
   }
 
-  // Get current user's profile
-  async getMyProfile(): Promise<Employee> {
-    try {
-      const response = await api.get('/employees/me');
-      return response.data.data.employee;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to fetch profile');
-    }
-  }
-
-  // Update current user's profile
-  async updateMyProfile(data: Partial<CreateEmployeeRequest>): Promise<Employee> {
-    try {
-      const response = await api.put('/profile', data);
-      return response.data.data.employee;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to update profile');
-    }
-  }
-
-  // Search employees
-  async searchEmployees(query: string): Promise<Employee[]> {
-    try {
-      const response = await api.get('/employees/search', {
-        params: { q: query }
-      });
-      return response.data.data.employees;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Search failed');
-    }
-  }
-
-  // Create employee (admin only)
-  async createEmployee(employeeData: CreateEmployeeRequest): Promise<Employee> {
-    try {
-      const response = await api.post('/employees', employeeData);
-      return response.data.data.employee;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to create employee');
-    }
-  }
-
-  // Update employee (admin only)
-  async updateEmployee(id: string, data: UpdateEmployeeRequest): Promise<Employee> {
+  async updateEmployee(id: string, data: Partial<Employee>): Promise<Employee> {
     try {
       const response = await api.put(`/employees/${id}`, data);
-      return response.data.data.employee;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to update employee');
+      return response.data.data;
+    } catch (error) {
+      console.error(`Failed to update employee ${id}:`, error);
+      throw new Error('Failed to update employee');
     }
   }
 
-  // Delete employee (admin only)
-  async deleteEmployee(id: string): Promise<void> {
+  async getDepartments(): Promise<Department[]> {
     try {
-      await api.delete(`/employees/${id}`);
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to delete employee');
+      const response = await api.get('/departments');
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Failed to fetch departments:', error);
+      throw new Error('Failed to fetch departments');
     }
   }
 
-  // Get pending approvals (admin only)
-  async getPendingApprovals(): Promise<Employee[]> {
+  async bulkUpdateEmployees(updates: BulkUpdate[]): Promise<BulkUpdateResult> {
     try {
-      const response = await api.get('/employees/pending');
-      return response.data.employees || [];
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to fetch pending approvals');
+      const response = await api.post('/employees/bulk-update', { updates });
+      return response.data.data;
+    } catch (error) {
+      console.error('Failed to bulk update employees:', error);
+      throw new Error('Failed to bulk update employees');
     }
   }
 
-  // Approve employee (admin only)
-  async approveEmployee(id: string): Promise<Employee> {
+  async updateMyProfile(data: Partial<Employee>): Promise<Employee> {
     try {
-      const response = await api.post(`/employees/${id}/approve`);
-      return response.data.data.employee;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to approve employee');
+      const response = await api.put('/employees/my-profile', data);
+      return response.data.data;
+    } catch (error) {
+      console.error('Failed to update my profile:', error);
+      throw new Error('Failed to update profile');
     }
   }
 
-  // Assign department (admin only)
-  async assignDepartment(id: string, department: string): Promise<Employee> {
+  async getMyProfile(): Promise<Employee> {
     try {
-      const response = await api.post(`/employees/${id}/department`, { department });
-      return response.data.data.employee;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to assign department');
+      const response = await api.get('/employees/my-profile');
+      return response.data.data;
+    } catch (error) {
+      console.error('Failed to fetch my profile:', error);
+      throw new Error('Failed to fetch profile');
+    }
+  }
+
+  async getEmployeesForTasks(): Promise<Employee[]> {
+    try {
+      const response = await api.get('/employees/for-tasks');
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Failed to fetch employees for tasks:', error);
+      throw new Error('Failed to fetch employees for tasks');
     }
   }
 }
 
-// Export singleton instance
-export const employeeService = EmployeeService.getInstance();
+export const employeeService = new EmployeeService();

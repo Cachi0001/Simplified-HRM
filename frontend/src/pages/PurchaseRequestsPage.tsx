@@ -54,7 +54,7 @@ export function PurchaseRequestsPage() {
       const response = await api.get('/purchase-requests');
       const data = response.data.data || response.data;
       const requests = Array.isArray(data) ? data : (data?.purchaseRequests || []);
-      
+
       // Transform data to match our interface
       const transformedRequests = requests.map((req: any) => ({
         id: req.id || req._id,
@@ -70,7 +70,7 @@ export function PurchaseRequestsPage() {
         updatedAt: req.updated_at || req.updatedAt,
         employeeName: req.employee_name || req.employeeName
       }));
-      
+
       setPurchaseRequests(transformedRequests);
     } catch (error: any) {
       console.error('Error fetching purchase requests:', error);
@@ -82,7 +82,7 @@ export function PurchaseRequestsPage() {
 
   const handleCreatePurchaseRequest = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.itemName || !formData.description || formData.quantity <= 0 || formData.estimatedCost <= 0) {
       addToast('error', 'Please fill all fields correctly');
       return;
@@ -97,10 +97,10 @@ export function PurchaseRequestsPage() {
         estimated_cost: formData.estimatedCost,
         urgency: formData.urgency
       };
-      
+
       const response = await api.post('/purchase-requests', requestData);
       const newRequest = response.data.data || response.data;
-      
+
       // Transform response to match our interface
       const transformedRequest = {
         id: newRequest.id || newRequest._id,
@@ -114,7 +114,7 @@ export function PurchaseRequestsPage() {
         createdAt: newRequest.created_at || newRequest.createdAt,
         updatedAt: newRequest.updated_at || newRequest.updatedAt
       };
-      
+
       setPurchaseRequests([transformedRequest, ...purchaseRequests]);
       setFormData({ itemName: '', description: '', quantity: 1, estimatedCost: 0, urgency: 'medium' });
       setIsCreating(false);
@@ -182,28 +182,25 @@ export function PurchaseRequestsPage() {
   };
 
   return (
-    <div className={`min-h-screen p-6 transition-colors duration-200 ${
-      darkMode ? 'bg-gray-900' : 'bg-gray-50'
-    }`}>
+    <div className={`min-h-screen p-6 transition-colors duration-200 ${darkMode ? 'bg-gray-900' : 'bg-gray-50'
+      }`}>
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div className="flex items-center space-x-4">
-            <Link 
-              to="/dashboard" 
-              className={`transition-colors duration-200 ${
-                darkMode ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'
-              }`}
+            <Link
+              to="/dashboard"
+              className={`transition-colors duration-200 ${darkMode ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'
+                }`}
             >
               <ArrowLeft className="h-5 w-5" />
             </Link>
-            <h1 className={`text-3xl font-bold transition-colors duration-200 ${
-              darkMode ? 'text-white' : 'text-gray-900'
-            }`}>
+            <h1 className={`text-3xl font-bold transition-colors duration-200 ${darkMode ? 'text-white' : 'text-gray-900'
+              }`}>
               Purchase Requests
             </h1>
           </div>
-          {!isCreating && (
+          {!isCreating && currentUser?.role !== 'superadmin' && (
             <button
               onClick={() => setIsCreating(true)}
               className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-all duration-200 shadow-md hover:shadow-lg"
@@ -216,20 +213,17 @@ export function PurchaseRequestsPage() {
 
         {/* Create Form */}
         {isCreating && (
-          <div className={`rounded-lg shadow-lg p-6 mb-8 transition-colors duration-200 ${
-            darkMode ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'
-          }`}>
-            <h2 className={`text-xl font-bold mb-4 transition-colors duration-200 ${
-              darkMode ? 'text-white' : 'text-gray-900'
+          <div className={`rounded-lg shadow-lg p-6 mb-8 transition-colors duration-200 ${darkMode ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'
             }`}>
+            <h2 className={`text-xl font-bold mb-4 transition-colors duration-200 ${darkMode ? 'text-white' : 'text-gray-900'
+              }`}>
               Create Purchase Request
             </h2>
             <form onSubmit={handleCreatePurchaseRequest} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className={`block text-sm font-medium mb-1 transition-colors duration-200 ${
-                    darkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <label className={`block text-sm font-medium mb-1 transition-colors duration-200 ${darkMode ? 'text-gray-300' : 'text-gray-700'
+                    }`}>
                     Item Name
                   </label>
                   <input
@@ -238,19 +232,17 @@ export function PurchaseRequestsPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, itemName: e.target.value })
                     }
-                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
-                      darkMode 
-                        ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
-                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
-                    }`}
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${darkMode
+                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                      }`}
                     placeholder="e.g., Office Chair"
                     required
                   />
                 </div>
                 <div>
-                  <label className={`block text-sm font-medium mb-1 transition-colors duration-200 ${
-                    darkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <label className={`block text-sm font-medium mb-1 transition-colors duration-200 ${darkMode ? 'text-gray-300' : 'text-gray-700'
+                    }`}>
                     Quantity
                   </label>
                   <input
@@ -260,44 +252,39 @@ export function PurchaseRequestsPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, quantity: parseInt(e.target.value) || 1 })
                     }
-                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
-                      darkMode 
-                        ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
-                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
-                    }`}
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${darkMode
+                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                      }`}
                     required
                   />
                 </div>
               </div>
               <div>
-                <label className={`block text-sm font-medium mb-1 transition-colors duration-200 ${
-                  darkMode ? 'text-gray-300' : 'text-gray-700'
-                }`}>
+                <label className={`block text-sm font-medium mb-1 transition-colors duration-200 ${darkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>
                   Description
                 </label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
-                    darkMode 
-                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
-                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
-                  }`}
+                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${darkMode
+                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                    }`}
                   rows={3}
                   placeholder="Describe the item and its purpose..."
                   required
                 />
               </div>
               <div>
-                <label className={`block text-sm font-medium mb-1 transition-colors duration-200 ${
-                  darkMode ? 'text-gray-300' : 'text-gray-700'
-                }`}>
+                <label className={`block text-sm font-medium mb-1 transition-colors duration-200 ${darkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>
                   Estimated Cost (₦)
                 </label>
                 <div className="relative">
-                  <span className={`absolute left-3 top-3 text-lg font-semibold transition-colors duration-200 ${
-                    darkMode ? 'text-gray-400' : 'text-gray-500'
-                  }`}>
+                  <span className={`absolute left-3 top-3 text-lg font-semibold transition-colors duration-200 ${darkMode ? 'text-gray-400' : 'text-gray-500'
+                    }`}>
                     ₦
                   </span>
                   <input
@@ -308,11 +295,10 @@ export function PurchaseRequestsPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, estimatedCost: parseFloat(e.target.value) || 0 })
                     }
-                    className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
-                      darkMode 
-                        ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
-                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
-                    }`}
+                    className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${darkMode
+                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                      }`}
                     placeholder="0.00"
                     required
                   />
@@ -320,19 +306,17 @@ export function PurchaseRequestsPage() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className={`block text-sm font-medium mb-1 transition-colors duration-200 ${
-                    darkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <label className={`block text-sm font-medium mb-1 transition-colors duration-200 ${darkMode ? 'text-gray-300' : 'text-gray-700'
+                    }`}>
                     Urgency Level
                   </label>
                   <select
                     value={formData.urgency}
                     onChange={(e) => setFormData({ ...formData, urgency: e.target.value as 'low' | 'medium' | 'high' })}
-                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
-                      darkMode 
-                        ? 'bg-gray-700 border-gray-600 text-white' 
-                        : 'bg-white border-gray-300 text-gray-900'
-                    }`}
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${darkMode
+                      ? 'bg-gray-700 border-gray-600 text-white'
+                      : 'bg-white border-gray-300 text-gray-900'
+                      }`}
                   >
                     <option value="low">Low Priority</option>
                     <option value="medium">Medium Priority</option>
@@ -353,11 +337,10 @@ export function PurchaseRequestsPage() {
                     setIsCreating(false);
                     setFormData({ itemName: '', description: '', quantity: 1, estimatedCost: 0, urgency: 'medium' });
                   }}
-                  className={`flex-1 px-6 py-3 rounded-lg transition-all duration-200 font-medium shadow-md hover:shadow-lg ${
-                    darkMode 
-                      ? 'bg-gray-600 text-white hover:bg-gray-500' 
-                      : 'bg-gray-300 text-gray-900 hover:bg-gray-400'
-                  }`}
+                  className={`flex-1 px-6 py-3 rounded-lg transition-all duration-200 font-medium shadow-md hover:shadow-lg ${darkMode
+                    ? 'bg-gray-600 text-white hover:bg-gray-500'
+                    : 'bg-gray-300 text-gray-900 hover:bg-gray-400'
+                    }`}
                 >
                   Cancel
                 </button>
@@ -369,30 +352,24 @@ export function PurchaseRequestsPage() {
         {/* Purchase Requests List */}
         {loading ? (
           <div className="text-center py-12">
-            <AlertCircle className={`h-12 w-12 mx-auto mb-4 transition-colors duration-200 ${
-              darkMode ? 'text-gray-500' : 'text-gray-400'
-            }`} />
-            <p className={`transition-colors duration-200 ${
-              darkMode ? 'text-gray-400' : 'text-gray-600'
-            }`}>
+            <AlertCircle className={`h-12 w-12 mx-auto mb-4 transition-colors duration-200 ${darkMode ? 'text-gray-500' : 'text-gray-400'
+              }`} />
+            <p className={`transition-colors duration-200 ${darkMode ? 'text-gray-400' : 'text-gray-600'
+              }`}>
               Loading purchase requests...
             </p>
           </div>
         ) : purchaseRequests.length === 0 ? (
-          <div className={`text-center py-12 rounded-lg shadow-md transition-colors duration-200 ${
-            darkMode ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'
-          }`}>
-            <AlertCircle className={`h-12 w-12 mx-auto mb-4 transition-colors duration-200 ${
-              darkMode ? 'text-gray-500' : 'text-gray-400'
-            }`} />
-            <p className={`transition-colors duration-200 ${
-              darkMode ? 'text-gray-400' : 'text-gray-600'
+          <div className={`text-center py-12 rounded-lg shadow-md transition-colors duration-200 ${darkMode ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'
             }`}>
+            <AlertCircle className={`h-12 w-12 mx-auto mb-4 transition-colors duration-200 ${darkMode ? 'text-gray-500' : 'text-gray-400'
+              }`} />
+            <p className={`transition-colors duration-200 ${darkMode ? 'text-gray-400' : 'text-gray-600'
+              }`}>
               No purchase requests found
             </p>
-            <p className={`text-sm mt-2 transition-colors duration-200 ${
-              darkMode ? 'text-gray-500' : 'text-gray-500'
-            }`}>
+            <p className={`text-sm mt-2 transition-colors duration-200 ${darkMode ? 'text-gray-500' : 'text-gray-500'
+              }`}>
               Click "New Purchase Request" to create your first request
             </p>
           </div>
@@ -401,11 +378,10 @@ export function PurchaseRequestsPage() {
             {purchaseRequests.map((request) => (
               <div
                 key={request.id}
-                className={`rounded-lg shadow-md hover:shadow-xl transition-all duration-200 p-6 border ${
-                  darkMode 
-                    ? 'bg-gray-800 border-gray-700 hover:bg-gray-750' 
-                    : 'bg-white border-gray-200 hover:bg-gray-50'
-                }`}
+                className={`rounded-lg shadow-md hover:shadow-xl transition-all duration-200 p-6 border ${darkMode
+                  ? 'bg-gray-800 border-gray-700 hover:bg-gray-750'
+                  : 'bg-white border-gray-200 hover:bg-gray-50'
+                  }`}
               >
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex flex-col gap-2">
@@ -424,9 +400,8 @@ export function PurchaseRequestsPage() {
                   {(currentUser?.role !== 'admin' && currentUser?.role !== 'hr' && request.status === 'pending') && (
                     <button
                       onClick={() => handleDeletePurchaseRequest(request.id)}
-                      className={`transition-colors duration-200 ${
-                        darkMode ? 'text-red-400 hover:text-red-300' : 'text-red-600 hover:text-red-800'
-                      }`}
+                      className={`transition-colors duration-200 ${darkMode ? 'text-red-400 hover:text-red-300' : 'text-red-600 hover:text-red-800'
+                        }`}
                       title="Delete request"
                     >
                       <Trash2 className="h-5 w-5" />
@@ -436,67 +411,57 @@ export function PurchaseRequestsPage() {
 
                 <div className="space-y-4">
                   <div>
-                    <p className={`text-sm font-medium transition-colors duration-200 ${
-                      darkMode ? 'text-gray-400' : 'text-gray-500'
-                    }`}>
+                    <p className={`text-sm font-medium transition-colors duration-200 ${darkMode ? 'text-gray-400' : 'text-gray-500'
+                      }`}>
                       Item
                     </p>
-                    <p className={`text-lg font-semibold transition-colors duration-200 ${
-                      darkMode ? 'text-white' : 'text-gray-900'
-                    }`}>
+                    <p className={`text-lg font-semibold transition-colors duration-200 ${darkMode ? 'text-white' : 'text-gray-900'
+                      }`}>
                       {request.itemName}
                     </p>
                   </div>
 
                   <div>
-                    <p className={`text-sm font-medium transition-colors duration-200 ${
-                      darkMode ? 'text-gray-400' : 'text-gray-500'
-                    }`}>
+                    <p className={`text-sm font-medium transition-colors duration-200 ${darkMode ? 'text-gray-400' : 'text-gray-500'
+                      }`}>
                       Description
                     </p>
-                    <p className={`text-sm line-clamp-3 transition-colors duration-200 ${
-                      darkMode ? 'text-gray-300' : 'text-gray-700'
-                    }`}>
+                    <p className={`text-sm line-clamp-3 transition-colors duration-200 ${darkMode ? 'text-gray-300' : 'text-gray-700'
+                      }`}>
                       {request.description}
                     </p>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className={`text-sm font-medium transition-colors duration-200 ${
-                        darkMode ? 'text-gray-400' : 'text-gray-500'
-                      }`}>
+                      <p className={`text-sm font-medium transition-colors duration-200 ${darkMode ? 'text-gray-400' : 'text-gray-500'
+                        }`}>
                         Quantity
                       </p>
-                      <p className={`text-sm font-semibold transition-colors duration-200 ${
-                        darkMode ? 'text-white' : 'text-gray-900'
-                      }`}>
+                      <p className={`text-sm font-semibold transition-colors duration-200 ${darkMode ? 'text-white' : 'text-gray-900'
+                        }`}>
                         {request.quantity}
                       </p>
                     </div>
                     <div>
-                      <p className={`text-sm font-medium transition-colors duration-200 ${
-                        darkMode ? 'text-gray-400' : 'text-gray-500'
-                      }`}>
+                      <p className={`text-sm font-medium transition-colors duration-200 ${darkMode ? 'text-gray-400' : 'text-gray-500'
+                        }`}>
                         Est. Cost
                       </p>
-                      <p className={`text-sm font-semibold transition-colors duration-200 ${
-                        darkMode ? 'text-green-400' : 'text-green-600'
-                      }`}>
+                      <p className={`text-sm font-semibold transition-colors duration-200 ${darkMode ? 'text-green-400' : 'text-green-600'
+                        }`}>
                         ₦{request.estimatedCost.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
                       </p>
                     </div>
                   </div>
 
                   <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
-                    <p className={`text-sm font-medium transition-colors duration-200 ${
-                      darkMode ? 'text-gray-400' : 'text-gray-500'
-                    }`}>
+                    <p className={`text-sm font-medium transition-colors duration-200 ${darkMode ? 'text-gray-400' : 'text-gray-500'
+                      }`}>
                       Submitted
                     </p>
-                    <p className={`text-sm transition-colors duration-200 ${
-                      darkMode ? 'text-gray-300' : 'text-gray-700'
-                    }`}>
+                    <p className={`text-sm transition-colors duration-200 ${darkMode ? 'text-gray-300' : 'text-gray-700'
+                      }`}>
                       {new Date(request.createdAt).toLocaleDateString('en-NG', {
                         year: 'numeric',
                         month: 'short',

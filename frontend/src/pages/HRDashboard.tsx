@@ -300,7 +300,7 @@ export default function HRDashboard() {
 
         {activeTab === 'employees' && <AdminEmployeeManagement darkMode={darkMode} />}
         {activeTab === 'tasks' && <AdminTasks darkMode={darkMode} />}
-        {activeTab === 'departments' && <AdminDepartments darkMode={darkMode} />}
+        {activeTab === 'departments' && <AdminDepartments darkMode={darkMode} currentUser={currentUser} />}
         {activeTab === 'attendance' && <AdminAttendance darkMode={darkMode} />}
         {activeTab === 'leaves' && <AdminLeaveRequests darkMode={darkMode} />}
         {activeTab === 'announcements' && (

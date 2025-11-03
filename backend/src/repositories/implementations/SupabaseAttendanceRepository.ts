@@ -199,15 +199,41 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
         throw new Error('Already checked in today');
       }
 
+      const checkInTime = new Date();
+      
+      // Calculate minutes late (standard time is 8:35 AM)
+      const standardTime = new Date(checkInTime);
+      standardTime.setHours(8, 35, 0, 0); // 8:35 AM
+      
+      let minutesLate = 0;
+      let isLate = false;
+      
+      if (checkInTime > standardTime) {
+        const diffMs = checkInTime.getTime() - standardTime.getTime();
+        minutesLate = Math.floor(diffMs / (1000 * 60)); // Convert to minutes
+        isLate = true;
+      }
+
       const createData = {
         employee_id: employeeId,
         date: today,
-        check_in_time: new Date().toISOString(),
+        check_in_time: checkInTime.toISOString(),
         status: 'checked_in',
+        minutes_late: minutesLate,
+        is_late: isLate,
         ...(attendanceData.check_in_location && { check_in_location: attendanceData.check_in_location })
       };
 
-      return await this.create(createData);
+      const result = await this.create(createData);
+      
+      logger.info('✅ [SupabaseAttendanceRepository] Check in successful', {
+        attendanceId: result.id,
+        employeeId: result.employee_id,
+        isLate,
+        minutesLate
+      });
+
+      return result;
     } catch (error) {
       logger.error('❌ [SupabaseAttendanceRepository] Check in failed:', error);
       throw error;
@@ -443,6 +469,23 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
         const date = record.date ?? (record as any)?.created_at ?? new Date().toISOString();
         const checkInLocation = this.parseLocation((record as any)?.check_in_location);
         const checkOutLocation = this.parseLocation((record as any)?.check_out_location);
+        
+        // Format minutes late for display
+        const minutesLate = (record as any).minutes_late || 0;
+        const isLate = (record as any).is_late || false;
+        let lateDisplay = 'On time';
+        
+        if (minutesLate > 0) {
+          if (minutesLate >= 60) {
+            const hours = Math.floor(minutesLate / 60);
+            const remainingMinutes = minutesLate % 60;
+            lateDisplay = remainingMinutes > 0 
+              ? `${hours}h ${remainingMinutes}m late`
+              : `${hours}h late`;
+          } else {
+            lateDisplay = `${minutesLate}m late`;
+          }
+        }
 
         return {
           _id: {
@@ -466,6 +509,9 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
           checkOutLocation,
           totalHours: record.total_hours,
           status: record.status,
+          minutesLate: minutesLate,
+          isLate: isLate,
+          lateDisplay: lateDisplay,
           createdAt: record.created_at,
           updatedAt: record.updated_at
         };

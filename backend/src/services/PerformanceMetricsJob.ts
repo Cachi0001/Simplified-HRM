@@ -241,7 +241,7 @@ export class PerformanceMetricsJob {
         // Get today's attendance records
         const { data: attendanceRecords, error } = await this.supabase
             .from('attendance')
-            .select('user_id, check_in_time, check_out_time, minutes_late')
+            .select('employee_id, check_in_time, check_out_time, minutes_late')
             .gte('date', today)
             .lt('date', `${today}T23:59:59`);
 
@@ -250,9 +250,9 @@ export class PerformanceMetricsJob {
         }
 
         // Update attendance analytics for each user
-        const userIds = [...new Set(attendanceRecords?.map(record => record.user_id) || [])];
-        for (const userId of userIds) {
-            // await this.performanceService.updateAttendanceAnalytics(userId);
+        const employeeIds = [...new Set(attendanceRecords?.map(record => record.employee_id) || [])];
+        for (const employeeId of employeeIds) {
+            // await this.performanceService.updateAttendanceAnalytics(employeeId);
         }
     }
 

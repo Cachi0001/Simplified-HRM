@@ -682,7 +682,7 @@ export class AnnouncementController {
   async addReaction(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
-      const { reactionType } = req.body;
+      const { reaction_type } = req.body;
       const userId = req.user?.id;
 
       if (!userId) {
@@ -693,10 +693,13 @@ export class AnnouncementController {
         return;
       }
 
-      if (!reactionType || !['like', 'love', 'laugh', 'wow', 'sad', 'angry'].includes(reactionType)) {
+      // Support both emoji and text reaction types
+      const validReactions = ['like', 'love', 'laugh', 'wow', 'sad', 'angry', '👍', '❤️', '😂', '😮', '😢', '😡'];
+      if (!reaction_type || !validReactions.includes(reaction_type)) {
         res.status(400).json({
           status: 'error',
-          message: 'Valid reaction type is required (like, love, laugh, wow, sad, angry)'
+          message: 'Valid reaction type is required',
+          validTypes: validReactions
         });
         return;
       }
@@ -704,7 +707,7 @@ export class AnnouncementController {
       logger.info('👍 [AnnouncementController] Adding reaction', {
         announcementId: id,
         userId,
-        reactionType
+        reactionType: reaction_type
       });
 
       const supabase = supabaseConfig.getClient();
@@ -724,13 +727,28 @@ export class AnnouncementController {
         return;
       }
 
+      // Get user's employee record for proper foreign key relationship
+      const { data: employee, error: employeeError } = await supabase
+        .from('employees')
+        .select('id, user_id')
+        .eq('user_id', userId)
+        .single();
+
+      if (employeeError || !employee) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Employee record not found'
+        });
+        return;
+      }
+
       // Upsert reaction (replace existing reaction or create new one)
       const { data: reaction, error: reactionError } = await supabase
         .from('announcement_reactions')
         .upsert({
           announcement_id: id,
           user_id: userId,
-          reaction_type: reactionType
+          reaction_type: reaction_type
         }, {
           onConflict: 'announcement_id,user_id'
         })
@@ -738,32 +756,87 @@ export class AnnouncementController {
         .single();
 
       if (reactionError) {
+        logger.error('Reaction upsert error', { error: reactionError });
         throw reactionError;
       }
 
-      // Send notification to announcement author (if not reacting to own announcement)
-      if (announcement.author_id !== userId) {
-        try {
-          await this.notifyAuthorOfReaction(announcement, userId, reactionType);
-        } catch (notifyError) {
-          logger.error('Failed to notify author of reaction', { error: notifyError });
-          // Don't fail the reaction if notification fails
-        }
+      // Get updated reaction summary for WhatsApp-like response
+      const { data: reactionSummary, error: summaryError } = await supabase
+        .from('announcement_reaction_summary')
+        .select('reaction_type, count')
+        .eq('announcement_id', id);
+
+      if (summaryError) {
+        logger.error('Failed to get reaction summary', { error: summaryError });
+      }
+
+      // Get users who reacted with each type
+      const { data: reactionUsers, error: usersError } = await supabase
+        .from('announcement_reactions')
+        .select(`
+          reaction_type,
+          created_at,
+          users!announcement_reactions_user_id_fkey (
+            id,
+            full_name,
+            email
+          )
+        `)
+        .eq('announcement_id', id)
+        .order('created_at', { ascending: false });
+
+      if (usersError) {
+        logger.error('Failed to get reaction users', { error: usersError });
+      }
+
+      // Format response like WhatsApp
+      const reactionData = {
+        summary: {} as { [key: string]: number },
+        users: {} as { [key: string]: any[] },
+        totalReactions: 0
+      };
+
+      if (reactionSummary) {
+        reactionSummary.forEach((item: any) => {
+          reactionData.summary[item.reaction_type] = item.count;
+          reactionData.totalReactions += item.count;
+        });
+      }
+
+      if (reactionUsers) {
+        const groupedUsers: { [key: string]: any[] } = {};
+        reactionUsers.forEach((item: any) => {
+          if (!groupedUsers[item.reaction_type]) {
+            groupedUsers[item.reaction_type] = [];
+          }
+          groupedUsers[item.reaction_type].push({
+            id: item.users?.id,
+            name: item.users?.full_name,
+            email: item.users?.email,
+            reacted_at: item.created_at
+          });
+        });
+        reactionData.users = groupedUsers;
       }
 
       res.status(200).json({
         status: 'success',
         message: 'Reaction added successfully',
-        data: { reaction }
+        data: {
+          reaction,
+          reactions: reactionData
+        }
       });
     } catch (error) {
       logger.error('❌ [AnnouncementController] Add reaction error', {
         error: (error as Error).message,
-        announcementId: req.params.id
+        announcementId: req.params.id,
+        stack: (error as Error).stack
       });
       res.status(500).json({
         status: 'error',
-        message: 'Failed to add reaction'
+        message: 'Failed to add reaction',
+        details: (error as Error).message
       });
     }
   }
@@ -825,7 +898,7 @@ export class AnnouncementController {
   }
 
   /**
-   * Get reactions for announcement
+   * Get reactions for announcement (WhatsApp-like format)
    * GET /api/announcements/:id/reactions
    */
   async getReactions(req: Request, res: Response): Promise<void> {
@@ -838,13 +911,24 @@ export class AnnouncementController {
 
       const supabase = supabaseConfig.getClient();
 
-      const { data: reactions, error } = await supabase
+      // Get reaction summary for counts
+      const { data: reactionSummary, error: summaryError } = await supabase
+        .from('announcement_reaction_summary')
+        .select('reaction_type, count')
+        .eq('announcement_id', id);
+
+      if (summaryError) {
+        throw summaryError;
+      }
+
+      // Get detailed reactions with user info
+      const { data: reactions, error: reactionsError } = await supabase
         .from('announcement_reactions')
         .select(`
           id,
           reaction_type,
           created_at,
-          employees!announcement_reactions_user_id_fkey (
+          users!announcement_reactions_user_id_fkey (
             id,
             full_name,
             email
@@ -853,36 +937,83 @@ export class AnnouncementController {
         .eq('announcement_id', id)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        throw error;
+      if (reactionsError) {
+        throw reactionsError;
       }
 
-      // Group reactions by type and count them
-      const reactionCounts: { [key: string]: number } = {};
-      const reactionUsers: { [key: string]: any[] } = {};
+      // Format data like WhatsApp
+      const reactionData = {
+        summary: {} as { [key: string]: number },
+        users: {} as { [key: string]: any[] },
+        totalReactions: 0,
+        recentReactions: [] as any[]
+      };
 
-      reactions?.forEach((reaction: any) => {
-        const type = reaction.reaction_type;
-        reactionCounts[type] = (reactionCounts[type] || 0) + 1;
-        
-        if (!reactionUsers[type]) {
-          reactionUsers[type] = [];
-        }
-        
-        reactionUsers[type].push({
-          id: reaction.employees?.id,
-          name: reaction.employees?.full_name,
-          email: reaction.employees?.email
+      // Build summary from reaction_summary table
+      if (reactionSummary) {
+        reactionSummary.forEach((item: any) => {
+          reactionData.summary[item.reaction_type] = item.count;
+          reactionData.totalReactions += item.count;
         });
+      }
+
+      // Group users by reaction type
+      if (reactions) {
+        const groupedUsers: { [key: string]: any[] } = {};
+        
+        reactions.forEach((reaction: any) => {
+          const type = reaction.reaction_type;
+          
+          if (!groupedUsers[type]) {
+            groupedUsers[type] = [];
+          }
+          
+          groupedUsers[type].push({
+            id: reaction.users?.id,
+            name: reaction.users?.full_name,
+            email: reaction.users?.email,
+            reacted_at: reaction.created_at
+          });
+        });
+        
+        reactionData.users = groupedUsers;
+        
+        // Get recent reactions for activity feed
+        reactionData.recentReactions = reactions.slice(0, 10).map((reaction: any) => ({
+          id: reaction.id,
+          type: reaction.reaction_type,
+          user: {
+            id: reaction.users?.id,
+            name: reaction.users?.full_name,
+            email: reaction.users?.email
+          },
+          created_at: reaction.created_at
+        }));
+      }
+
+      // Create WhatsApp-like reaction strings
+      const reactionStrings: { [key: string]: string } = {};
+      Object.keys(reactionData.users).forEach(reactionType => {
+        const users = reactionData.users[reactionType];
+        const count = reactionData.summary[reactionType] || 0;
+        
+        if (count === 1) {
+          reactionStrings[reactionType] = `${users[0].name} reacted with ${reactionType}`;
+        } else if (count === 2) {
+          reactionStrings[reactionType] = `${users[0].name} and ${users[1].name} reacted with ${reactionType}`;
+        } else if (count > 2) {
+          reactionStrings[reactionType] = `${users[0].name}, ${users[1].name} and ${count - 2} others reacted with ${reactionType}`;
+        }
       });
 
       res.status(200).json({
         status: 'success',
         data: {
+          ...reactionData,
+          reactionStrings,
+          // Legacy format for backward compatibility
           reactions: reactions || [],
-          counts: reactionCounts,
-          users: reactionUsers,
-          totalReactions: reactions?.length || 0
+          counts: reactionData.summary
         }
       });
     } catch (error) {
@@ -900,35 +1031,74 @@ export class AnnouncementController {
   /**
    * Notify announcement author of reaction
    */
-  private async notifyAuthorOfReaction(announcement: any, reactorId: string, reactionType: string): Promise<void> {
+  private async notifyAuthorOfReaction(announcement: any, reactorUserId: string, reactionType: string): Promise<void> {
     try {
       const supabase = supabaseConfig.getClient();
 
-      // Get reactor info
+      // Get reactor info using user_id
       const { data: reactor, error: reactorError } = await supabase
         .from('employees')
-        .select('full_name, email')
-        .eq('id', reactorId)
+        .select('id, full_name, email, user_id')
+        .eq('user_id', reactorUserId)
         .single();
 
       if (reactorError || !reactor) {
-        throw new Error('Reactor not found');
+        throw new Error('Reactor employee record not found');
       }
 
-      // Create notification for author
+      // Don't notify if user is reacting to their own announcement
+      if (announcement.author_id === reactor.id) {
+        return;
+      }
+
+      // Create WhatsApp-like notification message
+      let notificationMessage = '';
+      switch (reactionType) {
+        case 'like':
+        case '👍':
+          notificationMessage = `${reactor.full_name} liked your announcement "${announcement.title}"`;
+          break;
+        case 'love':
+        case '❤️':
+          notificationMessage = `${reactor.full_name} loved your announcement "${announcement.title}"`;
+          break;
+        case 'laugh':
+        case '😂':
+          notificationMessage = `${reactor.full_name} found your announcement "${announcement.title}" funny`;
+          break;
+        case 'wow':
+        case '😮':
+          notificationMessage = `${reactor.full_name} was amazed by your announcement "${announcement.title}"`;
+          break;
+        case 'sad':
+        case '😢':
+          notificationMessage = `${reactor.full_name} reacted sadly to your announcement "${announcement.title}"`;
+          break;
+        case 'angry':
+        case '😡':
+          notificationMessage = `${reactor.full_name} reacted angrily to your announcement "${announcement.title}"`;
+          break;
+        default:
+          notificationMessage = `${reactor.full_name} reacted with ${reactionType} to your announcement "${announcement.title}"`;
+      }
+
+      // Create notification for author (using employee ID, not user ID)
       const { error: notificationError } = await supabase
         .from('notifications')
         .insert({
-          user_id: announcement.author_id,
+          user_id: announcement.author_id, // This should be the employee ID
           title: `${reactor.full_name} reacted to your announcement`,
-          message: `${reactor.full_name} reacted with ${reactionType} to your announcement "${announcement.title}"`,
+          message: notificationMessage,
           type: 'reaction',
           data: {
             announcementId: announcement.id,
             reactionType,
-            reactorId,
-            reactorName: reactor.full_name
-          }
+            reactorId: reactor.id,
+            reactorUserId: reactorUserId,
+            reactorName: reactor.full_name,
+            announcementTitle: announcement.title
+          },
+          related_id: announcement.id
         });
 
       if (notificationError) {
@@ -938,7 +1108,8 @@ export class AnnouncementController {
       logger.info('📢 [AnnouncementController] Author notified of reaction', {
         announcementId: announcement.id,
         authorId: announcement.author_id,
-        reactorId,
+        reactorId: reactor.id,
+        reactorUserId,
         reactionType
       });
     } catch (error) {
@@ -958,40 +1129,83 @@ export class AnnouncementController {
     try {
       const supabase = supabaseConfig.getClient();
 
-      // Get all active users
-      const { data: users, error: usersError } = await supabase
+      // Get all active employees (not users table to avoid foreign key issues)
+      const { data: employees, error: employeesError } = await supabase
         .from('employees')
-        .select('id, email, full_name')
+        .select('id, email, full_name, user_id')
         .eq('active', true);
 
-      if (usersError) {
-        throw usersError;
+      if (employeesError) {
+        logger.error('❌ [AnnouncementController] Failed to get employees', { error: employeesError });
+        throw employeesError;
       }
 
-      if (!users || users.length === 0) {
-        logger.warn('No active users found for notification');
+      if (!employees || employees.length === 0) {
+        logger.warn('No active employees found for notification');
         return;
       }
+
+      // Filter out employees that don't have valid user records
+      const validEmployees = [];
+      for (const employee of employees) {
+        // Verify the employee has a corresponding user record
+        const { data: userExists } = await supabase
+          .from('users')
+          .select('id')
+          .eq('id', employee.user_id)
+          .single();
+        
+        if (userExists) {
+          validEmployees.push(employee);
+        } else {
+          logger.warn('Employee has no corresponding user record', { 
+            employeeId: employee.id, 
+            userId: employee.user_id 
+          });
+        }
+      }
       
-      // Insert notifications for all users
-      const notifications = users.map((user: any) => ({
-        user_id: user.id,
+      if (validEmployees.length === 0) {
+        logger.warn('No valid employees found for notification');
+        return;
+      }
+
+      // Insert notifications for all valid employees (using employee IDs)
+      const notifications = validEmployees.map((employee: any) => ({
+        user_id: employee.id, // Use employee ID, not user ID
         title: `📢 New Announcement: ${announcement.title}`,
         message: `${announcement.content.substring(0, 200)}${announcement.content.length > 200 ? '...' : ''}\n\n- ${author?.full_name || 'Admin'}`,
-        type: 'announcement'
+        type: 'announcement',
+        data: {
+          announcementId: announcement.id,
+          authorId: author?.id,
+          authorName: author?.full_name
+        },
+        related_id: announcement.id
       }));
 
-      const { error: notificationError } = await supabase
-        .from('notifications')
-        .insert(notifications);
+      // Insert notifications in batches to avoid overwhelming the database
+      const batchSize = 100;
+      for (let i = 0; i < notifications.length; i += batchSize) {
+        const batch = notifications.slice(i, i + batchSize);
+        const { error: notificationError } = await supabase
+          .from('notifications')
+          .insert(batch);
 
-      if (notificationError) {
-        throw notificationError;
+        if (notificationError) {
+          logger.error('❌ [AnnouncementController] Failed to insert notification batch', {
+            error: notificationError,
+            batchStart: i,
+            batchSize: batch.length
+          });
+          throw notificationError;
+        }
       }
 
       logger.info('📢 [AnnouncementController] Notifications sent to all users', {
         announcementId: announcement.id,
-        userCount: users.length
+        userCount: validEmployees.length,
+        totalEmployees: employees.length
       });
 
       // TODO: Send email notifications here

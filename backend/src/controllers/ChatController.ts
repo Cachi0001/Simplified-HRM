@@ -1089,10 +1089,18 @@ export class ChatController {
 
       logger.info('📜 [ChatController] Get conversation history for admin', { 
         userId, 
-        userRole 
+        userRole,
+        note: 'Admin viewing conversation history - no indicators triggered'
       });
 
       const conversations = await this.chatService.getConversationHistoryForAdmin();
+
+      // Log access for audit purposes
+      try {
+        await this.logConversationAccess(userId, 'view_history', conversations.length);
+      } catch (logError) {
+        logger.warn('Failed to log conversation access (non-critical):', logError);
+      }
 
       res.status(200).json({
         status: 'success',
@@ -1112,6 +1120,30 @@ export class ChatController {
         status: 'error',
         message: 'Failed to get conversation history'
       });
+    }
+  }
+
+  /**
+   * Log conversation access for audit purposes
+   */
+  private async logConversationAccess(userId: string, accessType: string, conversationCount: number): Promise<void> {
+    try {
+      const supabase = SupabaseConfig.getClient();
+      
+      await supabase
+        .from('conversation_access_logs')
+        .insert({
+          accessor_id: userId,
+          accessed_user_id: userId, // Self-access for history view
+          chat_id: 'history_view',
+          access_type: accessType,
+          access_reason: `Admin viewed ${conversationCount} conversations`,
+          created_at: new Date().toISOString()
+        });
+        
+      logger.info('📝 Conversation access logged', { userId, accessType, conversationCount });
+    } catch (error) {
+      logger.warn('Failed to log conversation access:', error);
     }
   }
 }

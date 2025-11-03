@@ -10,6 +10,7 @@ import { Users, Building, Edit, Check, X } from 'lucide-react';
 
 interface AdminDepartmentsProps {
   darkMode?: boolean;
+  currentUser?: any;
 }
 
 const COMMON_DEPARTMENTS = [
@@ -25,7 +26,7 @@ const COMMON_DEPARTMENTS = [
   'Legal'
 ];
 
-export function AdminDepartments({ darkMode = false }: AdminDepartmentsProps) {
+export function AdminDepartments({ darkMode = false, currentUser }: AdminDepartmentsProps) {
   const [selectedEmployee, setSelectedEmployee] = useState<string>('');
   const [newDepartment, setNewDepartment] = useState<string>('');
   const [showAssignForm, setShowAssignForm] = useState(false);
@@ -238,43 +239,45 @@ export function AdminDepartments({ darkMode = false }: AdminDepartmentsProps) {
         </Card>
       )}
 
-      {/* Quick Assignment */}
-      <Card className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-        <div className="p-6">
-          <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-            Quick Department Assignment
-          </h3>
+      {/* Quick Assignment - Hidden for superadmin */}
+      {currentUser?.role !== 'superadmin' && (
+        <Card className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+          <div className="p-6">
+            <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+              Quick Department Assignment
+            </h3>
 
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">
-            {COMMON_DEPARTMENTS.map((dept, idx) => (
-              <Button
-                key={`quick-assign-${dept}-${idx}`}
-                onClick={() => {
-                  const employee = employeesWithoutDepartment[0];
-                  if (employee) {
-                    const empId = getEmployeeId(employee);
-                    handleQuickAssign(empId, dept);
-                  } else {
-                    addToast('info', 'No employees without departments available.');
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">
+              {COMMON_DEPARTMENTS.map((dept, idx) => (
+                <Button
+                  key={`quick-assign-${dept}-${idx}`}
+                  onClick={() => {
+                    const employee = employeesWithoutDepartment[0];
+                    if (employee) {
+                      const empId = getEmployeeId(employee);
+                      handleQuickAssign(empId, dept);
+                    } else {
+                      addToast('info', 'No employees without departments available.');
+                    }
+                  }}
+                  isLoading={assignDepartmentMutation.isPending && quickAssignDepartment === dept}
+                  disabled={
+                    employeesWithoutDepartment.length === 0 ||
+                    (assignDepartmentMutation.isPending && quickAssignDepartment !== dept)
                   }
-                }}
-                isLoading={assignDepartmentMutation.isPending && quickAssignDepartment === dept}
-                disabled={
-                  employeesWithoutDepartment.length === 0 ||
-                  (assignDepartmentMutation.isPending && quickAssignDepartment !== dept)
-                }
-                className={`text-xs ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
-              >
-                {dept}
-              </Button>
-            ))}
-          </div>
+                  className={`text-xs ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+                >
+                  {dept}
+                </Button>
+              ))}
+            </div>
 
-          <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-            💡 Click any department button to quickly assign it to the first employee without a department
-          </p>
-        </div>
-      </Card>
+            <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+              💡 Click any department button to quickly assign it to the first employee without a department
+            </p>
+          </div>
+        </Card>
+      )}
 
       {/* Department Overview */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
