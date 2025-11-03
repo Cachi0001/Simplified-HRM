@@ -1,6 +1,8 @@
 import { IEmployeeRepository } from '../repositories/interfaces/IEmployeeRepository';
 import { IEmployee, CreateEmployeeRequest, UpdateEmployeeRequest, EmployeeQuery } from '../models/SupabaseEmployee';
 import { EmailService } from './EmailService';
+import NotificationService from './NotificationService';
+import { ProfileValidationService } from './ProfileValidationService';
 import logger from '../utils/logger';
 import db from '../config/database';
 import supabaseConfig from '../config/supabase';
@@ -153,46 +155,83 @@ export class EmployeeService {
       }
 
       // Allow admin or HR to update any employee, or allow employee to update themselves
-      if (currentUserRole !== 'admin' && currentUserRole !== 'hr' && existingEmployee.user_id !== currentUserId) {
-        throw new Error('Access denied');
+      if (currentUserRole !== 'admin' && currentUserRole !== 'superadmin' && currentUserRole !== 'hr' && existingEmployee.user_id !== currentUserId) {
+        throw new Error('Access denied: You can only update your own profile');
       }
 
-      // For non-admin users, restrict fields they can update
-      if (currentUserRole !== 'admin') {
-        // HR can update role, department, position, and other fields
-        // But cannot change themselves to admin
-        if (currentUserRole === 'hr' && employeeData.role === 'admin') {
-          throw new Error('HR cannot assign admin role');
-        }
+      const isUpdatingSelf = existingEmployee.user_id === currentUserId;
 
-        // HR updating others - allow more fields
-        if (existingEmployee.user_id !== currentUserId) {
-          const hrAllowedFields = ['fullName', 'department', 'position', 'phone', 'address', 'dateOfBirth', 'hireDate', 'profilePicture', 'role', 'status'];
-          const filteredData: UpdateEmployeeRequest = {};
+      // Validate the profile update
+      const validation = ProfileValidationService.validateProfileUpdate(
+        employeeData,
+        currentUserRole,
+        isUpdatingSelf
+      );
 
-          hrAllowedFields.forEach(field => {
-            if (employeeData[field as keyof UpdateEmployeeRequest] !== undefined) {
-              (filteredData as any)[field] = employeeData[field as keyof UpdateEmployeeRequest];
-            }
-          });
-
-          employeeData = filteredData;
-        } else {
-          // Employee updating themselves - only allow personal fields
-          const allowedFields = ['fullName', 'department', 'position', 'phone', 'address', 'dateOfBirth', 'hireDate', 'profilePicture', 'status'];
-          const filteredData: UpdateEmployeeRequest = {};
-
-          allowedFields.forEach(field => {
-            if (employeeData[field as keyof UpdateEmployeeRequest] !== undefined) {
-              (filteredData as any)[field] = employeeData[field as keyof UpdateEmployeeRequest];
-            }
-          });
-
-          employeeData = filteredData;
-        }
+      if (!validation.isValid) {
+        throw new Error(`Profile validation failed: ${validation.errors.join(', ')}`);
       }
+
+      // Filter allowed fields based on user role and permissions
+      const filteredData = ProfileValidationService.filterAllowedFields(
+        employeeData,
+        currentUserRole,
+        isUpdatingSelf
+      );
+
+      // Special validation for HR role changes
+      if (currentUserRole === 'hr' && filteredData.role === 'admin') {
+        throw new Error('HR cannot assign admin role');
+      }
+
+      // Log validation warnings if any
+      if (validation.warnings.length > 0) {
+        logger.info('EmployeeService: Profile update warnings', {
+          employeeId: id,
+          warnings: validation.warnings,
+          updatedBy: currentUserRole
+        });
+      }
+
+      employeeData = filteredData;
 
       const updatedEmployee = await this.employeeRepository.update(id, employeeData);
+
+      // Send notifications to HR/Admin/Superadmin when employee updates their own profile
+      if (existingEmployee.user_id === currentUserId && currentUserRole === 'employee') {
+        try {
+          const updatedFields = Object.keys(employeeData).filter(field => 
+            employeeData[field as keyof UpdateEmployeeRequest] !== undefined
+          );
+          
+          if (updatedFields.length > 0) {
+            // Get all HR/Admin/Superadmin users to notify
+            const adminUsers = await this.getAdminUsers();
+            const adminUserIds = adminUsers.map(user => user.user_id).filter(Boolean);
+            
+            if (adminUserIds.length > 0) {
+              await NotificationService.notifyProfileUpdate(
+                id,
+                existingEmployee.fullName || existingEmployee.email,
+                updatedFields,
+                adminUserIds
+              );
+              
+              logger.info('EmployeeService: Profile update notifications sent', {
+                employeeId: id,
+                updatedFields,
+                adminCount: adminUserIds.length
+              });
+            }
+          }
+        } catch (notificationError) {
+          // Don't fail the update if notifications fail
+          logger.error('EmployeeService: Failed to send profile update notifications', {
+            error: (notificationError as Error).message,
+            employeeId: id
+          });
+        }
+      }
 
       logger.info('EmployeeService: Employee updated successfully', { employeeId: id, updatedFields: Object.keys(employeeData), updatedBy: currentUserRole });
       return this.mapEmployee(updatedEmployee);
@@ -820,6 +859,34 @@ export class EmployeeService {
         employeeId 
       });
       throw error;
+    }
+  }
+
+  /**
+   * Get all admin users (HR, Admin, Superadmin) for notifications
+   */
+  private async getAdminUsers(): Promise<Array<{ user_id: string; role: string; full_name?: string }>> {
+    try {
+      const supabase = supabaseConfig.getClient();
+      
+      const { data, error } = await supabase
+        .from('employees')
+        .select('user_id, role, full_name')
+        .in('role', ['hr', 'admin', 'superadmin'])
+        .eq('status', 'active')
+        .not('user_id', 'is', null);
+
+      if (error) {
+        logger.error('EmployeeService: Failed to get admin users', { error: error.message });
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      logger.error('EmployeeService: Error getting admin users', { 
+        error: (error as Error).message 
+      });
+      return [];
     }
   }
 }

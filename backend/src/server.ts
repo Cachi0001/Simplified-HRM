@@ -38,7 +38,7 @@ import approvalRoutes from './routes/approval.routes';
 import requestNotificationRoutes from './routes/request-notifications.routes';
 import performanceRoutes from './routes/performance.routes';
 import settingsRoutes from './routes/settings.routes';
-import profileRoutes from './routes/profile.routes';
+
 import checkoutMonitoringRoutes from './routes/checkout-monitoring.routes';
 import jobsRoutes from './routes/jobs.routes';
 import messageIndicatorRoutes from './routes/messageIndicators';
@@ -195,7 +195,7 @@ app.use('/api/approval-workflow', approvalRoutes);
 app.use('/api/request-notifications', requestNotificationRoutes);
 app.use('/api/performance', performanceRoutes);
 app.use('/api/settings', settingsRoutes);
-app.use('/api/profile', profileRoutes);
+
 app.use('/api/checkout-monitoring', checkoutMonitoringRoutes);
 app.use('/api/jobs', jobsRoutes);
 app.use('/api/message-indicators', messageIndicatorRoutes);
