@@ -1,56 +1,28 @@
 import { Router } from 'express';
-import { authenticateToken } from '../middleware/auth.middleware';
-import { PerformanceAnalyticsController } from '../controllers/PerformanceAnalyticsController';
-import { PerformanceAnalyticsService } from '../services/PerformanceAnalyticsService';
+import { PerformanceMetricsController } from '../controllers/PerformanceMetricsController';
+import { requireAuth } from '../middleware/auth.middleware';
+import { requireRole } from '../middleware/roleAuth';
 
 const router = Router();
+const performanceController = new PerformanceMetricsController();
 
-const performanceService = new PerformanceAnalyticsService();
-const performanceController = new PerformanceAnalyticsController(performanceService);
+// Apply authentication middleware to all routes
+router.use(requireAuth);
 
-// Protect all routes with authentication
-router.use(authenticateToken);
+// Employee performance metrics routes
+router.get('/employee/:employeeId', (req, res) => performanceController.getEmployeePerformance(req, res));
+router.post('/employee/:employeeId/calculate', (req, res) => performanceController.calculateEmployeePerformance(req, res));
+router.get('/employee/:employeeId/trends', (req, res) => performanceController.getEmployeePerformanceTrends(req, res));
 
-/**
- * Personal Performance Routes (for current user)
- */
-router.get('/my-report', (req, res) => performanceController.getMyPerformanceReport(req, res));
-router.get('/my-metrics', (req, res) => performanceController.getMyPerformanceMetrics(req, res));
+// Performance summary and dashboard routes
+router.get('/summary', (req, res) => performanceController.getPerformanceSummary(req, res));
+router.post('/multiple', (req, res) => performanceController.getMultipleEmployeePerformance(req, res));
 
-/**
- * Employee Performance Routes (admin/hr access)
- */
-router.get('/employee/:id/report', (req, res) => performanceController.getEmployeePerformanceReport(req, res));
-router.get('/employee/:id/metrics', (req, res) => performanceController.getEmployeePerformanceMetrics(req, res));
-router.post('/employee/:id/calculate', (req, res) => performanceController.calculateEmployeePerformance(req, res));
+// Performance weights configuration
+router.get('/weights', (req, res) => performanceController.getPerformanceWeights(req, res));
+router.put('/weights/:weightId', (req, res) => performanceController.updatePerformanceWeight(req, res));
 
-/**
- * Department Performance Routes (admin/hr access)
- */
-router.get('/department/:id/summary', (req, res) => performanceController.getDepartmentPerformanceSummary(req, res));
-
-/**
- * Organization Performance Routes (admin/hr access)
- */
-router.get('/top-performers', (req, res) => performanceController.getTopPerformers(req, res));
-router.post('/calculate-all', (req, res) => performanceController.calculateAllEmployeesPerformance(req, res));
-
-/**
- * Analytics Dashboard Routes
- */
-router.get('/dashboard', (req, res) => performanceController.getAnalyticsDashboard(req, res));
-router.get('/insights', (req, res) => performanceController.getPerformanceInsights(req, res));
-router.get('/trends', (req, res) => performanceController.getPerformanceTrends(req, res));
-
-/**
- * Performance Report Generation
- */
-router.post('/reports/generate', (req, res) => performanceController.generatePerformanceReport(req, res));
-
-/**
- * Real-time Performance Updates
- */
-router.get('/real-time/updates', (req, res) => performanceController.getRealTimePerformanceUpdates(req, res));
-router.post('/real-time/update', (req, res) => performanceController.updatePerformanceMetrics(req, res));
+// Batch operations (admin only)
+router.post('/recalculate-all', (req, res) => performanceController.recalculateAllPerformance(req, res));
 
 export default router;

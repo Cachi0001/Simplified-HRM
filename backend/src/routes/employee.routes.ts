@@ -24,6 +24,11 @@ router.get('/my-profile', (req, res) => employeeController.getMyProfile(req, res
 router.put('/my-profile', (req, res) => employeeController.updateMyProfile(req, res));
 router.get('/me', (req, res) => employeeController.getMyProfile(req, res));
 router.put('/me', (req, res) => employeeController.updateMyProfile(req, res));
+
+// Working days endpoints
+router.get('/my-working-days', (req, res) => employeeController.getMyWorkingDays(req, res));
+router.put('/my-working-days', (req, res) => employeeController.updateMyWorkingDays(req, res));
+router.get('/my-working-days/stats', (req, res) => employeeController.getMyWorkingDaysStats(req, res));
 router.get('/pending', requireRole(['admin', 'hr', 'superadmin']), (req, res) => employeeController.getPendingApprovals(req, res));
 router.get('/stats', requireRole(['admin', 'hr', 'superadmin']), (req, res) => employeeController.getEmployeeStats(req, res));
 router.get('/approvals/history', requireRole(['admin', 'hr', 'superadmin']), (req, res) => employeeController.getApprovalHistory(req, res));

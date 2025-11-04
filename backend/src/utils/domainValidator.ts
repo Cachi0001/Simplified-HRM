@@ -12,6 +12,7 @@ export interface DomainValidationResult {
 export class DomainValidator {
   private static readonly ALLOWED_BASE_DOMAINS = [
     'go3net.com',
+    'go3net.vercel.app',
     'go3nethrm.com',
     'go3nethrm.vercel.app',
     'localhost'
@@ -37,12 +38,22 @@ export class DomainValidator {
     try {
       // Remove protocol and get clean domain
       const cleanDomain = this.sanitizeDomain(origin);
-      
+
+      // Special handling for localhost - always allow in development
+      if (cleanDomain.includes('localhost') || cleanDomain.includes('127.0.0.1')) {
+        return {
+          isValid: true,
+          domain: cleanDomain,
+          reason: 'Development localhost domain'
+        };
+      }
+
       // Check for exact matches first
       if (this.isExactMatch(cleanDomain)) {
         return {
           isValid: true,
-          domain: cleanDomain
+          domain: cleanDomain,
+          reason: 'Exact domain match'
         };
       }
 
@@ -56,7 +67,8 @@ export class DomainValidator {
       if (this.isDevelopmentDomain(cleanDomain)) {
         return {
           isValid: true,
-          domain: cleanDomain
+          domain: cleanDomain,
+          reason: 'Development domain'
         };
       }
 
@@ -81,7 +93,7 @@ export class DomainValidator {
   static isSubdomain(domain: string, baseDomain: string): boolean {
     const cleanDomain = this.sanitizeDomain(domain);
     const cleanBase = this.sanitizeDomain(baseDomain);
-    
+
     return cleanDomain.endsWith(`.${cleanBase}`) || cleanDomain === cleanBase;
   }
 
@@ -103,11 +115,18 @@ export class DomainValidator {
     const exactMatches = [
       'go3net.com',
       'www.go3net.com',
+      'go3net.vercel.app',
       'go3nethrm.com',
       'www.go3nethrm.com',
       'go3nethrm.vercel.app',
       'localhost',
-      '127.0.0.1'
+      'localhost:5173',
+      'localhost:3000',
+      'localhost:8080',
+      '127.0.0.1',
+      '127.0.0.1:5173',
+      '127.0.0.1:3000',
+      '127.0.0.1:8080'
     ];
 
     return exactMatches.includes(domain);
@@ -121,7 +140,7 @@ export class DomainValidator {
       if (this.isSubdomain(domain, baseDomain)) {
         // Extract subdomain
         const subdomain = domain.replace(`.${baseDomain}`, '').replace(baseDomain, '');
-        
+
         return {
           isValid: true,
           domain: baseDomain,
@@ -141,8 +160,16 @@ export class DomainValidator {
    * Check if domain is for development
    */
   private static isDevelopmentDomain(domain: string): boolean {
-    return this.ALLOWED_DEVELOPMENT_DOMAINS.some(devDomain => 
-      domain === devDomain || domain.startsWith(`${devDomain}:`)
+    // Handle localhost with ports (including the sanitized domain without protocol)
+    if (domain.includes('localhost') || domain.includes('127.0.0.1')) {
+      return true;
+    }
+
+    // Handle exact matches and port variations
+    return this.ALLOWED_DEVELOPMENT_DOMAINS.some(devDomain =>
+      domain === devDomain ||
+      domain.startsWith(`${devDomain}:`) ||
+      domain.endsWith(`:${devDomain}`)
     );
   }
 
@@ -159,12 +186,12 @@ export class DomainValidator {
       'https://api.go3net.com',
       'https://hr.go3net.com',
       'https://hrm.go3net.com',
-      
+
       // Go3nethrm domains
       'https://go3nethrm.com',
       'https://www.go3nethrm.com',
       'https://go3nethrm.vercel.app',
-      
+
       // Development domains
       'http://localhost:3000',
       'http://localhost:5173',

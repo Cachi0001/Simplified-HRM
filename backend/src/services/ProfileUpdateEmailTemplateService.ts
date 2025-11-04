@@ -22,7 +22,7 @@ export class ProfileUpdateEmailTemplateService {
       <head>
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Employee Profile Update - Go3net HR Management System</title>
+          <title>Staff Profile Update - Go3net HR Management System</title>
           <style>
               body { 
                   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
@@ -134,12 +134,12 @@ export class ProfileUpdateEmailTemplateService {
           <div class="email-container">
               <div class="header">
                   <h1>👤 Profile Updated</h1>
-                  <p>Employee Profile Change Notification</p>
+                  <p>Staff Profile Change Notification</p>
               </div>
               <div class="content">
                   <p style="font-size: 16px; color: #555;">Hello ${adminName},</p>
                   <p style="font-size: 16px; color: #555;">
-                      An employee has updated their profile information and requires your review.
+                      A staff member has updated their profile information and requires your review.
                   </p>
                   
                   <div class="employee-card">
@@ -184,13 +184,13 @@ export class ProfileUpdateEmailTemplateService {
     const fieldsText = updatedFields.join(', ');
 
     return `
-Employee Profile Update Notification
+Staff Profile Update Notification
 
 Hello ${adminName},
 
-An employee has updated their profile information:
+A staff member has updated their profile information:
 
-Employee Name: ${employeeName}
+Staff Member: ${employeeName}
 Updated Fields: ${fieldsText}
 Update Date: ${new Date().toLocaleDateString()}
 Update Time: ${new Date().toLocaleTimeString()}

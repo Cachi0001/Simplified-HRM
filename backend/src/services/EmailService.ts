@@ -201,7 +201,7 @@ export class EmailService {
                         </div>
                         <div class="content">
                             <h2>Hello ${employeeName},</h2>
-                            <p>Great news! Your employee account has been approved and activated.</p>
+                            <p>Great news! Your staff account has been approved and activated.</p>
                             <div style="background: #e8f5e8; padding: 15px; border-radius: 5px; margin: 20px 0;">
                                 <strong>Account Details:</strong><br>
                                 📧 Email: ${email}<br>

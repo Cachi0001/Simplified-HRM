@@ -476,7 +476,7 @@ export class NotificationService {
       });
 
       const fieldsText = updatedFields.join(', ');
-      const title = 'Employee Profile Updated';
+      const title = 'Staff Profile Updated';
       const message = `${employeeName} has updated their profile (${fieldsText})`;
 
       for (const adminUserId of adminUserIds) {

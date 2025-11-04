@@ -1,10 +1,15 @@
 import { Request, Response } from 'express';
 import { EmployeeService } from '../services/EmployeeService';
+import { WorkingDaysService } from '../services/WorkingDaysService';
 import { CreateEmployeeRequest, UpdateEmployeeRequest, EmployeeQuery } from '../models/SupabaseEmployee';
 import logger from '../utils/logger';
 
 export class EmployeeController {
-  constructor(private employeeService: EmployeeService) {}
+  private workingDaysService: WorkingDaysService;
+
+  constructor(private employeeService: EmployeeService) {
+    this.workingDaysService = new WorkingDaysService();
+  }
 
   async createEmployee(req: Request, res: Response): Promise<void> {
     try {
@@ -117,7 +122,7 @@ export class EmployeeController {
       if (!employee) {
         res.status(404).json({
           status: 'error',
-          message: 'Employee profile not found'
+          message: 'Staff profile not found'
         });
         return;
       }
@@ -777,6 +782,136 @@ export class EmployeeController {
         error: (error as Error).message,
         employeeId: req.params.id 
       });
+      res.status(400).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
+
+  /**
+   * Get working days configuration for current user
+   * GET /api/employees/my-working-days
+   */
+  async getMyWorkingDays(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.id;
+
+      if (!userId) {
+        res.status(401).json({
+          status: 'error',
+          message: 'User not authenticated'
+        });
+        return;
+      }
+
+      // Get employee ID from user ID
+      const employee = await this.employeeService.getMyProfile(userId);
+      if (!employee) {
+        res.status(404).json({
+          status: 'error',
+          message: 'Employee profile not found'
+        });
+        return;
+      }
+
+      const workingDaysConfig = await this.workingDaysService.getWorkingDaysConfig(employee.id);
+
+      res.status(200).json({
+        status: 'success',
+        data: workingDaysConfig
+      });
+    } catch (error) {
+      logger.error('EmployeeController: Get my working days error', { error: (error as Error).message });
+      res.status(400).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
+
+  /**
+   * Update working days configuration for current user
+   * PUT /api/employees/my-working-days
+   */
+  async updateMyWorkingDays(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.id;
+      const { working_days, working_hours, timezone } = req.body;
+
+      if (!userId) {
+        res.status(401).json({
+          status: 'error',
+          message: 'User not authenticated'
+        });
+        return;
+      }
+
+      // Get employee ID from user ID
+      const employee = await this.employeeService.getMyProfile(userId);
+      if (!employee) {
+        res.status(404).json({
+          status: 'error',
+          message: 'Employee profile not found'
+        });
+        return;
+      }
+
+      const updatedConfig = await this.workingDaysService.updateWorkingDaysConfig(employee.id, {
+        working_days,
+        working_hours,
+        timezone
+      });
+
+      res.status(200).json({
+        status: 'success',
+        message: 'Working days configuration updated successfully',
+        data: updatedConfig
+      });
+    } catch (error) {
+      logger.error('EmployeeController: Update my working days error', { error: (error as Error).message });
+      res.status(400).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
+
+  /**
+   * Get working days statistics for current user
+   * GET /api/employees/my-working-days/stats
+   */
+  async getMyWorkingDaysStats(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.id;
+      const { month } = req.query;
+
+      if (!userId) {
+        res.status(401).json({
+          status: 'error',
+          message: 'User not authenticated'
+        });
+        return;
+      }
+
+      // Get employee ID from user ID
+      const employee = await this.employeeService.getMyProfile(userId);
+      if (!employee) {
+        res.status(404).json({
+          status: 'error',
+          message: 'Employee profile not found'
+        });
+        return;
+      }
+
+      const stats = await this.workingDaysService.getWorkingDaysStats(employee.id, month as string);
+
+      res.status(200).json({
+        status: 'success',
+        data: stats
+      });
+    } catch (error) {
+      logger.error('EmployeeController: Get my working days stats error', { error: (error as Error).message });
       res.status(400).json({
         status: 'error',
         message: (error as Error).message

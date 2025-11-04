@@ -247,7 +247,7 @@ export class EmployeeService {
     try {
       const employee = await this.employeeRepository.findByUserId(userId);
       if (!employee) {
-        throw new Error('Employee profile not found');
+        throw new Error('Staff profile not found');
       }
 
       return await this.updateEmployee(employee.id, employeeData, 'employee', userId);
@@ -530,7 +530,7 @@ export class EmployeeService {
             userId: user.id,
             type: 'approval_decision',
             title: 'Account Approved! 🎉',
-            message: `Your employee account has been approved with role: ${role}. You can now access the system.`,
+            message: `Your staff account has been approved with role: ${role}. You can now access the system.`,
             actionUrl: '/dashboard'
           });
         }
@@ -576,7 +576,7 @@ export class EmployeeService {
             userId: user.id,
             type: 'approval_decision',
             title: 'Account Application Update',
-            message: `Your employee account application was not approved. ${reason ? `Reason: ${reason}` : 'Please contact HR for more information.'}`,
+            message: `Your staff account application was not approved. ${reason ? `Reason: ${reason}` : 'Please contact HR for more information.'}`,
             actionUrl: '/contact'
           });
         }
@@ -951,6 +951,42 @@ export class EmployeeService {
       logger.error('EmployeeService: Error updating employee fields', { 
         error: (error as Error).message,
         employeeId 
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get team members for a team lead
+   */
+  async getTeamMembers(teamLeadUserId: string): Promise<IEmployee[]> {
+    try {
+      logger.info('EmployeeService: Getting team members', { teamLeadUserId });
+
+      // Get the team lead's employee record
+      const teamLead = await this.employeeRepository.findByUserId(teamLeadUserId);
+      if (!teamLead) {
+        throw new Error('Team lead not found');
+      }
+
+      // For now, return employees in the same department
+      // This can be enhanced later with proper team management
+      const { data, error } = await this.supabase
+        .from('employees')
+        .select('*')
+        .eq('department_id', teamLead.department)
+        .eq('status', 'approved')
+        .neq('id', teamLead.id); // Exclude the team lead themselves
+
+      if (error) {
+        throw error;
+      }
+
+      return this.mapEmployees(data || []);
+    } catch (error) {
+      logger.error('EmployeeService: Get team members failed', {
+        error: (error as Error).message,
+        teamLeadUserId
       });
       throw error;
     }

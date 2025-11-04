@@ -122,29 +122,60 @@ app.use(helmet({
 app.use((req: Request, res: Response, next: NextFunction) => {
   const origin = req.headers.origin;
 
-  // Use domain validator for enhanced security and logging
-  const validationResult = DomainValidator.getValidationDetails(origin || '');
-  const isAllowedOrigin = !origin || validationResult.isValid;
+  // Define allowed origins explicitly
+  const allowedOrigins = [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:3000',
+    'https://go3nethrm.vercel.app',
+    'https://go3net.com',
+    'https://www.go3net.com',
+    'https://app.go3net.com',
+    'https://admin.go3net.com',
+    'https://hr.go3net.com',
+    'https://hrm.go3net.com',
+    'https://go3nethrm.com',
+    'https://www.go3nethrm.com'
+  ];
 
-  if (isAllowedOrigin) {
-    res.header('Access-Control-Allow-Origin', origin || '*');
+  // Check if origin is allowed
+  const isAllowedOrigin = origin && allowedOrigins.includes(origin);
+
+  // Always allow localhost for development, regardless of NODE_ENV
+  const isLocalhost = origin && (origin.includes('localhost') || origin.includes('127.0.0.1'));
+
+  // Also use domain validator as fallback
+  const validationResult = DomainValidator.getValidationDetails(origin || '');
+  const isDomainValid = validationResult.isValid;
+
+  // Allow if any method approves OR if no origin (same-origin requests)
+  const shouldAllow = !origin || isAllowedOrigin || isLocalhost || isDomainValid;
+
+  if (shouldAllow && origin) {
+    res.header('Access-Control-Allow-Origin', origin);
     res.header('Vary', 'Origin');
     
-    // Log successful CORS validation for go3net.com domains
-    if (origin && origin.includes('go3net.com')) {
-      logger.info('✅ CORS: go3net.com domain allowed', {
-        origin,
-        domain: validationResult.domain,
-        subdomain: validationResult.subdomain,
-        timestamp: new Date().toISOString()
-      });
-    }
+    // Log successful CORS validation
+    const method = isAllowedOrigin ? 'explicit-list' : 
+                   isLocalhost ? 'localhost-override' : 'domain-validator';
+    
+    logger.info('✅ CORS: Origin allowed', {
+      origin,
+      method,
+      nodeEnv: process.env.NODE_ENV,
+      timestamp: new Date().toISOString()
+    });
+  } else if (!origin) {
+    // Same-origin request, no CORS headers needed
+    logger.debug('Same-origin request, no CORS headers needed');
   } else {
     // Enhanced logging for rejected origins
     logger.warn('❌ CORS: Rejected origin', {
       origin,
-      reason: validationResult.reason,
-      domain: validationResult.domain,
+      reason: 'Not in allowed origins list and failed domain validation',
+      validationResult,
+      allowedOrigins,
       timestamp: new Date().toISOString()
     });
   }

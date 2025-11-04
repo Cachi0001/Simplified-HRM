@@ -20,6 +20,9 @@ export interface IEmployee {
   passwordResetExpires?: Date;
   profileUpdatedAt?: Date; // Timestamp of when profile was last updated
   performanceScore?: number; // Performance score for the employee
+  working_days?: string[]; // Working days configuration
+  working_hours?: { start: string; end: string }; // Working hours configuration
+  timezone?: string; // Timezone for accurate calculations
   createdAt: Date;
   updatedAt: Date;
 }
@@ -51,6 +54,9 @@ export interface UpdateEmployeeRequest {
   status?: 'active' | 'rejected' | 'pending';
   profileUpdatedAt?: Date;
   performanceScore?: number;
+  working_days?: string[];
+  working_hours?: { start: string; end: string };
+  timezone?: string;
 }
 
 export interface EmployeeQuery {
