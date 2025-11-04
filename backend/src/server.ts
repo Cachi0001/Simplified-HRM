@@ -9,6 +9,18 @@ if (result.error) {
   // .env file loaded successfully (reduced logging)
 }
 
+// Validate critical environment variables
+const requiredEnvVars = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'JWT_SECRET'];
+const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
+
+if (missingEnvVars.length > 0) {
+  console.error('❌ Missing required environment variables:', missingEnvVars);
+  if (process.env.NODE_ENV === 'production') {
+    console.error('❌ Cannot start server without required environment variables');
+    // Don't exit in production, let Vercel handle it
+  }
+}
+
 if (process.env.NODE_ENV !== 'production') {
   // Loading .env file for development (reduced logging)
   dotenv.config({ path: path.resolve(__dirname, '../.env') });
@@ -314,31 +326,33 @@ app.get('/api/health', async (req: Request, res: Response) => {
     origin: req.headers.origin || 'No origin'
   });
 
+  // Basic health check without database dependency
+  const basicHealth = {
+    status: 'ok',
+    message: 'HR Management System Backend is running',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    deployment: process.env.VERCEL ? 'vercel' : 'local',
+    config: {
+      NODE_ENV: process.env.NODE_ENV,
+      VERCEL: process.env.VERCEL,
+      SUPABASE_URL: process.env.SUPABASE_URL ? 'SET' : 'NOT SET',
+      SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'SET' : 'NOT SET',
+      JWT_SECRET: process.env.JWT_SECRET ? 'SET' : 'NOT SET'
+    }
+  };
+
+  // Try database check but don't fail if it doesn't work
   try {
     const dbStatus = await supabaseConfig.healthCheck();
-
     res.status(200).json({
-      status: 'ok',
-      message: 'HR Management System Backend is running',
-      timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV || 'development',
-      deployment: process.env.VERCEL ? 'vercel' : 'local',
-      database: dbStatus,
-      config: {
-        NODE_ENV: process.env.NODE_ENV,
-        VERCEL: process.env.VERCEL,
-        SUPABASE_URL: process.env.SUPABASE_URL ? 'SET' : 'NOT SET',
-        SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'SET' : 'NOT SET'
-      }
+      ...basicHealth,
+      database: dbStatus
     });
   } catch (error) {
-    logger.error('❌ Health check failed:', { error });
+    logger.error('❌ Health check database failed:', { error });
     res.status(200).json({
-      status: 'ok',
-      message: 'HR Management System Backend is running',
-      timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV || 'development',
-      deployment: process.env.VERCEL ? 'vercel' : 'local',
+      ...basicHealth,
       database: {
         status: 'error',
         connection: false,
