@@ -102,6 +102,34 @@ export function ApprovalModal({
     setIsApproving(true);
     try {
       await onApprove(employee.id, selectedRole, approvalReason || undefined);
+      
+      // Send notification to the approved employee
+      try {
+        const roleLabel = roleOptions.find(r => r.value === selectedRole)?.label || selectedRole;
+        await fetch('/api/notifications', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+          },
+          body: JSON.stringify({
+            user_id: employee.id,
+            title: '🎉 Account Approved!',
+            message: `Congratulations! Your employee account has been approved with ${roleLabel} role. ${approvalReason ? `Note: ${approvalReason}` : 'You can now access all system features.'}`,
+            type: 'approval',
+            data: JSON.stringify({
+              type: 'employee_approved',
+              role: selectedRole,
+              approved_by: 'HR Team',
+              approved_at: new Date().toISOString(),
+              reason: approvalReason
+            })
+          })
+        });
+      } catch (notificationError) {
+        console.warn('Failed to send approval notification:', notificationError);
+      }
+
       onClose();
     } catch (error) {
       console.error('Failed to approve employee:', error);
@@ -116,6 +144,32 @@ export function ApprovalModal({
     setIsRejecting(true);
     try {
       await onReject(employee.id, rejectionReason);
+      
+      // Send notification to the rejected employee
+      try {
+        await fetch('/api/notifications', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+          },
+          body: JSON.stringify({
+            user_id: employee.id,
+            title: '❌ Account Application Rejected',
+            message: `We regret to inform you that your employee account application has been rejected. Reason: ${rejectionReason}`,
+            type: 'rejection',
+            data: JSON.stringify({
+              type: 'employee_rejected',
+              rejected_by: 'HR Team',
+              rejected_at: new Date().toISOString(),
+              reason: rejectionReason
+            })
+          })
+        });
+      } catch (notificationError) {
+        console.warn('Failed to send rejection notification:', notificationError);
+      }
+
       onClose();
     } catch (error) {
       console.error('Failed to reject employee:', error);
@@ -138,12 +192,20 @@ export function ApprovalModal({
 
   // Check if current user can approve this employee
   const canApproveEmployee = () => {
+    // Don't allow approval of already processed employees
+    if (employee.status === 'active' || employee.status === 'rejected') {
+      return false;
+    }
+    
     // Only superadmin can approve superadmin employees
     if (employee.role === 'superadmin' && currentUserRole !== 'superadmin') {
       return false;
     }
     return true;
   };
+
+  // Check if employee is already processed
+  const isProcessed = employee.status === 'active' || employee.status === 'rejected';
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -154,8 +216,16 @@ export function ApprovalModal({
           }`}>
           <div>
             <h2 className={`text-base font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-              Approve Employee
+              {isProcessed 
+                ? `Employee ${employee.status === 'active' ? 'Approved' : 'Rejected'}` 
+                : 'Approve Employee'
+              }
             </h2>
+            {isProcessed && (
+              <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                This employee has already been {employee.status === 'active' ? 'approved' : 'rejected'}
+              </p>
+            )}
           </div>
           <button
             onClick={onClose}
@@ -190,10 +260,17 @@ export function ApprovalModal({
             <div className={`p-4 rounded-lg border ${darkMode ? 'bg-red-900/20 border-red-800 text-red-300' : 'bg-red-50 border-red-200 text-red-700'}`}>
               <div className="flex items-center">
                 <AlertCircle className="h-5 w-5 mr-2" />
-                <span className="font-medium">Access Restricted</span>
+                <span className="font-medium">
+                  {employee.status === 'active' || employee.status === 'rejected' ? 'Already Processed' : 'Access Restricted'}
+                </span>
               </div>
               <p className="text-sm mt-1">
-                Only superadmin users can approve or reject superadmin employee registrations.
+                {employee.status === 'active' 
+                  ? 'This employee has already been approved and activated.'
+                  : employee.status === 'rejected'
+                  ? 'This employee has already been rejected.'
+                  : 'Only superadmin users can approve or reject superadmin employee registrations.'
+                }
               </p>
             </div>
           ) : !showRejectForm ? (

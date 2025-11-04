@@ -1,20 +1,27 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { attendanceService } from '../../services/attendanceService';
 import { employeeService } from '../../services/employeeService';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { Calendar, Clock, MapPin, Users, Filter, Download, RefreshCw } from 'lucide-react';
+import { Calendar, Clock, MapPin, Users, Filter, Download, RefreshCw, LogIn, LogOut, Bell, AlertTriangle } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface AdminAttendanceProps {
   darkMode?: boolean;
 }
 
 export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [selectedEmployee, setSelectedEmployee] = useState<string>('');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
+  const [showCheckoutReminder, setShowCheckoutReminder] = useState<boolean>(false);
+
+  // Check if user has admin privileges
+  const hasAdminPrivileges = user?.role && ['hr', 'admin', 'superadmin', 'team_lead'].includes(user.role);
 
   // Fetch all employees for filtering
   const { data: employees = [], isLoading: employeesLoading } = useQuery({
@@ -24,6 +31,49 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
       // Filter out admin users for display purposes
       const nonAdminEmployees = response.employees.filter((emp: any) => emp.role !== 'admin');
       return nonAdminEmployees;
+    },
+  });
+
+  // Admin check-in mutation
+  const checkInMutation = useMutation({
+    mutationFn: async (employeeId: string) => {
+      try {
+        const location = await attendanceService.getCurrentLocation();
+        return await attendanceService.adminCheckIn(employeeId, location);
+      } catch (error) {
+        // If location fails, try without location (for Friday or admin override)
+        return await attendanceService.adminCheckIn(employeeId);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['attendance-report'] });
+      refetch();
+    },
+  });
+
+  // Admin check-out mutation
+  const checkOutMutation = useMutation({
+    mutationFn: async (employeeId: string) => {
+      try {
+        const location = await attendanceService.getCurrentLocation();
+        return await attendanceService.adminCheckOut(employeeId, location);
+      } catch (error) {
+        // If location fails, try without location (for Friday or admin override)
+        return await attendanceService.adminCheckOut(employeeId);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['attendance-report'] });
+      refetch();
+    },
+  });
+
+  // Send checkout reminder mutation
+  const reminderMutation = useMutation({
+    mutationFn: () => attendanceService.sendCheckoutReminder(),
+    onSuccess: () => {
+      setShowCheckoutReminder(true);
+      setTimeout(() => setShowCheckoutReminder(false), 3000);
     },
   });
 
@@ -92,6 +142,48 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
     return { status, distance };
   };
 
+  const isLateCheckIn = (checkInTime: string) => {
+    if (!checkInTime) return false;
+    const checkIn = new Date(checkInTime);
+    const cutoff = new Date(checkIn);
+    cutoff.setHours(8, 35, 0, 0); // 8:35 AM cutoff
+    return checkIn > cutoff;
+  };
+
+  const getTimingStatus = (record: any) => {
+    const isLate = record.is_late || isLateCheckIn(record.checkInTime);
+    const minutesLate = record.minutes_late || 0;
+    
+    if (isLate) {
+      return {
+        status: 'late',
+        label: `Late (${minutesLate}min)`,
+        className: darkMode ? 'bg-red-900 text-red-200' : 'bg-red-100 text-red-700'
+      };
+    }
+    
+    return {
+      status: 'ontime',
+      label: 'On Time',
+      className: darkMode ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-700'
+    };
+  };
+
+  const canPerformAction = (record: any, action: 'checkin' | 'checkout') => {
+    if (!hasAdminPrivileges) return false;
+    
+    if (action === 'checkin') {
+      return !record.checkInTime || record.status === 'checked_out';
+    } else {
+      return record.checkInTime && record.status === 'checked_in';
+    }
+  };
+
+  const isCheckoutReminderTime = () => {
+    const now = new Date();
+    return now.getHours() >= 18; // 6:00 PM or later
+  };
+
   const exportReport = () => {
     // Simple CSV export
     if (!report || report.length === 0) return;
@@ -120,6 +212,16 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
 
   return (
     <div className={`space-y-6 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+      {/* Checkout Reminder Success Notification */}
+      {showCheckoutReminder && (
+        <div className={`p-4 rounded-lg border-l-4 border-green-500 ${darkMode ? 'bg-green-900/20 text-green-200' : 'bg-green-50 text-green-800'}`}>
+          <div className="flex items-center">
+            <Bell className="h-5 w-5 mr-2" />
+            <p className="font-medium">Checkout reminder sent successfully!</p>
+          </div>
+          <p className="text-sm mt-1">All active employees have been notified about the 6:00 PM checkout time.</p>
+        </div>
+      )}
       {/* Filters */}
       <Card className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
         <div className="p-6">
@@ -181,6 +283,16 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
                 <Download className="h-4 w-4 mr-2" />
                 Export CSV
               </Button>
+              {hasAdminPrivileges && isCheckoutReminderTime() && (
+                <Button 
+                  onClick={() => reminderMutation.mutate()} 
+                  className="flex-1 min-h-[40px] bg-orange-600 hover:bg-orange-700"
+                  isLoading={reminderMutation.isPending}
+                >
+                  <Bell className="h-4 w-4 mr-2" />
+                  Send 6PM Reminder
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -209,6 +321,7 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
             <div className="space-y-3">
               {report.map((record, index) => {
                 const locationMeta = getLocationMeta(record);
+                const timingStatus = getTimingStatus(record);
                 const locationBadgeClass = locationMeta.status === 'onsite'
                   ? darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-700'
                   : locationMeta.status === 'remote'
@@ -227,7 +340,7 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
                           <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                             {getEmployeeName(record)}
                           </p>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                               {formatDate(record._id?.date ?? record.date)}
                             </p>
@@ -236,10 +349,44 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
                               {locationLabel}
                               {typeof locationMeta.distance === 'number' ? `· ${locationMeta.distance}m` : ''}
                             </span>
+                            {record.checkInTime && (
+                              <span className={`text-xs px-2 py-0.5 rounded-full ${timingStatus.className}`}>
+                                {timingStatus.status === 'late' ? <AlertTriangle className="h-3 w-3 mr-1 inline" /> : null}
+                                {timingStatus.label}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
                       <div className="text-right">
+                        <div className="flex items-center gap-2 mb-2">
+                          {hasAdminPrivileges && (
+                            <>
+                              {canPerformAction(record, 'checkin') && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => checkInMutation.mutate(record._id?.employeeId ?? record.employeeId)}
+                                  isLoading={checkInMutation.isPending}
+                                  className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 text-xs"
+                                >
+                                  <LogIn className="h-3 w-3 mr-1" />
+                                  Check In
+                                </Button>
+                              )}
+                              {canPerformAction(record, 'checkout') && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => checkOutMutation.mutate(record._id?.employeeId ?? record.employeeId)}
+                                  isLoading={checkOutMutation.isPending}
+                                  className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 text-xs"
+                                >
+                                  <LogOut className="h-3 w-3 mr-1" />
+                                  Check Out
+                                </Button>
+                              )}
+                            </>
+                          )}
+                        </div>
                         <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                           {record.status === 'checked_out' ? 'Completed' : 'Active'}
                         </p>

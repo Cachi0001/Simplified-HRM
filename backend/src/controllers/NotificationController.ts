@@ -378,6 +378,54 @@ export class NotificationController {
   }
 
   /**
+   * Create a new notification
+   * POST /api/notifications
+   */
+  async createNotification(req: Request, res: Response): Promise<void> {
+    try {
+      const { user_id, title, message, type, data } = req.body;
+      const createdBy = req.user?.id;
+
+      if (!user_id || !title || !message) {
+        res.status(400).json({
+          status: 'error',
+          message: 'user_id, title, and message are required'
+        });
+        return;
+      }
+
+      logger.info('📬 [NotificationController] Create notification', {
+        user_id,
+        title,
+        type,
+        createdBy
+      });
+
+      const notification = await this.notificationService.createNotification({
+        userId: user_id,
+        title,
+        message,
+        type: type || 'approval',
+        metadata: data ? (typeof data === 'string' ? JSON.parse(data) : data) : undefined
+      });
+
+      res.status(201).json({
+        status: 'success',
+        message: 'Notification created successfully',
+        data: { notification }
+      });
+    } catch (error) {
+      logger.error('❌ [NotificationController] Create notification error', {
+        error: (error as Error).message
+      });
+      res.status(500).json({
+        status: 'error',
+        message: 'Failed to create notification'
+      });
+    }
+  }
+
+  /**
    * Get users with push tokens for a specific notification type
    * This is typically called internally when sending notifications
    * GET /api/notifications/push-tokens/:notificationType

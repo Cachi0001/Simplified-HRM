@@ -1,1 +1,1 @@
-export { default as AttendanceWidget } from './AttendanceWidget';
+export { AttendanceWidget } from './AttendanceWidget';

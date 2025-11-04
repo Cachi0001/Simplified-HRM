@@ -21,4 +21,13 @@ router.get('/current-status', (req, res) => attendanceController.getCurrentStatu
 router.get('/history', (req, res) => attendanceController.getAttendanceHistory(req, res));
 router.get('/stats', (req, res) => attendanceController.getAttendanceStats(req, res));
 
+/**
+ * Admin Attendance Management (HR/Admin/Superadmin/Team Lead only)
+ */
+router.get('/report', (req, res) => attendanceController.getAttendanceReport(req, res));
+router.post('/admin-check-in', (req, res) => attendanceController.adminCheckIn(req, res));
+router.post('/admin-check-out', (req, res) => attendanceController.adminCheckOut(req, res));
+router.post('/checkout-reminder', (req, res) => attendanceController.sendCheckoutReminder(req, res));
+router.post('/trigger-checkout-reminder', (req, res) => attendanceController.triggerScheduledCheckoutReminder(req, res));
+
 export default router;

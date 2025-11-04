@@ -297,4 +297,59 @@ export class SupabaseTaskRepository implements ITaskRepository {
       throw error;
     }
   }
+
+  async getAllEmployees(): Promise<any[]> {
+    try {
+      const { data, error } = await this.supabase
+        .from('employees')
+        .select('id, full_name, email, role, department, status')
+        .eq('status', 'active')
+        .order('full_name');
+
+      if (error) {
+        logger.error('❌ [SupabaseTaskRepository] Get all employees failed:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      logger.error('❌ [SupabaseTaskRepository] Get all employees failed:', error);
+      throw error;
+    }
+  }
+
+  async getTeamMembersByLeadId(leadId: string): Promise<any[]> {
+    try {
+      // First get the team lead's department
+      const { data: leadData, error: leadError } = await this.supabase
+        .from('employees')
+        .select('department')
+        .eq('id', leadId)
+        .single();
+
+      if (leadError || !leadData) {
+        logger.error('❌ [SupabaseTaskRepository] Get team lead failed:', leadError);
+        return [];
+      }
+
+      // Get all employees in the same department (excluding the lead)
+      const { data, error } = await this.supabase
+        .from('employees')
+        .select('id, full_name, email, role, department, status')
+        .eq('department', leadData.department)
+        .eq('status', 'active')
+        .neq('id', leadId)
+        .order('full_name');
+
+      if (error) {
+        logger.error('❌ [SupabaseTaskRepository] Get team members failed:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      logger.error('❌ [SupabaseTaskRepository] Get team members failed:', error);
+      throw error;
+    }
+  }
 }

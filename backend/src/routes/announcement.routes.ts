@@ -14,6 +14,9 @@ router.get('/', (req, res) => announcementController.getAnnouncements(req, res))
 // GET /api/announcements/templates - Get announcement templates (must be before /:id route)
 router.get('/templates', (req, res) => announcementController.getTemplates(req, res));
 
+// POST /api/announcements/templates - Create announcement template (admin/hr only)
+router.post('/templates', (req, res) => announcementController.createTemplate(req, res));
+
 // GET /api/announcements/:id - Get specific announcement
 router.get('/:id', (req, res) => announcementController.getAnnouncement(req, res));
 

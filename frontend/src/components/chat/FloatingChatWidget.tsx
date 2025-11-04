@@ -7,14 +7,15 @@ import { ChatBadge } from './ChatBadge';
 import { useChat, Chat, User } from '../../hooks/useChat';
 import { useTheme } from '../../contexts/ThemeContext';
 import api from '../../lib/api';
-import webSocketService from '../../services/WebSocketService';
+import websocketService from '../../services/WebSocketService';
 import userStatusService from '../../services/UserStatusService';
 import { IndicatorWrapper } from '../indicators/IndicatorWrapper';
 import { IndicatorTest } from '../indicators/IndicatorTest';
 import WhatsAppMessageList from './WhatsAppMessageList';
 import { useMessageIndicators } from '../../hooks/useMessageIndicators';
-import { AnnouncementList, CreateAnnouncement } from '../announcements';
+import AnnouncementList from '../announcements/AnnouncementList';
 import { useAnnouncements } from '../../hooks/useAnnouncements';
+import CreateAnnouncement from '../announcements/CreateAnnouncement';
 import Logo from '../ui/Logo';
 
 

@@ -348,4 +348,100 @@ export class TaskService {
       throw error;
     }
   }
+
+  /**
+   * Get team members for task assignment
+   */
+  async getTeamMembers(currentUserRole: string, currentUserId?: string): Promise<any[]> {
+    try {
+      logger.info('TaskService: Getting team members', { role: currentUserRole });
+
+      // For admin roles, return all active employees
+      if (['admin', 'hr', 'superadmin', 'super-admin'].includes(currentUserRole)) {
+        const employees = await this.taskRepository.getAllEmployees();
+        return employees.map(emp => ({
+          id: emp.id,
+          name: emp.full_name,
+          email: emp.email,
+          role: emp.role,
+          department: emp.department
+        }));
+      }
+
+      // For team leads, return their team members
+      if (currentUserRole === 'team-lead') {
+        const employeeId = await this.resolveEmployeeId(currentUserId);
+        if (!employeeId) {
+          return [];
+        }
+
+        const teamMembers = await this.taskRepository.getTeamMembersByLeadId(employeeId);
+        return teamMembers.map(emp => ({
+          id: emp.id,
+          name: emp.full_name,
+          email: emp.email,
+          role: emp.role,
+          department: emp.department
+        }));
+      }
+
+      // Regular employees can't assign tasks to others
+      return [];
+    } catch (error) {
+      logger.error('TaskService: Get team members failed', { error: (error as Error).message });
+      throw error;
+    }
+  }
+
+  /**
+   * Get assignable employees for task assignment
+   */
+  async getAssignableEmployees(currentUserRole: string, currentUserId?: string): Promise<any[]> {
+    try {
+      logger.info('TaskService: Getting assignable employees', { role: currentUserRole });
+
+      // Check if user has permission to assign tasks
+      const canAssignTasks = ['admin', 'hr', 'superadmin', 'super-admin', 'team-lead'].includes(currentUserRole);
+      
+      if (!canAssignTasks) {
+        throw new Error('You do not have permission to assign tasks');
+      }
+
+      // For admin roles, return all active employees
+      if (['admin', 'hr', 'superadmin', 'super-admin'].includes(currentUserRole)) {
+        const employees = await this.taskRepository.getAllEmployees();
+        return employees.map(emp => ({
+          id: emp.id,
+          name: emp.full_name,
+          email: emp.email,
+          role: emp.role,
+          department: emp.department,
+          status: emp.status
+        }));
+      }
+
+      // For team leads, return their team members
+      if (currentUserRole === 'team-lead') {
+        const employeeId = await this.resolveEmployeeId(currentUserId);
+        if (!employeeId) {
+          return [];
+        }
+
+        const teamMembers = await this.taskRepository.getTeamMembersByLeadId(employeeId);
+        return teamMembers.map(emp => ({
+          id: emp.id,
+          name: emp.full_name,
+          email: emp.email,
+          role: emp.role,
+          department: emp.department,
+          status: emp.status
+        }));
+      }
+
+      return [];
+    } catch (error) {
+      logger.error('TaskService: Get assignable employees failed', { error: (error as Error).message });
+      throw error;
+    }
+  }
 }

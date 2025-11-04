@@ -3,6 +3,7 @@ import { EmployeeOverviewCards } from '../components/dashboard/EmployeeOverviewC
 import { EmployeeTasks } from '../components/dashboard/EmployeeTasks';
 import { DraggableLogo } from '../components/dashboard/DraggableLogo';
 import { NotificationBell } from '../components/dashboard/NotificationBell';
+import { AttendanceWidget } from '../components/attendance';
 import { DarkModeToggle } from '../components/ui/DarkModeToggle';
 import { NotificationManager, triggerNotification, NotificationUtils } from '../components/notifications/NotificationManager';
 import { useQuery } from '@tanstack/react-query';
@@ -278,19 +279,12 @@ export default function EmployeeDashboard() {
           <EmployeeTasks employeeId={currentUser._id || currentUser.id} darkMode={darkMode} />
         </section>
 
-        {/* Check-in/Check-out with Draggable Logo */}
+        {/* Enhanced Attendance Widget */}
         <section>
           <h2 className={`text-2xl font-semibold mb-6 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-            Daily Check-in/Out
+            Daily Attendance
           </h2>
-          <DraggableLogo
-            employeeId={currentUser._id || currentUser.id}
-            darkMode={darkMode}
-            onStatusChange={(status) => {
-              // Handle status change if needed
-              console.log('Check-in status changed:', status);
-            }}
-          />
+          <AttendanceWidget darkMode={darkMode} />
         </section>
       </div>
 

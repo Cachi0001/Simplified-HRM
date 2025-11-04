@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { announcementService } from '../services/announcementService';
 import { authService } from '../services/authService';
 import { AdminLeaveRequests } from '../components/dashboard/AdminLeaveRequests';
 import { AdminEmployeeManagement } from '../components/dashboard/AdminEmployeeManagement';
@@ -14,11 +15,13 @@ import { NotificationManager } from '../components/notifications/NotificationMan
 import Logo from '../components/ui/Logo';
 import { Clock, Users, FileText, CheckSquare, Building, Calendar, AlertCircle, TrendingUp, MessageSquare, Plus } from 'lucide-react';
 import { useTokenValidation } from '../hooks/useTokenValidation';
-import { AnnouncementList } from '../components/announcements';
+import AnnouncementList from '../components/announcements/AnnouncementList';
+import { AnnouncementManager } from '../components/announcements/AnnouncementManager';
 import api from '../lib/api';
 
 export default function HRDashboard() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('darkMode');
     return saved ? JSON.parse(saved) : false;
@@ -26,6 +29,7 @@ export default function HRDashboard() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedTimeRange, setSelectedTimeRange] = useState('30');
+  const [showAnnouncementManager, setShowAnnouncementManager] = useState(false);
 
   // Save dark mode preference
   useEffect(() => {
@@ -99,7 +103,7 @@ export default function HRDashboard() {
   }, [currentUser]);
 
   const handleCreateAnnouncement = () => {
-    navigate('/announcements');
+    setShowAnnouncementManager(true);
   };
 
   if (!currentUser) {
@@ -467,18 +471,31 @@ export default function HRDashboard() {
         {activeTab === 'announcements' && (
           <div className={`rounded-lg shadow-md ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
             <AnnouncementList
-              announcements={[]}
-              loading={false}
+              announcements={announcements || []}
+              loading={announcementsLoading}
               darkMode={darkMode}
               canCreate={true}
-              onCreateNew={() => {
-                console.log('Create new announcement');
+              onCreateNew={() => setShowAnnouncementManager(true)}
+              onReaction={async (announcementId, reactionType) => {
+                try {
+                  await announcementService.addReaction(announcementId, reactionType);
+                  // Refresh announcements
+                  queryClient.invalidateQueries({ queryKey: ['dashboard-announcements'] });
+                } catch (error) {
+                  console.error('Failed to add reaction:', error);
+                }
               }}
-              onReaction={(announcementId, reactionType) => {
-                console.log('Reaction:', announcementId, reactionType);
+              onMarkAsRead={async (announcementId) => {
+                try {
+                  await announcementService.markAsRead(announcementId);
+                  // Refresh announcements
+                  queryClient.invalidateQueries({ queryKey: ['dashboard-announcements'] });
+                } catch (error) {
+                  console.error('Failed to mark as read:', error);
+                }
               }}
-              onMarkAsRead={(announcementId) => {
-                console.log('Mark as read:', announcementId);
+              onRefresh={() => {
+                queryClient.invalidateQueries({ queryKey: ['dashboard-announcements'] });
               }}
             />
           </div>
@@ -495,6 +512,13 @@ export default function HRDashboard() {
 
       {/* Bottom Navigation */}
       <BottomNavbar darkMode={darkMode} />
+
+      {/* Announcement Manager Modal */}
+      {showAnnouncementManager && (
+        <AnnouncementManager
+          onClose={() => setShowAnnouncementManager(false)}
+        />
+      )}
     </div>
   );
 }

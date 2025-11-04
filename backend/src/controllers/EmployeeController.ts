@@ -455,8 +455,9 @@ export class EmployeeController {
    async rejectEmployee(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
+      const { reason } = req.body;
 
-      await this.employeeService.rejectEmployee(id);
+      await this.employeeService.rejectEmployee(id, reason);
 
       res.status(200).json({
         status: 'success',

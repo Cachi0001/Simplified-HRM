@@ -41,6 +41,10 @@ export const EmployeeApprovalCard: React.FC<EmployeeApprovalCardProps> = ({
   });
 
   const employeeId = employee.id || employee._id;
+  
+  // Check if employee is already processed (approved or rejected)
+  const isProcessed = employee.status === 'active' || employee.status === 'rejected';
+  const isPending = employee.status === 'pending';
 
   // Update employee mutation
   const updateMutation = useMutation({
@@ -64,9 +68,28 @@ export const EmployeeApprovalCard: React.FC<EmployeeApprovalCardProps> = ({
       const response = await api.post(`/employees/${employeeId}/approve`);
       return response.data;
     },
-    onSuccess: () => {
-      addToast('success', 'Employee approved successfully');
+    onSuccess: (data) => {
+      addToast('success', `${employee.full_name} has been approved and activated successfully`);
+      
+      // Send notification to the approved employee
+      try {
+        api.post('/notifications', {
+          user_id: employeeId,
+          title: '🎉 Account Approved!',
+          message: 'Congratulations! Your employee account has been approved and activated. You can now access all system features.',
+          type: 'approval',
+          data: JSON.stringify({
+            type: 'employee_approved',
+            approved_by: 'HR Team',
+            approved_at: new Date().toISOString()
+          })
+        });
+      } catch (notificationError) {
+        console.warn('Failed to send approval notification:', notificationError);
+      }
+
       queryClient.invalidateQueries({ queryKey: ['employees-management'] });
+      queryClient.invalidateQueries({ queryKey: ['pending-employees'] });
       onApprove?.();
     },
     onError: (error: any) => {
@@ -80,9 +103,28 @@ export const EmployeeApprovalCard: React.FC<EmployeeApprovalCardProps> = ({
       const response = await api.post(`/employees/${employeeId}/reject`);
       return response.data;
     },
-    onSuccess: () => {
-      addToast('success', 'Employee rejected');
+    onSuccess: (data) => {
+      addToast('success', `${employee.full_name} has been rejected`);
+      
+      // Send notification to the rejected employee
+      try {
+        api.post('/notifications', {
+          user_id: employeeId,
+          title: '❌ Account Application Rejected',
+          message: 'We regret to inform you that your employee account application has been rejected. Please contact HR for more information.',
+          type: 'rejection',
+          data: JSON.stringify({
+            type: 'employee_rejected',
+            rejected_by: 'HR Team',
+            rejected_at: new Date().toISOString()
+          })
+        });
+      } catch (notificationError) {
+        console.warn('Failed to send rejection notification:', notificationError);
+      }
+
       queryClient.invalidateQueries({ queryKey: ['employees-management'] });
+      queryClient.invalidateQueries({ queryKey: ['pending-employees'] });
       onReject?.();
     },
     onError: (error: any) => {
@@ -115,9 +157,11 @@ export const EmployeeApprovalCard: React.FC<EmployeeApprovalCardProps> = ({
   };
 
   return (
-    <div className={`rounded-lg shadow-md p-6 border-l-4 border-blue-500 ${
-      darkMode ? 'bg-gray-800' : 'bg-white'
-    }`}>
+    <div className={`rounded-lg shadow-md p-6 border-l-4 transition-all duration-200 ${
+      isProcessed 
+        ? `border-gray-400 ${darkMode ? 'bg-gray-800/60 opacity-75' : 'bg-gray-50 opacity-80'}` 
+        : `border-blue-500 ${darkMode ? 'bg-gray-800' : 'bg-white'}`
+    } ${isProcessed ? 'cursor-not-allowed' : ''}`}>
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div>
@@ -138,8 +182,40 @@ export const EmployeeApprovalCard: React.FC<EmployeeApprovalCardProps> = ({
         </div>
       </div>
 
+      {/* Status Banner for Processed Employees */}
+      {isProcessed && (
+        <div className={`mb-4 p-3 rounded-lg border-l-4 ${
+          employee.status === 'active'
+            ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
+            : 'border-red-500 bg-red-50 dark:bg-red-900/20'
+        }`}>
+          <div className="flex items-center">
+            {employee.status === 'active' ? (
+              <Check className="h-5 w-5 text-green-600 dark:text-green-400 mr-2" />
+            ) : (
+              <XCircle className="h-5 w-5 text-red-600 dark:text-red-400 mr-2" />
+            )}
+            <span className={`font-medium ${
+              employee.status === 'active'
+                ? 'text-green-800 dark:text-green-200'
+                : 'text-red-800 dark:text-red-200'
+            }`}>
+              {employee.status === 'active' ? 'Employee Approved' : 'Employee Rejected'}
+            </span>
+          </div>
+          <p className={`text-sm mt-1 ${
+            employee.status === 'active'
+              ? 'text-green-700 dark:text-green-300'
+              : 'text-red-700 dark:text-red-300'
+          }`}>
+            This employee has been {employee.status === 'active' ? 'approved and activated' : 'rejected'}. 
+            No further actions are required.
+          </p>
+        </div>
+      )}
+
       {/* Editable Content */}
-      {isEditing ? (
+      {isEditing && !isProcessed ? (
         <div className="space-y-4 mb-4">
           <div>
             <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
@@ -280,50 +356,67 @@ export const EmployeeApprovalCard: React.FC<EmployeeApprovalCardProps> = ({
 
       {/* Action Buttons */}
       <div className="flex gap-3">
-        <button
-          onClick={() => setIsEditing(!isEditing)}
-          className={`flex-1 font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 ${
-            isEditing
-              ? darkMode
-                ? 'bg-gray-700 text-gray-200'
-                : 'bg-gray-200 text-gray-800'
-              : darkMode
-              ? 'bg-blue-600/20 hover:bg-blue-600/30 text-blue-300'
-              : 'bg-blue-100 hover:bg-blue-200 text-blue-700'
-          }`}
-        >
-          <Edit2 className="w-4 h-4" />
-          {isEditing ? 'Editing' : 'Edit'}
-        </button>
-
-        {employee.status === 'pending' && (
+        {/* Only show interactive buttons for pending employees */}
+        {isPending ? (
           <>
             <button
+              onClick={() => setIsEditing(!isEditing)}
+              disabled={isProcessed}
+              className={`flex-1 font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 ${
+                isEditing
+                  ? darkMode
+                    ? 'bg-gray-700 text-gray-200'
+                    : 'bg-gray-200 text-gray-800'
+                  : darkMode
+                  ? 'bg-blue-600/20 hover:bg-blue-600/30 text-blue-300'
+                  : 'bg-blue-100 hover:bg-blue-200 text-blue-700'
+              } ${isProcessed ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <Edit2 className="w-4 h-4" />
+              {isEditing ? 'Editing' : 'Edit'}
+            </button>
+
+            <button
               onClick={() => approveMutation.mutate()}
-              disabled={approveMutation.isPending || isEditing}
-              className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              disabled={approveMutation.isPending || isEditing || isProcessed}
+              className={`flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2 ${
+                isProcessed ? 'cursor-not-allowed' : ''
+              }`}
             >
               <Check className="w-4 h-4" />
               Approve
             </button>
             <button
               onClick={() => rejectMutation.mutate()}
-              disabled={rejectMutation.isPending || isEditing}
-              className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              disabled={rejectMutation.isPending || isEditing || isProcessed}
+              className={`flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2 ${
+                isProcessed ? 'cursor-not-allowed' : ''
+              }`}
             >
               <X className="w-4 h-4" />
               Reject
             </button>
           </>
-        )}
-
-        {employee.status !== 'pending' && (
-          <div className={`flex-1 py-2 px-4 rounded-lg font-semibold text-center ${
-            employee.status === 'active'
-              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-              : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-          }`}>
-            {employee.status === 'active' ? '✓ Approved' : '✗ Rejected'}
+        ) : (
+          /* Read-only status display for processed employees */
+          <div className="flex-1 flex items-center justify-center">
+            <div className={`flex items-center gap-2 py-2 px-4 rounded-lg font-semibold ${
+              employee.status === 'active'
+                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+            }`}>
+              {employee.status === 'active' ? (
+                <>
+                  <Check className="w-4 h-4" />
+                  <span>Approved & Active</span>
+                </>
+              ) : (
+                <>
+                  <XCircle className="w-4 h-4" />
+                  <span>Rejected</span>
+                </>
+              )}
+            </div>
           </div>
         )}
       </div>

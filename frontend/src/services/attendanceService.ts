@@ -323,6 +323,198 @@ class AttendanceService {
   }
 
   /**
+   * Get attendance report for admin/HR
+   */
+  async getAttendanceReport(employeeId?: string, startDate?: Date, endDate?: Date): Promise<any[]> {
+    try {
+      const params = new URLSearchParams();
+      if (employeeId) params.append('employee_id', employeeId);
+      if (startDate) params.append('start_date', startDate.toISOString().split('T')[0]);
+      if (endDate) params.append('end_date', endDate.toISOString().split('T')[0]);
+
+      const response = await api.get(`/attendance/report?${params.toString()}`);
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Failed to get attendance report:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Admin check-in for employee (HR/Admin/Superadmin/Team Lead roles)
+   */
+  async adminCheckIn(employeeId: string, location?: LocationData): Promise<AttendanceRecord> {
+    try {
+      const requestData: any = {
+        employee_id: employeeId
+      };
+
+      if (location) {
+        requestData.location_latitude = location.latitude;
+        requestData.location_longitude = location.longitude;
+        requestData.check_in_location = location.address;
+        requestData.distance_from_office = this.calculateDistance(
+          location.latitude,
+          location.longitude,
+          this.OFFICE_LOCATION.latitude,
+          this.OFFICE_LOCATION.longitude
+        );
+      }
+
+      const response = await api.post('/attendance/admin-check-in', requestData);
+      return response.data.data;
+    } catch (error) {
+      console.error('Admin check-in failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Admin check-out for employee (HR/Admin/Superadmin/Team Lead roles)
+   */
+  async adminCheckOut(employeeId: string, location?: LocationData): Promise<AttendanceRecord> {
+    try {
+      const requestData: any = {
+        employee_id: employeeId
+      };
+
+      if (location) {
+        requestData.location_latitude = location.latitude;
+        requestData.location_longitude = location.longitude;
+        requestData.check_out_location = location.address;
+        requestData.distance_from_office = this.calculateDistance(
+          location.latitude,
+          location.longitude,
+          this.OFFICE_LOCATION.latitude,
+          this.OFFICE_LOCATION.longitude
+        );
+      }
+
+      const response = await api.post('/attendance/admin-check-out', requestData);
+      return response.data.data;
+    } catch (error) {
+      console.error('Admin check-out failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if location restrictions apply based on day of week
+   * Monday-Thursday: 15,000m radius, Friday: anywhere
+   */
+  private getLocationRestrictions(date: Date = new Date()): { radius: number; anywhere: boolean } {
+    const day = date.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    
+    if (day === 5) { // Friday
+      return { radius: Infinity, anywhere: true };
+    } else if (day >= 1 && day <= 4) { // Monday to Thursday
+      return { radius: 15000, anywhere: false }; // 15km radius
+    } else {
+      return { radius: this.OFFICE_LOCATION.radius, anywhere: false }; // Default office radius
+    }
+  }
+
+  /**
+   * Enhanced location validation with day-specific rules
+   */
+  private isWithinAllowedLocation(location: LocationData, date: Date = new Date()): boolean {
+    const restrictions = this.getLocationRestrictions(date);
+    
+    if (restrictions.anywhere) {
+      return true; // Friday - can check in from anywhere
+    }
+
+    const distance = this.calculateDistance(
+      location.latitude,
+      location.longitude,
+      this.OFFICE_LOCATION.latitude,
+      this.OFFICE_LOCATION.longitude
+    );
+
+    return distance <= restrictions.radius;
+  }
+
+  /**
+   * Check if time is considered late (after 8:35 AM)
+   */
+  private isLateCheckIn(checkInTime: Date = new Date()): boolean {
+    const cutoffTime = new Date(checkInTime);
+    cutoffTime.setHours(8, 35, 0, 0); // 8:35 AM
+    
+    return checkInTime > cutoffTime;
+  }
+
+  /**
+   * Enhanced check-in with day-specific location rules and late calculation
+   */
+  async enhancedCheckIn(): Promise<AttendanceRecord> {
+    try {
+      const now = new Date();
+      
+      // Check if it's a working day
+      if (!this.isWorkingDay(now)) {
+        throw new Error('Check-in is only allowed on working days (Monday to Saturday)');
+      }
+
+      // Get current location
+      const location = await this.getCurrentLocation();
+      const restrictions = this.getLocationRestrictions(now);
+
+      // Validate location based on day-specific rules
+      if (!this.isWithinAllowedLocation(location, now)) {
+        const distance = this.calculateDistance(
+          location.latitude,
+          location.longitude,
+          this.OFFICE_LOCATION.latitude,
+          this.OFFICE_LOCATION.longitude
+        );
+        
+        const radiusKm = restrictions.radius / 1000;
+        throw new Error(
+          `You must be within ${radiusKm}km of the office to check in on ${now.toLocaleDateString('en-US', { weekday: 'long' })}. ` +
+          `You are currently ${(distance / 1000).toFixed(1)}km away.`
+        );
+      }
+
+      // Calculate if late
+      const isLate = this.isLateCheckIn(now);
+      const minutesLate = isLate ? Math.floor((now.getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate(), 8, 35).getTime()) / (1000 * 60)) : 0;
+
+      // Send enhanced check-in request
+      const response = await api.post('/attendance/check-in', {
+        location_latitude: location.latitude,
+        location_longitude: location.longitude,
+        check_in_location: location.address,
+        distance_from_office: this.calculateDistance(
+          location.latitude,
+          location.longitude,
+          this.OFFICE_LOCATION.latitude,
+          this.OFFICE_LOCATION.longitude
+        ),
+        is_late: isLate,
+        minutes_late: minutesLate
+      });
+
+      return response.data.data;
+    } catch (error) {
+      console.error('Enhanced check-in failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send checkout reminder notification
+   */
+  async sendCheckoutReminder(): Promise<void> {
+    try {
+      await api.post('/attendance/checkout-reminder');
+    } catch (error) {
+      console.error('Failed to send checkout reminder:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Check if user can check in/out (location and time validation)
    */
   async canPerformAttendanceAction(): Promise<{
@@ -332,8 +524,10 @@ class AttendanceService {
     location?: LocationData;
   }> {
     try {
+      const now = new Date();
+      
       // Check working day
-      if (!this.isWorkingDay()) {
+      if (!this.isWorkingDay(now)) {
         return {
           canCheckIn: false,
           canCheckOut: false,
@@ -343,9 +537,10 @@ class AttendanceService {
 
       // Get location
       const location = await this.getCurrentLocation();
-      const isWithinRadius = this.isWithinOfficeRadius(location);
+      const restrictions = this.getLocationRestrictions(now);
+      const isWithinAllowed = this.isWithinAllowedLocation(location, now);
 
-      if (!isWithinRadius) {
+      if (!isWithinAllowed) {
         const distance = this.calculateDistance(
           location.latitude,
           location.longitude,
@@ -353,10 +548,15 @@ class AttendanceService {
           this.OFFICE_LOCATION.longitude
         );
 
+        const radiusKm = restrictions.radius / 1000;
+        const dayName = now.toLocaleDateString('en-US', { weekday: 'long' });
+        
         return {
           canCheckIn: false,
           canCheckOut: false,
-          reason: `You must be within ${this.OFFICE_LOCATION.radius}m of the office. You are ${Math.round(distance)}m away.`,
+          reason: restrictions.anywhere 
+            ? 'Location validation failed'
+            : `You must be within ${radiusKm}km of the office on ${dayName}. You are ${(distance / 1000).toFixed(1)}km away.`,
           location
         };
       }

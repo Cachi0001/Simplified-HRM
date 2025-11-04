@@ -16,6 +16,11 @@ const notificationController = new NotificationController(notificationService);
 router.use(authenticateToken);
 
 /**
+ * Notification Creation
+ */
+router.post('/', (req, res) => notificationController.createNotification(req, res));
+
+/**
  * Notification Retrieval
  */
 router.get('/', (req, res) => notificationController.getNotifications(req, res));

@@ -49,7 +49,7 @@ export default function AttendanceReportPage({ darkMode: initialDarkMode = false
     queryKey: ['employees'],
     queryFn: async () => {
       const response = await employeeService.getAllEmployees();
-      return response.employees.filter((emp: any) => emp.role !== 'admin');
+      return response.filter((emp: any) => emp.role !== 'admin');
     },
     enabled: currentUser.role === 'admin',
   });

@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
 import logger from '../utils/logger';
-import nodemailer from 'nodemailer';
+import * as nodemailer from 'nodemailer';
 
 export interface EmailTemplate {
     id: string;
@@ -224,12 +224,77 @@ export class EmailService {
             `;
             await this.sendEmail({
                 to: email,
-                subject: '🎉 Your Go3Net Account Has Been Approved!',
+                subject: '🎉 Your Go3net Account Has Been Approved!',
                 html: emailHtml
             });
             logger.info('Approval email sent successfully', { email, role });
         } catch (error) {
             logger.error('Failed to send approval email', { email, error });
+            throw error;
+        }
+    }
+
+    /**
+     * Send employee rejection email
+     */
+    async sendRejectionEmail(email: string, employeeName: string, reason?: string): Promise<void> {
+        try {
+            const supportUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/contact`;
+            const emailHtml = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="utf-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Account Application Update - Go3Net HR System</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                        .header { background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+                        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+                        .button { display: inline-block; background: #3498db; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+                        .footer { text-align: center; margin-top: 20px; color: #666; font-size: 14px; }
+                        .reason-box { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0; }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="header">
+                            <h1>📋 Account Application Update</h1>
+                            <p>Go3Net HR Management System</p>
+                        </div>
+                        <div class="content">
+                            <h2>Hello ${employeeName},</h2>
+                            <p>Thank you for your interest in joining Go3Net. After careful review, we regret to inform you that your account application has not been approved at this time.</p>
+                            ${reason ? `
+                            <div class="reason-box">
+                                <strong>Reason:</strong><br>
+                                ${reason}
+                            </div>
+                            ` : ''}
+                            <p>We appreciate the time you took to apply and encourage you to consider future opportunities with us.</p>
+                            <p>If you have any questions about this decision or would like to discuss your application further, please don't hesitate to contact our HR department.</p>
+                            <div style="text-align: center;">
+                                <a href="${supportUrl}" class="button">Contact HR Support</a>
+                            </div>
+                            <p>Thank you for your understanding.</p>
+                            <p>Best regards,<br>Go3Net HR Team</p>
+                        </div>
+                        <div class="footer">
+                            <p>This is an automated message from Go3Net HR Management System</p>
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `;
+            await this.sendEmail({
+                to: email,
+                subject: '📋 Go3Net Account Application Update',
+                html: emailHtml
+            });
+            logger.info('Rejection email sent successfully', { email });
+        } catch (error) {
+            logger.error('Failed to send rejection email', { email, error });
             throw error;
         }
     }
@@ -852,6 +917,92 @@ export class EmailService {
                 authorEmail,
                 reactorName,
                 reactionType
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Send checkout reminder email
+     */
+    async sendCheckoutReminder(
+        employeeEmail: string,
+        employeeName: string
+    ): Promise<void> {
+        try {
+            const dashboardUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard`;
+            
+            const emailHtml = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="utf-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Checkout Reminder - Go3Net HR System</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                        .header { background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+                        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+                        .reminder-box { background: white; padding: 20px; border-left: 4px solid #FF6B6B; margin: 20px 0; border-radius: 5px; text-align: center; }
+                        .time-emoji { font-size: 48px; margin: 10px 0; }
+                        .button { display: inline-block; background: #FF6B6B; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+                        .footer { text-align: center; margin-top: 20px; color: #666; font-size: 14px; }
+                        .urgent { color: #FF6B6B; font-weight: bold; }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="header">
+                            <h1>🕕 Checkout Reminder</h1>
+                            <p>Go3Net HR Management System</p>
+                        </div>
+                        <div class="content">
+                            <h2>Hello ${employeeName},</h2>
+                            <p>This is a friendly reminder that it's now <span class="urgent">6:00 PM</span>!</p>
+                            
+                            <div class="reminder-box">
+                                <div class="time-emoji">🕕</div>
+                                <h3 style="margin: 10px 0; color: #333;">Don't forget to check out!</h3>
+                                <p style="color: #666;">Please remember to check out before leaving the office to ensure accurate attendance tracking.</p>
+                            </div>
+                            
+                            <div style="text-align: center;">
+                                <a href="${dashboardUrl}" class="button">Check Out Now</a>
+                            </div>
+                            
+                            <p style="font-size: 14px; color: #666;">
+                                If you've already checked out, please disregard this message. 
+                                If you're working late, you can check out when you're ready to leave.
+                            </p>
+                            
+                            <p>Best regards,<br>Go3Net HR Team</p>
+                        </div>
+                        <div class="footer">
+                            <p>This is an automated reminder from Go3Net HR Management System</p>
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `;
+
+            await this.sendEmail({
+                to: employeeEmail,
+                subject: '🕕 Checkout Reminder - 6:00 PM',
+                html: emailHtml,
+                text: `Hello ${employeeName},\n\nThis is a friendly reminder that it's now 6:00 PM! Don't forget to check out before leaving the office.\n\nYou can check out from the dashboard: ${dashboardUrl}\n\nBest regards,\nGo3Net HR Team`
+            });
+
+            logger.info('📧 [EmailService] Checkout reminder email sent successfully', {
+                employeeEmail,
+                employeeName
+            });
+
+        } catch (error) {
+            logger.error('❌ [EmailService] Failed to send checkout reminder email', {
+                error: (error as Error).message,
+                employeeEmail,
+                employeeName
             });
             throw error;
         }

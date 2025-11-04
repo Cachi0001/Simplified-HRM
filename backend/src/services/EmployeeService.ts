@@ -8,6 +8,8 @@ import db from '../config/database';
 import supabaseConfig from '../config/supabase';
 
 export class EmployeeService {
+  private supabase = supabaseConfig.getClient();
+  
   constructor(private employeeRepository: IEmployeeRepository) {}
 
   private mapEmployee(record: any): IEmployee {
@@ -346,9 +348,26 @@ export class EmployeeService {
     }
   }
 
-  async rejectEmployee(id: string): Promise<void> {
+  async rejectEmployee(id: string, reason?: string): Promise<void> {
     try {
+      // Get employee details before deletion for notification
+      const employee = await this.employeeRepository.findById(id);
+      if (!employee) {
+        throw new Error('Employee not found');
+      }
+
       await this.employeeRepository.delete(id);
+
+      // Send rejection notification
+      try {
+        await this.sendRejectionNotification(employee.email, employee.full_name, reason);
+      } catch (emailError) {
+        logger.error('EmployeeService: Failed to send rejection notification', { 
+          employeeId: id, 
+          error: emailError 
+        });
+        // Don't fail the rejection if email fails
+      }
 
       logger.info('EmployeeService: Employee rejected successfully', { employeeId: id });
     } catch (error) {
@@ -494,9 +513,84 @@ export class EmployeeService {
       const emailService = new EmailService(db);
       await emailService.sendApprovalEmail(email, employeeName, role);
 
+      // Also create in-app notification if user exists
+      try {
+        const { NotificationService } = await import('./NotificationService');
+        const notificationService = new NotificationService();
+        
+        // Find user by email to get user ID
+        const { data: user } = await this.supabase
+          .from('users')
+          .select('id')
+          .eq('email', email)
+          .single();
+
+        if (user) {
+          await notificationService.createNotification({
+            userId: user.id,
+            type: 'approval_decision',
+            title: 'Account Approved! 🎉',
+            message: `Your employee account has been approved with role: ${role}. You can now access the system.`,
+            actionUrl: '/dashboard'
+          });
+        }
+      } catch (notificationError) {
+        logger.error('EmployeeService: Failed to create in-app notification', { 
+          error: notificationError,
+          email 
+        });
+        // Don't fail if notification creation fails
+      }
+
       logger.info('EmployeeService: Approval notification sent successfully', { email });
     } catch (error) {
       logger.error('EmployeeService: Send approval notification failed', { 
+        error: (error as Error).message,
+        email 
+      });
+      throw error;
+    }
+  }
+
+  async sendRejectionNotification(email: string, employeeName: string, reason?: string): Promise<void> {
+    try {
+      logger.info('EmployeeService: Sending rejection notification', { email });
+
+      const emailService = new EmailService(db);
+      await emailService.sendRejectionEmail(email, employeeName, reason);
+
+      // Also create in-app notification if user exists
+      try {
+        const { NotificationService } = await import('./NotificationService');
+        const notificationService = new NotificationService();
+        
+        // Find user by email to get user ID
+        const { data: user } = await this.supabase
+          .from('users')
+          .select('id')
+          .eq('email', email)
+          .single();
+
+        if (user) {
+          await notificationService.createNotification({
+            userId: user.id,
+            type: 'approval_decision',
+            title: 'Account Application Update',
+            message: `Your employee account application was not approved. ${reason ? `Reason: ${reason}` : 'Please contact HR for more information.'}`,
+            actionUrl: '/contact'
+          });
+        }
+      } catch (notificationError) {
+        logger.error('EmployeeService: Failed to create in-app notification', { 
+          error: notificationError,
+          email 
+        });
+        // Don't fail if notification creation fails
+      }
+
+      logger.info('EmployeeService: Rejection notification sent successfully', { email });
+    } catch (error) {
+      logger.error('EmployeeService: Send rejection notification failed', { 
         error: (error as Error).message,
         email 
       });
@@ -742,8 +836,8 @@ export class EmployeeService {
       }
 
       // Get department and manager names separately to avoid relationship conflicts
-      const departmentIds = [...new Set(employees?.map(emp => emp.department_id).filter(Boolean))];
-      const managerIds = [...new Set(employees?.map(emp => emp.manager_id).filter(Boolean))];
+      const departmentIds = Array.from(new Set(employees?.map(emp => emp.department_id).filter(Boolean)));
+      const managerIds = Array.from(new Set(employees?.map(emp => emp.manager_id).filter(Boolean)));
       
       // Fetch departments
       const { data: departments } = await supabaseConfig.getClient()

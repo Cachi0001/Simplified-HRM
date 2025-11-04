@@ -220,4 +220,65 @@ export class TaskController {
       });
     }
   }
+
+  /**
+   * Create team task (alias for createTask)
+   * POST /api/tasks/team-task
+   */
+  async createTeamTask(req: Request, res: Response): Promise<void> {
+    // This is just an alias for createTask
+    await this.createTask(req, res);
+  }
+
+  /**
+   * Get team members for task assignment
+   * GET /api/tasks/team-members
+   */
+  async getTeamMembers(req: Request, res: Response): Promise<void> {
+    try {
+      const userRole = req.user?.role;
+      const userId = req.user?.id;
+
+      logger.info('TaskController: Get team members request', { userId, userRole });
+
+      const teamMembers = await this.taskService.getTeamMembers(userRole, userId);
+
+      res.status(200).json({
+        status: 'success',
+        data: { teamMembers }
+      });
+    } catch (error) {
+      logger.error('TaskController: Get team members error', { error: (error as Error).message });
+      res.status(400).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
+
+  /**
+   * Get assignable employees for task assignment
+   * GET /api/tasks/assignable-employees
+   */
+  async getAssignableEmployees(req: Request, res: Response): Promise<void> {
+    try {
+      const userRole = req.user?.role;
+      const userId = req.user?.id;
+
+      logger.info('TaskController: Get assignable employees request', { userId, userRole });
+
+      const employees = await this.taskService.getAssignableEmployees(userRole, userId);
+
+      res.status(200).json({
+        status: 'success',
+        data: { employees }
+      });
+    } catch (error) {
+      logger.error('TaskController: Get assignable employees error', { error: (error as Error).message });
+      res.status(400).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
 }

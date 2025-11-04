@@ -132,7 +132,7 @@ export default function TasksPage() {
       if (!isAdmin) return [];
 
       const response = await employeeService.getAllEmployees();
-      const nonAdminEmployees = response.employees.filter((emp: any) => emp.role !== 'admin');
+      const nonAdminEmployees = response.filter((emp: any) => emp.role !== 'admin');
       return nonAdminEmployees;
     },
     enabled: isAdmin && !!currentUser,

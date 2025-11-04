@@ -11,6 +11,7 @@ import { DarkModeToggle } from '../components/ui/DarkModeToggle';
 import { Logo } from '../components/ui/Logo';
 import { BottomNavbar } from '../components/layout/BottomNavbar';
 import { NotificationBell } from '../components/dashboard/NotificationBell';
+import { ProfileFieldRestrictions } from '../components/profile/ProfileFieldRestrictions';
 import { 
   User, Mail, Phone, Building, Briefcase, Lock, Bell, Eye, EyeOff, 
   Check, X, ChevronRight, ArrowLeft, Save, Calendar
@@ -242,6 +243,13 @@ export default function UserSettingsPage({ darkMode: initialDarkMode = false }: 
       }
     }
 
+    // Role-based validation warnings
+    if (userRole === 'employee') {
+      if (formData.department !== currentUser?.department) {
+        errors.push('Employees cannot change their department. Contact HR for department changes.');
+      }
+    }
+
     // Optional field validations
     if (formData.phone && formData.phone.trim()) {
       const phoneRegex = /^[\+]?[1-9][\d\s\-\(\)]{7,15}$/;
@@ -281,12 +289,11 @@ export default function UserSettingsPage({ darkMode: initialDarkMode = false }: 
       // Use updateMyProfile for current user
       const response = await employeeService.updateMyProfile({
         fullName: formData.fullName,
-        email: formData.email,
         phone: formData.phone,
         address: formData.address,
         department: formData.department,
         position: formData.position,
-        dateOfBirth: formData.dateOfBirth,
+        dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth) : undefined,
       });
 
       console.log('[UserSettings] Profile updated successfully:', response);
@@ -300,7 +307,13 @@ export default function UserSettingsPage({ darkMode: initialDarkMode = false }: 
       localStorage.setItem('currentUser', JSON.stringify(updatedUser));
       setCurrentUser(updatedUser);
 
-      addToast('success', 'Profile updated successfully! Administrators have been notified of your changes.');
+      const successMessage = userRole === 'employee' 
+        ? 'Profile updated successfully! HR/Admin have been notified of your changes.'
+        : userRole === 'hr'
+        ? 'Profile updated successfully! Changes have been saved.'
+        : 'Profile updated successfully!';
+      
+      addToast('success', successMessage);
     } catch (error: any) {
       console.error('[UserSettings] Error saving profile:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Failed to update profile';
@@ -459,13 +472,10 @@ export default function UserSettingsPage({ darkMode: initialDarkMode = false }: 
                 <div className="space-y-6">
                   <div>
                     <h2 className="text-2xl font-bold mb-6">Profile Information</h2>
-                    {userRole === 'admin' && (
-                      <div className={`p-4 rounded-lg mb-6 ${darkMode ? 'bg-blue-900/20' : 'bg-blue-50'}`}>
-                        <p className="text-sm text-blue-600">
-                          ⚠️ Admin accounts have limited profile editing. Contact system administrator for changes.
-                        </p>
-                      </div>
-                    )}
+                    <ProfileFieldRestrictions 
+                      userRole={userRole} 
+                      darkMode={darkMode} 
+                    />
                   </div>
 
                   {/* Profile Form */}
@@ -479,7 +489,7 @@ export default function UserSettingsPage({ darkMode: initialDarkMode = false }: 
                         value={formData.fullName}
                         onChange={handleFormChange}
                         placeholder="Enter your full name"
-                        disabled={userRole === 'admin'}
+                        disabled={false}
                         darkMode={darkMode}
                         className={formErrors.fullName ? 'border-red-500' : ''}
                       />
@@ -498,10 +508,13 @@ export default function UserSettingsPage({ darkMode: initialDarkMode = false }: 
                         value={formData.email}
                         onChange={handleFormChange}
                         placeholder="your.email@company.com"
-                        disabled={userRole === 'admin'}
+                        disabled={true}
                         darkMode={darkMode}
                         className={formErrors.email ? 'border-red-500' : ''}
                       />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Email changes must be made through HR/Admin
+                      </p>
                       {formErrors.email && (
                         <p className="text-red-500 text-sm mt-1">{formErrors.email}</p>
                       )}
@@ -551,13 +564,18 @@ export default function UserSettingsPage({ darkMode: initialDarkMode = false }: 
                             ? 'bg-gray-800 border-gray-600 text-white'
                             : 'bg-white border-gray-300 text-gray-900'
                         } focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                        disabled={userRole === 'admin'}
+                        disabled={userRole === 'employee'}
                       >
                         <option value="">Select Department</option>
                         {DEPARTMENTS.map(dept => (
                           <option key={dept} value={dept}>{dept}</option>
                         ))}
                       </select>
+                      {userRole === 'employee' && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Department changes require HR/Admin approval
+                        </p>
+                      )}
                     </div>
 
                     <div>
@@ -591,7 +609,7 @@ export default function UserSettingsPage({ darkMode: initialDarkMode = false }: 
                   <div className="flex gap-3 pt-4 border-t border-gray-200">
                     <Button
                       onClick={handleSaveProfile}
-                      disabled={isSaving || userRole === 'admin'}
+                      disabled={isSaving}
                       className="flex items-center gap-2"
                     >
                       <Save size={16} />

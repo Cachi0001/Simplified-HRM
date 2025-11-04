@@ -11,4 +11,6 @@ export interface ITaskRepository {
   updateStatus(id: string, status: 'pending' | 'in_progress' | 'completed' | 'cancelled'): Promise<ITask>;
   getEmployeeById(employeeId: string): Promise<any>;
   getEmployeeByUserId(userId: string): Promise<any>;
+  getAllEmployees(): Promise<any[]>;
+  getTeamMembersByLeadId(leadId: string): Promise<any[]>;
 }

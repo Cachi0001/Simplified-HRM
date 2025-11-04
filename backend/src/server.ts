@@ -50,6 +50,7 @@ import dashboardRoutes from './routes/dashboard.routes';
 import domainRoutes from './routes/domain.routes';
 import CheckoutMonitoringService from './services/CheckoutMonitoringService';
 import JobScheduler from './services/JobScheduler';
+import SchedulerService from './services/SchedulerService';
 import supabaseConfig from './config/supabase';
 import { initializeWebSocketService } from './services/WebSocketService';
 
@@ -479,6 +480,11 @@ if (require.main === module) {
     // Initialize job scheduler (this will set up all CRON jobs)
     JobScheduler;
     logger.info('✅ Job scheduler initialized with all CRON jobs');
+    
+    // Initialize attendance scheduler service
+    const schedulerService = SchedulerService.getInstance();
+    schedulerService.initializeJobs();
+    logger.info('✅ Attendance scheduler service initialized');
     
     // Create HTTP server
     const server = createServer(app);
