@@ -18,6 +18,32 @@ export interface Employee {
   profilePicture?: string;
 }
 
+// Extended Employee interface matching backend model
+export interface IEmployee {
+  id: string;
+  userId: string;
+  email: string;
+  fullName: string;
+  role: 'admin' | 'employee' | 'hr' | 'superadmin' | 'teamlead';
+  department?: string;
+  position?: string;
+  phone?: string;
+  address?: string;
+  dateOfBirth?: Date | string;
+  hireDate?: Date | string;
+  profilePicture?: string;
+  status: 'active' | 'pending' | 'rejected';
+  emailVerified: boolean;
+  emailVerificationToken?: string;
+  emailVerificationExpires?: Date | string;
+  passwordResetToken?: string;
+  passwordResetExpires?: Date | string;
+  profileUpdatedAt?: Date | string;
+  performanceScore?: number;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
 // For API responses
 export interface EmployeeResponse {
   employees: Employee[];

@@ -28,6 +28,11 @@ import ApiConnectionTest from './src/components/ApiConnectionTest';
 import { FloatingChatWidget } from './src/components/chat/FloatingChatWidget';
 import { ChatDemo } from './src/components/demo/ChatDemo';
 import ErrorBoundary from './src/components/ErrorBoundary';
+import ProfileCompletionPopup from './src/components/profile/ProfileCompletionPopup';
+import ProfileCompletionTest from './src/components/profile/ProfileCompletionTest';
+import { useProfileCompletion } from './src/hooks/useProfileCompletion';
+import { useTheme } from './src/contexts/ThemeContext';
+import { useEffect } from 'react';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -40,7 +45,8 @@ const queryClient = new QueryClient({
 
 function AppContent() {
   const location = useLocation();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const { darkMode } = useTheme();
   const isDashboardPage = location.pathname.startsWith('/dashboard') ||
                          location.pathname.startsWith('/employee-dashboard') ||
                          location.pathname.startsWith('/hr-dashboard') ||
@@ -57,10 +63,47 @@ function AppContent() {
                          location.pathname.startsWith('/performance-metrics') ||
                          location.pathname.startsWith('/chat');
 
+  // Profile completion logic
+  const {
+    showPopup,
+    completionStatus,
+    dismissPopup,
+    refreshProfileStatus
+  } = useProfileCompletion();
+
+  const handleCompleteProfile = () => {
+    // Navigate to settings page to complete profile
+    window.location.href = '/settings';
+  };
+
+  // Refresh profile status when returning from settings
+  useEffect(() => {
+    const handleFocus = () => {
+      if (isAuthenticated) {
+        refreshProfileStatus();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [isAuthenticated, refreshProfileStatus]);
+
   return (
     <div className="flex flex-col min-h-screen bg-primary">
       {!isDashboardPage && <Header />}
       {isAuthenticated && isDashboardPage && <FloatingChatWidget />}
+      
+      {/* Profile Completion Popup */}
+      {isAuthenticated && (
+        <ProfileCompletionPopup
+          isOpen={showPopup}
+          onClose={dismissPopup}
+          onCompleteProfile={handleCompleteProfile}
+          completionStatus={completionStatus}
+          darkMode={darkMode}
+        />
+      )}
+      
       <main className="flex-grow">
         <Routes>
           <Route path="/" element={<HomePage />} />
@@ -144,6 +187,7 @@ function AppContent() {
           } />
           <Route path="/api-test" element={<ApiConnectionTest />} />
           <Route path="/chat-demo" element={<ChatDemo />} />
+          <Route path="/profile-completion-test" element={<ProfileCompletionTest />} />
         </Routes>
       </main>
       {!isDashboardPage && <Footer />}
