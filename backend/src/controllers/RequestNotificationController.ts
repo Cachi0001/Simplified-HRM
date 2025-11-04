@@ -9,10 +9,6 @@ export class RequestNotificationController {
         this.requestNotificationService = new RequestNotificationService();
     }
 
-    /**
-     * Send notification for request status change
-     * POST /api/request-notifications/status-change
-     */
     async sendStatusChangeNotification(req: Request, res: Response): Promise<void> {
         try {
             const { requestType, requestId, newStatus, changedBy } = req.body;
