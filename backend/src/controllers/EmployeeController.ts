@@ -782,4 +782,98 @@ export class EmployeeController {
       });
     }
   }
+
+  /**
+   * Get my working days configuration
+   * GET /api/employees/me/working-days
+   */
+  async getMyWorkingDays(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.id;
+
+      if (!userId) {
+        res.status(401).json({
+          status: 'error',
+          message: 'User not authenticated'
+        });
+        return;
+      }
+
+      logger.info('EmployeeController: Get my working days', { userId });
+
+      const workingDays = await this.employeeService.getMyWorkingDays(userId);
+
+      res.status(200).json({
+        status: 'success',
+        data: workingDays
+      });
+    } catch (error) {
+      logger.error('EmployeeController: Get my working days error', { error: (error as Error).message });
+      res.status(400).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
+
+  /**
+   * Update my working days configuration
+   * PUT /api/employees/me/working-days
+   */
+  async updateMyWorkingDays(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.id;
+      const { working_days, working_hours, timezone } = req.body;
+
+      if (!userId) {
+        res.status(401).json({
+          status: 'error',
+          message: 'User not authenticated'
+        });
+        return;
+      }
+
+      // Validate working days
+      if (working_days && (!Array.isArray(working_days) || working_days.length === 0)) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Working days must be a non-empty array'
+        });
+        return;
+      }
+
+      // Validate working hours
+      if (working_hours && (!working_hours.start || !working_hours.end)) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Working hours must include start and end times'
+        });
+        return;
+      }
+
+      logger.info('EmployeeController: Update my working days', { 
+        userId, 
+        working_days, 
+        working_hours, 
+        timezone 
+      });
+
+      const result = await this.employeeService.updateMyWorkingDays(
+        userId,
+        { working_days, working_hours, timezone }
+      );
+
+      res.status(200).json({
+        status: 'success',
+        message: 'Working days configuration updated successfully',
+        data: result
+      });
+    } catch (error) {
+      logger.error('EmployeeController: Update my working days error', { error: (error as Error).message });
+      res.status(400).json({
+        status: 'error',
+        message: (error as Error).message
+      });
+    }
+  }
 }

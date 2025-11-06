@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '@/lib/api';
-import supabaseRealtimeService from '@/services/SupabaseRealtimeService';
+import { supabase } from '@/lib/supabase';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 
 export interface Chat {
   id: string;
@@ -265,7 +266,7 @@ export function useOptimizedChat(options: UseOptimizedChatOptions = {}) {
       setError(null);
 
       console.log(`📥 Loading messages for chat: ${chatId}`);
-      const response = await api.get(`/chat/${chatId}/messages`);
+      const response = await api.get(`/chat/${chatId}/history`);
 
       if (response.data?.data && Array.isArray(response.data.data)) {
         const currentUserId = JSON.parse(localStorage.getItem('currentUser') || '{}').id;
@@ -354,7 +355,7 @@ export function useOptimizedChat(options: UseOptimizedChatOptions = {}) {
         }
       } else {
         // Fallback to API
-        const response = await api.post(`/chat/${chatId}/message`, { content });
+        const response = await api.post('/chat/send', { chatId, message: content });
         if (response.data?.data) {
           const sentMessage = response.data.data;
           setMessages(prev => ({

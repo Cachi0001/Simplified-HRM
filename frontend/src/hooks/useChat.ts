@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
-import webSocketService, { ChatMessage as WSChatMessage } from '@/services/WebSocketService';
+import { supabase } from '@/lib/supabase';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 
 export interface Chat {
   id: string;
@@ -47,6 +48,7 @@ export function useChat() {
   const [error, setError] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'connecting'>('disconnected');
   const [typingUsers, setTypingUsers] = useState<Record<string, string[]>>({});
+  const [realtimeChannels, setRealtimeChannels] = useState<Map<string, RealtimeChannel>>(new Map());
 
   // Load chats
   const loadChats = useCallback(async () => {
@@ -558,52 +560,41 @@ export function useChat() {
     }
   }, []);
 
-  // Initialize WebSocket connection and monitoring
+  // Initialize Supabase Realtime connection
   useEffect(() => {
-    console.log('🔄 Initializing WebSocket connection monitoring...');
+    console.log('🔄 Initializing Supabase Realtime connection...');
     
-    // Monitor connection status
-    const handleConnectionChange = (connected: boolean) => {
-      setConnectionStatus(connected ? 'connected' : 'disconnected');
-      console.log('🔌 WebSocket connection status changed:', connected ? 'connected' : 'disconnected');
+    // Check if user is authenticated
+    const checkAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (session) {
+          setConnectionStatus('connected');
+          console.log('✅ Supabase Realtime connected');
+        } else {
+          setConnectionStatus('disconnected');
+          console.log('⚠️ No Supabase session found');
+        }
+      } catch (error) {
+        console.error('❌ Supabase auth check failed:', error);
+        setConnectionStatus('disconnected');
+      }
     };
 
-    webSocketService.onConnection(handleConnectionChange);
+    checkAuth();
 
-    // Set up typing indicator handler
-    const typingHandlerId = webSocketService.onTyping((typingData) => {
-      setTypingUsers(prev => {
-        const chatTyping = prev[typingData.chatId] || [];
-        if (typingData.isTyping) {
-          // Add user to typing list if not already there
-          if (!chatTyping.includes(typingData.userId)) {
-            return {
-              ...prev,
-              [typingData.chatId]: [...chatTyping, typingData.userId]
-            };
-          }
-        } else {
-          // Remove user from typing list
-          return {
-            ...prev,
-            [typingData.chatId]: chatTyping.filter(id => id !== typingData.userId)
-          };
-        }
-        return prev;
-      });
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('🔐 Supabase auth state changed:', event);
+      if (session) {
+        setConnectionStatus('connected');
+      } else {
+        setConnectionStatus('disconnected');
+      }
     });
 
-    // Authenticate WebSocket if we have credentials
-    const token = localStorage.getItem('accessToken');
-    const userId = getCurrentUserId();
-    if (token && userId) {
-      console.log('🔐 Authenticating WebSocket connection...');
-      webSocketService.authenticate(userId, token);
-    }
-
     return () => {
-      webSocketService.offConnection(handleConnectionChange);
-      webSocketService.offTyping(typingHandlerId);
+      subscription.unsubscribe();
     };
   }, []);
 

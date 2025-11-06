@@ -1,3 +1,4 @@
+// CACHE BUST: v2.0 - Force localhost API
 import axios from 'axios';
 import { InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 
@@ -55,63 +56,31 @@ const hasStatusCodeText = (value?: string) => {
   return /status\s*(code|error)/i.test(value);
 };
 
-// Backend API base URL with enhanced domain detection and go3net.com support
+// TEMPORARY FIX: Force localhost for development - Cache Bust v2
 const API_BASE_URL = (() => {
-  // Check if we're in production mode
-  const isProduction = import.meta.env.PROD;
+  // HARDCODE localhost for development to bypass any caching issues
+  const FORCE_LOCALHOST = 'http://localhost:3000/api';
   
-  // Get environment variables with fallbacks
-  const devApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-  const prodApiUrl = import.meta.env.VITE_API_URL_PROD || 'https://go3nethrm-backend.vercel.app/api';
-  const customApiUrl = import.meta.env.VITE_API_URL_CUSTOM || 'https://go3nethrm-backend.vercel.app/api';
-
-  // Log API configuration for debugging
-  console.log(`API Configuration:
-    - Environment: ${isProduction ? 'Production' : 'Development'}
-    - Dev API URL: ${devApiUrl}
-    - Prod API URL: ${prodApiUrl}
-    - Custom API URL: ${customApiUrl}
-  `);
-
-  // Use production URL in production, localhost URL in development
-  let baseUrl = isProduction ? prodApiUrl : devApiUrl;
-
-  // If running in a browser, check if we need to override based on hostname
-  if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-
-    // Enhanced domain detection including go3net.com
-    const isVercelDeployment = hostname.includes('vercel.app');
-    const isGo3nethrm = hostname.includes('go3nethrm.com');
-    const isGo3net = hostname.includes('go3net.com');
-    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
-
-    // Domain-specific API URL selection
-    if (isGo3net) {
-      console.log('Detected go3net.com domain - using custom API URL');
-      baseUrl = customApiUrl;
-    } else if (isVercelDeployment || isGo3nethrm) {
-      console.log('Detected production deployment - using production API');
-      baseUrl = prodApiUrl;
-    } else if (isLocalhost && !isProduction) {
-      console.log('Detected localhost in development mode - using development API');
-      baseUrl = devApiUrl;
-    } else if ((isVercelDeployment || isGo3nethrm || isGo3net) && baseUrl.includes('localhost')) {
-      console.log('Detected production deployment but using localhost API - switching to production API');
-      baseUrl = isGo3net ? customApiUrl : prodApiUrl;
-    }
-
-    // Special case for preview deployments
-    if (isVercelDeployment && hostname !== 'go3nethrm.vercel.app') {
-      console.log('Detected Vercel preview deployment');
-      baseUrl = prodApiUrl;
-    }
-
-    console.log(`Final API URL: ${baseUrl} (Host: ${hostname}, Domain: ${isGo3net ? 'go3net.com' : isGo3nethrm ? 'go3nethrm.com' : 'other'})`);
+  console.log('🚨 EMERGENCY FIX: Forcing localhost API');
+  console.log('🎯 HARDCODED API URL:', FORCE_LOCALHOST);
+  console.log('🔍 Environment Debug:', {
+    PROD: import.meta.env.PROD,
+    MODE: import.meta.env.MODE,
+    NODE_ENV: import.meta.env.NODE_ENV,
+    VITE_API_URL: import.meta.env.VITE_API_URL,
+    hostname: typeof window !== 'undefined' ? window.location.hostname : 'server'
+  });
+  
+  // For now, always return localhost in development
+  if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+    console.log('✅ Using localhost API (forced)');
+    return FORCE_LOCALHOST;
   }
-
-  // Ensure no trailing slash to prevent double slash issues
-  return baseUrl.replace(/\/$/, '');
+  
+  // Fallback for production (when not on localhost)
+  const prodApiUrl = import.meta.env.VITE_API_URL_PROD || 'https://go3nethrm-backend.vercel.app/api';
+  console.log('🌐 Using production API:', prodApiUrl);
+  return prodApiUrl;
 })();
 
 // Create axios instance with explicit CORS headers
@@ -136,9 +105,12 @@ api.interceptors.request.use(
       // Remove leading slash from the URL path to prevent double slashes
       config.url = config.url.replace(/^\//, '');
 
+      // Log ALL API requests for debugging
+      const fullUrl = `${config.baseURL}/${config.url}`;
+      console.log(`🌐 API Request [${requestId}]: ${config.method?.toUpperCase()} ${fullUrl}`);
+
       // Only log chat-related API requests
       if (config.url?.includes('chat') || config.url?.includes('message')) {
-        const fullUrl = `${config.baseURL}/${config.url}`;
         console.log(`💬 Chat API [${requestId}]: ${config.method?.toUpperCase()} ${fullUrl}`);
       }
     }

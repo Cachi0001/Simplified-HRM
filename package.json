@@ -1,0 +1,41 @@
+{
+  "name": "go3net-hrm-system",
+  "version": "1.0.0",
+  "description": "Go3net HR Management System - Full Stack Application",
+  "private": true,
+  "scripts": {
+    "build": "cd frontend && npm install && npm run build",
+    "dev": "concurrently \"cd frontend && npm run dev\" \"cd backend/api && npm run dev\"",
+    "install:frontend": "cd frontend && npm install",
+    "install:backend": "cd backend/api && npm install",
+    "install:all": "npm run install:frontend && npm run install:backend",
+    "test": "npm run test:frontend && npm run test:backend",
+    "test:frontend": "cd frontend && npm run test:run",
+    "test:backend": "cd backend && npm test",
+    "lint": "npm run lint:frontend",
+    "lint:frontend": "cd frontend && npm run lint",
+    "start": "cd frontend && npm run preview",
+    "vercel-build": "cd frontend && npm install && npm run build"
+  },
+  "workspaces": [
+    "frontend",
+    "backend/api"
+  ],
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "keywords": [
+    "hr",
+    "management",
+    "system",
+    "react",
+    "node",
+    "supabase"
+  ],
+  "author": "Go3net",
+  "license": "MIT"
+}

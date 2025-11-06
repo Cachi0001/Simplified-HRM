@@ -61,7 +61,7 @@ const WorkingDaysConfig: React.FC<WorkingDaysConfigProps> = ({
     const loadWorkingDaysConfig = async () => {
       try {
         setIsLoading(true);
-        const response = await api.get("/employees/my-working-days");
+        const response = await api.get("/employees/me/working-days");
 
         if (response.data.status === "success") {
           const config = response.data.data;

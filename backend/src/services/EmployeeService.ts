@@ -889,4 +889,93 @@ export class EmployeeService {
       return [];
     }
   }
+
+  /**
+   * Get working days configuration for current user
+   */
+  async getMyWorkingDays(userId: string): Promise<any> {
+    try {
+      logger.info('EmployeeService: Getting working days for user', { userId });
+
+      const { data, error } = await supabaseConfig.getClient()
+        .from('employees')
+        .select('work_days, working_hours, timezone')
+        .eq('user_id', userId)
+        .single();
+
+      if (error) {
+        logger.error('EmployeeService: Error getting working days', { error: error.message });
+        throw new Error(`Failed to get working days: ${error.message}`);
+      }
+
+      return {
+        working_days: data?.work_days || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+        working_hours: data?.working_hours || { start: '09:00', end: '17:00' },
+        timezone: data?.timezone || 'UTC'
+      };
+    } catch (error) {
+      logger.error('EmployeeService: Error in getMyWorkingDays', { 
+        error: (error as Error).message,
+        userId 
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Update working days configuration for current user
+   */
+  async updateMyWorkingDays(userId: string, workingDaysData: {
+    working_days?: string[];
+    working_hours?: { start: string; end: string };
+    timezone?: string;
+  }): Promise<any> {
+    try {
+      logger.info('EmployeeService: Updating working days for user', { 
+        userId, 
+        workingDaysData 
+      });
+
+      // Prepare update data
+      const updateData: any = {};
+      
+      if (workingDaysData.working_days) {
+        updateData.work_days = workingDaysData.working_days;
+      }
+      
+      if (workingDaysData.working_hours) {
+        updateData.working_hours = workingDaysData.working_hours;
+      }
+      
+      if (workingDaysData.timezone) {
+        updateData.timezone = workingDaysData.timezone;
+      }
+
+      updateData.updated_at = new Date().toISOString();
+
+      const { data, error } = await supabaseConfig.getClient()
+        .from('employees')
+        .update(updateData)
+        .eq('user_id', userId)
+        .select('work_days, working_hours, timezone')
+        .single();
+
+      if (error) {
+        logger.error('EmployeeService: Error updating working days', { error: error.message });
+        throw new Error(`Failed to update working days: ${error.message}`);
+      }
+
+      return {
+        working_days: data?.work_days || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+        working_hours: data?.working_hours || { start: '09:00', end: '17:00' },
+        timezone: data?.timezone || 'UTC'
+      };
+    } catch (error) {
+      logger.error('EmployeeService: Error in updateMyWorkingDays', { 
+        error: (error as Error).message,
+        userId 
+      });
+      throw error;
+    }
+  }
 }

@@ -97,7 +97,12 @@ async function initializeDatabase() {
   } catch (error) {
     console.error('❌ Supabase connection failed:', error);
     logger.error('❌ Supabase connection failed:', { error });
-    process.exit(1);
+    // Don't exit in development - let the server start and handle DB errors per request
+    if (process.env.NODE_ENV === 'production') {
+      process.exit(1);
+    } else {
+      console.log('⚠️ Continuing in development mode without database connection');
+    }
   }
 }
 

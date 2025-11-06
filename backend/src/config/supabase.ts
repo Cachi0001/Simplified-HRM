@@ -27,6 +27,10 @@ export class SupabaseConfig {
     }
 
     try {
+      if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        throw new Error('Missing required Supabase environment variables');
+      }
+
       // Test the connection by making a simple query
       const { data, error } = await this.supabase
         .from('users')
@@ -45,6 +49,8 @@ export class SupabaseConfig {
     } catch (error) {
       logger.error('❌ Failed to connect to Supabase:', {
         error: error instanceof Error ? error.message : String(error),
+        supabaseUrl: process.env.SUPABASE_URL ? 'SET' : 'NOT SET',
+        serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'SET' : 'NOT SET'
       });
       throw error;
     }

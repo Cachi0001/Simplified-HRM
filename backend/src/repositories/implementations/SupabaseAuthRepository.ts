@@ -964,34 +964,90 @@ export class SupabaseAuthRepository implements IAuthRepository {
 
   private async sendEmailConfirmation(email: string, fullName: string, confirmationUrl: string): Promise<void> {
     try {
-      // TODO: Implement email confirmation service
-      logger.info('📧 [SupabaseAuthRepository] Email confirmation would be sent', {
+      logger.info('📧 [SupabaseAuthRepository] Sending email confirmation', {
         email,
         confirmationUrl
       });
       
-      // Find user ID by email for templated email
-      const { data: user, error } = await this.supabase
-        .from('users')
-        .select('id')
-        .eq('email', email)
-        .single();
-
-      if (user && !error) {
-        // TODO: Send templated email confirmation
-        logger.info('📧 [SupabaseAuthRepository] Would send email confirmation', {
-          userId: user.id,
-          email,
-          confirmationUrl
-        });
-      } else {
-        // Fallback: send direct email without template
-        logger.warn('⚠️ User not found for templated email, skipping confirmation email', { email });
-      }
+      // Import EmailService dynamically to avoid circular dependencies
+      const { EmailService } = await import('../../services/EmailService');
+      const { Pool } = await import('pg');
       
-      logger.info('📧 Email confirmation sent successfully', { email, fullName });
+      // Use a simpler approach - create EmailService without database connection
+      // since we're just sending emails, not logging to database
+      const nodemailer = await import('nodemailer');
+      
+      const transporter = nodemailer.default.createTransport({
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT || '587'),
+        secure: process.env.SMTP_SECURE === 'true',
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS
+        }
+      });
+      
+      // Create email content
+      const emailHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Verify Your Email - Go3Net HR System</title>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+            .button { display: inline-block; background: #4CAF50; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+            .footer { text-align: center; margin-top: 20px; color: #666; font-size: 14px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>📧 Verify Your Email</h1>
+              <p>Welcome to Go3Net HR Management System</p>
+            </div>
+            <div class="content">
+              <h2>Hello ${fullName},</h2>
+              <p>Thank you for signing up! Please verify your email address to complete your account setup.</p>
+              <div style="text-align: center;">
+                <a href="${confirmationUrl}" class="button">Verify Email Address</a>
+              </div>
+              <p>If the button doesn't work, you can copy and paste this link into your browser:</p>
+              <p style="word-break: break-all; background: #eee; padding: 10px; border-radius: 5px;">${confirmationUrl}</p>
+              <p><strong>Important:</strong> This verification link will expire in 1 hour for security reasons.</p>
+              <p>If you didn't create an account with us, please ignore this email.</p>
+              <p>Best regards,<br>Go3Net HR Team</p>
+            </div>
+            <div class="footer">
+              <p>This is an automated message from Go3Net HR Management System</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+      
+      // Send the email directly using nodemailer
+      const mailOptions = {
+        from: process.env.SMTP_USER || 'noreply@go3net.com',
+        to: email,
+        subject: '📧 Verify Your Email - Go3Net HR System',
+        html: emailHtml,
+        text: `Hello ${fullName}, Please verify your email address by clicking this link: ${confirmationUrl}. This link will expire in 1 hour.`
+      };
+      
+      await transporter.sendMail(mailOptions);
+      
+      logger.info('✅ [SupabaseAuthRepository] Email confirmation sent successfully', { 
+        email, 
+        fullName 
+      });
+      
     } catch (error) {
-      logger.error('❌ Failed to send email confirmation', {
+      logger.error('❌ [SupabaseAuthRepository] Failed to send email confirmation', {
         error: (error as Error).message,
         email,
         fullName

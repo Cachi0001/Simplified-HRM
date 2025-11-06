@@ -13,10 +13,10 @@ import {
   Sun,
 } from "lucide-react";
 import { ChatBadge } from "./ChatBadge";
-import { useOptimizedChat, Chat, User } from "../../hooks/useOptimizedChat";
+import { useRealtimeChat, Chat, User } from "../../hooks/useRealtimeChat";
 import { useTheme } from "../../contexts/ThemeContext";
 import api from "../../lib/api";
-import supabaseRealtimeService from "../../services/SupabaseRealtimeService";
+// Removed SupabaseRealtimeService - now using useRealtimeChat hook
 import { IndicatorWrapper } from "../indicators/IndicatorWrapper";
 import { IndicatorTest } from "../indicators/IndicatorTest";
 import WhatsAppMessageList from "./WhatsAppMessageList";
@@ -24,6 +24,8 @@ import { useMessageIndicators } from "../../hooks/useMessageIndicators";
 import { AnnouncementList, CreateAnnouncement } from "../announcements";
 import { useAnnouncements } from "../../hooks/useAnnouncements";
 import Logo from "../ui/Logo";
+import { userStatusService } from "../../services/UserStatusService";
+import { useRealtimeTyping } from "../../hooks/useRealtimeTyping";
 
 interface FloatingChatWidgetProps {
   className?: string;
@@ -72,16 +74,16 @@ export function FloatingChatWidget({
     getTotalUnreadCount,
     subscribeToChat,
     unsubscribeFromChat,
-    startTyping,
-    stopTyping,
-    typingUsers: chatTypingUsers,
     clearCache,
     forceRefresh,
-  } = useOptimizedChat({
-    enableRealtime: true,
-    maxRetries: 3,
-    cacheTimeout: 5 * 60 * 1000, // 5 minutes cache
-  });
+  } = useRealtimeChat();
+
+  // Use typing hook separately
+  const {
+    typingUsers: chatTypingUsers,
+    subscribeToTyping,
+    unsubscribeFromTyping,
+  } = useRealtimeTyping(selectedChat?.id || null);
 
   // Initialize message indicators
   const { handleMessageSent, handleMessageReceived, hasActiveIndicator } =
@@ -115,24 +117,33 @@ export function FloatingChatWidget({
     return user ? user.name : `User ${userId}`;
   });
 
-  // Initialize Supabase realtime service
+  // Initialize user status tracking
   useEffect(() => {
-    console.log("🚀 Initializing Supabase realtime for chat widget");
+    console.log("🚀 Initializing user status tracking for chat widget");
 
     // Update user status to online
-    supabaseRealtimeService.updateUserStatus("online");
+    const currentUserId = getCurrentUserId();
+    if (currentUserId) {
+      userStatusService.updateUserStatus(currentUserId, "online");
+    }
 
     // Set up global event listeners for performance
     const handleVisibilityChange = () => {
-      if (document.hidden) {
-        supabaseRealtimeService.updateUserStatus("away");
-      } else {
-        supabaseRealtimeService.updateUserStatus("online");
+      const currentUserId = getCurrentUserId();
+      if (currentUserId) {
+        if (document.hidden) {
+          userStatusService.updateUserStatus(currentUserId, "away");
+        } else {
+          userStatusService.updateUserStatus(currentUserId, "online");
+        }
       }
     };
 
     const handleBeforeUnload = () => {
-      supabaseRealtimeService.updateUserStatus("offline");
+      const currentUserId = getCurrentUserId();
+      if (currentUserId) {
+        userStatusService.updateUserStatus(currentUserId, "offline");
+      }
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -141,7 +152,10 @@ export function FloatingChatWidget({
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("beforeunload", handleBeforeUnload);
-      supabaseRealtimeService.updateUserStatus("offline");
+      const currentUserId = getCurrentUserId();
+      if (currentUserId) {
+        userStatusService.updateUserStatus(currentUserId, "offline");
+      }
     };
   }, []);
 
@@ -235,7 +249,7 @@ export function FloatingChatWidget({
         }
       };
     }
-  }, [selectedChat?.id, loadMessages, markChatAsRead, activeTab]);
+  }, [selectedChat?.id, activeTab]);
 
   // Get messages for the selected chat
   const chatMessages = selectedChat?.id ? messages[selectedChat.id] || [] : [];
@@ -305,6 +319,17 @@ export function FloatingChatWidget({
     }
   }, [selectedChat?.id]);
 
+  // Simple typing functions (placeholder for now)
+  const startTyping = async (chatId: string) => {
+    console.log('Starting typing for chat:', chatId);
+    // TODO: Implement actual typing indicator
+  };
+
+  const stopTyping = async (chatId: string) => {
+    console.log('Stopping typing for chat:', chatId);
+    // TODO: Implement actual typing indicator
+  };
+
   // Handle typing indicator
   const handleTypingChange = useCallback(
     (value: string) => {
@@ -331,7 +356,7 @@ export function FloatingChatWidget({
 
       setTypingTimeout(newTimeout);
     },
-    [selectedChat, isTyping, typingTimeout, startTyping, stopTyping],
+    [selectedChat, isTyping, typingTimeout],
   );
 
   // Optimized realtime subscription with cleanup
@@ -396,7 +421,7 @@ export function FloatingChatWidget({
         retryTimeoutRef.current = null;
       }
     };
-  }, [selectedChat?.id, subscribeToChat, unsubscribeFromChat]);
+  }, [selectedChat?.id]);
 
   const totalUnreadCount = getTotalUnreadCount();
 
@@ -1419,7 +1444,11 @@ export function FloatingChatWidget({
                   <WhatsAppMessageList
                     messages={chatMessages}
                     currentUserId={getCurrentUserId()}
-                    onRetryMessage={retryMessage}
+                    onRetryMessage={(messageId: string) => {
+                      if (selectedChat?.id) {
+                        retryMessage(selectedChat.id, messageId);
+                      }
+                    }}
                     darkMode={darkMode}
                   />
                 )}

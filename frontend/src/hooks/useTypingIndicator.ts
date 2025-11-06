@@ -53,7 +53,7 @@ export function useTypingIndicator(userId?: string): UseTypingIndicatorReturn {
       if (!isTypingRef.current) return;
       
       isTypingRef.current = false;
-      await api.post('/typing/stop', { chatId });
+      await api.post(`/chat/${chatId}/typing/stop`);
       
       // Remove current user from typing list
       setTypingUsers(prev => prev.filter(user => user.userId !== userId));
@@ -75,7 +75,7 @@ export function useTypingIndicator(userId?: string): UseTypingIndicatorReturn {
         // Send start typing if not already typing
         if (!isTypingRef.current) {
           isTypingRef.current = true;
-          await api.post('/typing/start', { chatId });
+          await api.post(`/chat/${chatId}/typing/start`);
           
           // Add current user to typing list if not already there
           setTypingUsers(prev => {
@@ -106,7 +106,7 @@ export function useTypingIndicator(userId?: string): UseTypingIndicatorReturn {
 
   const getTypingUsers = useCallback(async (chatId: string) => {
     try {
-      const response = await api.get(`/typing/${chatId}`);
+      const response = await api.get(`/chat/${chatId}/typing`);
       if (response.data?.data?.users) {
         const users = response.data.data.users.map((user: any) => ({
           userId: user.userId || user.user_id,
@@ -123,7 +123,7 @@ export function useTypingIndicator(userId?: string): UseTypingIndicatorReturn {
 
   const isUserTyping = useCallback(async (chatId: string, userIdToCheck: string): Promise<boolean> => {
     try {
-      const response = await api.get(`/typing/${chatId}/${userIdToCheck}`);
+      const response = await api.get(`/chat/${chatId}/typing/${userIdToCheck}`);
       return response.data?.data?.isTyping || false;
     } catch (error) {
       console.error('Failed to check typing status:', error);

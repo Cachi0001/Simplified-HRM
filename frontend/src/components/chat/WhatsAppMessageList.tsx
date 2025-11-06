@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { ChatMessage } from '../../hooks/useChat';
+import { ChatMessage } from '../../hooks/useRealtimeChat';
 import { IndicatorWrapper } from '../indicators/IndicatorWrapper';
 
 interface WhatsAppMessageListProps {
@@ -224,7 +224,29 @@ export function WhatsAppMessageList({
                                             >
                                                 {/* Message Content */}
                                                 <div className="text-sm leading-relaxed">
-                                                    {message.content}
+                                                    {(() => {
+                                                        // Debug logging
+                                                        if (typeof message.content !== 'string') {
+                                                            console.warn('Non-string message content:', {
+                                                                content: message.content,
+                                                                type: typeof message.content,
+                                                                messageId: message.id
+                                                            });
+                                                        }
+                                                        
+                                                        // Safe content rendering
+                                                        if (typeof message.content === 'string') {
+                                                            return message.content;
+                                                        } else if (message.content && typeof message.content === 'object') {
+                                                            // If it's an object, try to extract text content
+                                                            if (message.content.text) return String(message.content.text);
+                                                            if (message.content.message) return String(message.content.message);
+                                                            if (message.content.content) return String(message.content.content);
+                                                            return JSON.stringify(message.content);
+                                                        } else {
+                                                            return String(message.content || 'Empty message');
+                                                        }
+                                                    })()}
                                                 </div>
 
                                                 {/* Message Footer - only show on last message in group */}

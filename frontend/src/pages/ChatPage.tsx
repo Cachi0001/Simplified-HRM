@@ -3,12 +3,12 @@ import { ChevronLeft, Send, Loader } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ChatMessage } from '@/components/chat/ChatMessage';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
-import { useChat } from '@/hooks/useChat';
-import { useTypingIndicator } from '@/hooks/useTypingIndicator';
+import { useRealtimeChat } from '@/hooks/useRealtimeChat';
+import { useRealtimeTyping } from '@/hooks/useRealtimeTyping';
 import { useChatUnreadCount } from '@/hooks/useChatUnreadCount';
 import { authService } from '@/services/authService';
-import type { ChatMessage as ChatMessageType } from '@/types/chat';
 import api from '@/lib/api';
+import type { ChatMessage as ChatMessageType } from '@/types/chat';
 
 /**
  * ChatPage Component
@@ -26,7 +26,6 @@ export default function ChatPage() {
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // State
-  const [chats, setChats] = useState<any[]>([]);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [messageText, setMessageText] = useState('');
   const [isLoadingChats, setIsLoadingChats] = useState(true);
@@ -36,21 +35,24 @@ export default function ChatPage() {
 
   // Hooks
   const {
+    chats,
+    users,
     messages,
     isLoading: isMessagesLoading,
     error: messagesError,
+    connectionStatus,
+    loadMessages,
     sendMessage,
+    createOrGetDM,
     markChatAsRead,
-    getChatHistory
-  } = useChat();
+    subscribeToChat,
+    unsubscribeFromChat
+  } = useRealtimeChat();
 
   const {
     typingUsers,
-    typingUserNames,
-    startTyping,
-    stopTyping,
-    getTypingUsers
-  } = useTypingIndicator();
+    getTypingText,
+  } = useRealtimeTyping(selectedChatId);
 
   const {
     totalUnreadCount,
@@ -71,7 +73,7 @@ export default function ChatPage() {
 
   // Load chats on mount
   useEffect(() => {
-    loadChats();
+    loadChatData();
   }, []);
 
   // Load chat history when chat is selected
@@ -89,34 +91,22 @@ export default function ChatPage() {
     scrollToBottom();
   }, [messages]);
 
-  // Poll for typing users
-  useEffect(() => {
-    if (!selectedChatId) return;
+  // Simple typing functions (placeholder)
+  const startTyping = async (chatId: string) => {
+    console.log('Starting typing for chat:', chatId);
+  };
 
-    const interval = setInterval(() => {
-      getTypingUsers(selectedChatId).catch(err =>
-        console.error('Failed to get typing users:', err)
-      );
-    }, 1000);
+  const stopTyping = async (chatId: string) => {
+    console.log('Stopping typing for chat:', chatId);
+  };
 
-    return () => clearInterval(interval);
-  }, [selectedChatId, getTypingUsers]);
-
-  const loadChats = async () => {
+  const loadChatData = async () => {
     try {
       setIsLoadingChats(true);
-      const response = await api.get('/chat/list');
-
-      if (response.data?.data?.chats) {
-        setChats(response.data.data.chats);
-
-        // Select first chat if available
-        if (response.data.data.chats.length > 0 && !selectedChatId) {
-          setSelectedChatId(response.data.data.chats[0].id);
-        }
+      // Use the hook's data instead of making separate API calls
+      if (chats.length > 0 && !selectedChatId) {
+        setSelectedChatId(chats[0].id);
       }
-
-      // Refresh unread counts
       await getAllUnreadCounts();
     } catch (err) {
       console.error('Failed to load chats:', err);
@@ -130,7 +120,7 @@ export default function ChatPage() {
 
     try {
       setIsLoadingMessages(true);
-      await getChatHistory(selectedChatId, 1, 100);
+      await loadMessages(selectedChatId);
     } catch (err) {
       console.error('Failed to load chat history:', err);
     } finally {
@@ -212,19 +202,25 @@ export default function ChatPage() {
   };
 
   const getTypingUserNames = (): string[] => {
-    return typingUserNames; // Use the names from the hook, not IDs
+    if (selectedChatId) {
+      const typingText = getTypingText();
+      return typingText ? [typingText] : [];
+    }
+    return [];
   };
 
   // Filter out current user from messages to determine if "own" message
-  const getMessageProps = (msg: ChatMessageType) => ({
+  const getMessageProps = (msg: any) => ({
     id: msg.id,
-    senderName: msg.senderName || 'Unknown',
+    senderName: msg.senderName || msg.sender_full_name || 'Unknown',
     senderAvatar: msg.senderAvatar,
-    content: msg.message,
+    content: msg.content || msg.message,
     timestamp: msg.timestamp,
-    isOwn: msg.sender_id === currentUser?.id,
-    readAt: msg.read_at,
-    status: msg.read_at ? 'read' : msg.delivered_at ? 'delivered' : msg.sent_at ? 'sent' : 'sending'
+    isOwn: msg.senderId === currentUser?.id || msg.sender_id === currentUser?.id,
+    readAt: msg.readAt || msg.read_at,
+    status: (msg.readAt || msg.read_at ? 'read' : 
+             msg.deliveredAt || msg.delivered_at ? 'delivered' : 
+             msg.sentAt || msg.sent_at ? 'sent' : 'sending') as 'sent' | 'sending' | 'delivered' | 'read'
   });
 
   if (!currentUser) {
@@ -290,7 +286,7 @@ export default function ChatPage() {
                           {chat.name}
                         </h3>
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {chat.participant_count || 0} participants
+                          {chat.participants?.length || 0} participants
                         </p>
                       </div>
                       {unreadCount > 0 && (
@@ -317,13 +313,13 @@ export default function ChatPage() {
                 <div className="flex items-center justify-center h-full">
                   <Loader className="h-6 w-6 animate-spin text-blue-600" />
                 </div>
-              ) : messages.length === 0 ? (
+              ) : !selectedChatId || (messages[selectedChatId] || []).length === 0 ? (
                 <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
                   <p>No messages yet. Start the conversation!</p>
                 </div>
               ) : (
                 <>
-                  {messages.map((msg) => (
+                  {(selectedChatId ? messages[selectedChatId] || [] : []).map((msg) => (
                     <ChatMessage
                       key={msg.id}
                       {...getMessageProps(msg)}

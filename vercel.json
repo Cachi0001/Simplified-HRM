@@ -2,6 +2,13 @@
   "version": 2,
   "builds": [
     {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "frontend/dist"
+      }
+    },
+    {
       "src": "backend/api/index.js",
       "use": "@vercel/node"
     }
@@ -13,7 +20,7 @@
     },
     {
       "src": "/(.*)",
-      "dest": "/index.html"
+      "dest": "frontend/dist/index.html"
     }
   ],
   "env": {
@@ -23,5 +30,14 @@
     "backend/api/index.js": {
       "maxDuration": 30
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/backend/api/index.js"
+    }
+  ],
+  "outputDirectory": "frontend/dist",
+  "buildCommand": "npm run vercel-build",
+  "installCommand": "npm install --no-optional"
 }

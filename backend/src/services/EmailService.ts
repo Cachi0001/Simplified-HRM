@@ -244,20 +244,56 @@ export class EmailService {
         text?: string;
     }): Promise<void> {
         try {
+            logger.info('📧 [EmailService] Attempting to send email', {
+                to: options.to,
+                subject: options.subject,
+                from: process.env.FROM_EMAIL || process.env.SMTP_USER
+            });
+
             const mailOptions = {
-                from: process.env.SMTP_FROM || 'noreply@go3net.com',
+                from: process.env.FROM_EMAIL || process.env.SMTP_USER || 'noreply@go3net.com',
                 to: options.to,
                 subject: options.subject,
                 html: options.html,
                 text: options.text
             };
 
-            await this.transporter.sendMail(mailOptions);
+            // Verify transporter before sending
+            try {
+                await this.transporter.verify();
+                logger.info('✅ [EmailService] SMTP connection verified');
+            } catch (verifyError) {
+                logger.error('❌ [EmailService] SMTP verification failed', verifyError);
+                throw new Error(`SMTP verification failed: ${(verifyError as Error).message}`);
+            }
+
+            const result = await this.transporter.sendMail(mailOptions);
+            
+            logger.info('✅ [EmailService] Email sent successfully', {
+                to: options.to,
+                messageId: result.messageId,
+                response: result.response,
+                accepted: result.accepted,
+                rejected: result.rejected
+            });
+
+            // Log any rejected recipients
+            if (result.rejected && result.rejected.length > 0) {
+                logger.warn('⚠️ [EmailService] Some recipients were rejected', {
+                    rejected: result.rejected
+                });
+            }
 
         } catch (error) {
             logger.error('❌ [EmailService] Send email error', {
                 error: (error as Error).message,
-                to: options.to
+                stack: (error as Error).stack,
+                to: options.to,
+                subject: options.subject,
+                smtpHost: process.env.SMTP_HOST,
+                smtpPort: process.env.SMTP_PORT,
+                smtpUser: process.env.SMTP_USER,
+                fromEmail: process.env.FROM_EMAIL
             });
             throw error;
         }
@@ -277,15 +313,14 @@ export class EmailService {
             const query = `
                 INSERT INTO notification_delivery_log (
                     recipient_id, delivery_type, status, recipient_email,
-                    template_used, error_message, sent_at
-                ) VALUES ($1, 'email', $2, $3, $4, $5, NOW())
+                    error_message, sent_at
+                ) VALUES ($1, 'email', $2, $3, $4, NOW())
             `;
 
             await this.db.query(query, [
                 userId,
                 status,
                 email,
-                templateName,
                 errorMessage || null
             ]);
 

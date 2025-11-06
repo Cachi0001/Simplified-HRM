@@ -463,6 +463,39 @@ class SupabaseRealtimeService {
   }
 
   // Utility methods
+  /**
+   * Set the current user for the WebSocket service
+   */
+  setCurrentUser(userId: string, userName?: string) {
+    this.currentUserId = userId;
+    console.log('✅ WebSocket service current user set:', userId);
+  }
+
+  /**
+   * Get current user ID
+   */
+  getCurrentUserId(): string | null {
+    return this.currentUserId;
+  }
+
+  /**
+   * Reinitialize current user from localStorage
+   */
+  reinitializeCurrentUser() {
+    try {
+      const currentUser = localStorage.getItem('currentUser');
+      if (currentUser) {
+        const user = JSON.parse(currentUser);
+        this.currentUserId = user.id || user.employeeId;
+        console.log('✅ WebSocket service reinitialized for user:', this.currentUserId);
+      } else {
+        console.warn('⚠️ No current user found in localStorage');
+      }
+    } catch (error) {
+      console.error('❌ Failed to reinitialize current user:', error);
+    }
+  }
+
   private getCurrentUserName(): string {
     const currentUser = localStorage.getItem('currentUser');
     if (currentUser) {

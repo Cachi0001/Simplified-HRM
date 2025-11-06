@@ -25,25 +25,46 @@ export class NotificationService {
         type: request.type
       });
 
-      // Validate and sanitize notification type
-      const validTypes = ['info', 'success', 'warning', 'error', 'leave_request', 'purchase_request', 'announcement', 'employee_update', 'system_alert'];
-      let notificationType = request.type;
+      // Use 'announcement' as the base type since it's the only one allowed by the constraint
+      // Store the actual type in the data field
+      const actualType = request.type;
+      const notificationType = 'announcement'; // Use the allowed type
       
-      if (!validTypes.includes(notificationType)) {
-        logger.warn('NotificationService: Invalid notification type, using fallback', {
-          originalType: request.type,
-          fallbackType: 'info'
+      logger.info('NotificationService: Using announcement type with actual type in data', {
+        originalType: actualType,
+        storedType: notificationType
+      });
+
+      // The notifications table references employees, so we need to ensure we're using employee ID
+      // If userId is a user ID, we need to get the corresponding employee ID
+      let employeeId = request.userId;
+      
+      // Check if this is a user ID by trying to find the corresponding employee
+      const { data: employee, error: employeeError } = await this.supabase
+        .from('employees')
+        .select('id')
+        .eq('user_id', request.userId)
+        .single();
+      
+      if (!employeeError && employee) {
+        employeeId = employee.id;
+        logger.info('NotificationService: Mapped user ID to employee ID', {
+          userId: request.userId,
+          employeeId: employeeId
         });
-        notificationType = 'update';
       }
 
       const { data, error } = await this.supabase
         .from('notifications')
         .insert({
-          user_id: request.userId,
+          user_id: employeeId,
           type: notificationType,
           title: request.title,
           message: request.message,
+          data: {
+            ...request.data,
+            actual_type: actualType // Store the real notification type
+          },
           related_id: request.relatedId || null,
           action_url: request.actionUrl || null,
           is_read: false,

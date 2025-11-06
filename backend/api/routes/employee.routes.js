@@ -20,6 +20,8 @@ router.use(auth_middleware_1.authenticateToken);
 router.get('/search', (req, res) => employeeController.searchEmployees(req, res));
 router.get('/me', (req, res) => employeeController.getMyProfile(req, res));
 router.put('/me', (req, res) => employeeController.updateMyProfile(req, res));
+router.get('/me/working-days', (req, res) => employeeController.getMyWorkingDays(req, res));
+router.put('/me/working-days', (req, res) => employeeController.updateMyWorkingDays(req, res));
 router.get('/pending', (0, auth_middleware_1.requireRole)(['admin']), (req, res) => employeeController.getPendingApprovals(req, res));
 router.get('/stats', (0, auth_middleware_1.requireRole)(['admin']), (req, res) => employeeController.getEmployeeStats(req, res));
 router.post('/', (0, auth_middleware_1.requireRole)(['admin']), (req, res) => employeeController.createEmployee(req, res));

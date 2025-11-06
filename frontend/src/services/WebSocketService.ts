@@ -32,9 +32,12 @@ class WebSocketService {
 
   private connect() {
     // Force localhost in development, use environment URL in production
-    const serverUrl = import.meta.env.PROD
-      ? (import.meta.env.VITE_API_URL?.replace('/api', '') || 'https://go3nethrm-backend.vercel.app')
-      : 'http://localhost:3000';
+    const devUrl = 'http://localhost:3001'; // Updated to match backend port
+    const prodUrl = import.meta.env.VITE_API_URL_PROD?.replace('/api', '') || 'https://go3nethrm-backend.vercel.app';
+    
+    const serverUrl = import.meta.env.PROD ? prodUrl : devUrl;
+    
+    console.log('🔌 WebSocket connecting to:', serverUrl, '(Production:', import.meta.env.PROD, ')');
 
     // Connecting to WebSocket server (reduced logging)
 
@@ -181,7 +184,7 @@ class WebSocketService {
 
   private getCurrentUserId(): string | null {
     try {
-      // Try multiple possible keys for user data
+      // Try multiple possible keys for user data (prioritize 'user' as that's what authService uses)
       const possibleKeys = ['user', 'currentUser', 'authUser', 'userData'];
 
       for (const key of possibleKeys) {

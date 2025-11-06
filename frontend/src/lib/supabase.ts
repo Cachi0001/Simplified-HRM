@@ -1,13 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Supabase credentials - disabled for WebSocket-only chat implementation
-// Using custom WebSocket service instead of Supabase real-time
-const supabaseUrl = 'https://disabled.supabase.co';
-const supabaseAnonKey = 'disabled-key';
+// Supabase credentials - enabled for Realtime chat implementation
+// Using Supabase Realtime instead of WebSocket (Vercel doesn't support WebSocket)
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Note: Supabase real-time is disabled - using custom WebSocket service for chat
-// The backend uses Supabase for data storage but WebSocket + Redis for real-time features
-console.log('🔍 Supabase real-time disabled - using WebSocket service for chat');
+// Note: Using Supabase Realtime for chat since Vercel doesn't support WebSocket
+console.log('🔍 Supabase Realtime enabled for chat functionality');
 
 console.log('🔍 Supabase Environment Check:', {
   hasUrl: !!supabaseUrl,

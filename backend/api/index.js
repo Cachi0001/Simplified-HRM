@@ -1,41 +1,44 @@
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
+const express = require("express");
+const cors = require("cors");
+const helmet = require("helmet");
 
 // Import route handlers
-const authRoutes = require('./routes/auth.routes').default;
-const employeeRoutes = require('./routes/employee.routes').default;
-const attendanceRoutes = require('./routes/attendance.routes').default;
-const taskRoutes = require('./routes/task.routes').default;
+const authRoutes = require("./routes/auth.routes").default;
+const employeeRoutes = require("./routes/employee.routes").default;
+const attendanceRoutes = require("./routes/attendance.routes").default;
+const taskRoutes = require("./routes/task.routes").default;
+const chatRoutes = require("./routes/chat.routes");
 
 // Import database configuration
-const supabaseConfig = require('./config/supabase');
+const supabaseConfig = require("./config/supabase");
 
 const app = express();
 
 // Debug: Log environment variables in serverless
-console.log('🔍 Vercel Environment Variables:', {
+console.log("🔍 Vercel Environment Variables:", {
   NODE_ENV: process.env.NODE_ENV,
   VERCEL: process.env.VERCEL,
-  SUPABASE_URL: process.env.SUPABASE_URL ? 'SET' : 'NOT SET',
-  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'SET' : 'NOT SET',
+  SUPABASE_URL: process.env.SUPABASE_URL ? "SET" : "NOT SET",
+  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY
+    ? "SET"
+    : "NOT SET",
   FRONTEND_URL: process.env.FRONTEND_URL,
   SMTP_HOST: process.env.SMTP_HOST,
   SMTP_PORT: process.env.SMTP_PORT,
-  SMTP_USER: process.env.SMTP_USER ? 'SET' : 'NOT SET',
+  SMTP_USER: process.env.SMTP_USER ? "SET" : "NOT SET",
   FROM_EMAIL: process.env.FROM_EMAIL,
-  JWT_SECRET: process.env.JWT_SECRET ? 'SET' : 'NOT SET',
-  VAPID_EMAIL: process.env.VAPID_EMAIL
+  JWT_SECRET: process.env.JWT_SECRET ? "SET" : "NOT SET",
+  VAPID_EMAIL: process.env.VAPID_EMAIL,
 });
 
 // Initialize database connection
 async function initializeDatabase() {
   try {
-    console.log('🔌 Starting Supabase connection...');
+    console.log("🔌 Starting Supabase connection...");
     await supabaseConfig.connect();
-    console.log('✅ Supabase connected successfully');
+    console.log("✅ Supabase connected successfully");
   } catch (error) {
-    console.error('❌ Supabase connection failed:', error);
+    console.error("❌ Supabase connection failed:", error);
     // Don't throw error in serverless - let the app start and handle DB errors per request
   }
 }
@@ -46,50 +49,81 @@ async function initializeDatabase() {
 })();
 
 // Security middleware
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'"],
+        imgSrc: ["'self'", "data:", "https:"],
+      },
     },
-  },
-  crossOriginEmbedderPolicy: false,
-}));
+    crossOriginEmbedderPolicy: false,
+  }),
+);
 
-// CORS configuration 
-//
-app.use(cors({
-  origin: process.env.FRONTEND_URL || '*',
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: [
-    'Content-Type',
-    'Authorization',
-    'X-Requested-With',
-    'Accept',
-    'Origin',
-    'Access-Control-Request-Method',
-    'Access-Control-Request-Headers',
-    'x-request-id',
-    'x-client-version',
-    'x-api-key'
-  ]
-}));
+// CORS configuration
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "https://go3net-simplified.vercel.app",
+  "https://*.vercel.app",
+].filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, curl, etc.)
+      if (!origin) return callback(null, true);
+
+      // Check if the origin is in our allowed list
+      const isAllowed = allowedOrigins.some((allowedOrigin) => {
+        if (allowedOrigin.includes("*")) {
+          const pattern = allowedOrigin.replace("*", ".*");
+          return new RegExp(pattern).test(origin);
+        }
+        return allowedOrigin === origin;
+      });
+
+      if (isAllowed) {
+        callback(null, true);
+      } else {
+        console.warn("CORS blocked origin:", origin);
+        callback(null, true); // Allow all for now, log for debugging
+      }
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Requested-With",
+      "Accept",
+      "Origin",
+      "Access-Control-Request-Method",
+      "Access-Control-Request-Headers",
+      "x-request-id",
+      "x-client-version",
+      "x-api-key",
+    ],
+  }),
+);
 
 // Body parsing middleware
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
 // Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/employees', employeeRoutes);
-app.use('/api/attendance', attendanceRoutes);
-app.use('/api/tasks', taskRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/employees", employeeRoutes);
+app.use("/api/attendance", attendanceRoutes);
+app.use("/api/tasks", taskRoutes);
+app.use("/api/chat", chatRoutes);
 
 // Health check endpoint
-app.get('/api/health', async (req, res) => {
+app.get("/api/health", async (req, res) => {
   try {
     const dbStatus = await supabaseConfig.healthCheck();
 
@@ -97,81 +131,83 @@ app.get('/api/health', async (req, res) => {
     const envStatus = {
       NODE_ENV: process.env.NODE_ENV,
       VERCEL: process.env.VERCEL,
-      SUPABASE_URL: process.env.SUPABASE_URL ? 'SET' : 'NOT SET',
-      SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'SET' : 'NOT SET',
+      SUPABASE_URL: process.env.SUPABASE_URL ? "SET" : "NOT SET",
+      SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY
+        ? "SET"
+        : "NOT SET",
       SMTP_HOST: process.env.SMTP_HOST,
       SMTP_PORT: process.env.SMTP_PORT,
-      SMTP_USER: process.env.SMTP_USER ? 'SET' : 'NOT SET',
+      SMTP_USER: process.env.SMTP_USER ? "SET" : "NOT SET",
       FROM_EMAIL: process.env.FROM_EMAIL,
-      JWT_SECRET: process.env.JWT_SECRET ? 'SET' : 'NOT SET',
+      JWT_SECRET: process.env.JWT_SECRET ? "SET" : "NOT SET",
       VAPID_EMAIL: process.env.VAPID_EMAIL,
-      FRONTEND_URL: process.env.FRONTEND_URL
+      FRONTEND_URL: process.env.FRONTEND_URL,
     };
 
-    console.log('🏥 Health Check Request:', {
+    console.log("🏥 Health Check Request:", {
       timestamp: new Date().toISOString(),
       dbStatus,
-      envStatus
+      envStatus,
     });
 
     res.status(200).json({
-      status: 'ok',
-      message: 'HR Management System Backend is running',
+      status: "ok",
+      message: "HR Management System Backend is running",
       timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV || 'development',
-      deployment: process.env.VERCEL ? 'vercel' : 'local',
+      environment: process.env.NODE_ENV || "development",
+      deployment: process.env.VERCEL ? "vercel" : "local",
       database: dbStatus,
       config: envStatus,
       server: {
         nodeVersion: process.version,
         platform: process.platform,
-        memory: process.memoryUsage()
-      }
+        memory: process.memoryUsage(),
+      },
     });
   } catch (error) {
-    console.error('❌ Health check failed:', error);
+    console.error("❌ Health check failed:", error);
     res.status(200).json({
-      status: 'ok',
-      message: 'HR Management System Backend is running',
+      status: "ok",
+      message: "HR Management System Backend is running",
       timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV || 'development',
-      deployment: process.env.VERCEL ? 'vercel' : 'local',
+      environment: process.env.NODE_ENV || "development",
+      deployment: process.env.VERCEL ? "vercel" : "local",
       database: {
-        status: 'error',
+        status: "error",
         connection: false,
-        error: error.message
-      }
+        error: error.message,
+      },
     });
   }
 });
 
 // CORS diagnostic endpoint
-app.get('/api/cors-test', (req, res) => {
+app.get("/api/cors-test", (req, res) => {
   res.status(200).json({
-    status: 'ok',
-    message: 'CORS test successful',
+    status: "ok",
+    message: "CORS test successful",
     timestamp: new Date().toISOString(),
     corsConfig: {
       frontendUrl: process.env.FRONTEND_URL,
-      nodeEnv: process.env.NODE_ENV
-    }
+      nodeEnv: process.env.NODE_ENV,
+    },
   });
 });
 
 // API info endpoint
-app.get('/api', (req, res) => {
+app.get("/api", (req, res) => {
   res.status(200).json({
-    status: 'ok',
-    message: 'HR Management System API',
-    version: '1.0.0'
+    status: "ok",
+    message: "HR Management System API",
+    version: "1.0.0",
   });
 });
 
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({
-    status: 'error',
-    message: 'Route not found'
+    status: "error",
+    message: "Route not found",
   });
 });
 
