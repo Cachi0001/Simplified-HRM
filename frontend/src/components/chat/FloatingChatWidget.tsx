@@ -1,28 +1,35 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback } from "react";
 import {
-  MessageCircle, X, Send, Users, Search, Plus,
-  ArrowLeft, Bell, History, Moon, Sun
-} from 'lucide-react';
-import { ChatBadge } from './ChatBadge';
-import { useChat, Chat, User } from '../../hooks/useChat';
-import { useTheme } from '../../contexts/ThemeContext';
-import api from '../../lib/api';
-import webSocketService from '../../services/WebSocketService';
-import userStatusService from '../../services/UserStatusService';
-import { IndicatorWrapper } from '../indicators/IndicatorWrapper';
-import { IndicatorTest } from '../indicators/IndicatorTest';
-import WhatsAppMessageList from './WhatsAppMessageList';
-import { useMessageIndicators } from '../../hooks/useMessageIndicators';
-import { AnnouncementList, CreateAnnouncement } from '../announcements';
-import { useAnnouncements } from '../../hooks/useAnnouncements';
-import Logo from '../ui/Logo';
-
+  MessageCircle,
+  X,
+  Send,
+  Users,
+  Search,
+  Plus,
+  ArrowLeft,
+  Bell,
+  History,
+  Moon,
+  Sun,
+} from "lucide-react";
+import { ChatBadge } from "./ChatBadge";
+import { useOptimizedChat, Chat, User } from "../../hooks/useOptimizedChat";
+import { useTheme } from "../../contexts/ThemeContext";
+import api from "../../lib/api";
+import supabaseRealtimeService from "../../services/SupabaseRealtimeService";
+import { IndicatorWrapper } from "../indicators/IndicatorWrapper";
+import { IndicatorTest } from "../indicators/IndicatorTest";
+import WhatsAppMessageList from "./WhatsAppMessageList";
+import { useMessageIndicators } from "../../hooks/useMessageIndicators";
+import { AnnouncementList, CreateAnnouncement } from "../announcements";
+import { useAnnouncements } from "../../hooks/useAnnouncements";
+import Logo from "../ui/Logo";
 
 interface FloatingChatWidgetProps {
   className?: string;
 }
 
-type TabType = 'dms' | 'announcements' | 'history';
+type TabType = "dms" | "announcements" | "history";
 
 interface ExtendedChat extends Chat {
   userData?: User;
@@ -30,12 +37,14 @@ interface ExtendedChat extends Chat {
   isUser?: boolean;
 }
 
-export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) {
+export function FloatingChatWidget({
+  className = "",
+}: FloatingChatWidgetProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabType>('dms');
+  const [activeTab, setActiveTab] = useState<TabType>("dms");
   const [selectedChat, setSelectedChat] = useState<ExtendedChat | null>(null);
-  const [messageInput, setMessageInput] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [messageInput, setMessageInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [showCreateAnnouncement, setShowCreateAnnouncement] = useState(false);
   const [conversationHistory, setConversationHistory] = useState<any[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -46,7 +55,7 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Use real chat hook
+  // Use optimized chat hook with Supabase realtime
   const {
     chats,
     users,
@@ -66,10 +75,17 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
     startTyping,
     stopTyping,
     typingUsers: chatTypingUsers,
-  } = useChat();
+    clearCache,
+    forceRefresh,
+  } = useOptimizedChat({
+    enableRealtime: true,
+    maxRetries: 3,
+    cacheTimeout: 5 * 60 * 1000, // 5 minutes cache
+  });
 
   // Initialize message indicators
-  const { handleMessageSent, handleMessageReceived, hasActiveIndicator } = useMessageIndicators();
+  const { handleMessageSent, handleMessageReceived, hasActiveIndicator } =
+    useMessageIndicators();
 
   // Use announcements hook
   const {
@@ -81,57 +97,106 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
     handleReaction,
     markAsRead,
     updateFilters,
-    refresh: refreshAnnouncements
+    refresh: refreshAnnouncements,
   } = useAnnouncements();
 
   // State for typing indicator - only show when actually typing
   const [isTyping, setIsTyping] = useState(false);
-  const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(
+    null,
+  );
 
   // Use typing users from useChat hook and convert IDs to names
-  const currentChatTypingUserIds = selectedChat ? (chatTypingUsers[selectedChat.id] || []) : [];
-  const currentChatTypingUsers = currentChatTypingUserIds.map(userId => {
-    const user = users.find(u => u.id === userId);
+  const currentChatTypingUserIds = selectedChat
+    ? chatTypingUsers[selectedChat.id] || []
+    : [];
+  const currentChatTypingUsers = currentChatTypingUserIds.map((userId) => {
+    const user = users.find((u) => u.id === userId);
     return user ? user.name : `User ${userId}`;
   });
 
-  // Initialize user status service
+  // Initialize Supabase realtime service
   useEffect(() => {
-    userStatusService.initialize();
+    console.log("🚀 Initializing Supabase realtime for chat widget");
+
+    // Update user status to online
+    supabaseRealtimeService.updateUserStatus("online");
+
+    // Set up global event listeners for performance
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        supabaseRealtimeService.updateUserStatus("away");
+      } else {
+        supabaseRealtimeService.updateUserStatus("online");
+      }
+    };
+
+    const handleBeforeUnload = () => {
+      supabaseRealtimeService.updateUserStatus("offline");
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      supabaseRealtimeService.updateUserStatus("offline");
+    };
   }, []);
 
   // Set up WebSocket listeners for message indicators
   useEffect(() => {
     const handleMessageIndicator = (event: CustomEvent) => {
       const { userId, chatId, indicatorType } = event.detail;
-      console.log('✨ Message indicator event received:', { userId, chatId, indicatorType });
-      
-      if (indicatorType === 'sent') {
+      console.log("✨ Message indicator event received:", {
+        userId,
+        chatId,
+        indicatorType,
+      });
+
+      if (indicatorType === "sent") {
         handleMessageSent(userId, chatId);
-      } else if (indicatorType === 'received') {
+      } else if (indicatorType === "received") {
         handleMessageReceived(userId, chatId);
       }
     };
 
     const handleUserIndicator = (event: CustomEvent) => {
       const { userId, chatId, indicatorType } = event.detail;
-      console.log('👤 User indicator event received:', { userId, chatId, indicatorType });
-      
+      console.log("👤 User indicator event received:", {
+        userId,
+        chatId,
+        indicatorType,
+      });
+
       // Handle global user indicators (for avatar indicators)
-      if (indicatorType === 'sent') {
+      if (indicatorType === "sent") {
         handleMessageSent(userId, chatId);
-      } else if (indicatorType === 'received') {
+      } else if (indicatorType === "received") {
         handleMessageReceived(userId, chatId);
       }
     };
 
     // Listen for WebSocket indicator events
-    window.addEventListener('message-indicator', handleMessageIndicator as EventListener);
-    window.addEventListener('user-indicator', handleUserIndicator as EventListener);
+    window.addEventListener(
+      "message-indicator",
+      handleMessageIndicator as EventListener,
+    );
+    window.addEventListener(
+      "user-indicator",
+      handleUserIndicator as EventListener,
+    );
 
     return () => {
-      window.removeEventListener('message-indicator', handleMessageIndicator as EventListener);
-      window.removeEventListener('user-indicator', handleUserIndicator as EventListener);
+      window.removeEventListener(
+        "message-indicator",
+        handleMessageIndicator as EventListener,
+      );
+      window.removeEventListener(
+        "user-indicator",
+        handleUserIndicator as EventListener,
+      );
     };
   }, [handleMessageSent, handleMessageReceived]);
 
@@ -139,52 +204,97 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
 
   // Dark mode is now managed globally - no need for local storage
 
-  // Load messages when chat is selected
+  // Optimized message loading with debouncing
+  const loadMessagesDebounced = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     if (selectedChat?.id) {
-      console.log('🔍 useEffect: Loading messages for selected chat:', {
+      console.log("🔍 Loading messages for selected chat:", {
         chatId: selectedChat.id,
         chatName: selectedChat.name,
-        isUser: selectedChat.isUser,
-        userData: selectedChat.userData
+        messageCount: messages[selectedChat.id]?.length || 0,
       });
 
-      // Load messages with a small delay to ensure chat is properly selected
-      const loadTimer = setTimeout(() => {
-        loadMessages(selectedChat.id);
-        markChatAsRead(selectedChat.id);
-      }, 100);
+      // Clear existing debounce
+      if (loadMessagesDebounced.current) {
+        clearTimeout(loadMessagesDebounced.current);
+      }
 
-      return () => clearTimeout(loadTimer);
+      // Debounced loading to prevent rapid calls
+      loadMessagesDebounced.current = setTimeout(() => {
+        loadMessages(selectedChat.id);
+        // Only mark as read if actively viewing (not history)
+        if (activeTab === "dms") {
+          markChatAsRead(selectedChat.id);
+        }
+      }, 150);
+
+      return () => {
+        if (loadMessagesDebounced.current) {
+          clearTimeout(loadMessagesDebounced.current);
+        }
+      };
     }
-  }, [selectedChat?.id, loadMessages, markChatAsRead]); // Include dependencies
+  }, [selectedChat?.id, loadMessages, markChatAsRead, activeTab]);
 
   // Get messages for the selected chat
-  const chatMessages = selectedChat?.id ? (messages[selectedChat.id] || []) : [];
+  const chatMessages = selectedChat?.id ? messages[selectedChat.id] || [] : [];
 
-  // Detailed logging for message display
-  useEffect(() => {
-    if (selectedChat?.id) {
-      console.log('🔍 DETAILED: Message display update:', {
-        chatId: selectedChat.id,
-        messageCount: chatMessages.length,
-        messagesState: messages,
-        chatMessages: chatMessages.map(m => ({
-          id: m.id,
-          sender: m.senderId,
-          isOwn: m.isOwn,
-          content: m.content?.substring(0, 30) + '...'
-        }))
-      });
-    }
-  }, [selectedChat?.id, chatMessages.length, messages]);
+  // Optimized message display logging (reduced frequency)
+  const logMessageUpdates = useRef<NodeJS.Timeout | null>(null);
 
-  // Auto-scroll to bottom
   useEffect(() => {
-    if (messagesEndRef.current && selectedChat) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (selectedChat?.id && chatMessages.length > 0) {
+      // Throttle logging to prevent console spam
+      if (logMessageUpdates.current) {
+        clearTimeout(logMessageUpdates.current);
+      }
+
+      logMessageUpdates.current = setTimeout(() => {
+        console.log("📊 Message display update:", {
+          chatId: selectedChat.id,
+          messageCount: chatMessages.length,
+          lastMessage:
+            chatMessages[chatMessages.length - 1]?.content?.substring(0, 30) +
+            "...",
+        });
+      }, 1000);
     }
-  }, [chatMessages, selectedChat]);
+
+    return () => {
+      if (logMessageUpdates.current) {
+        clearTimeout(logMessageUpdates.current);
+      }
+    };
+  }, [selectedChat?.id, chatMessages.length]);
+
+  // Optimized auto-scroll with throttling
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (messagesEndRef.current && selectedChat && chatMessages.length > 0) {
+      // Clear existing scroll timeout
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+
+      // Throttled scroll to prevent excessive calls
+      scrollTimeoutRef.current = setTimeout(() => {
+        if (messagesEndRef.current) {
+          messagesEndRef.current.scrollIntoView({
+            behavior: "smooth",
+            block: "end",
+          });
+        }
+      }, 100);
+    }
+
+    return () => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  }, [chatMessages.length, selectedChat?.id]);
 
   // Clear typing indicators when switching chats
   useEffect(() => {
@@ -196,134 +306,111 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
   }, [selectedChat?.id]);
 
   // Handle typing indicator
-  const handleTypingChange = useCallback((value: string) => {
-    if (!selectedChat) return;
+  const handleTypingChange = useCallback(
+    (value: string) => {
+      if (!selectedChat) return;
 
-    if (value.trim() && !isTyping) {
-      // Start typing
-      setIsTyping(true);
-      startTyping(selectedChat.id);
-    }
-
-    // Clear existing timeout
-    if (typingTimeout) {
-      clearTimeout(typingTimeout);
-    }
-
-    // Set new timeout to stop typing after 2 seconds of inactivity
-    const newTimeout = setTimeout(() => {
-      if (isTyping) {
-        setIsTyping(false);
-        stopTyping(selectedChat.id);
+      if (value.trim() && !isTyping) {
+        // Start typing
+        setIsTyping(true);
+        startTyping(selectedChat.id);
       }
-    }, 2000);
 
-    setTypingTimeout(newTimeout);
-  }, [selectedChat, isTyping, typingTimeout, startTyping, stopTyping]);
+      // Clear existing timeout
+      if (typingTimeout) {
+        clearTimeout(typingTimeout);
+      }
 
-  // Real-time message subscription (replaces polling)
+      // Set new timeout to stop typing after 2 seconds of inactivity
+      const newTimeout = setTimeout(() => {
+        if (isTyping) {
+          setIsTyping(false);
+          stopTyping(selectedChat.id);
+        }
+      }, 2000);
+
+      setTypingTimeout(newTimeout);
+    },
+    [selectedChat, isTyping, typingTimeout, startTyping, stopTyping],
+  );
+
+  // Optimized realtime subscription with cleanup
+  const subscriptionRef = useRef<any>(null);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     if (!selectedChat?.id) {
-      console.log('🔍 No selected chat, skipping realtime setup');
       return;
     }
 
-    console.log('🔄 Setting up realtime subscription for chat:', {
-      chatId: selectedChat.id,
-      chatName: selectedChat.name,
-      chatType: selectedChat.type,
-      connectionStatus
-    });
+    console.log(
+      "🔄 Setting up optimized realtime subscription for chat:",
+      selectedChat.id,
+    );
 
-    // Initial load of messages
-    loadMessages(selectedChat.id);
+    // Clean up existing subscription
+    if (subscriptionRef.current) {
+      unsubscribeFromChat(selectedChat.id);
+      subscriptionRef.current = null;
+    }
 
-    // Set up realtime subscription with retry logic
-    let currentChannel: any = null;
-    let retryCount = 0;
-    const maxRetries = 3;
-    let retryTimeout: NodeJS.Timeout | null = null;
+    // Clear any existing retry timeout
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
 
+    // Setup subscription with error handling
     const setupSubscription = () => {
-      console.log(`🔄 Setting up subscription attempt ${retryCount + 1}/${maxRetries + 1} for chat:`, selectedChat.id);
-
       try {
-        currentChannel = subscribeToChat(selectedChat.id);
+        subscriptionRef.current = subscribeToChat(selectedChat.id);
+        console.log(
+          "✅ Realtime subscription established for chat:",
+          selectedChat.id,
+        );
+      } catch (error) {
+        console.error("❌ Failed to setup subscription:", error);
 
-        // Monitor for connection failures and retry
-        const connectionMonitor = setInterval(() => {
-          if (connectionStatus === 'disconnected' && retryCount < maxRetries) {
-            console.log(`🔄 Connection failed, scheduling retry ${retryCount + 1}/${maxRetries} for chat:`, selectedChat.id);
-            retryCount++;
-
-            // Clean up current channel
-            if (currentChannel) {
-              unsubscribeFromChat(currentChannel);
-              currentChannel = null;
-            }
-
-            // Retry with exponential backoff
-            const delay = Math.min(1000 * Math.pow(2, retryCount - 1), 10000);
-            retryTimeout = setTimeout(() => {
-              setupSubscription();
-            }, delay);
-
-            clearInterval(connectionMonitor);
-          } else if (connectionStatus === 'connected') {
-            // Reset retry count on successful connection
-            retryCount = 0;
+        // Retry with exponential backoff
+        retryTimeoutRef.current = setTimeout(() => {
+          if (selectedChat?.id) {
+            console.log("🔄 Retrying subscription for chat:", selectedChat.id);
+            setupSubscription();
           }
         }, 3000);
-
-        // Store monitor for cleanup
-        if (currentChannel) {
-          (currentChannel as any)._connectionMonitor = connectionMonitor;
-        }
-
-      } catch (error) {
-
-        if (retryCount < maxRetries) {
-          retryCount++;
-          const delay = Math.min(1000 * Math.pow(2, retryCount - 1), 10000);
-          console.log(`🔄 Retrying subscription setup in ${delay}ms...`);
-
-          retryTimeout = setTimeout(() => {
-            setupSubscription();
-          }, delay);
-        }
       }
     };
 
     setupSubscription();
 
     return () => {
+      console.log("🧹 Cleaning up subscription for chat:", selectedChat.id);
 
-      // Clear retry timeout
-      if (retryTimeout) {
-        clearTimeout(retryTimeout);
+      if (subscriptionRef.current) {
+        unsubscribeFromChat(selectedChat.id);
+        subscriptionRef.current = null;
       }
 
-      // Clean up current channel
-      if (currentChannel) {
-        // Clear connection monitor
-        if ((currentChannel as any)._connectionMonitor) {
-          clearInterval((currentChannel as any)._connectionMonitor);
-        }
-
-        unsubscribeFromChat(currentChannel);
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
       }
     };
-  }, [selectedChat?.id, loadMessages, subscribeToChat, unsubscribeFromChat, connectionStatus]);
+  }, [selectedChat?.id, subscribeToChat, unsubscribeFromChat]);
 
   const totalUnreadCount = getTotalUnreadCount();
 
   // Get role badge color
   const getRoleBadgeColor = (role: string) => {
     switch (role?.toLowerCase()) {
-      case 'hr': return 'bg-blue-500 text-white';
-      case 'super-admin': return 'bg-purple-500 text-white';
-      case 'admin': return 'bg-red-500 text-white';
-      default: return 'bg-gray-500 text-white';
+      case "hr":
+        return "bg-blue-500 text-white";
+      case "super-admin":
+        return "bg-purple-500 text-white";
+      case "admin":
+        return "bg-red-500 text-white";
+      default:
+        return "bg-gray-500 text-white";
     }
   };
 
@@ -337,14 +424,15 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
       const diffHours = Math.floor(diffMs / 3600000);
       const diffDays = Math.floor(diffMs / 86400000);
 
-      if (diffMins < 1) return 'now';
+      if (diffMins < 1) return "now";
       if (diffMins < 60) return `${diffMins}m`;
       if (diffHours < 24) return `${diffHours}h`;
-      if (diffDays === 1) return 'yesterday';
-      if (diffDays < 7) return date.toLocaleDateString([], { weekday: 'short' });
-      return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      if (diffDays === 1) return "yesterday";
+      if (diffDays < 7)
+        return date.toLocaleDateString([], { weekday: "short" });
+      return date.toLocaleDateString([], { month: "short", day: "numeric" });
     } catch (error) {
-      return '';
+      return "";
     }
   };
 
@@ -352,7 +440,7 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
   const getCurrentUserId = () => {
     try {
       // Try multiple possible keys for user data
-      const possibleKeys = ['user', 'currentUser', 'authUser', 'userData'];
+      const possibleKeys = ["user", "currentUser", "authUser", "userData"];
 
       for (const key of possibleKeys) {
         const storedData = localStorage.getItem(key);
@@ -369,87 +457,115 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
       }
 
       // Try to extract from JWT token
-      const token = localStorage.getItem('accessToken');
+      const token = localStorage.getItem("accessToken");
       if (token) {
         try {
-          const base64Url = token.split('.')[1];
-          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-          const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
-            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-          }).join(''));
+          const base64Url = token.split(".")[1];
+          const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+          const jsonPayload = decodeURIComponent(
+            atob(base64)
+              .split("")
+              .map(function (c) {
+                return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
+              })
+              .join(""),
+          );
 
           const decoded = JSON.parse(jsonPayload);
-          if (decoded && (decoded.id || decoded.userId || decoded.user_id || decoded.sub)) {
-            return decoded.id || decoded.userId || decoded.user_id || decoded.sub;
+          if (
+            decoded &&
+            (decoded.id || decoded.userId || decoded.user_id || decoded.sub)
+          ) {
+            return (
+              decoded.id || decoded.userId || decoded.user_id || decoded.sub
+            );
           }
         } catch (tokenError) {
           // Silent fail
         }
       }
     } catch (error) {
-      console.error('Failed to get current user ID:', error);
+      console.error("Failed to get current user ID:", error);
     }
     return null;
   };
 
   // For DMs, show available users to chat with in WhatsApp style (moved from announcements)
   const getDisplayItems = (): ExtendedChat[] => {
-    if (activeTab === 'dms') {
+    if (activeTab === "dms") {
       const currentUserId = getCurrentUserId();
-      
+
       // Get existing chats
-      const filteredChats = chats.filter(chat => {
-        if (searchQuery && !chat.name?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      const filteredChats = chats.filter((chat) => {
+        if (
+          searchQuery &&
+          !chat.name?.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+          return false;
         return true;
       });
 
       // Transform existing chats
-      const existingChats = filteredChats.map(chat => {
+      const existingChats = filteredChats.map((chat) => {
         const chatMessages = messages[chat.id] || [];
-        const latestMessage = chatMessages.length > 0 
-          ? chatMessages[chatMessages.length - 1] 
-          : null;
+        const latestMessage =
+          chatMessages.length > 0
+            ? chatMessages[chatMessages.length - 1]
+            : null;
 
         return {
           ...chat,
-          lastMessage: latestMessage?.content || chat.lastMessage || 'No messages yet',
-          lastMessageTime: latestMessage?.timestamp 
+          lastMessage:
+            latestMessage?.content || chat.lastMessage || "No messages yet",
+          lastMessageTime: latestMessage?.timestamp
             ? formatWhatsAppTime(latestMessage.timestamp)
-            : chat.lastMessageTime || '',
-          sortTimestamp: latestMessage?.timestamp || chat.createdAt || '1970-01-01T00:00:00Z',
+            : chat.lastMessageTime || "",
+          sortTimestamp:
+            latestMessage?.timestamp ||
+            chat.createdAt ||
+            "1970-01-01T00:00:00Z",
           hasUnread: chat.unreadCount > 0,
           isUser: false,
-          userData: undefined
+          userData: undefined,
         };
       });
 
       // Transform users for chat list (exclude current user)
-      const transformedUsers = (users || []).filter(user => {
-        // Exclude current user from DM list
-        return user.id !== currentUserId && user.employeeId !== currentUserId;
-      }).filter(user => {
-        // Apply search filter
-        if (searchQuery && !user.name?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-        return true;
-      }).filter(user => {
-        // Exclude users who already have existing chats
-        return !existingChats.some(chat => 
-          chat.userData?.id === user.id || 
-          chat.userData?.employeeId === user.employeeId ||
-          chat.name === user.name
-        );
-      }).map(user => ({
-        id: `user-${user.id}`,
-        name: user.name,
-        type: 'dm' as const,
-        lastMessage: 'Start a conversation',
-        lastMessageTime: '',
-        unreadCount: 0,
-        userData: user,
-        isUser: true,
-        sortTimestamp: '1970-01-01T00:00:00Z',
-        hasUnread: false
-      }));
+      const transformedUsers = (users || [])
+        .filter((user) => {
+          // Exclude current user from DM list
+          return user.id !== currentUserId && user.employeeId !== currentUserId;
+        })
+        .filter((user) => {
+          // Apply search filter
+          if (
+            searchQuery &&
+            !user.name?.toLowerCase().includes(searchQuery.toLowerCase())
+          )
+            return false;
+          return true;
+        })
+        .filter((user) => {
+          // Exclude users who already have existing chats
+          return !existingChats.some(
+            (chat) =>
+              chat.userData?.id === user.id ||
+              chat.userData?.employeeId === user.employeeId ||
+              chat.name === user.name,
+          );
+        })
+        .map((user) => ({
+          id: `user-${user.id}`,
+          name: user.name,
+          type: "dm" as const,
+          lastMessage: "Start a conversation",
+          lastMessageTime: "",
+          unreadCount: 0,
+          userData: user,
+          isUser: true,
+          sortTimestamp: "1970-01-01T00:00:00Z",
+          hasUnread: false,
+        }));
 
       // Combine and sort: existing chats first (by activity), then available users (alphabetically)
       const combinedItems = [
@@ -457,39 +573,51 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
           // First sort by unread status (unread chats first)
           if (a.hasUnread && !b.hasUnread) return -1;
           if (!a.hasUnread && b.hasUnread) return 1;
-          
+
           // Then sort by latest message timestamp (newest first)
-          return new Date(b.sortTimestamp).getTime() - new Date(a.sortTimestamp).getTime();
+          return (
+            new Date(b.sortTimestamp).getTime() -
+            new Date(a.sortTimestamp).getTime()
+          );
         }),
-        ...transformedUsers.sort((a, b) => a.name.localeCompare(b.name))
+        ...transformedUsers.sort((a, b) => a.name.localeCompare(b.name)),
       ];
 
       return combinedItems;
-    } else if (activeTab === 'history') {
+    } else if (activeTab === "history") {
       // For history tab, show conversation history as chat items
-      return conversationHistory.filter(conversation => {
-        if (searchQuery && !conversation.participantNames?.some((name: string) => 
-          name.toLowerCase().includes(searchQuery.toLowerCase())
-        )) return false;
-        return true;
-      }).map(conversation => ({
-        id: conversation.id,
-        name: conversation.participantNames?.join(', ') || 'Unknown participants',
-        type: 'dm' as const,
-        lastMessage: conversation.lastMessage || 'No messages yet',
-        lastMessageTime: conversation.lastMessageAt 
-          ? new Date(conversation.lastMessageAt).toLocaleDateString()
-          : 'No date',
-        unreadCount: 0,
-        userData: {
+      return conversationHistory
+        .filter((conversation) => {
+          if (
+            searchQuery &&
+            !conversation.participantNames?.some((name: string) =>
+              name.toLowerCase().includes(searchQuery.toLowerCase()),
+            )
+          )
+            return false;
+          return true;
+        })
+        .map((conversation) => ({
           id: conversation.id,
-          name: conversation.participantNames?.join(', ') || 'Unknown participants',
-          email: 'conversation@system.local',
-          role: 'conversation',
-          status: 'offline' as const
-        },
-        isUser: false
-      }));
+          name:
+            conversation.participantNames?.join(", ") || "Unknown participants",
+          type: "dm" as const,
+          lastMessage: conversation.lastMessage || "No messages yet",
+          lastMessageTime: conversation.lastMessageAt
+            ? new Date(conversation.lastMessageAt).toLocaleDateString()
+            : "No date",
+          unreadCount: 0,
+          userData: {
+            id: conversation.id,
+            name:
+              conversation.participantNames?.join(", ") ||
+              "Unknown participants",
+            email: "conversation@system.local",
+            role: "conversation",
+            status: "offline" as const,
+          },
+          isUser: false,
+        }));
     } else {
       // For announcements tab, return empty array since we don't show a list
       return [];
@@ -508,40 +636,40 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
       // Show loading state immediately
       setSelectedChat({
         ...item,
-        loading: true
+        loading: true,
       });
 
       if (item.isUser) {
         // Create or get DM with this user
         const dmChat = await createOrGetDM(item.userData.id);
         if (dmChat) {
-          console.log('🔍 DM Chat created/retrieved:', {
+          console.log("🔍 DM Chat created/retrieved:", {
             dmChatId: dmChat.id,
             recipientId: item.userData.id,
-            recipientName: item.userData.name
+            recipientName: item.userData.name,
           });
 
           setSelectedChat({
             ...dmChat,
             userData: item.userData,
-            loading: false
+            loading: false,
           });
 
           // Load messages with the correct DM chat ID
-          console.log('📜 Loading messages for DM chat:', dmChat.id);
+          console.log("📜 Loading messages for DM chat:", dmChat.id);
           loadMessages(dmChat.id);
         }
       } else {
         // Regular chat selection
         setSelectedChat({
           ...item,
-          loading: false
+          loading: false,
         });
         // Load messages in background
         loadMessages(item.id);
       }
     } catch (error) {
-      console.error('Failed to select chat:', error);
+      console.error("Failed to select chat:", error);
       setSelectedChat(null);
     }
   };
@@ -554,8 +682,8 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
 
     try {
       setIsSending(true);
-      setMessageInput('');
-      
+      setMessageInput("");
+
       // Stop typing indicator when sending message
       if (isTyping) {
         setIsTyping(false);
@@ -566,22 +694,22 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
         }
       }
 
-      console.log('📤 Sending message to chat:', {
+      console.log("📤 Sending message to chat:", {
         chatId: selectedChat.id,
-        content: content.substring(0, 50) + (content.length > 50 ? '...' : ''),
-        chatName: selectedChat.name
+        content: content.substring(0, 50) + (content.length > 50 ? "..." : ""),
+        chatName: selectedChat.name,
       });
 
       await sendChatMessage(selectedChat.id, content);
-      
+
       // Trigger message indicator for current user (only for actual sent messages)
       const currentUserId = getCurrentUserId();
       if (currentUserId) {
         handleMessageSent(currentUserId, selectedChat.id);
-        console.log('✨ Message indicator triggered for user:', currentUserId);
+        console.log("✨ Message indicator triggered for user:", currentUserId);
       }
     } catch (error) {
-      console.error('Failed to send message:', error);
+      console.error("Failed to send message:", error);
       // Restore message input on error
       setMessageInput(content);
     } finally {
@@ -593,7 +721,7 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
   const getCurrentUserRole = () => {
     try {
       // Try multiple possible keys for user data
-      const possibleKeys = ['user', 'currentUser', 'authUser', 'userData'];
+      const possibleKeys = ["user", "currentUser", "authUser", "userData"];
 
       for (const key of possibleKeys) {
         const storedData = localStorage.getItem(key);
@@ -610,14 +738,19 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
       }
 
       // Try to extract from JWT token
-      const token = localStorage.getItem('accessToken');
+      const token = localStorage.getItem("accessToken");
       if (token) {
         try {
-          const base64Url = token.split('.')[1];
-          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-          const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
-            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-          }).join(''));
+          const base64Url = token.split(".")[1];
+          const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+          const jsonPayload = decodeURIComponent(
+            atob(base64)
+              .split("")
+              .map(function (c) {
+                return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
+              })
+              .join(""),
+          );
 
           const decoded = JSON.parse(jsonPayload);
           if (decoded && decoded.role) {
@@ -628,33 +761,33 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
         }
       }
     } catch (error) {
-      console.error('Failed to get current user role:', error);
+      console.error("Failed to get current user role:", error);
     }
-    return 'employee'; // Default to employee role
+    return "employee"; // Default to employee role
   };
 
   // Helper function to check if user can edit/delete announcements
   const canManageAnnouncement = (announcement: any) => {
     const userRole = getCurrentUserRole();
     const currentUserId = getCurrentUserId();
-    
+
     // Superadmin and admin can manage all announcements
-    if (['superadmin', 'admin'].includes(userRole)) {
+    if (["superadmin", "admin"].includes(userRole)) {
       return true;
     }
-    
+
     // HR can manage their own announcements
-    if (userRole === 'hr' && announcement.author_id === currentUserId) {
+    if (userRole === "hr" && announcement.author_id === currentUserId) {
       return true;
     }
-    
+
     return false;
   };
 
   // Helper function to check if user can access conversation history
   const canAccessHistory = () => {
     const userRole = getCurrentUserRole();
-    return ['hr', 'admin', 'superadmin'].includes(userRole);
+    return ["hr", "admin", "superadmin"].includes(userRole);
   };
 
   // Fetch conversation history for administrators
@@ -663,10 +796,10 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
 
     try {
       setHistoryLoading(true);
-      const response = await api.get('/chat/conversation-history');
+      const response = await api.get("/chat/conversation-history");
       setConversationHistory(response.data.data?.conversations || []);
     } catch (error) {
-      console.error('Failed to fetch conversation history:', error);
+      console.error("Failed to fetch conversation history:", error);
       setConversationHistory([]);
     } finally {
       setHistoryLoading(false);
@@ -675,21 +808,22 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
 
   // Load conversation history when History tab is selected
   useEffect(() => {
-    if (activeTab === 'history' && canAccessHistory()) {
+    if (activeTab === "history" && canAccessHistory()) {
       fetchConversationHistory();
     }
   }, [activeTab]);
 
   // Authentication guard
-  const isAuthenticated = !!localStorage.getItem('accessToken');
-  const isLanding = typeof window !== 'undefined' && window.location.pathname === '/';
+  const isAuthenticated = !!localStorage.getItem("accessToken");
+  const isLanding =
+    typeof window !== "undefined" && window.location.pathname === "/";
   if (!isAuthenticated || isLanding) {
     return null;
   }
 
   const themeClasses = darkMode
-    ? 'bg-gray-900 text-white border-gray-700 transition-colors duration-300'
-    : 'bg-white text-gray-900 border-gray-200 transition-colors duration-300';
+    ? "bg-gray-900 text-white border-gray-700 transition-colors duration-300"
+    : "bg-white text-gray-900 border-gray-200 transition-colors duration-300";
 
   // Chat button when closed
   if (!isOpen) {
@@ -700,7 +834,7 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
             onClick={() => setIsOpen(true)}
             className="w-14 h-14 rounded-full shadow-lg transition-all duration-300 hover:scale-110 flex items-center justify-center focus:outline-none focus:ring-4 focus:ring-blue-300"
             style={{
-              background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+              background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
             }}
             title="Open Chat"
           >
@@ -725,7 +859,7 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
         <div
           className={`${themeClasses} rounded-xl shadow-2xl border transition-all duration-300 w-full h-full sm:w-[85vw] sm:h-[85vh] sm:max-w-5xl sm:max-h-[700px] sm:min-h-[500px] overflow-hidden flex flex-col`}
           style={{
-            maxHeight: 'calc(100vh - 2rem)', // Ensure modal never exceeds viewport minus padding
+            maxHeight: "calc(100vh - 2rem)", // Ensure modal never exceeds viewport minus padding
           }}
         >
           {/* Header */}
@@ -736,21 +870,25 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
               <h3 className="font-semibold text-lg">Chat</h3>
               {totalUnreadCount > 0 && (
                 <div className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
-                  {totalUnreadCount > 99 ? '99+' : totalUnreadCount}
+                  {totalUnreadCount > 99 ? "99+" : totalUnreadCount}
                 </div>
               )}
             </div>
-
-
 
             <div className="flex items-center gap-2">
               {/* Dark Mode Toggle */}
               <button
                 onClick={toggleDarkMode}
                 className="p-2 rounded hover:bg-white/20 transition-all duration-200"
-                title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                title={
+                  darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"
+                }
               >
-                {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                {darkMode ? (
+                  <Sun className="w-5 h-5" />
+                ) : (
+                  <Moon className="w-5 h-5" />
+                )}
               </button>
 
               {/* Close Button */}
@@ -766,13 +904,19 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
 
           <div className="flex flex-1 overflow-hidden">
             {/* Sidebar - DMs List or Announcements */}
-            <div className={`${selectedChat ? 'hidden md:flex' : 'flex'} w-full md:w-80 flex-col border-r ${darkMode ? 'border-gray-700' : 'border-gray-200'} flex-shrink-0`}>
+            <div
+              className={`${selectedChat ? "hidden md:flex" : "flex"} w-full md:w-80 flex-col border-r ${darkMode ? "border-gray-700" : "border-gray-200"} flex-shrink-0`}
+            >
               {/* Tab Navigation */}
-              <div className={`flex border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'} flex-shrink-0`}>
+              <div
+                className={`flex border-b ${darkMode ? "border-gray-700" : "border-gray-200"} flex-shrink-0`}
+              >
                 {[
-                  { key: 'dms', label: 'DMs', icon: MessageCircle },
-                  { key: 'announcements', label: 'News', icon: Bell },
-                  ...(canAccessHistory() ? [{ key: 'history', label: 'History', icon: History }] : [])
+                  { key: "dms", label: "DMs", icon: MessageCircle },
+                  { key: "announcements", label: "News", icon: Bell },
+                  ...(canAccessHistory()
+                    ? [{ key: "history", label: "History", icon: History }]
+                    : []),
                 ].map(({ key, label, icon: Icon }) => (
                   <button
                     key={key}
@@ -780,10 +924,15 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                       setActiveTab(key as TabType);
                       setSelectedChat(null); // Clear selected chat when switching tabs
                     }}
-                    className={`flex-1 p-3 text-xs font-medium transition-colors flex flex-col items-center gap-1 ${activeTab === key
-                      ? darkMode ? 'bg-gray-800 text-blue-400' : 'bg-blue-50 text-blue-600'
-                      : darkMode ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'
-                      }`}
+                    className={`flex-1 p-3 text-xs font-medium transition-colors flex flex-col items-center gap-1 ${
+                      activeTab === key
+                        ? darkMode
+                          ? "bg-gray-800 text-blue-400"
+                          : "bg-blue-50 text-blue-600"
+                        : darkMode
+                          ? "text-gray-400 hover:text-white"
+                          : "text-gray-600 hover:text-gray-900"
+                    }`}
                   >
                     <Icon className="w-4 h-4" />
                     <span>{label}</span>
@@ -792,7 +941,7 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
               </div>
 
               {/* Announcements View in Sidebar */}
-              {activeTab === 'announcements' ? (
+              {activeTab === "announcements" ? (
                 <div className="flex-1 flex flex-col overflow-hidden">
                   <AnnouncementList
                     announcements={announcements}
@@ -812,188 +961,250 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                   {/* Search Bar - Only for DMs and History */}
                   <div className="p-4 flex-shrink-0">
                     <div className="relative mb-2">
-                      <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+                      <Search
+                        className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 ${darkMode ? "text-gray-400" : "text-gray-500"}`}
+                      />
                       <input
                         type="text"
-                        placeholder={activeTab === 'dms' ? 'Search chats...' : 'Search conversations...'}
+                        placeholder={
+                          activeTab === "dms"
+                            ? "Search chats..."
+                            : "Search conversations..."
+                        }
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className={`w-full pl-10 pr-4 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${darkMode
-                          ? 'bg-gray-800 border-gray-600 text-white placeholder-gray-400'
-                          : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500'
-                          }`}
+                        className={`w-full pl-10 pr-4 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                          darkMode
+                            ? "bg-gray-800 border-gray-600 text-white placeholder-gray-400"
+                            : "bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500"
+                        }`}
                       />
                     </div>
 
                     {/* Refresh Button */}
                     <button
                       onClick={() => {
-                        if (activeTab === 'dms') {
+                        if (activeTab === "dms") {
                           loadUsers();
-                        } else if (activeTab === 'history') {
+                        } else if (activeTab === "history") {
                           fetchConversationHistory();
                         }
                       }}
                       className="w-full px-3 py-2 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
                     >
-                      {activeTab === 'dms' ? 'Refresh Chats' : 'Refresh History'}
+                      {activeTab === "dms"
+                        ? "Refresh Chats"
+                        : "Refresh History"}
                     </button>
                   </div>
 
                   {/* User/Chat List */}
                   <div className="flex-1 overflow-y-auto">
-                {isLoading ? (
-                  <div className={`p-6 text-center ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                    <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"></div>
-                    <p className="text-sm">Loading users...</p>
-                  </div>
-                ) : displayItems.length === 0 ? (
-                  <div className={`p-6 text-center ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                    <MessageCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">
-                      {activeTab === 'dms' 
-                        ? 'No users available' 
-                        : activeTab === 'history' 
-                          ? 'No conversation history found'
-                          : 'No chats found'
-                      }
-                    </p>
-                    {chatError && (
-                      <p className="text-xs mt-2 text-red-500">
-                        Error please click the refresh button
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  displayItems.map((item) => (
-                    <div
-                      key={item.id}
-                      onClick={() => handleChatSelect(item)}
-                      className={`p-4 border-b cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${selectedChat?.id === item.id
-                        ? darkMode ? 'bg-gray-800' : 'bg-blue-50'
-                        : darkMode ? 'border-gray-700' : 'border-gray-100'
-                        }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        {/* Circular Avatar (40px) with status indicator */}
-                        <div className="relative w-10 h-10 flex-shrink-0">
-                          {activeTab === 'dms' ? (
-                            <IndicatorWrapper userId={item.id}>
-                              <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium text-sm">
-                                {item.name ? item.name.charAt(0).toUpperCase() : 'U'}
-                              </div>
-                            </IndicatorWrapper>
-                          ) : (
-                            <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium text-sm">
-                              {item.name ? item.name.charAt(0).toUpperCase() : 'U'}
-                            </div>
-                          )}
-                          {/* Status indicator */}
-                          {item.isUser && (
-                            <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${userStatusService.getStatusColor(item.userData?.id || '')}`}></div>
-                          )}
-                        </div>
-
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between mb-1">
-                            <h4 className="font-bold text-sm truncate">{item.name}</h4>
-                            <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                              {item.lastMessageTime}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 flex-1 min-w-0">
-                              {/* Show message preview with sender info */}
-                              <div className="flex-1 min-w-0">
-                                {!item.isUser && item.lastMessage && item.lastMessage !== 'No messages yet' ? (
-                                  <div className="flex items-center gap-1">
-                                    {/* Show "You:" for own messages */}
-                                    {(() => {
-                                      const chatMessages = messages[item.id] || [];
-                                      const latestMessage = chatMessages[chatMessages.length - 1];
-                                      const currentUserId = getCurrentUserId();
-                                      const isOwnMessage = latestMessage && String(latestMessage.senderId) === String(currentUserId);
-                                      
-                                      return isOwnMessage ? (
-                                        <span className={`text-xs font-medium ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
-                                          You:
-                                        </span>
-                                      ) : null;
-                                    })()}
-                                    <p className={`text-sm truncate ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                                      {item.lastMessage}
-                                    </p>
+                    {isLoading ? (
+                      <div
+                        className={`p-6 text-center ${darkMode ? "text-gray-400" : "text-gray-500"}`}
+                      >
+                        <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"></div>
+                        <p className="text-sm">Loading users...</p>
+                      </div>
+                    ) : displayItems.length === 0 ? (
+                      <div
+                        className={`p-6 text-center ${darkMode ? "text-gray-400" : "text-gray-500"}`}
+                      >
+                        <MessageCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">
+                          {activeTab === "dms"
+                            ? "No users available"
+                            : activeTab === "history"
+                              ? "No conversation history found"
+                              : "No chats found"}
+                        </p>
+                        {chatError && (
+                          <p className="text-xs mt-2 text-red-500">
+                            Error please click the refresh button
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      displayItems.map((item) => (
+                        <div
+                          key={item.id}
+                          onClick={() => handleChatSelect(item)}
+                          className={`p-4 border-b cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                            selectedChat?.id === item.id
+                              ? darkMode
+                                ? "bg-gray-800"
+                                : "bg-blue-50"
+                              : darkMode
+                                ? "border-gray-700"
+                                : "border-gray-100"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            {/* Circular Avatar (40px) with status indicator */}
+                            <div className="relative w-10 h-10 flex-shrink-0">
+                              {activeTab === "dms" ? (
+                                <IndicatorWrapper userId={item.id}>
+                                  <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium text-sm">
+                                    {item.name
+                                      ? item.name.charAt(0).toUpperCase()
+                                      : "U"}
                                   </div>
-                                ) : (
-                                  <p className={`text-sm truncate ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                                    {item.lastMessage}
-                                  </p>
-                                )}
-                              </div>
-                              
-                              {/* Role Badge for non-employees */}
-                              {item.userData?.role && item.userData.role !== 'employee' && (
-                                <span className={`text-xs px-2 py-0.5 rounded-full ${getRoleBadgeColor(item.userData.role)}`}>
-                                  {item.userData.role}
-                                </span>
-                              )}
-                            </div>
-
-                            <div className="flex items-center gap-2 ml-2">
-                              {/* Message status for own messages */}
-                              {(() => {
-                                const chatMessages = messages[item.id] || [];
-                                const latestMessage = chatMessages[chatMessages.length - 1];
-                                const currentUserId = getCurrentUserId();
-                                const isOwnMessage = latestMessage && String(latestMessage.senderId) === String(currentUserId);
-                                
-                                if (isOwnMessage && latestMessage?.status) {
-                                  return (
-                                    <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                                      {latestMessage.status === 'sending' && '⏳'}
-                                      {latestMessage.status === 'sent' && '✓'}
-                                      {latestMessage.status === 'delivered' && '✓✓'}
-                                      {latestMessage.status === 'read' && '✓✓'}
-                                      {latestMessage.status === 'failed' && '❌'}
-                                    </span>
-                                  );
-                                }
-                                return null;
-                              })()}
-
-                              {/* Unread count badge */}
-                              {item.unreadCount > 0 && (
-                                <div className="bg-green-500 text-white text-xs px-2 py-0.5 rounded-full min-w-[20px] text-center">
-                                  {item.unreadCount > 99 ? '99+' : item.unreadCount}
+                                </IndicatorWrapper>
+                              ) : (
+                                <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium text-sm">
+                                  {item.name
+                                    ? item.name.charAt(0).toUpperCase()
+                                    : "U"}
                                 </div>
                               )}
+                              {/* Status indicator */}
+                              {item.isUser && (
+                                <div
+                                  className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${userStatusService.getStatusColor(item.userData?.id || "")}`}
+                                ></div>
+                              )}
+                            </div>
+
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between mb-1">
+                                <h4 className="font-bold text-sm truncate">
+                                  {item.name}
+                                </h4>
+                                <span
+                                  className={`text-xs ${darkMode ? "text-gray-400" : "text-gray-500"}`}
+                                >
+                                  {item.lastMessageTime}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                  {/* Show message preview with sender info */}
+                                  <div className="flex-1 min-w-0">
+                                    {!item.isUser &&
+                                    item.lastMessage &&
+                                    item.lastMessage !== "No messages yet" ? (
+                                      <div className="flex items-center gap-1">
+                                        {/* Show "You:" for own messages */}
+                                        {(() => {
+                                          const chatMessages =
+                                            messages[item.id] || [];
+                                          const latestMessage =
+                                            chatMessages[
+                                              chatMessages.length - 1
+                                            ];
+                                          const currentUserId =
+                                            getCurrentUserId();
+                                          const isOwnMessage =
+                                            latestMessage &&
+                                            String(latestMessage.senderId) ===
+                                              String(currentUserId);
+
+                                          return isOwnMessage ? (
+                                            <span
+                                              className={`text-xs font-medium ${darkMode ? "text-blue-400" : "text-blue-600"}`}
+                                            >
+                                              You:
+                                            </span>
+                                          ) : null;
+                                        })()}
+                                        <p
+                                          className={`text-sm truncate ${darkMode ? "text-gray-400" : "text-gray-600"}`}
+                                        >
+                                          {item.lastMessage}
+                                        </p>
+                                      </div>
+                                    ) : (
+                                      <p
+                                        className={`text-sm truncate ${darkMode ? "text-gray-400" : "text-gray-600"}`}
+                                      >
+                                        {item.lastMessage}
+                                      </p>
+                                    )}
+                                  </div>
+
+                                  {/* Role Badge for non-employees */}
+                                  {item.userData?.role &&
+                                    item.userData.role !== "employee" && (
+                                      <span
+                                        className={`text-xs px-2 py-0.5 rounded-full ${getRoleBadgeColor(item.userData.role)}`}
+                                      >
+                                        {item.userData.role}
+                                      </span>
+                                    )}
+                                </div>
+
+                                <div className="flex items-center gap-2 ml-2">
+                                  {/* Message status for own messages */}
+                                  {(() => {
+                                    const chatMessages =
+                                      messages[item.id] || [];
+                                    const latestMessage =
+                                      chatMessages[chatMessages.length - 1];
+                                    const currentUserId = getCurrentUserId();
+                                    const isOwnMessage =
+                                      latestMessage &&
+                                      String(latestMessage.senderId) ===
+                                        String(currentUserId);
+
+                                    if (isOwnMessage && latestMessage?.status) {
+                                      return (
+                                        <span
+                                          className={`text-xs ${darkMode ? "text-gray-400" : "text-gray-500"}`}
+                                        >
+                                          {latestMessage.status === "sending" &&
+                                            "⏳"}
+                                          {latestMessage.status === "sent" &&
+                                            "✓"}
+                                          {latestMessage.status ===
+                                            "delivered" && "✓✓"}
+                                          {latestMessage.status === "read" &&
+                                            "✓✓"}
+                                          {latestMessage.status === "failed" &&
+                                            "❌"}
+                                        </span>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
+
+                                  {/* Unread count badge */}
+                                  {item.unreadCount > 0 && (
+                                    <div className="bg-green-500 text-white text-xs px-2 py-0.5 rounded-full min-w-[20px] text-center">
+                                      {item.unreadCount > 99
+                                        ? "99+"
+                                        : item.unreadCount}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    </div>
-                  ))
-                )}
+                      ))
+                    )}
                   </div>
                 </>
               )}
             </div>
 
             {/* Main Content Area */}
-            {activeTab === 'history' && !selectedChat ? (
+            {activeTab === "history" && !selectedChat ? (
               /* Conversation History View */
               <div className="flex-1 flex flex-col p-6 overflow-hidden">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                  <h2
+                    className={`text-xl font-semibold ${darkMode ? "text-white" : "text-gray-900"}`}
+                  >
                     Conversation History
                   </h2>
                   <button
                     onClick={fetchConversationHistory}
                     className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                      darkMode 
-                        ? 'bg-gray-700 hover:bg-gray-600 text-gray-300' 
-                        : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                      darkMode
+                        ? "bg-gray-700 hover:bg-gray-600 text-gray-300"
+                        : "bg-gray-100 hover:bg-gray-200 text-gray-700"
                     }`}
                   >
                     Refresh
@@ -1003,19 +1214,32 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                 {historyLoading ? (
                   <div className="flex-1 flex items-center justify-center">
                     <div className="text-center">
-                      <div className={`animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2`}></div>
-                      <p className={darkMode ? 'text-gray-300' : 'text-gray-600'}>Loading conversation history...</p>
+                      <div
+                        className={`animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2`}
+                      ></div>
+                      <p
+                        className={darkMode ? "text-gray-300" : "text-gray-600"}
+                      >
+                        Loading conversation history...
+                      </p>
                     </div>
                   </div>
                 ) : conversationHistory.length === 0 ? (
                   <div className="flex-1 flex items-center justify-center">
                     <div className="text-center">
-                      <History className={`w-12 h-12 mx-auto mb-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
-                      <p className={`text-lg font-medium mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                      <History
+                        className={`w-12 h-12 mx-auto mb-4 ${darkMode ? "text-gray-400" : "text-gray-500"}`}
+                      />
+                      <p
+                        className={`text-lg font-medium mb-2 ${darkMode ? "text-white" : "text-gray-900"}`}
+                      >
                         No conversation history
                       </p>
-                      <p className={darkMode ? 'text-gray-400' : 'text-gray-600'}>
-                        Conversation history will appear here when users start chatting
+                      <p
+                        className={darkMode ? "text-gray-400" : "text-gray-600"}
+                      >
+                        Conversation history will appear here when users start
+                        chatting
                       </p>
                     </div>
                   </div>
@@ -1025,37 +1249,49 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                       <div
                         key={conversation.id}
                         className={`p-4 rounded-lg border cursor-pointer transition-colors ${
-                          darkMode 
-                            ? 'bg-gray-800 border-gray-700 hover:bg-gray-700' 
-                            : 'bg-white border-gray-200 hover:bg-gray-50'
+                          darkMode
+                            ? "bg-gray-800 border-gray-700 hover:bg-gray-700"
+                            : "bg-white border-gray-200 hover:bg-gray-50"
                         }`}
                         onClick={() => {
                           // Handle conversation selection - could open the conversation
-                          console.log('Selected conversation:', conversation);
+                          console.log("Selected conversation:", conversation);
                         }}
                       >
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
-                              <h3 className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                                {conversation.participantNames?.join(', ') || 'Unknown participants'}
+                              <h3
+                                className={`font-medium ${darkMode ? "text-white" : "text-gray-900"}`}
+                              >
+                                {conversation.participantNames?.join(", ") ||
+                                  "Unknown participants"}
                               </h3>
-                              <span className={`text-xs px-2 py-1 rounded-full ${
-                                darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'
-                              }`}>
+                              <span
+                                className={`text-xs px-2 py-1 rounded-full ${
+                                  darkMode
+                                    ? "bg-gray-700 text-gray-300"
+                                    : "bg-gray-100 text-gray-600"
+                                }`}
+                              >
                                 {conversation.messageCount || 0} messages
                               </span>
                             </div>
-                            <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'} line-clamp-2`}>
-                              {conversation.lastMessage || 'No messages yet'}
+                            <p
+                              className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-600"} line-clamp-2`}
+                            >
+                              {conversation.lastMessage || "No messages yet"}
                             </p>
                           </div>
                           <div className="text-right">
-                            <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
-                              {conversation.lastMessageAt 
-                                ? new Date(conversation.lastMessageAt).toLocaleDateString()
-                                : 'No date'
-                              }
+                            <p
+                              className={`text-xs ${darkMode ? "text-gray-500" : "text-gray-500"}`}
+                            >
+                              {conversation.lastMessageAt
+                                ? new Date(
+                                    conversation.lastMessageAt,
+                                  ).toLocaleDateString()
+                                : "No date"}
                             </p>
                           </div>
                         </div>
@@ -1068,7 +1304,9 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
               /* Chat Messages Area */
               <div className="flex-1 flex flex-col">
                 {/* Chat Header */}
-                <div className={`p-4 border-b flex items-center justify-between ${darkMode ? 'border-gray-700' : 'border-gray-200'} flex-shrink-0`}>
+                <div
+                  className={`p-4 border-b flex items-center justify-between ${darkMode ? "border-gray-700" : "border-gray-200"} flex-shrink-0`}
+                >
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => setSelectedChat(null)}
@@ -1078,47 +1316,73 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                     </button>
 
                     {/* Avatar */}
-                    <IndicatorWrapper userId={selectedChat.userData?.id || selectedChat.id}>
+                    <IndicatorWrapper
+                      userId={selectedChat.userData?.id || selectedChat.id}
+                    >
                       <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium text-sm">
-                        {(selectedChat.userData?.name || selectedChat.userData?.full_name || selectedChat.name || 'U')?.charAt(0).toUpperCase()}
+                        {(
+                          selectedChat.userData?.name ||
+                          selectedChat.userData?.full_name ||
+                          selectedChat.name ||
+                          "U"
+                        )
+                          ?.charAt(0)
+                          .toUpperCase()}
                       </div>
                     </IndicatorWrapper>
 
                     <div>
-                      <h3 className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                        {selectedChat.userData?.name || selectedChat.userData?.full_name || selectedChat.name || 'Chat'}
+                      <h3
+                        className={`font-medium ${darkMode ? "text-white" : "text-gray-900"}`}
+                      >
+                        {selectedChat.userData?.name ||
+                          selectedChat.userData?.full_name ||
+                          selectedChat.name ||
+                          "Chat"}
                       </h3>
                       <div className="flex items-center gap-2">
                         {selectedChat.userData?.role && (
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${getRoleBadgeColor(selectedChat.userData.role)}`}>
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded-full ${getRoleBadgeColor(selectedChat.userData.role)}`}
+                          >
                             {selectedChat.userData.role}
                           </span>
                         )}
                         <div className="flex items-center gap-1">
-                          <div className={`w-2 h-2 rounded-full ${connectionStatus === 'connected' ? 'bg-green-500' :
-                            connectionStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'
-                            }`}></div>
+                          <div
+                            className={`w-2 h-2 rounded-full ${
+                              connectionStatus === "connected"
+                                ? "bg-green-500"
+                                : connectionStatus === "connecting"
+                                  ? "bg-yellow-500"
+                                  : "bg-red-500"
+                            }`}
+                          ></div>
                           <span className="text-xs text-gray-500 dark:text-gray-400">
-                            {connectionStatus === 'connected' ? 'Real-time' :
-                              connectionStatus === 'connecting' ? 'Connecting...' : 'Offline'}
+                            {connectionStatus === "connected"
+                              ? "Real-time"
+                              : connectionStatus === "connecting"
+                                ? "Connecting..."
+                                : "Offline"}
                           </span>
                         </div>
                       </div>
                     </div>
-
-
                   </div>
                 </div>
 
                 {/* Connection Status Banner */}
-                {connectionStatus === 'disconnected' && (
+                {connectionStatus === "disconnected" && (
                   <div className="p-3 bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 text-center text-sm">
                     <div className="flex items-center justify-center gap-2">
-                      <span>⚠️ Real-time connection failed. Messages may not update automatically.</span>
+                      <span>
+                        ⚠️ Real-time connection failed. Messages may not update
+                        automatically.
+                      </span>
                       <button
                         onClick={() => {
                           if (selectedChat) {
-                            console.log('🔄 Refreshing messages...');
+                            console.log("🔄 Refreshing messages...");
                             loadMessages(selectedChat.id);
                           }
                         }}
@@ -1129,7 +1393,7 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                       <button
                         onClick={() => {
                           if (selectedChat) {
-                            console.log('🔄 Retrying real-time connection...');
+                            console.log("🔄 Retrying real-time connection...");
                             const channel = subscribeToChat(selectedChat.id);
                             // Store channel for cleanup
                             (selectedChat as any)._realtimeChannel = channel;
@@ -1159,7 +1423,7 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                     darkMode={darkMode}
                   />
                 )}
-                
+
                 <div ref={messagesEndRef} />
 
                 {/* Typing Indicator - Only show when someone is actually typing */}
@@ -1167,9 +1431,18 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                   <div className="px-4 py-2">
                     <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-sm">
                       <div className="flex gap-1">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                        <div
+                          className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                          style={{ animationDelay: "0ms" }}
+                        ></div>
+                        <div
+                          className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                          style={{ animationDelay: "150ms" }}
+                        ></div>
+                        <div
+                          className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                          style={{ animationDelay: "300ms" }}
+                        ></div>
                       </div>
                       <span className="text-xs">
                         {currentChatTypingUsers.length === 1
@@ -1181,16 +1454,24 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                 )}
 
                 {/* Message Input - Restrict only for history tab for admin/superadmin/hr */}
-                {activeTab === 'history' && ['admin', 'superadmin', 'hr'].includes(getCurrentUserRole()) ? (
+                {activeTab === "history" &&
+                ["admin", "superadmin", "hr"].includes(getCurrentUserRole()) ? (
                   /* Message restriction for history tab only */
-                  <div className={`p-4 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'} flex-shrink-0`}>
-                    <div className={`text-center text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                      You can view conversation history but cannot send messages in archived chats.
+                  <div
+                    className={`p-4 border-t ${darkMode ? "border-gray-700" : "border-gray-200"} flex-shrink-0`}
+                  >
+                    <div
+                      className={`text-center text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}
+                    >
+                      You can view conversation history but cannot send messages
+                      in archived chats.
                     </div>
                   </div>
                 ) : (
                   /* Normal message input for DMs and other tabs */
-                  <div className={`p-4 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'} flex-shrink-0`}>
+                  <div
+                    className={`p-4 border-t ${darkMode ? "border-gray-700" : "border-gray-200"} flex-shrink-0`}
+                  >
                     <div className="flex items-center gap-2">
                       <input
                         ref={inputRef}
@@ -1201,25 +1482,27 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                           handleTypingChange(e.target.value);
                         }}
                         onKeyPress={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
+                          if (e.key === "Enter" && !e.shiftKey) {
                             e.preventDefault();
                             handleSendMessage();
                           }
                         }}
                         placeholder="Type a message..."
                         disabled={isSending}
-                        className={`flex-1 px-4 py-2 rounded-full border text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${darkMode
-                          ? 'bg-gray-800 border-gray-600 text-white placeholder-gray-400'
-                          : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500'
-                          } ${isSending ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        className={`flex-1 px-4 py-2 rounded-full border text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                          darkMode
+                            ? "bg-gray-800 border-gray-600 text-white placeholder-gray-400"
+                            : "bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500"
+                        } ${isSending ? "opacity-50 cursor-not-allowed" : ""}`}
                       />
                       <button
                         onClick={handleSendMessage}
                         disabled={!messageInput.trim() || isSending}
-                        className={`p-2 rounded-full transition-colors ${messageInput.trim() && !isSending
-                          ? 'bg-blue-500 hover:bg-blue-600 text-white'
-                          : 'bg-gray-300 dark:bg-gray-600 text-gray-500 cursor-not-allowed'
-                          }`}
+                        className={`p-2 rounded-full transition-colors ${
+                          messageInput.trim() && !isSending
+                            ? "bg-blue-500 hover:bg-blue-600 text-white"
+                            : "bg-gray-300 dark:bg-gray-600 text-gray-500 cursor-not-allowed"
+                        }`}
                       >
                         {isSending ? (
                           <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -1238,12 +1521,11 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
                   <MessageCircle className="w-16 h-16 mx-auto mb-4 opacity-50" />
                   <h3 className="text-lg font-medium mb-2">Welcome to Chat</h3>
                   <p className="text-sm">
-                    {activeTab === 'dms' 
-                      ? 'Select a user to start a conversation' 
-                      : activeTab === 'history'
-                        ? 'View conversation history and access past chats'
-                        : 'Check out the latest announcements'
-                    }
+                    {activeTab === "dms"
+                      ? "Select a user to start a conversation"
+                      : activeTab === "history"
+                        ? "View conversation history and access past chats"
+                        : "Check out the latest announcements"}
                   </p>
                 </div>
               </div>
@@ -1259,7 +1541,7 @@ export function FloatingChatWidget({ className = '' }: FloatingChatWidgetProps) 
               await createAnnouncement(data, publish);
               setShowCreateAnnouncement(false);
             } catch (error) {
-              console.error('Failed to create announcement:', error);
+              console.error("Failed to create announcement:", error);
             }
           }}
           onClose={() => setShowCreateAnnouncement(false)}
