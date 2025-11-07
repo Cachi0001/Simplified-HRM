@@ -38,7 +38,7 @@ export const useMessageIndicators = () => {
       return newIndicator;
     } catch (error: any) {
       console.error('❌ Error creating message indicator:', error);
-      setError(error.response?.data?.message || 'Failed to create indicator');
+      setError(error.response?.data?.error?.message || error.response?.data?.message || 'Failed to create indicator');
       throw error;
     }
   }, []);
@@ -80,7 +80,7 @@ export const useMessageIndicators = () => {
       return activeIndicators;
     } catch (error: any) {
       console.error('❌ Error fetching active indicators:', error);
-      setError(error.response?.data?.message || 'Failed to fetch indicators');
+      setError(error.response?.data?.error?.message || error.response?.data?.message || 'Failed to fetch indicators');
       return [];
     } finally {
       setLoading(false);
@@ -94,7 +94,7 @@ export const useMessageIndicators = () => {
       setIndicators(prev => prev.filter(ind => ind.id !== indicatorId));
     } catch (error: any) {
       console.error('❌ Error expiring indicator:', error);
-      setError(error.response?.data?.message || 'Failed to expire indicator');
+      setError(error.response?.data?.error?.message || error.response?.data?.message || 'Failed to expire indicator');
     }
   }, []);
 
@@ -125,7 +125,7 @@ export const useMessageIndicators = () => {
       return response.data.data;
     } catch (error: any) {
       console.error('❌ Error fetching indicator stats:', error);
-      setError(error.response?.data?.message || 'Failed to fetch stats');
+      setError(error.response?.data?.error?.message || error.response?.data?.message || 'Failed to fetch stats');
       return null;
     }
   }, []);

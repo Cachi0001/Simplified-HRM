@@ -1,38 +1,48 @@
 import { Pool } from 'pg';
-import logger from '../utils/logger';
+import dotenv from 'dotenv';
 
-// Database configuration
-const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  database: process.env.DB_NAME || 'hr_system',
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'password',
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-  max: 20, // Maximum number of clients in the pool
-  idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
-  connectionTimeoutMillis: 2000, // Return an error after 2 seconds if connection could not be established
+dotenv.config();
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
+});
+
+pool.on('error', (err) => {
+  console.error('Unexpected database error:', err);
+});
+
+export const query = async (text: string, params?: any[]) => {
+  const start = Date.now();
+  try {
+    const res = await pool.query(text, params);
+    const duration = Date.now() - start;
+    console.log('Executed query', { text, duration, rows: res.rowCount });
+    return res;
+  } catch (error) {
+    console.error('Database query error:', error);
+    throw error;
+  }
 };
 
-// Create database connection pool
-const db = new Pool(dbConfig);
+export const getClient = async () => {
+  const client = await pool.connect();
+  const query = client.query.bind(client);
+  const release = client.release.bind(client);
+  
+  const timeout = setTimeout(() => {
+    console.error('Client checkout timeout');
+  }, 5000);
+  
+  client.release = () => {
+    clearTimeout(timeout);
+    return release();
+  };
+  
+  return client;
+};
 
-// Test database connection
-db.on('connect', () => {
-  logger.info('✅ [Database] Connected to PostgreSQL database');
-});
-
-db.on('error', (err) => {
-  logger.error('❌ [Database] Unexpected error on idle client', err);
-});
-
-// Test initial connection
-db.query('SELECT NOW()', (err, result) => {
-  if (err) {
-    logger.error('❌ [Database] Initial connection test failed:', err);
-  } else {
-    logger.info('✅ [Database] Initial connection test successful');
-  }
-});
-
-export default db;
+export default pool;

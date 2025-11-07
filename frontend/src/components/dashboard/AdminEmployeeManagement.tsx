@@ -130,7 +130,7 @@ export const AdminEmployeeManagement = ({ darkMode }: AdminEmployeeManagementPro
       queryClient.invalidateQueries({ queryKey: ['employees-management'] });
     },
     onError: (error: any) => {
-      addToast('error', error.response?.data?.message || 'Failed to approve employee');
+      addToast('error', error.response?.data?.error?.message || error.response?.data?.message || 'Failed to approve employee');
     }
   });
 
@@ -149,7 +149,7 @@ export const AdminEmployeeManagement = ({ darkMode }: AdminEmployeeManagementPro
       queryClient.invalidateQueries({ queryKey: ['employees-management'] });
     },
     onError: (error: any) => {
-      addToast('error', error.response?.data?.message || 'Failed to reject employee');
+      addToast('error', error.response?.data?.error?.message || error.response?.data?.message || 'Failed to reject employee');
     }
   });
 

@@ -42,7 +42,7 @@ export function ApprovalModal({
     const baseRoles: RoleOption[] = [
       {
         value: 'employee',
-        label: 'Employee',
+        label: 'Staff',
         description: 'Basic employee access with standard permissions',
         disabled: false,
         icon: User

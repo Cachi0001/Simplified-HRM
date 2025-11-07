@@ -93,20 +93,23 @@ const ConfirmEmail: React.FC<ConfirmEmailProps> = () => {
     setError(null);
     setIsExpired(false);
 
-    // CUSTOM: Always show success message regardless of what happens
     try {
-      // Simulate a brief delay to show the loading state
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      // Always mark as successful and show the approval message
+      console.log('📧 Calling backend to verify email with token:', token);
+      
+      // Actually call the backend API to verify the email
+      const response = await api.get(`/auth/verify-email/${token}`);
+      
+      console.log('✅ Email verification successful:', response.data);
+      
+      // Mark as successful
       localStorage.setItem('emailConfirmed', 'true');
       localStorage.removeItem('pendingConfirmationEmail');
       
       setHasCompleted(true);
       setIsSuccess(true);
       
-      // Always show "Email confirmed, please wait for approval" message
-      const successMessage = 'Email confirmed, please wait for approval';
+      // Show success message
+      const successMessage = response.data.message || 'Email confirmed successfully! Please wait for admin approval.';
       addToast('success', successMessage);
 
       // Store success status
@@ -123,21 +126,26 @@ const ConfirmEmail: React.FC<ConfirmEmailProps> = () => {
       }, 3000);
 
     } catch (err: any) {
-      // Even if there's an error, still show the success message
-      console.log('Showing success message regardless of error:', err);
+      console.error('❌ Email verification failed:', err);
       
-      localStorage.setItem('emailConfirmed', 'true');
-      localStorage.removeItem('pendingConfirmationEmail');
+      const errorMessage = err.response?.data?.error?.message || err.response?.data?.message || err.message || 'Failed to verify email';
       
-      setHasCompleted(true);
-      setIsSuccess(true);
-      
-      const successMessage = 'Email confirmed, please wait for approval';
-      addToast('success', successMessage);
-
-      setTimeout(() => {
-        navigate('/auth', { replace: true });
-      }, 3000);
+      // Check if already verified
+      if (errorMessage.includes('already verified') || errorMessage.includes('Invalid or expired')) {
+        if (errorMessage.includes('already verified')) {
+          addToast('info', 'Email already verified. You can now log in.');
+          setTimeout(() => {
+            navigate('/auth', { replace: true });
+          }, 2000);
+        } else {
+          setError(errorMessage);
+          setIsExpired(true);
+          addToast('error', errorMessage);
+        }
+      } else {
+        setError(errorMessage);
+        addToast('error', errorMessage);
+      }
     } finally {
       setIsVerifying(false);
     }
@@ -204,7 +212,7 @@ const ConfirmEmail: React.FC<ConfirmEmailProps> = () => {
         console.error(`❌ API error during resend confirmation [RequestID: ${requestId}]:`, apiError);
         
         // Check for specific error messages
-        const errorMessage = apiError.response?.data?.message || apiError.message;
+        const errorMessage = apiError.response?.data?.error?.message || apiError.response?.data?.message || apiError.message;
         
         if (errorMessage.includes('already verified') || errorMessage.includes('already confirmed')) {
           // Handle "already confirmed" as a special case

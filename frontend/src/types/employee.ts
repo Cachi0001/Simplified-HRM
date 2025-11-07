@@ -7,6 +7,7 @@ export interface Employee {
   fullName: string;
   role: 'employee' | 'hr' | 'admin' | 'superadmin';
   department?: string;
+  departmentId?: string;
   position?: string;
   phone?: string;
   address?: string;
@@ -31,7 +32,7 @@ export interface CreateEmployeeRequest {
   email: string;
   fullName: string;
   role?: string;
-  department?: string;
+  departmentId?: string;
   position?: string;
   phone?: string;
   address?: string;
@@ -41,7 +42,7 @@ export interface CreateEmployeeRequest {
 export interface UpdateEmployeeRequest {
   fullName?: string;
   role?: string;
-  department?: string;
+  departmentId?: string;
   position?: string;
   phone?: string;
   address?: string;

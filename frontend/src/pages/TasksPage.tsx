@@ -150,7 +150,7 @@ export default function TasksPage() {
       addToast('success', 'Task created successfully!');
     },
     onError: (error: any) => {
-      const errorMessage = error.message || error.response?.data?.message || 'Failed to create task';
+      const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || error.message || 'Failed to create task';
       addToast('error', errorMessage);
     },
   });

@@ -120,7 +120,7 @@ export function LeaveRequestsPage() {
       addToast('success', 'Leave request created successfully');
     } catch (error: any) {
       console.error('Error creating leave request:', error);
-      const errorMessage = error.response?.data?.message || error.message || 'Failed to create leave request';
+      const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || error.message || 'Failed to create leave request';
       addToast('error', errorMessage);
     } finally {
       setSubmitting(false);
@@ -169,7 +169,7 @@ export function LeaveRequestsPage() {
       addToast('success', 'Leave request approved successfully');
     } catch (error: any) {
       console.error('Error approving leave request:', error);
-      const errorMessage = error.response?.data?.message || 'Failed to approve leave request';
+      const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || 'Failed to approve leave request';
       addToast('error', errorMessage);
     } finally {
       setApproving(null);
@@ -207,7 +207,7 @@ export function LeaveRequestsPage() {
       setRejectReason('');
     } catch (error: any) {
       console.error('Error rejecting leave request:', error);
-      const errorMessage = error.response?.data?.message || 'Failed to reject leave request';
+      const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || 'Failed to reject leave request';
       addToast('error', errorMessage);
     } finally {
       setRejecting(null);

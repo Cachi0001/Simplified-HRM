@@ -63,7 +63,7 @@ export const AdminLeaveRequests: React.FC<AdminLeaveRequestsProps> = ({ darkMode
     },
     onError: (error: any) => {
       console.error('Approve error:', error);
-      addToast('error', error.response?.data?.message || 'Failed to approve leave request');
+      addToast('error', error.response?.data?.error?.message || error.response?.data?.message || 'Failed to approve leave request');
     }
   });
 
@@ -82,7 +82,7 @@ export const AdminLeaveRequests: React.FC<AdminLeaveRequestsProps> = ({ darkMode
     },
     onError: (error: any) => {
       console.error('Reject error:', error);
-      addToast('error', error.response?.data?.message || 'Failed to reject leave request');
+      addToast('error', error.response?.data?.error?.message || error.response?.data?.message || 'Failed to reject leave request');
     }
   });
 

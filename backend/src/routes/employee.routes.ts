@@ -1,55 +1,199 @@
-import dotenv from 'dotenv';
-import path from 'path';
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
-
-import { Router } from 'express';
-import { SupabaseEmployeeRepository } from '../repositories/implementations/SupabaseEmployeeRepository';
-import { EmployeeService } from '../services/EmployeeService';
-import { EmployeeController } from '../controllers/EmployeeController';
-import { authenticateToken, requireRole } from '../middleware/auth.middleware';
+import { Router, Request, Response, NextFunction } from 'express';
+import { EmployeeRepository } from '../repositories/EmployeeRepository';
+import { authenticate } from '../middleware/auth';
+import { NotFoundError, ValidationError } from '../middleware/errorHandler';
 
 const router = Router();
+const employeeRepo = new EmployeeRepository();
 
-const employeeRepository = new SupabaseEmployeeRepository();
-const employeeService = new EmployeeService(employeeRepository);
-const employeeController = new EmployeeController(employeeService);
+// All routes require authentication
+router.use(authenticate);
 
-router.use(authenticateToken);
+// Get pending employees (for admin approval)
+router.get('/pending', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const employees = await employeeRepo.findPending();
+    res.json({
+      success: true,
+      employees
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
-// Static routes before dynamic routes - ORDER MATTERS!
-router.get('/search', (req, res) => employeeController.searchEmployees(req, res));
-router.get('/for-chat', (req, res) => employeeController.getEmployeesForChat(req, res));
-router.get('/for-tasks', (req, res) => employeeController.getEmployeesForTasks(req, res));
-router.get('/my-profile', (req, res) => employeeController.getMyProfile(req, res));
-router.put('/my-profile', (req, res) => employeeController.updateMyProfile(req, res));
-router.get('/me', (req, res) => employeeController.getMyProfile(req, res));
-router.put('/me', (req, res) => employeeController.updateMyProfile(req, res));
-router.get('/pending', requireRole(['admin', 'hr', 'superadmin']), (req, res) => employeeController.getPendingApprovals(req, res));
-router.get('/stats', requireRole(['admin', 'hr', 'superadmin']), (req, res) => employeeController.getEmployeeStats(req, res));
-router.get('/approvals/history', requireRole(['admin', 'hr', 'superadmin']), (req, res) => employeeController.getApprovalHistory(req, res));
-router.get('/management', requireRole(['admin', 'hr', 'super-admin', 'superadmin']), (req, res) => employeeController.getEmployeesForManagement(req, res));
+// Get all employees (for management)
+router.get('/management', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { status, department } = req.query;
+    const filters: any = {};
+    
+    if (status) filters.status = status as string;
+    if (department) filters.department = department as string;
+    
+    const employees = await employeeRepo.findAll(filters);
+    res.json({
+      success: true,
+      data: employees
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
-router.post('/', requireRole(['admin', 'superadmin']), (req, res) => employeeController.createEmployee(req, res));
-router.get('/', requireRole(['admin', 'hr', 'super-admin', 'superadmin']), (req, res) => employeeController.getAllEmployees(req, res));
+// Get employees for task assignment
+router.get('/for-tasks', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const employees = await employeeRepo.findAll({ status: 'active' });
+    res.json({
+      success: true,
+      data: employees
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
-// Dynamic routes
-router.get('/:id', (req, res) => employeeController.getEmployeeById(req, res));
-router.put('/:id', requireRole(['admin', 'hr', 'super-admin', 'superadmin']), (req, res) => employeeController.updateEmployee(req, res));
-router.delete('/:id', requireRole(['admin', 'superadmin']), (req, res) => employeeController.deleteEmployee(req, res));
+// Get my profile
+router.get('/my-profile', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = (req as any).user?.userId;
+    if (!userId) {
+      throw new ValidationError('User ID not found');
+    }
+    
+    const employee = await employeeRepo.findByUserId(userId);
+    if (!employee) {
+      throw new NotFoundError('Employee profile not found');
+    }
+    
+    res.json({
+      success: true,
+      data: employee
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
-// Approval endpoints with role assignment
-router.post('/:id/approve-with-role', requireRole(['admin', 'hr', 'superadmin']), (req, res) => employeeController.approveEmployeeWithRole(req, res));
-router.post('/:id/approve', requireRole(['admin', 'hr', 'superadmin']), (req, res) => employeeController.approveEmployee(req, res));
-router.post('/:id/reject', requireRole(['admin', 'hr', 'superadmin']), (req, res) => employeeController.rejectEmployee(req, res));
-router.post('/:id/update-role', requireRole(['admin', 'super-admin']), (req, res) => employeeController.updateRole(req, res));
-router.post('/:id/department', requireRole(['admin', 'hr', 'super-admin']), (req, res) => employeeController.assignDepartment(req, res));
+// Update my profile
+router.put('/my-profile', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = (req as any).user?.userId;
+    if (!userId) {
+      throw new ValidationError('User ID not found');
+    }
+    
+    const employee = await employeeRepo.findByUserId(userId);
+    if (!employee) {
+      throw new NotFoundError('Employee profile not found');
+    }
+    
+    const updated = await employeeRepo.updateProfile(employee.id, req.body);
+    res.json({
+      success: true,
+      data: updated
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
-// Employee management endpoints (moved /management above to static routes section)
-router.put('/:id/status', requireRole(['admin', 'hr', 'super-admin', 'superadmin']), (req, res) => employeeController.updateEmployeeStatus(req, res));
-router.put('/:id/fields', requireRole(['admin', 'hr', 'super-admin', 'superadmin']), (req, res) => employeeController.updateEmployeeFields(req, res));
-router.get('/:id/status-history', requireRole(['admin', 'hr', 'super-admin', 'superadmin']), (req, res) => employeeController.getEmployeeStatusHistory(req, res));
+// Get employee by ID
+router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const employee = await employeeRepo.findById(req.params.id);
+    if (!employee) {
+      throw new NotFoundError('Employee not found');
+    }
+    
+    res.json({
+      success: true,
+      data: employee
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
-// Bulk operations
-router.post('/bulk-update', requireRole(['admin', 'hr', 'super-admin', 'superadmin']), (req, res) => employeeController.bulkUpdateEmployees(req, res));
+// Approve employee
+router.post('/:id/approve', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { role } = req.body;
+    const approverId = (req as any).user?.userId;
+    
+    const employee = await employeeRepo.approve(req.params.id, approverId, role || 'employee');
+    res.json({
+      success: true,
+      message: 'Employee approved successfully',
+      data: employee
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Reject employee
+router.post('/:id/reject', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { reason } = req.body;
+    const employee = await employeeRepo.reject(req.params.id, reason || 'Application rejected');
+    res.json({
+      success: true,
+      message: 'Employee rejected',
+      data: employee
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Bulk update employees
+router.post('/bulk-update', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { updates } = req.body;
+    
+    if (!Array.isArray(updates)) {
+      throw new ValidationError('Updates must be an array');
+    }
+    
+    const results = await Promise.all(
+      updates.map(async (update: any) => {
+        try {
+          const employee = await employeeRepo.updateProfile(update.id, update.data);
+          return { id: update.id, success: true, employee };
+        } catch (error: any) {
+          return { id: update.id, success: false, error: error.message };
+        }
+      })
+    );
+    
+    res.json({
+      success: true,
+      data: results
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Update working days
+router.put('/:id/working-days', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { workingDays } = req.body;
+    
+    if (!Array.isArray(workingDays)) {
+      throw new ValidationError('Working days must be an array');
+    }
+    
+    const employee = await employeeRepo.updateWorkingDays(req.params.id, workingDays);
+    res.json({
+      success: true,
+      data: employee
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 export default router;

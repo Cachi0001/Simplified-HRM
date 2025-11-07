@@ -142,7 +142,7 @@ class EmployeeService {
       return response.data;
     } catch (error: any) {
       console.error('Failed to update employee status:', error);
-      const errorMessage = error.response?.data?.message || 'Failed to update employee status';
+      const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || error.message || 'Failed to update employee status';
       return {
         success: false,
         error: errorMessage
@@ -166,7 +166,7 @@ class EmployeeService {
       return response.data;
     } catch (error: any) {
       console.error('Failed to update employee fields:', error);
-      const errorMessage = error.response?.data?.message || 'Failed to update employee fields';
+      const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || error.message || 'Failed to update employee fields';
       return {
         success: false,
         error: errorMessage

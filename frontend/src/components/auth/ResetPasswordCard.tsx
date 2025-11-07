@@ -49,10 +49,14 @@ const ResetPasswordCard: React.FC<ResetPasswordCardProps> = () => {
     setIsLoading(true);
 
     try {
-      const response = await api.post(`auth/reset-password/${token}`, { newPassword });
+      // Correct API call - send token in body, not URL
+      const response = await api.post('auth/reset-password', { 
+        token, 
+        newPassword 
+      });
 
-      if (response.status === 200) {
-        addToast('success', 'Password reset successfully! You can now sign in with your new password.');
+      if (response.data.success) {
+        addToast('success', response.data.message || 'Password reset successfully! You can now sign in with your new password.');
 
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
@@ -63,7 +67,8 @@ const ResetPasswordCard: React.FC<ResetPasswordCardProps> = () => {
         }, 2000);
       }
     } catch (err: any) {
-      addToast('error', err.message || 'Network error occurred. Please try again.');
+      const errorMessage = err.response?.data?.error?.message || err.response?.data?.message || err.message || 'Failed to reset password';
+      addToast('error', errorMessage);
     } finally {
       setIsLoading(false);
     }

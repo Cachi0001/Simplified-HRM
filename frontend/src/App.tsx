@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import HomePage from './pages/HomePage';
 import AuthPage from './pages/AuthPage';
 import ConfirmEmail from './pages/ConfirmEmail';
-import ResetPasswordCard from './components/auth/ResetPasswordCard';
+import ResetPassword from './pages/ResetPassword';
 import AdminDashboard from './pages/AdminDashboard';
 import EmployeeDashboard from './pages/EmployeeDashboard';
 import HRDashboard from './pages/HRDashboard';
@@ -25,7 +25,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import ApiConnectionTest from './components/ApiConnectionTest';
-import { FloatingChatWidget } from './components/chat/FloatingChatWidget';
+// import { FloatingChatWidget } from './components/chat/FloatingChatWidget'; // Temporarily hidden
 import { ChatDemo } from './components/demo/ChatDemo';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -60,13 +60,15 @@ function AppContent() {
   return (
     <div className="flex flex-col min-h-screen bg-primary">
       {!isDashboardPage && <Header />}
-      {isAuthenticated && isDashboardPage && <FloatingChatWidget />}
+      {/* Temporarily hidden - focusing on core functionality */}
+      {/* {isAuthenticated && isDashboardPage && <FloatingChatWidget />} */}
       <main className="flex-grow">
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/auth" element={<AuthPage />} />
           <Route path="/confirm" element={<ConfirmEmail />} />
-          <Route path="/reset-password" element={<ResetPasswordCard />} />
+          <Route path="/verify-email" element={<ConfirmEmail />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/dashboard" element={
             <ProtectedRoute>
               <AdminDashboard />

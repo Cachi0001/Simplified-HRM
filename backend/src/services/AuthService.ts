@@ -1,279 +1,181 @@
-import { IAuthRepository } from '../repositories/interfaces/IAuthRepository';
-import { IUser, CreateUserRequest, LoginRequest, AuthResponse } from '../models/SupabaseUser';
-import logger from '../utils/logger';
-import bcrypt from 'bcryptjs';
+import { UserRepository } from '../repositories/UserRepository';
+import { EmployeeRepository } from '../repositories/EmployeeRepository';
+import { EmailService } from './EmailService';
+import { generateToken } from '../config/jwt';
+import { RegisterData, LoginData, AuthResponse, PasswordResetRequest, PasswordResetConfirm } from '../types/auth.types';
+import { AuthenticationError, ConflictError, NotFoundError, ValidationError } from '../middleware/errorHandler';
 
 export class AuthService {
-  constructor(private authRepository: IAuthRepository) {}
+  private userRepo: UserRepository;
+  private employeeRepo: EmployeeRepository;
+  private emailService: EmailService;
 
-  async signUp(userData: CreateUserRequest): Promise<AuthResponse> {
-    try {
-      logger.info('🔍 [AuthService] Starting signup process', {
-        email: userData.email,
-        fullName: userData.fullName,
-        role: userData.role || 'employee',
-        hasPassword: !!userData.password
-      });
-
-      if (!userData.email || !userData.fullName || !userData.password) {
-        logger.error('❌ [AuthService] Missing required fields', {
-          hasEmail: !!userData.email,
-          hasFullName: !!userData.fullName,
-          hasPassword: !!userData.password
-        });
-        throw new Error('Email, full name, and password are required');
-      }
-
-      logger.info('🔄 [AuthService] Calling repository signup...');
-      const result = await this.authRepository.signUp(userData);
-
-      // Check if email confirmation is required
-      if (result.requiresEmailVerification) {
-        logger.info('📧 [AuthService] Email verification required - returning confirmation response', {
-          userId: result.user.id,
-          email: userData.email
-        });
-
-        return {
-          user: result.user,
-          accessToken: '',
-          refreshToken: '',
-          requiresEmailVerification: true,
-          message: result.message || 'Account created! Please check your email to verify your account before logging in.'
-        };
-      }
-
-      logger.info('✅ [AuthService] User signed up successfully', {
-        userId: result.user.id,
-        email: userData.email,
-        role: result.user.role
-      });
-
-      return result;
-    } catch (error) {
-      logger.error('❌ [AuthService] Signup failed', {
-        error: (error as Error).message,
-        stack: (error as Error).stack,
-        email: userData.email
-      });
-      throw error;
-    }
+  constructor() {
+    this.userRepo = new UserRepository();
+    this.employeeRepo = new EmployeeRepository();
+    this.emailService = new EmailService();
   }
 
-  async signIn(credentials: LoginRequest): Promise<AuthResponse> {
-    try {
-      logger.info('🔐 [AuthService] Password signin request', { email: credentials.email });
-
-      if (!credentials.email || !credentials.password) {
-        throw new Error('Email and password are required');
-      }
-
-      const result = await this.authRepository.signIn(credentials);
-
-      logger.info('✅ [AuthService] User signed in successfully', { email: credentials.email });
-      return result;
-    } catch (error) {
-      logger.error('❌ [AuthService] Signin failed', { error: (error as Error).message });
-      throw error;
+  async register(data: RegisterData): Promise<{ message: string }> {
+    const existingUser = await this.userRepo.findByEmail(data.email);
+    if (existingUser) {
+      throw new ConflictError('Email already registered');
     }
+
+    const user = await this.userRepo.create({
+      email: data.email,
+      password: data.password,
+      role: 'employee'
+    });
+
+    const employee = await this.employeeRepo.create({
+      userId: user.id,
+      email: data.email,
+      fullName: data.fullName,
+      phone: data.phoneNumber,
+      dateOfBirth: data.dateOfBirth,
+      address: data.address,
+      departmentId: data.departmentId
+    });
+
+    await this.emailService.sendWelcomeEmail(data.email, data.fullName);
+    
+    if (user.verification_token) {
+      await this.emailService.sendVerificationEmail(data.email, data.fullName, user.verification_token);
+    }
+
+    await this.notifyAdminsOfNewEmployee(data.fullName, data.email);
+
+    return { message: 'Registration successful. Please check your email for verification link.' };
   }
 
-  async signInWithGoogle(provider: string, idToken?: string): Promise<AuthResponse> {
-    try {
-      logger.info('AuthService: Google OAuth signin', { provider });
-
-      const result = await this.authRepository.signInWithOAuth(provider, idToken);
-
-      logger.info('AuthService: Google OAuth successful');
-      return result;
-    } catch (error) {
-      logger.error('AuthService: Google OAuth failed', { error: (error as Error).message });
-      throw error;
+  async login(data: LoginData): Promise<AuthResponse> {
+    const user = await this.userRepo.validatePassword(data.email, data.password);
+    
+    if (!user) {
+      throw new AuthenticationError('Invalid email or password');
     }
+
+    const employee = await this.employeeRepo.findByUserId(user.id);
+    
+    if (!employee) {
+      throw new NotFoundError('Employee profile not found');
+    }
+
+    // Check employee status BEFORE email verification
+    if (employee.status === 'pending') {
+      throw new AuthenticationError('Your account is pending admin approval. You will receive an email once approved.');
+    }
+
+    if (employee.status === 'rejected') {
+      throw new AuthenticationError('Your account has been rejected. Please contact support for more information.');
+    }
+
+    if (employee.status === 'inactive') {
+      throw new AuthenticationError('Your account is inactive. Please contact support.');
+    }
+
+    // Only check email verification if account is active
+    if (!user.email_verified) {
+      throw new AuthenticationError('Please verify your email before logging in. Check your inbox for the verification link.');
+    }
+
+    const token = generateToken({
+      userId: user.id,
+      email: user.email,
+      role: user.role
+    });
+
+    return {
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        fullName: employee.full_name
+      }
+    };
   }
 
-  async refreshToken(refreshToken: string): Promise<AuthResponse> {
-    try {
-      if (!refreshToken) {
-        throw new Error('Refresh token is required');
-      }
-
-      return await this.authRepository.refreshToken(refreshToken);
-    } catch (error) {
-      logger.error('AuthService: Token refresh failed', { error: (error as Error).message });
-      throw error;
+  async verifyEmail(token: string): Promise<{ message: string }> {
+    const user = await this.userRepo.verifyEmail(token);
+    
+    if (!user) {
+      throw new ValidationError('Invalid or expired verification token');
     }
-  }
 
-  async updatePassword(email: string, currentPassword: string, newPassword: string): Promise<void> {
-    try {
-      if (!email || !currentPassword || !newPassword) {
-        throw new Error('Email, current password, and new password are required');
-      }
-
-      // For Supabase, this would need to be implemented differently
-      // The current implementation assumes repository handles password updates
-      await this.authRepository.updatePasswordByEmail(email, newPassword);
-
-      logger.info('AuthService: Password updated successfully', { email });
-    } catch (error) {
-      logger.error('AuthService: Update password failed', { error: (error as Error).message });
-      throw error;
-    }
-  }
-
-  async getCurrentUser(accessToken: string): Promise<IUser> {
-    try {
-      if (!accessToken) {
-        throw new Error('Access token is required');
-      }
-
-      const user = await this.authRepository.getCurrentUser(accessToken);
-
-      if (!user) {
-        throw new Error('User not found');
-      }
-
-      return user;
-    } catch (error) {
-      logger.error('AuthService: Get current user failed', { error: (error as Error).message });
-      throw error;
-    }
-  }
-
-  async signOut(accessToken: string): Promise<void> {
-    try {
-      if (!accessToken) {
-        throw new Error('Access token is required');
-      }
-
-      await this.authRepository.signOut(accessToken);
-      logger.info('AuthService: User signed out');
-    } catch (error) {
-      logger.error('AuthService: Signout failed', { error: (error as Error).message });
-      throw error;
-    }
-  }
-
-  async resetPassword(email: string): Promise<void> {
-    try {
-      if (!email) {
-        throw new Error('Email is required');
-      }
-
-      await this.authRepository.resetPassword(email);
-      logger.info('AuthService: Password reset email sent', { email });
-    } catch (error) {
-      logger.error('AuthService: Password reset failed', { error: (error as Error).message });
-      throw error;
-    }
+    return { message: 'Email verified successfully. You can now log in.' };
   }
 
   async resendConfirmationEmail(email: string): Promise<{ message: string }> {
-    try {
-      if (!email) {
-        throw new Error('Email is required');
-      }
-
-      const result = await this.authRepository.resendConfirmationEmail(email);
-      logger.info('AuthService: Confirmation email resent', { email });
-
-      return result;
-    } catch (error) {
-      logger.error('AuthService: Resend confirmation failed', { error: (error as Error).message });
-      throw error;
+    const user = await this.userRepo.findByEmail(email);
+    
+    if (!user) {
+      throw new NotFoundError('User not found');
     }
+
+    if (user.email_verified) {
+      throw new ValidationError('Email is already verified');
+    }
+
+    const employee = await this.employeeRepo.findByUserId(user.id);
+    
+    if (!employee) {
+      throw new NotFoundError('Employee profile not found');
+    }
+
+    // Generate a new verification token
+    const newToken = await this.userRepo.regenerateVerificationToken(user.id);
+    
+    // Send the verification email
+    await this.emailService.sendVerificationEmail(email, employee.full_name, newToken);
+
+    return { message: 'Verification email sent successfully. Please check your inbox.' };
   }
 
-  async confirmEmail(accessToken: string, refreshToken: string): Promise<AuthResponse> {
-    try {
-      logger.info('🔗 [AuthService] Confirming email with tokens');
-
-      if (!accessToken || !refreshToken) {
-        throw new Error('Both access token and refresh token are required');
-      }
-
-      // Use the repository's refresh token method to verify and get new tokens
-      const result = await this.authRepository.refreshToken(refreshToken);
-
-      // Mark email as verified (Supabase version - no save() needed)
-      if (result.user) {
-        result.user.emailVerified = true;
-        result.user.emailVerificationToken = undefined;
-        logger.info('✅ [AuthService] Email confirmed successfully', {
-          userId: result.user.id,
-          email: result.user.email
-        });
-      }
-
-      return {
-        ...result,
-        message: 'Email verified successfully',
-      };
-    } catch (error) {
-      logger.error('❌ [AuthService] Confirm email failed', { error: (error as Error).message });
-      throw error;
+  async requestPasswordReset(data: PasswordResetRequest): Promise<{ message: string }> {
+    const user = await this.userRepo.findByEmail(data.email);
+    
+    if (!user) {
+      return { message: 'If the email exists, a password reset link has been sent.' };
     }
+
+    const employee = await this.employeeRepo.findByUserId(user.id);
+    
+    if (!employee) {
+      return { message: 'If the email exists, a password reset link has been sent.' };
+    }
+
+    const resetToken = await this.userRepo.createResetToken(data.email);
+    
+    await this.emailService.sendPasswordResetEmail(data.email, employee.full_name, resetToken);
+
+    return { message: 'If the email exists, a password reset link has been sent.' };
   }
 
-  async getEmployeeByUserId(userId: string): Promise<any> {
-    try {
-      return await this.authRepository.getEmployeeByUserId(userId);
-    } catch (error) {
-      logger.error('AuthService: Get employee by user ID failed', { error: (error as Error).message });
-      throw error;
+  async resetPassword(data: PasswordResetConfirm): Promise<{ message: string }> {
+    if (data.newPassword.length < 8) {
+      throw new ValidationError('Password must be at least 8 characters long');
     }
+
+    const user = await this.userRepo.resetPassword(data.token, data.newPassword);
+    
+    if (!user) {
+      throw new ValidationError('Invalid or expired reset token');
+    }
+
+    return { message: 'Password reset successfully. You can now log in with your new password.' };
   }
 
-  async createEmployeeRecord(employeeData: any): Promise<any> {
+  private async notifyAdminsOfNewEmployee(employeeName: string, employeeEmail: string): Promise<void> {
     try {
-      return await this.authRepository.createEmployeeRecord(employeeData);
-    } catch (error) {
-      logger.error('AuthService: Create employee record failed', { error: (error as Error).message });
-      throw error;
-    }
-  }
-
-  async confirmEmailByToken(token: string): Promise<AuthResponse> {
-    try {
-      logger.info('🔗 [AuthService] Confirming email by token', { token });
-
-      const result = await this.authRepository.confirmEmailByToken(token);
-
-      logger.info('✅ [AuthService] Email confirmed by token successfully', {
-        userId: result.user.id,
-        email: result.user.email
-      });
-
-      return result;
-    } catch (error) {
-      logger.error('❌ [AuthService] Confirm email by token failed', { error: (error as Error).message });
-      throw error;
-    }
-  }
-
-  async resetPasswordWithToken(token: string, newPassword: string): Promise<void> {
-    try {
-      if (!token || !newPassword) {
-        throw new Error('Token and new password are required');
-      }
-
-      await this.authRepository.resetPasswordWithToken(token, newPassword);
-      logger.info('AuthService: Password reset with token successful');
-    } catch (error) {
-      logger.error('AuthService: Password reset with token failed', { error: (error as Error).message });
-      throw error;
-    }
-  }
-
-  async addRefreshToken(userId: string, token: string): Promise<void> {
-    try {
-      if (this.authRepository.addRefreshToken) {
-        await this.authRepository.addRefreshToken(userId, token);
+      const admins = await this.userRepo.findByEmail('kayode@go3net.com.ng');
+      
+      if (admins) {
+        await this.emailService.sendNewEmployeeNotification(admins.email, employeeName, employeeEmail);
       }
     } catch (error) {
-      logger.error('AuthService: Add refresh token failed', { error: (error as Error).message });
-      throw error;
+      console.error('Failed to notify admins:', error);
     }
   }
 }

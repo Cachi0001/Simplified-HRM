@@ -129,7 +129,7 @@ export function PurchaseRequestsPage() {
       addToast('success', 'Purchase request created successfully');
     } catch (error: any) {
       console.error('Error creating purchase request:', error);
-      const errorMessage = error.response?.data?.message || error.message || 'Failed to create purchase request';
+      const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || error.message || 'Failed to create purchase request';
       addToast('error', errorMessage);
     } finally {
       setSubmitting(false);
@@ -178,7 +178,7 @@ export function PurchaseRequestsPage() {
       addToast('success', 'Purchase request approved successfully');
     } catch (error: any) {
       console.error('Error approving purchase request:', error);
-      const errorMessage = error.response?.data?.message || 'Failed to approve purchase request';
+      const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || 'Failed to approve purchase request';
       addToast('error', errorMessage);
     } finally {
       setApproving(null);
@@ -216,7 +216,7 @@ export function PurchaseRequestsPage() {
       setRejectReason('');
     } catch (error: any) {
       console.error('Error rejecting purchase request:', error);
-      const errorMessage = error.response?.data?.message || 'Failed to reject purchase request';
+      const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || 'Failed to reject purchase request';
       addToast('error', errorMessage);
     } finally {
       setRejecting(null);

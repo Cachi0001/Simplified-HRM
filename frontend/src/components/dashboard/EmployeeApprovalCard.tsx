@@ -54,7 +54,7 @@ export const EmployeeApprovalCard: React.FC<EmployeeApprovalCardProps> = ({
       queryClient.invalidateQueries({ queryKey: ['employees-management'] });
     },
     onError: (error: any) => {
-      addToast('error', error.response?.data?.message || 'Failed to update employee');
+      addToast('error', error.response?.data?.error?.message || error.response?.data?.message || 'Failed to update employee');
     }
   });
 
@@ -70,7 +70,7 @@ export const EmployeeApprovalCard: React.FC<EmployeeApprovalCardProps> = ({
       onApprove?.();
     },
     onError: (error: any) => {
-      addToast('error', error.response?.data?.message || 'Failed to approve employee');
+      addToast('error', error.response?.data?.error?.message || error.response?.data?.message || 'Failed to approve employee');
     }
   });
 
@@ -86,7 +86,7 @@ export const EmployeeApprovalCard: React.FC<EmployeeApprovalCardProps> = ({
       onReject?.();
     },
     onError: (error: any) => {
-      addToast('error', error.response?.data?.message || 'Failed to reject employee');
+      addToast('error', error.response?.data?.error?.message || error.response?.data?.message || 'Failed to reject employee');
     }
   });
 

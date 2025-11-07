@@ -84,7 +84,7 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
     queryFn: async () => {
       const response = await employeeService.getAllEmployees();
       // Filter out admin users for display purposes
-      const nonAdminEmployees = response.employees.filter((emp: any) => emp.role !== 'admin');
+      const nonAdminEmployees = response.filter((emp: any) => emp.role !== 'admin');
       return nonAdminEmployees;
     },
   });
@@ -102,7 +102,7 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
 
     },
     onError: (error: any) => {
-      const errorMessage = error.message || error.response?.data?.message || 'Failed to create task';
+      const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || error.message || 'Failed to create task';
       addToast('error', errorMessage);
     },
   });
@@ -222,7 +222,7 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
                     const value = normalizeId(emp.id);
                     return (
                       <option key={value} value={value}>
-                        {emp.fullName} ({emp.department || 'No Department'})
+                        {emp.full_name} ({emp.department || 'No Department'})
                       </option>
                     );
                   })}
@@ -375,7 +375,7 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
                     <div className={`flex items-center gap-2 ${darkMode ? 'text-blue-200' : 'text-blue-700'}`}>
                       <User className="h-4 w-4" />
                       <span className="font-medium">Assigned to:</span>
-                      <span className="font-semibold">{assignedEmployee?.fullName || 'Unknown Employee'}</span>
+                      <span className="font-semibold">{assignedEmployee?.full_name || 'Unknown Employee'}</span>
                     </div>
                     {assignedEmployee?.department && (
                       <div className={`text-xs ml-6 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>

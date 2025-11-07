@@ -1,98 +1,30 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import logger from '../utils/logger';
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
 
-export class SupabaseConfig {
-  private static instance: SupabaseConfig;
-  private supabase: SupabaseClient;
-  private isConnected = false;
+dotenv.config();
 
-  private constructor() {
-    this.supabase = createClient(
-      process.env.SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-  }
+const supabaseUrl = process.env.SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-  public static getInstance(): SupabaseConfig {
-    if (!SupabaseConfig.instance) {
-      SupabaseConfig.instance = new SupabaseConfig();
-    }
-    return SupabaseConfig.instance;
-  }
-
-  public async connect(): Promise<void> {
-    if (this.isConnected) {
-      logger.info('🔄 Supabase already connected');
-      return;
-    }
-
-    try {
-      if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-        throw new Error('Missing required Supabase environment variables');
-      }
-
-      // Test the connection by making a simple query
-      const { data, error } = await this.supabase
-        .from('users')
-        .select('count', { count: 'exact', head: true });
-
-      if (error && error.code !== 'PGRST116') { // PGRST116 is "table not found" which is OK for first run
-        throw error;
-      }
-
-      this.isConnected = true;
-      logger.info('✅ Supabase connected successfully');
-
-      // Log environment variables
-      // Supabase Environment Variables checked (reduced logging)
-
-    } catch (error) {
-      logger.error('❌ Failed to connect to Supabase:', {
-        error: error instanceof Error ? error.message : String(error),
-        supabaseUrl: process.env.SUPABASE_URL ? 'SET' : 'NOT SET',
-        serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'SET' : 'NOT SET'
-      });
-      throw error;
-    }
-  }
-
-  public async disconnect(): Promise<void> {
-    try {
-      // Supabase doesn't require explicit disconnection
-      this.isConnected = false;
-      logger.info('🔌 Supabase disconnected');
-    } catch (error) {
-      logger.error('❌ Error disconnecting from Supabase:', { error });
-      throw error;
-    }
-  }
-
-  public getClient(): SupabaseClient {
-    return this.supabase;
-  }
-
-  public isDbConnected(): boolean {
-    return this.isConnected;
-  }
-
-  public async healthCheck(): Promise<{
-    status: string;
-    connection: boolean;
-    hasSupabaseUrl: boolean;
-    supabaseUrlLength: number;
-    timestamp: string;
-  }> {
-    const hasSupabaseUrl = !!process.env.SUPABASE_URL;
-    const supabaseUrlLength = process.env.SUPABASE_URL?.length || 0;
-
-    return {
-      status: this.isConnected ? 'connected' : 'disconnected',
-      connection: this.isConnected,
-      hasSupabaseUrl,
-      supabaseUrlLength,
-      timestamp: new Date().toISOString()
-    };
-  }
+if (!supabaseUrl || !supabaseServiceKey) {
+  throw new Error('Missing Supabase credentials');
 }
 
-export default SupabaseConfig.getInstance();
+export const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  },
+  db: {
+    schema: 'public'
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'supabase-js-node'
+    }
+  }
+});
+
+console.log('✅ Supabase client initialized');
+
+export default supabase;

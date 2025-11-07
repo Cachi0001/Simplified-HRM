@@ -84,7 +84,7 @@ export function AdminDepartments({ darkMode = false, currentUser }: AdminDepartm
       addToast('success', `Department assigned successfully!`);
     },
     onError: (error: any) => {
-      const errorMessage = error.message || error.response?.data?.message || 'Failed to assign department';
+      const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || error.message || 'Failed to assign department';
       addToast('error', errorMessage);
     },
   });

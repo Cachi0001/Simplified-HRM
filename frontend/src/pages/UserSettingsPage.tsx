@@ -8,7 +8,7 @@ import { Input } from "../components/ui/Input";
 import { Badge } from "../components/ui/Badge";
 import { useToast } from "../components/ui/Toast";
 import { DarkModeToggle } from "../components/ui/DarkModeToggle";
-import { Logo } from "../components/ui/Logo";
+import Logo from "../components/ui/Logo";
 import { BottomNavbar } from "../components/layout/BottomNavbar";
 import { NotificationBell } from "../components/dashboard/NotificationBell";
 import { ProfileFieldRestrictions } from "../components/profile/ProfileFieldRestrictions";
@@ -123,20 +123,19 @@ export default function UserSettingsPage({
 
         // Fetch full employee details
         if (user.id) {
-          const employeeResponse = await employeeService.getEmployeeById(
+          const employee = await employeeService.getEmployee(
             user.id,
           );
-          const employee = employeeResponse.employee;
 
           if (employee) {
             setFormData({
-              fullName: employee.fullName || "",
+              fullName: (employee as any).fullName || (employee as any).full_name || "",
               email: employee.email || "",
               phone: employee.phone || "",
               address: employee.address || "",
               department: employee.department || "",
               position: employee.position || "",
-              dateOfBirth: employee.dateOfBirth || "",
+              dateOfBirth: (employee as any).hireDate || (employee as any).hire_date || "",
             });
           }
         }
@@ -308,13 +307,11 @@ export default function UserSettingsPage({
 
       // Use updateMyProfile for current user
       const response = await employeeService.updateMyProfile({
-        fullName: formData.fullName,
         email: formData.email,
         phone: formData.phone,
         address: formData.address,
         department: formData.department,
         position: formData.position,
-        dateOfBirth: formData.dateOfBirth,
       });
 
       console.log("[UserSettings] Profile updated successfully:", response);
@@ -335,6 +332,7 @@ export default function UserSettingsPage({
     } catch (error: any) {
       console.error("[UserSettings] Error saving profile:", error);
       const errorMessage =
+        error.response?.data?.error?.message ||
         error.response?.data?.message ||
         error.message ||
         "Failed to update profile";
@@ -517,9 +515,9 @@ export default function UserSettingsPage({
                 <Badge
                   variant={
                     userRole === "admin"
-                      ? "error"
+                      ? "destructive"
                       : userRole === "hr"
-                        ? "warning"
+                        ? "secondary"
                         : "default"
                   }
                   className="mt-3 w-full justify-center"
@@ -555,6 +553,8 @@ export default function UserSettingsPage({
                         Full Name *
                       </label>
                       <Input
+                        id="fullName"
+                        label=""
                         name="fullName"
                         value={formData.fullName}
                         onChange={handleFormChange}
@@ -577,6 +577,8 @@ export default function UserSettingsPage({
                         Email *
                       </label>
                       <Input
+                        id="email"
+                        label=""
                         name="email"
                         type="email"
                         value={formData.email}
@@ -600,6 +602,8 @@ export default function UserSettingsPage({
                         Phone
                       </label>
                       <Input
+                        id="phone"
+                        label=""
                         name="phone"
                         type="tel"
                         value={formData.phone}
@@ -616,6 +620,8 @@ export default function UserSettingsPage({
                         Date of Birth
                       </label>
                       <Input
+                        id="dateOfBirth"
+                        label=""
                         name="dateOfBirth"
                         type="date"
                         value={formData.dateOfBirth}
@@ -665,6 +671,8 @@ export default function UserSettingsPage({
                         Position
                       </label>
                       <Input
+                        id="position"
+                        label=""
                         name="position"
                         value={formData.position}
                         onChange={handleFormChange}
@@ -680,6 +688,8 @@ export default function UserSettingsPage({
                         Address
                       </label>
                       <Input
+                        id="address"
+                        label=""
                         name="address"
                         value={formData.address}
                         onChange={handleFormChange}

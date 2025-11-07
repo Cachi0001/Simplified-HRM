@@ -200,7 +200,8 @@ const WorkingDaysConfig: React.FC<WorkingDaysConfigProps> = ({
       console.error("Error saving working days config:", error);
       addToast(
         "error",
-        error.response?.data?.message ||
+        error.response?.data?.error?.message ||
+          error.response?.data?.message ||
           "Failed to save working days configuration",
       );
     } finally {

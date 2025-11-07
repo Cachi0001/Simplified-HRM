@@ -85,7 +85,7 @@ export function AttendanceWidget({ darkMode = false, userRole = 'employee', clas
         }
       }
     } catch (error: any) {
-      setError(error.response?.data?.message || 'Failed to check in');
+      setError(error.response?.data?.error?.message || error.response?.data?.message || 'Failed to check in');
     } finally {
       setIsLoading(false);
     }
@@ -108,7 +108,7 @@ export function AttendanceWidget({ darkMode = false, userRole = 'employee', clas
         await fetchCurrentStatus();
       }
     } catch (error: any) {
-      setError(error.response?.data?.message || 'Failed to check out');
+      setError(error.response?.data?.error?.message || error.response?.data?.message || 'Failed to check out');
     } finally {
       setIsLoading(false);
     }

@@ -10,64 +10,69 @@ export class AuthService {
     return AuthService.instance;
   }
 
-  // Login user (passwordless with magic links)
+  // Login user
   async login(credentials: LoginRequest): Promise<AuthResponse> {
     try {
-      const response = await api.post<AuthResponse>('/auth/login', credentials);
+      const response = await api.post('/auth/login', credentials);
 
-      if (response.data.data.requiresConfirmation) {
-        // Magic link sent - return the response as is
-        return response.data;
-      }
-
-      // User is logged in immediately (fallback for direct login)
-      if (response.data.data.accessToken && response.data.data.refreshToken) {
-        // Store tokens and user data
-        localStorage.setItem('accessToken', response.data.data.accessToken);
-        localStorage.setItem('refreshToken', response.data.data.refreshToken);
-        localStorage.setItem('user', JSON.stringify(response.data.data.user));
-      }
-
-      return response.data;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Login failed');
-    }
-  }
-
-  // Signup user
-  async signup(userData: SignupRequest): Promise<{ requiresConfirmation: boolean; message: string; user?: User }> {
-    try {
-      const response = await api.post<AuthResponse>('/auth/signup', userData);
-
-      // Check if response indicates an error (user already exists)
-      if (response.data.status === 'error') {
-        throw new Error(response.data.message || 'Signup failed');
-      }
-
-      // Check if email confirmation is required
-      if (response.data.data.requiresConfirmation || response.data.data.requiresEmailVerification) {
+      // New backend returns: { success: true, data: { token, user } }
+      if (response.data.success && response.data.data) {
+        const { token, user } = response.data.data;
+        
+        // Store token and user data
+        localStorage.setItem('accessToken', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        
+        // Return in expected format
         return {
-          requiresConfirmation: true,
-          message: response.data.message,
-          user: response.data.data.user
+          status: 'success',
+          message: 'Login successful',
+          data: {
+            user: {
+              id: user.id,
+              email: user.email,
+              fullName: user.fullName,
+              role: user.role,
+              status: 'active',
+              emailVerified: true,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            },
+            accessToken: token,
+            refreshToken: token // Using same token for now
+          }
         };
       }
 
-      // User is confirmed and logged in (fallback)
-      if (response.data.data.accessToken && response.data.data.refreshToken) {
-        // Store tokens and user data
-        localStorage.setItem('accessToken', response.data.data.accessToken);
-        localStorage.setItem('refreshToken', response.data.data.refreshToken);
-        localStorage.setItem('user', JSON.stringify(response.data.data.user));
+      throw new Error('Invalid response from server');
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error?.message || error.response?.data?.error || error.message || 'Login failed';
+      throw new Error(errorMessage);
+    }
+  }
+
+  // Signup user (register)
+  async signup(userData: SignupRequest): Promise<{ requiresConfirmation: boolean; message: string; user?: User }> {
+    try {
+      const response = await api.post('/auth/register', {
+        email: userData.email,
+        password: userData.password,
+        fullName: userData.fullName
+      });
+
+      // New backend returns: { success: true, message: "..." }
+      if (response.data.success) {
+        return {
+          requiresConfirmation: true,
+          message: response.data.message || 'Registration successful. Please check your email for verification link.',
+          user: undefined
+        };
       }
 
-      return {
-        requiresConfirmation: false,
-        message: response.data.message,
-        user: response.data.data.user
-      };
+      throw new Error('Invalid response from server');
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Signup failed');
+      const errorMessage = error.response?.data?.error?.message || error.response?.data?.error || error.message || 'Signup failed';
+      throw new Error(errorMessage);
     }
   }
 
@@ -77,7 +82,8 @@ export class AuthService {
       const response = await api.get<{ status: string; data: { user: User } }>('/auth/me');
       return response.data.data.user;
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to get user');
+      const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || error.message || 'Failed to get user';
+      throw new Error(errorMessage);
     }
   }
 
@@ -94,7 +100,8 @@ export class AuthService {
       });
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Token refresh failed');
+      const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || error.message || 'Token refresh failed';
+      throw new Error(errorMessage);
     }
   }
 
@@ -122,55 +129,51 @@ export class AuthService {
         message: response.data.message || 'Password updated successfully'
       };
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Password update failed');
+      const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || error.message || 'Password update failed';
+      throw new Error(errorMessage);
     }
   }
 
   // Reset password (request)
   async resetPassword(email: string): Promise<{ success: boolean; message: string }> {
     try {
-      // Generate a unique request ID for tracking
       const requestId = `forgot_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
       console.log(`🔑 Requesting password reset for ${email} [Request ID: ${requestId}]`);
 
-      // Use relative URL without leading slash to prevent double slash issues
-      const forgotUrl = `auth/forgot-password`;
-      console.log(`🔗 Password reset request URL: ${forgotUrl}`);
-
-      const response = await api.post(forgotUrl, { email });
+      const response = await api.post('auth/forgot-password', { email });
 
       console.log(`✅ Password reset email sent successfully [Request ID: ${requestId}]`);
       return {
-        success: true,
+        success: response.data.success || true,
         message: response.data.message || 'Password reset email sent successfully'
       };
     } catch (error: any) {
       console.error('❌ Failed to send password reset email', error);
-      throw new Error(error.message || 'Failed to send password reset email');
+      const errorMessage = error.response?.data?.error?.message || error.response?.data?.error || error.message || 'Failed to send password reset email';
+      throw new Error(errorMessage);
     }
   }
 
   // Complete password reset (with token)
   async completePasswordReset(token: string, newPassword: string): Promise<{ success: boolean; message: string }> {
     try {
-      // Generate a unique request ID for tracking
       const requestId = `reset_complete_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
       console.log(`🔑 Completing password reset with token [Request ID: ${requestId}]`);
 
-      // Use relative URL without leading slash to prevent double slash issues
-      const resetUrl = `auth/reset-password/${token}`;
-      console.log(`🔗 Password reset URL: ${resetUrl}`);
-
-      const response = await api.post(resetUrl, { newPassword });
+      const response = await api.post('auth/reset-password', { 
+        token, 
+        newPassword 
+      });
 
       console.log(`✅ Password reset completed successfully [Request ID: ${requestId}]`);
       return {
-        success: true,
+        success: response.data.success || true,
         message: response.data.message || 'Password reset successfully'
       };
     } catch (error: any) {
       console.error('❌ Failed to complete password reset', error);
-      throw new Error(error.message || 'Failed to reset password');
+      const errorMessage = error.response?.data?.error?.message || error.response?.data?.error || error.message || 'Failed to reset password';
+      throw new Error(errorMessage);
     }
   }
 
@@ -180,7 +183,8 @@ export class AuthService {
       const response = await api.post('/auth/resend-confirmation', { email });
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to resend confirmation email');
+      const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || error.message || 'Failed to resend confirmation email';
+      throw new Error(errorMessage);
     }
   }
 
