@@ -121,15 +121,12 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // Special handling for password reset endpoints
     if (config.url?.includes('auth/reset-password/') ||
         config.url?.includes('auth/forgot-password')) {
       console.log(`🔑 Password reset request detected [${requestId}]`);
 
-      // Set a longer timeout for password reset requests
       config.timeout = 15000; // 15 seconds
 
-      // Add specific Accept header to handle potential non-JSON responses
       config.headers.Accept = 'application/json, text/plain, */*';
     }
 
@@ -229,6 +226,34 @@ api.interceptors.response.use(
     // Add error ID and request ID to the error object for reference
     error.errorId = errorId;
     error.requestId = requestId;
+    
+    // CASE 0: HTML error responses (server returned HTML instead of JSON)
+    if (error.response?.data && typeof error.response.data === 'string' && 
+        error.response.data.includes('<!DOCTYPE html>')) {
+      console.error(`❌ HTML error response detected [${errorId}]:`, error.response.data.substring(0, 200));
+      
+      // Extract error message from HTML if possible
+      const match = error.response.data.match(/<pre>(.*?)<\/pre>/);
+      const htmlError = match ? match[1] : 'Server error';
+      
+      // Check if it's a "Cannot GET" error (route not found)
+      if (htmlError.includes('Cannot GET') || htmlError.includes('Cannot POST')) {
+        const endpoint = error.config?.url || 'unknown endpoint';
+        error.message = `API endpoint not found: ${endpoint}. Please contact support if this persists.`;
+      } else {
+        error.message = `Server error: ${htmlError}. Please try again or contact support.`;
+      }
+      
+      // Prevent the HTML from being shown to users
+      if (error.response.data) {
+        error.response.data = { 
+          error: { message: error.message },
+          success: false 
+        };
+      }
+      
+      return Promise.reject(error);
+    }
     
     // Special handling for password reset endpoints
     if (error.config?.url?.includes('auth/reset-password/') ||

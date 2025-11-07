@@ -1,78 +1,53 @@
 import { Request, Response, NextFunction } from 'express';
-import { verifyToken, JWTPayload } from '../config/jwt';
-import { UserRepository } from '../repositories/UserRepository';
-import { AuthenticationError, AuthorizationError } from './errorHandler';
+import jwt from 'jsonwebtoken';
+import { AuthenticationError } from './errorHandler';
 
-export interface AuthRequest extends Request {
-  user?: {
-    id: string;
-    email: string;
-    role: string;
-  };
+interface JwtPayload {
+  userId: string;
+  email: string;
+  role: string;
 }
 
-export const authenticate = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
+export const authenticate = (req: Request, res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers.authorization;
-
+    
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       throw new AuthenticationError('No token provided');
     }
-
+    
     const token = authHeader.substring(7);
-
-    let payload: JWTPayload;
-    try {
-      payload = verifyToken(token);
-    } catch (error) {
-      throw new AuthenticationError('Invalid or expired token');
-    }
-
-    const userRepo = new UserRepository();
-    const user = await userRepo.findById(payload.userId);
-
-    if (!user) {
-      throw new AuthenticationError('User not found');
-    }
-
-    if (!user.email_verified) {
-      throw new AuthenticationError('Email not verified');
-    }
-
-    req.user = {
-      id: user.id,
-      email: user.email,
-      role: user.role
-    };
-
+    const secret = process.env.JWT_SECRET || 'your-secret-key';
+    
+    const decoded = jwt.verify(token, secret) as JwtPayload;
+    
+    // Attach user info to request
+    (req as any).user = decoded;
+    
     next();
   } catch (error) {
-    next(error);
+    if (error instanceof jwt.JsonWebTokenError) {
+      next(new AuthenticationError('Invalid token'));
+    } else if (error instanceof jwt.TokenExpiredError) {
+      next(new AuthenticationError('Token expired'));
+    } else {
+      next(error);
+    }
   }
 };
 
-export const requireRole = (...allowedRoles: string[]) => {
-  return (req: AuthRequest, res: Response, next: NextFunction): void => {
-    try {
-      if (!req.user) {
-        throw new AuthenticationError('Authentication required');
-      }
-
-      if (!allowedRoles.includes(req.user.role)) {
-        throw new AuthorizationError('Insufficient permissions');
-      }
-
-      next();
-    } catch (error) {
-      next(error);
+export const authorize = (...roles: string[]) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const user = (req as any).user;
+    
+    if (!user) {
+      return next(new AuthenticationError('Not authenticated'));
     }
+    
+    if (!roles.includes(user.role)) {
+      return next(new AuthenticationError('Insufficient permissions'));
+    }
+    
+    next();
   };
 };
-
-export const requireSupervisor = requireRole('hr', 'admin', 'superadmin', 'teamlead');
-export const requireAdmin = requireRole('admin', 'superadmin');
-export const requireSuperAdmin = requireRole('superadmin');

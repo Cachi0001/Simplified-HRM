@@ -5,6 +5,11 @@ import dotenv from 'dotenv';
 import { errorHandler } from './middleware/errorHandler';
 import { requestLogger } from './middleware/requestLogger';
 import authRoutes from './routes/auth.routes';
+import employeeRoutes from './routes/employee.routes';
+import departmentRoutes from './routes/department.routes';
+import leaveRoutes from './routes/leave.routes';
+import purchaseRoutes from './routes/purchase.routes';
+import attendanceRoutes from './routes/attendance.routes';
 
 dotenv.config();
 
@@ -42,6 +47,11 @@ app.get('/api/health', (req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/employees', employeeRoutes);
+app.use('/api/departments', departmentRoutes);
+app.use('/api/leave', leaveRoutes);
+app.use('/api/purchase', purchaseRoutes);
+app.use('/api/attendance', attendanceRoutes);
 
 app.use(errorHandler);
 

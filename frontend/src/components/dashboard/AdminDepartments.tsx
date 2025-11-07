@@ -13,25 +13,10 @@ interface AdminDepartmentsProps {
   currentUser?: any;
 }
 
-const COMMON_DEPARTMENTS = [
-  'Engineering',
-  'Marketing',
-  'Sales',
-  'HR',
-  'Finance',
-  'Operations',
-  'Customer Service',
-  'Product',
-  'Design',
-  'Legal'
-];
-
 export function AdminDepartments({ darkMode = false, currentUser }: AdminDepartmentsProps) {
   const [selectedEmployee, setSelectedEmployee] = useState<string>('');
-  const [newDepartment, setNewDepartment] = useState<string>('');
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('');
   const [showAssignForm, setShowAssignForm] = useState(false);
-  const [customDepartment, setCustomDepartment] = useState('');
-  const [quickAssignDepartment, setQuickAssignDepartment] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
   const { addToast } = useToast();
@@ -54,33 +39,28 @@ export function AdminDepartments({ darkMode = false, currentUser }: AdminDepartm
     queryKey: ['employees'],
     queryFn: async () => {
       const response = await employeeService.getAllEmployees();
-      // Filter out admin users for display purposes
-      const nonAdminEmployees = response.employees.filter((emp: any) => emp.role !== 'admin');
-      
-      // Log employee data for debugging
-      console.log('📊 [AdminDepartments] Fetched employees:', nonAdminEmployees.map((emp: any) => ({
-        fullName: emp.fullName,
-        id: emp.id,
-        _id: emp._id,
-        idType: typeof emp.id,
-        _idType: typeof emp._id
-      })));
-      
-      return nonAdminEmployees;
+      return response.filter((emp: any) => emp.role !== 'admin');
+    },
+  });
+
+  // Fetch all departments from API
+  const { data: departments = [], isLoading: departmentsLoading } = useQuery({
+    queryKey: ['departments'],
+    queryFn: async () => {
+      return await employeeService.getDepartments();
     },
   });
 
   // Assign department mutation
   const assignDepartmentMutation = useMutation({
-    mutationFn: async ({ employeeId, department }: { employeeId: string; department: string }) => {
-      return await employeeService.assignDepartment(employeeId, department);
+    mutationFn: async ({ employeeId, departmentId }: { employeeId: string; departmentId: string }) => {
+      return await employeeService.updateEmployeeFields(employeeId, { department_id: departmentId });
     },
-    onSuccess: (data, variables) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       setShowAssignForm(false);
       setSelectedEmployee('');
-      setNewDepartment('');
-      setCustomDepartment('');
+      setSelectedDepartmentId('');
       addToast('success', `Department assigned successfully!`);
     },
     onError: (error: any) => {
@@ -90,14 +70,14 @@ export function AdminDepartments({ darkMode = false, currentUser }: AdminDepartm
   });
 
   const handleAssignDepartment = () => {
-    if (!selectedEmployee || !newDepartment) {
+    if (!selectedEmployee || !selectedDepartmentId) {
       addToast('error', 'Select an employee and department first.');
       return;
     }
 
     assignDepartmentMutation.mutate({
       employeeId: selectedEmployee,
-      department: newDepartment
+      departmentId: selectedDepartmentId
     });
   };
 
@@ -184,35 +164,21 @@ export function AdminDepartments({ darkMode = false, currentUser }: AdminDepartm
                   Department *
                 </label>
                 <select
-                  value={newDepartment}
-                  onChange={(e) => setNewDepartment(e.target.value)}
+                  value={selectedDepartmentId}
+                  onChange={(e) => setSelectedDepartmentId(e.target.value)}
                   className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
+                  disabled={departmentsLoading}
                 >
                   <option value="">Select Department</option>
-                  {COMMON_DEPARTMENTS.map(dept => (
-                    <option key={dept} value={dept}>{dept}</option>
+                  {departments.map(dept => (
+                    <option key={dept.id} value={dept.id}>
+                      {dept.name} {dept.team_lead_name ? `(Lead: ${dept.team_lead_name})` : ''}
+                    </option>
                   ))}
                 </select>
-              </div>
-            </div>
-
-            {/* Custom Department Input */}
-            <div className="mb-4">
-              <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                Or add custom department
-              </label>
-              <div className="flex gap-2">
-                <Input
-                  id="customDepartment"
-                  label="Custom Department"
-                  value={customDepartment}
-                  onChange={(e) => setCustomDepartment(e.target.value)}
-                  placeholder="Enter custom department name"
-                  className="flex-1"
-                />
-                <Button onClick={addCustomDepartment}>
-                  Add
-                </Button>
+                {departmentsLoading && (
+                  <p className="text-sm text-gray-500 mt-1">Loading departments...</p>
+                )}
               </div>
             </div>
 
@@ -225,8 +191,7 @@ export function AdminDepartments({ darkMode = false, currentUser }: AdminDepartm
                 onClick={() => {
                   setShowAssignForm(false);
                   setSelectedEmployee('');
-                  setNewDepartment('');
-                  setCustomDepartment('');
+                  setSelectedDepartmentId('');
                 }}
                 disabled={assignDepartmentMutation.isPending}
                 className="border border-gray-300 text-gray-700 hover:bg-gray-50"
@@ -238,36 +203,6 @@ export function AdminDepartments({ darkMode = false, currentUser }: AdminDepartm
           </div>
         </Card>
       )}
-
-      {/* Quick Assignment - Hidden for superadmin */}
-      {currentUser?.role !== 'superadmin' && (
-        <Card className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-          <div className="p-6">
-            <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-              Quick Department Assignment
-            </h3>
-
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">
-              {COMMON_DEPARTMENTS.map((dept, idx) => (
-                <Button
-                  key={`quick-assign-${dept}-${idx}`}
-                  onClick={() => {
-                    const employee = employeesWithoutDepartment[0];
-                    if (employee) {
-                      const empId = getEmployeeId(employee);
-                      handleQuickAssign(empId, dept);
-                    } else {
-                      addToast('info', 'No employees without departments available.');
-                    }
-                  }}
-                  isLoading={assignDepartmentMutation.isPending && quickAssignDepartment === dept}
-                  disabled={
-                    employeesWithoutDepartment.length === 0 ||
-                    (assignDepartmentMutation.isPending && quickAssignDepartment !== dept)
-                  }
-                  className={`text-xs ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
-                >
-                  {dept}
                 </Button>
               ))}
             </div>

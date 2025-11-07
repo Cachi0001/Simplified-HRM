@@ -58,7 +58,7 @@ export class EmailService {
             overflow: hidden;
           }
           .header { 
-            background: #3498db; 
+            background: #00BFFF; 
             color: #ffffff; 
             padding: 40px 30px; 
             text-align: center;
@@ -86,29 +86,29 @@ export class EmailService {
           .content strong {
             color: #ffffff;
           }
-          .button { 
+          a[class="button"] { 
             display: inline-block; 
             padding: 14px 32px; 
-            background: #3498db; 
+            background-color: #00BFFF !important; 
             color: #ffffff !important; 
-            text-decoration: none; 
+            text-decoration: none !important; 
             border-radius: 8px; 
             margin: 25px 0;
             font-weight: 600;
-            transition: background 0.3s ease;
+            mso-hide: none;
           }
-          .button:hover {
-            background: #2980b9;
+          a[class="button"]:hover {
+            background-color: #0099CC !important;
           }
-          .button:visited {
+          a[class="button"]:visited {
             color: #ffffff !important;
           }
-          .button:active {
+          a[class="button"]:active {
             color: #ffffff !important;
           }
           .info-box {
             background: #415A77;
-            border-left: 4px solid #3498db;
+            border-left: 4px solid #00BFFF;
             padding: 15px;
             margin: 20px 0;
             border-radius: 4px;
@@ -171,7 +171,7 @@ export class EmailService {
       <h2>Verify Your Email Address</h2>
       <p>Hello ${fullName},</p>
       <p>Please verify your email address by clicking the button below:</p>
-      <a href="${verificationUrl}" class="button">Verify Email</a>
+      <a href="${verificationUrl}" class="button" style="background-color: #00BFFF !important; color: #ffffff !important; text-decoration: none !important; display: inline-block; padding: 14px 32px; border-radius: 8px; font-weight: 600;">Verify Email</a>
       <p>Or copy and paste this link into your browser:</p>
       <p style="word-break: break-all;">${verificationUrl}</p>
       <p>This link will expire in 24 hours.</p>
@@ -188,7 +188,7 @@ export class EmailService {
       <h2>Password Reset Request</h2>
       <p>Hello ${fullName},</p>
       <p>We received a request to reset your password. Click the button below to reset it:</p>
-      <a href="${resetUrl}" class="button">Reset Password</a>
+      <a href="${resetUrl}" class="button" style="background-color: #00BFFF !important; color: #ffffff !important; text-decoration: none !important; display: inline-block; padding: 14px 32px; border-radius: 8px; font-weight: 600;">Reset Password</a>
       <p>Or copy and paste this link into your browser:</p>
       <p style="word-break: break-all;">${resetUrl}</p>
       <p>This link will expire in 24 hours.</p>
@@ -206,7 +206,7 @@ export class EmailService {
       <p>Hello ${fullName},</p>
       <p>Great news! Your account has been approved by our HR team.</p>
       <p>You can now log in and access the Go3net HR Management System.</p>
-      <a href="${loginUrl}" class="button">Login Now</a>
+      <a href="${loginUrl}" class="button" style="background-color: #00BFFF !important; color: #ffffff !important; text-decoration: none !important; display: inline-block; padding: 14px 32px; border-radius: 8px; font-weight: 600;">Login Now</a>
       <p>Welcome to the team!</p>
     `;
     
@@ -233,7 +233,7 @@ export class EmailService {
       <p>A new employee has registered and is awaiting approval:</p>
       <p><strong>Name:</strong> ${employeeName}</p>
       <p><strong>Email:</strong> ${employeeEmail}</p>
-      <a href="${approvalUrl}" class="button">Review Application</a>
+      <a href="${approvalUrl}" class="button" style="background-color: #00BFFF !important; color: #ffffff !important; text-decoration: none !important; display: inline-block; padding: 14px 32px; border-radius: 8px; font-weight: 600;">Review Application</a>
     `;
     
     await this.sendEmail(adminEmail, 'New Employee Registration - Go3net HR', this.getEmailTemplate(content));
@@ -247,7 +247,7 @@ export class EmailService {
       <p>Hello ${fullName},</p>
       <p>This is a friendly reminder that you haven't clocked out yet today.</p>
       <p>Please remember to clock out before leaving the office.</p>
-      <a href="${attendanceUrl}" class="button">Clock Out Now</a>
+      <a href="${attendanceUrl}" class="button" style="background-color: #00BFFF !important; color: #ffffff !important; text-decoration: none !important; display: inline-block; padding: 14px 32px; border-radius: 8px; font-weight: 600;">Clock Out Now</a>
     `;
     
     await this.sendEmail(email, 'Checkout Reminder - Go3net HR', this.getEmailTemplate(content));
@@ -270,7 +270,7 @@ export class EmailService {
       <p>You have been assigned a new task:</p>
       <p><strong>Task:</strong> ${taskTitle}</p>
       ${dueDate ? `<p><strong>Due Date:</strong> ${new Date(dueDate).toLocaleDateString()}</p>` : ''}
-      <a href="${tasksUrl}" class="button">View Task</a>
+      <a href="${tasksUrl}" class="button" style="background-color: #00BFFF !important; color: #ffffff !important; text-decoration: none !important; display: inline-block; padding: 14px 32px; border-radius: 8px; font-weight: 600;">View Task</a>
     `;
     
     await this.sendEmail(email, 'New Task Assigned - Go3net HR', this.getEmailTemplate(content));
@@ -334,7 +334,7 @@ export class EmailService {
       <p>Hello ${fullName},</p>
       <h3>${title}</h3>
       <p>${content}</p>
-      <a href="${announcementsUrl}" class="button">View All Announcements</a>
+      <a href="${announcementsUrl}" class="button" style="background-color: #00BFFF !important; color: #ffffff !important; text-decoration: none !important; display: inline-block; padding: 14px 32px; border-radius: 8px; font-weight: 600;">View All Announcements</a>
     `;
     
     await this.sendEmail(email, `New Announcement: ${title} - Go3net HR`, this.getEmailTemplate(emailContent));

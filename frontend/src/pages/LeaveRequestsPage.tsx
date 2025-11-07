@@ -57,22 +57,16 @@ export function LeaveRequestsPage() {
   const fetchLeaveRequests = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/leave');
-      const apiResponse = response.data as LeaveRequestResponse;
+      const response = await api.get('/api/leave/my-requests');
       
-      if (apiResponse.status === 'error') {
-        throw new Error(apiResponse.message || 'Failed to fetch leave requests');
+      if (response.data.success) {
+        setLeaveRequests(response.data.data || []);
+      } else {
+        throw new Error('Failed to fetch leave requests');
       }
-      
-      const requests = apiResponse.data?.leaveRequests || [];
-      
-      // Transform data using the proper transformation function
-      const transformedRequests = requests.map(transformFromBackendFormat);
-      
-      setLeaveRequests(transformedRequests);
     } catch (error: any) {
       console.error('Error fetching leave requests:', error);
-      addToast('error', error.message || 'Failed to fetch leave requests');
+      addToast('error', error.response?.data?.message || error.message || 'Failed to fetch leave requests');
     } finally {
       setLoading(false);
     }
@@ -98,21 +92,20 @@ export function LeaveRequestsPage() {
       const requestData = transformToBackendFormat(formData);
       // Employee ID will be set by the backend from the authenticated user
       
-      const response = await api.post('/leave', requestData);
-      const apiResponse = response.data as LeaveRequestResponse;
+      const response = await api.post('/api/leave/request', {
+        leaveType: formData.type,
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        reason: formData.reason,
+        notes: formData.notes
+      });
       
-      if (apiResponse.status === 'error') {
-        throw new Error(apiResponse.message || 'Failed to create leave request');
+      if (response.data.success) {
+        // Refresh the list
+        await fetchLeaveRequests();
+      } else {
+        throw new Error('Failed to create leave request');
       }
-      
-      const newRequest = apiResponse.data?.leaveRequest;
-      if (!newRequest) {
-        throw new Error('No leave request data returned');
-      }
-      
-      // Transform response and add to list
-      const transformedRequest = transformFromBackendFormat(newRequest);
-      setLeaveRequests([transformedRequest, ...leaveRequests]);
       
       // Reset form
       setFormData({ startDate: '', endDate: '', reason: '', type: 'annual', notes: '' });
@@ -138,13 +131,18 @@ export function LeaveRequestsPage() {
   const handleDeleteConfirm = async () => {
     try {
       setDeleting(true);
-      await api.delete(`/leave/${deleteConfirm.requestId}`);
-      setLeaveRequests(leaveRequests.filter(req => req.id !== deleteConfirm.requestId));
-      addToast('success', 'Leave request deleted successfully');
-      setDeleteConfirm({ isOpen: false, requestId: '', requestName: '' });
+      const response = await api.delete(`/api/leave/requests/${deleteConfirm.requestId}`);
+      
+      if (response.data.success) {
+        setLeaveRequests(leaveRequests.filter(req => req.id !== deleteConfirm.requestId));
+        addToast('success', response.data.message || 'Leave request deleted successfully');
+        setDeleteConfirm({ isOpen: false, requestId: '', requestName: '' });
+      } else {
+        throw new Error('Failed to delete leave request');
+      }
     } catch (error: any) {
       console.error('Error deleting leave request:', error);
-      addToast('error', 'Failed to delete leave request');
+      addToast('error', error.response?.data?.message || error.message || 'Failed to delete leave request');
     } finally {
       setDeleting(false);
     }
@@ -153,24 +151,20 @@ export function LeaveRequestsPage() {
   const handleApprove = async (requestId: string) => {
     try {
       setApproving(requestId);
-      await api.put(`/leave/${requestId}/approve`, {
-        notes: 'Approved via dashboard'
+      const response = await api.put(`/api/leave/requests/${requestId}/approve`, {
+        comments: 'Approved via dashboard'
       });
       
-      // Update the request status locally
-      setLeaveRequests(prev => 
-        prev.map(req => 
-          req.id === requestId 
-            ? { ...req, status: 'approved', approved_by: currentUser?.id, approved_at: new Date().toISOString() }
-            : req
-        )
-      );
-      
-      addToast('success', 'Leave request approved successfully');
+      if (response.data.success) {
+        // Refresh the list to get updated data
+        await fetchLeaveRequests();
+        addToast('success', response.data.message || 'Leave request approved successfully');
+      } else {
+        throw new Error('Failed to approve leave request');
+      }
     } catch (error: any) {
       console.error('Error approving leave request:', error);
-      const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || 'Failed to approve leave request';
-      addToast('error', errorMessage);
+      addToast('error', error.response?.data?.message || error.message || 'Failed to approve leave request');
     } finally {
       setApproving(null);
     }
@@ -189,26 +183,22 @@ export function LeaveRequestsPage() {
 
     try {
       setRejecting(showRejectModal);
-      await api.put(`/leave/${showRejectModal}/reject`, {
-        rejection_reason: rejectReason
+      const response = await api.put(`/api/leave/requests/${showRejectModal}/reject`, {
+        reason: rejectReason
       });
       
-      // Update the request status locally
-      setLeaveRequests(prev => 
-        prev.map(req => 
-          req.id === showRejectModal 
-            ? { ...req, status: 'rejected', rejected_by: currentUser?.id, rejected_at: new Date().toISOString(), rejection_reason: rejectReason }
-            : req
-        )
-      );
-      
-      addToast('success', 'Leave request rejected');
-      setShowRejectModal(null);
-      setRejectReason('');
+      if (response.data.success) {
+        // Refresh the list to get updated data
+        await fetchLeaveRequests();
+        addToast('success', response.data.message || 'Leave request rejected');
+        setShowRejectModal(null);
+        setRejectReason('');
+      } else {
+        throw new Error('Failed to reject leave request');
+      }
     } catch (error: any) {
       console.error('Error rejecting leave request:', error);
-      const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || 'Failed to reject leave request';
-      addToast('error', errorMessage);
+      addToast('error', error.response?.data?.message || error.message || 'Failed to reject leave request');
     } finally {
       setRejecting(null);
     }
@@ -586,6 +576,19 @@ export function LeaveRequestsPage() {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, requestId: '', requestName: '' })}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Leave Request"
+        message={`Are you sure you want to delete ${deleteConfirm.requestName}? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        type="danger"
+        loading={deleting}
+      />
     </div>
   );
 }

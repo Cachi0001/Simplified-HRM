@@ -3,18 +3,20 @@ import api from '../lib/api';
 export interface AttendanceRecord {
   id: string;
   employee_id: string;
-  status: 'checked_in' | 'checked_out';
-  check_in_time: string;
-  check_out_time?: string;
-  location_latitude?: number;
-  location_longitude?: number;
-  check_in_location?: string;
-  check_out_location?: string;
-  total_hours?: number;
-  minutes_late?: number;
-  is_late: boolean;
-  distance_from_office?: number;
   date: string;
+  clock_in: string;
+  clock_out?: string;
+  clock_in_lat?: number;
+  clock_in_lng?: number;
+  clock_in_address?: string;
+  clock_out_lat?: number;
+  clock_out_lng?: number;
+  clock_out_address?: string;
+  hours_worked?: number;
+  status: 'present' | 'absent' | 'late' | 'half_day' | 'on_leave';
+  late_minutes?: number;
+  is_late: boolean;
+  notes?: string;
   created_at: string;
   updated_at: string;
 }
@@ -365,8 +367,8 @@ class AttendanceService {
       const currentStatus = await this.getCurrentStatus();
       
       return {
-        canCheckIn: !currentStatus || currentStatus.status === 'checked_out',
-        canCheckOut: currentStatus?.status === 'checked_in',
+        canCheckIn: !currentStatus || !!currentStatus.clock_out,
+        canCheckOut: currentStatus && !!currentStatus.clock_in && !currentStatus.clock_out,
         location
       };
     } catch (error) {

@@ -2,18 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Clock, CheckCircle, XCircle, AlertCircle, ArrowLeft, Check, X } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { authService } from '../services/authService';
+import { purchaseService, PurchaseRequest, CreatePurchaseRequestData } from '../services/purchaseService';
 import { useToast } from '../components/ui/Toast';
 import { useTheme } from '../contexts/ThemeContext';
 import LoadingButton from '../components/ui/LoadingButton';
 import { ConfirmationDialog } from '../components/ui/ConfirmationDialog';
-import api from '../lib/api';
-import { 
-  PurchaseRequest, 
-  PurchaseRequestFormData,
-  PurchaseRequestResponse,
-  transformToBackendFormat,
-  transformFromBackendFormat
-} from '../types/purchase';
 import { safeString, safeNumber, formatCurrency, safeDateFormat } from '../utils/safeFormatting';
 
 export function PurchaseRequestsPage() {
@@ -32,7 +25,7 @@ export function PurchaseRequestsPage() {
   const [rejecting, setRejecting] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [showRejectModal, setShowRejectModal] = useState<string | null>(null);
-  const [formData, setFormData] = useState<PurchaseRequestFormData>({
+  const [formData, setFormData] = useState<CreatePurchaseRequestData>({
     itemName: '',
     description: '',
     quantity: 1,
@@ -61,19 +54,11 @@ export function PurchaseRequestsPage() {
   const fetchPurchaseRequests = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/purchase');
-      const apiResponse = response.data as PurchaseRequestResponse;
+      const requests = currentUser && ['hr', 'admin', 'superadmin'].includes(currentUser.role)
+        ? await purchaseService.getAllPurchaseRequests()
+        : await purchaseService.getMyPurchaseRequests();
       
-      if (apiResponse.status === 'error') {
-        throw new Error(apiResponse.message || 'Failed to fetch purchase requests');
-      }
-      
-      const requests = apiResponse.data?.purchaseRequests || [];
-      
-      // Transform data using the proper transformation function
-      const transformedRequests = requests.map(transformFromBackendFormat);
-      
-      setPurchaseRequests(transformedRequests);
+      setPurchaseRequests(requests);
     } catch (error: any) {
       console.error('Error fetching purchase requests:', error);
       addToast('error', error.message || 'Failed to fetch purchase requests');
@@ -82,10 +67,34 @@ export function PurchaseRequestsPage() {
     }
   };
 
+  const handleDeleteClick = (request: PurchaseRequest) => {
+    setDeleteConfirm({
+      isOpen: true,
+      requestId: request.id,
+      requestName: `${safeString(request.item_name, 'Purchase')} - ${formatCurrency(safeNumber(request.total_amount, 0))}`
+    });
+  };
+
+  const handleDeleteConfirm = async () => {
+    try {
+      setDeleting(true);
+      const response = await purchaseService.deletePurchaseRequest(deleteConfirm.requestId);
+      
+      setPurchaseRequests(purchaseRequests.filter(req => req.id !== deleteConfirm.requestId));
+      addToast('success', response.message || 'Purchase request deleted successfully');
+      setDeleteConfirm({ isOpen: false, requestId: '', requestName: '' });
+    } catch (error: any) {
+      console.error('Error deleting purchase request:', error);
+      addToast('error', error.message || 'Failed to delete purchase request');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const handleCreatePurchaseRequest = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.itemName || !formData.description || formData.quantity <= 0 || formData.unitPrice <= 0) {
+    if (!formData.itemName || formData.quantity! <= 0 || formData.unitPrice <= 0) {
       addToast('error', 'Please fill all required fields correctly. Unit price must be greater than 0.');
       return;
     }
@@ -93,25 +102,12 @@ export function PurchaseRequestsPage() {
     try {
       setSubmitting(true);
       
-      // Transform form data to backend format
-      const requestData = transformToBackendFormat(formData);
-      // Employee ID will be set by the backend from the authenticated user
+      const response = await purchaseService.createPurchaseRequest(formData);
       
-      const response = await api.post('/purchase', requestData);
-      const apiResponse = response.data as PurchaseRequestResponse;
+      addToast('success', response.message || 'Purchase request created successfully');
       
-      if (apiResponse.status === 'error') {
-        throw new Error(apiResponse.message || 'Failed to create purchase request');
-      }
-      
-      const newRequest = apiResponse.data?.purchaseRequest;
-      if (!newRequest) {
-        throw new Error('No purchase request data returned');
-      }
-      
-      // Transform response and add to list
-      const transformedRequest = transformFromBackendFormat(newRequest);
-      setPurchaseRequests([transformedRequest, ...purchaseRequests]);
+      // Refresh the list
+      await fetchPurchaseRequests();
       
       // Reset form
       setFormData({ 
@@ -126,60 +122,32 @@ export function PurchaseRequestsPage() {
         notes: ''
       });
       setIsCreating(false);
-      addToast('success', 'Purchase request created successfully');
     } catch (error: any) {
       console.error('Error creating purchase request:', error);
-      const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || error.message || 'Failed to create purchase request';
-      addToast('error', errorMessage);
+      addToast('error', error.message || 'Failed to create purchase request');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleDeleteClick = (request: PurchaseRequest) => {
-    setDeleteConfirm({
-      isOpen: true,
-      requestId: request.id,
-      requestName: `${safeString(request.item_name, 'Purchase request')} - ${formatCurrency(request.total_amount)}`
-    });
-  };
 
-  const handleDeleteConfirm = async () => {
-    try {
-      setDeleting(true);
-      await api.delete(`/purchase/${deleteConfirm.requestId}`);
-      setPurchaseRequests(purchaseRequests.filter(req => req.id !== deleteConfirm.requestId));
-      addToast('success', 'Purchase request deleted successfully');
-      setDeleteConfirm({ isOpen: false, requestId: '', requestName: '' });
-    } catch (error: any) {
-      console.error('Error deleting purchase request:', error);
-      addToast('error', 'Failed to delete purchase request');
-    } finally {
-      setDeleting(false);
-    }
-  };
 
   const handleApprove = async (requestId: string) => {
     try {
       setApproving(requestId);
-      await api.put(`/purchase/${requestId}/approve`, {
-        notes: 'Approved via dashboard'
-      });
+      const response = await purchaseService.approvePurchaseRequest(requestId, 'Approved via dashboard');
       
-      // Update the request status locally
+      // Update the request with the returned data
       setPurchaseRequests(prev => 
         prev.map(req => 
-          req.id === requestId 
-            ? { ...req, status: 'approved', approved_by: currentUser?.id, approved_at: new Date().toISOString() }
-            : req
+          req.id === requestId ? response.data : req
         )
       );
       
-      addToast('success', 'Purchase request approved successfully');
+      addToast('success', response.message || 'Purchase request approved successfully');
     } catch (error: any) {
       console.error('Error approving purchase request:', error);
-      const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || 'Failed to approve purchase request';
-      addToast('error', errorMessage);
+      addToast('error', error.message || 'Failed to approve purchase request');
     } finally {
       setApproving(null);
     }
@@ -198,26 +166,21 @@ export function PurchaseRequestsPage() {
 
     try {
       setRejecting(showRejectModal);
-      await api.put(`/purchase/${showRejectModal}/reject`, {
-        rejection_reason: rejectReason
-      });
+      const response = await purchaseService.rejectPurchaseRequest(showRejectModal, rejectReason);
       
-      // Update the request status locally
+      // Update the request with the returned data
       setPurchaseRequests(prev => 
         prev.map(req => 
-          req.id === showRejectModal 
-            ? { ...req, status: 'rejected', rejected_by: currentUser?.id, rejected_at: new Date().toISOString(), rejection_reason: rejectReason }
-            : req
+          req.id === showRejectModal ? response.data : req
         )
       );
       
-      addToast('success', 'Purchase request rejected');
+      addToast('success', response.message || 'Purchase request rejected');
       setShowRejectModal(null);
       setRejectReason('');
     } catch (error: any) {
       console.error('Error rejecting purchase request:', error);
-      const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || 'Failed to reject purchase request';
-      addToast('error', errorMessage);
+      addToast('error', error.message || 'Failed to reject purchase request');
     } finally {
       setRejecting(null);
     }
@@ -749,6 +712,19 @@ export function PurchaseRequestsPage() {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, requestId: '', requestName: '' })}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Purchase Request"
+        message={`Are you sure you want to delete ${deleteConfirm.requestName}? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        type="danger"
+        loading={deleting}
+      />
     </div>
   );
 }

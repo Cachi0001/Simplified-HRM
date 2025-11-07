@@ -1,0 +1,34 @@
+import { Router } from 'express';
+import { LeaveController } from '../controllers/LeaveController';
+import { authenticate } from '../middleware/auth';
+
+const router = Router();
+const leaveController = new LeaveController();
+
+router.use(authenticate);
+
+router.get('/types', leaveController.getLeaveTypes);
+
+router.post('/request', leaveController.createLeaveRequest);
+
+router.get('/my-requests', leaveController.getMyLeaveRequests);
+
+router.get('/my-balances', leaveController.getMyLeaveBalances);
+
+router.get('/my-statistics', leaveController.getMyLeaveStatistics);
+
+router.get('/requests', leaveController.getAllLeaveRequests);
+
+router.get('/requests/:id', leaveController.getLeaveRequestById);
+
+router.put('/requests/:id/approve', leaveController.approveLeaveRequest);
+
+router.put('/requests/:id/reject', leaveController.rejectLeaveRequest);
+
+router.put('/requests/:id/cancel', leaveController.cancelLeaveRequest);
+
+router.get('/balances/:employeeId', leaveController.getLeaveBalances);
+
+router.delete('/requests/:id', leaveController.deleteLeaveRequest);
+
+export default router;

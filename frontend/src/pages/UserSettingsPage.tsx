@@ -35,18 +35,7 @@ interface UserSettingsProps {
   darkMode?: boolean;
 }
 
-const DEPARTMENTS = [
-  "Engineering",
-  "Marketing",
-  "Sales",
-  "HR",
-  "Finance",
-  "Operations",
-  "Customer Service",
-  "Product",
-  "Design",
-  "Legal",
-];
+
 
 const ROLES = ["employee", "hr", "admin"];
 
@@ -82,6 +71,7 @@ export default function UserSettingsPage({
   });
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [departments, setDepartments] = useState<any[]>([]);
 
   const [passwordData, setPasswordData] = useState({
     currentPassword: "",
@@ -150,6 +140,14 @@ export default function UserSettingsPage({
         const savedNotifications = localStorage.getItem("notificationSettings");
         if (savedNotifications) {
           setNotificationSettings(JSON.parse(savedNotifications));
+        }
+
+        // Fetch departments from API
+        try {
+          const depts = await employeeService.getDepartments();
+          setDepartments(depts);
+        } catch (error) {
+          console.error("Error loading departments:", error);
         }
       } catch (error) {
         console.error("Error loading user data:", error);
@@ -656,9 +654,9 @@ export default function UserSettingsPage({
                         disabled={userRole === "admin"}
                       >
                         <option value="">Select Department</option>
-                        {DEPARTMENTS.map((dept) => (
-                          <option key={dept} value={dept}>
-                            {dept}
+                        {departments.map((dept) => (
+                          <option key={dept.id} value={dept.name}>
+                            {dept.name}
                           </option>
                         ))}
                       </select>

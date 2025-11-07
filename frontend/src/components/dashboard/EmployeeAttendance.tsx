@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { attendanceService } from '../../services/attendanceService';
+import { attendanceService, AttendanceRecord } from '../../services/attendanceService';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
-import { MapPin, Clock, Calendar, Play, Square } from 'lucide-react';
+import { MapPin, Clock, Calendar, Play, Square, CheckCircle, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useToast } from '../ui/Toast';
 
@@ -12,10 +12,10 @@ interface EmployeeAttendanceProps {
   darkMode?: boolean;
 }
 
-const fetchEmployeeAttendance = async () => {
+const fetchEmployeeAttendance = async (): Promise<AttendanceRecord[]> => {
   try {
     const history = await attendanceService.getAttendanceHistory();
-    return history.attendances;
+    return history;
   } catch (error) {
     console.error('Failed to fetch employee attendance:', error);
     return [];
@@ -71,39 +71,26 @@ export function EmployeeAttendance({ employeeId, darkMode = false }: EmployeeAtt
       if (!currentLocation) {
         throw new Error('You must allow location access to check in.');
       }
-
-      return await attendanceService.checkIn({
-        location: {
-          latitude: currentLocation.lat,
-          longitude: currentLocation.lng,
-          accuracy: 10 // meters
-        }
-      });
+      return await attendanceService.checkIn();
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employee-attendance', employeeId] });
       addToast('success', 'Successfully checked in!');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       addToast('error', error.message || 'Check-in failed');
     }
   });
 
   const checkOutMutation = useMutation({
     mutationFn: async () => {
-      return await attendanceService.checkOut({
-        location: currentLocation ? {
-          latitude: currentLocation.lat,
-          longitude: currentLocation.lng,
-          accuracy: 10
-        } : undefined
-      });
+      return await attendanceService.checkOut();
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employee-attendance', employeeId] });
       addToast('success', 'Successfully checked out!');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       addToast('error', error.message || 'Check-out failed');
     }
   });
@@ -128,7 +115,11 @@ export function EmployeeAttendance({ employeeId, darkMode = false }: EmployeeAtt
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
+    return new Date(dateString).toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric'
+    });
   };
 
   const calculateHours = (checkIn: string, checkOut?: string) => {
@@ -139,54 +130,79 @@ export function EmployeeAttendance({ employeeId, darkMode = false }: EmployeeAtt
     return Math.round(hours * 10) / 10;
   };
 
+  const todayRecord = attendance.find((a: AttendanceRecord) => {
+    const recordDate = new Date(a.date).toDateString();
+    const today = new Date().toDateString();
+    return recordDate === today;
+  });
+
+  const isCheckedIn = todayRecord && todayRecord.clock_in && !todayRecord.clock_out;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Check-in/Check-out Section */}
-      <Card className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-        <div className="p-6">
-          <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-            Daily Check-in/Check-out
-          </h3>
+      <Card className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} shadow-sm`}>
+        <div className="p-4 sm:p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className={`text-base sm:text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+              Today's Attendance
+            </h3>
+            {isCheckedIn && (
+              <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-medium">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                Active
+              </span>
+            )}
+          </div>
 
           {locationError && (
-            <div className={`mb-4 p-3 rounded ${darkMode ? 'bg-red-900/20 border border-red-700' : 'bg-red-50 border border-red-200'}`}>
-              <p className={`text-sm ${darkMode ? 'text-red-400' : 'text-red-600'}`}>
-                {locationError}
-              </p>
-              {locationDenied && (
-                <Button
-                  onClick={requestLocation}
-                  className={`mt-2 ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
-                >
-                  Enable Location Access
-                </Button>
-              )}
+            <div className={`mb-4 p-3 sm:p-4 rounded-lg ${darkMode ? 'bg-red-900/20 border border-red-700/50' : 'bg-red-50 border border-red-200'}`}>
+              <div className="flex items-start gap-2">
+                <AlertCircle className={`h-5 w-5 flex-shrink-0 mt-0.5 ${darkMode ? 'text-red-400' : 'text-red-600'}`} />
+                <div className="flex-1">
+                  <p className={`text-sm ${darkMode ? 'text-red-400' : 'text-red-600'}`}>
+                    {locationError}
+                  </p>
+                  {locationDenied && (
+                    <Button
+                      onClick={requestLocation}
+                      className={`mt-2 text-sm ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+                    >
+                      Enable Location Access
+                    </Button>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
-          <div className="flex gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Button
               onClick={() => checkInMutation.mutate()}
-              disabled={checkInMutation.isPending || !currentLocation}
-              className="bg-green-600 hover:bg-green-700 text-white flex-1 min-h-[40px]"
+              disabled={checkInMutation.isPending || !currentLocation || isCheckedIn}
+              className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white flex items-center justify-center gap-2 py-3 sm:py-2.5 text-sm sm:text-base font-medium rounded-lg transition-colors"
             >
-              <Play className="h-4 w-4 mr-2" />
-              Check In
+              <Play className="h-4 w-4 sm:h-5 sm:w-5" />
+              {checkInMutation.isPending ? 'Checking In...' : 'Check In'}
             </Button>
             <Button
               onClick={() => checkOutMutation.mutate()}
-              disabled={checkOutMutation.isPending || !attendance.some(a => a.status === 'checked_in')}
-              className="bg-red-600 hover:bg-red-700 text-white flex-1 min-h-[40px]"
+              disabled={checkOutMutation.isPending || !isCheckedIn}
+              className="bg-red-600 hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white flex items-center justify-center gap-2 py-3 sm:py-2.5 text-sm sm:text-base font-medium rounded-lg transition-colors"
             >
-              <Square className="h-4 w-4 mr-2" />
-              Check Out
+              <Square className="h-4 w-4 sm:h-5 sm:w-5" />
+              {checkOutMutation.isPending ? 'Checking Out...' : 'Check Out'}
             </Button>
           </div>
 
           {currentLocation && (
-            <div className={`mt-3 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-              <MapPin className="h-4 w-4 inline mr-1" />
-              Location: {currentLocation.lat.toFixed(4)}, {currentLocation.lng.toFixed(4)}
+            <div className={`mt-4 pt-4 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+              <div className={`flex items-center gap-2 text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                <MapPin className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">
+                  Location: {currentLocation.lat.toFixed(4)}, {currentLocation.lng.toFixed(4)}
+                </span>
+              </div>
             </div>
           )}
         </div>
@@ -194,58 +210,85 @@ export function EmployeeAttendance({ employeeId, darkMode = false }: EmployeeAtt
 
       {/* Attendance History */}
       <div>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+        <div className="flex items-center justify-between mb-3 sm:mb-4">
+          <h3 className={`text-base sm:text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
             Recent Attendance
           </h3>
           <Link
             to="/attendance-report"
-            className={`text-sm font-medium ${darkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800'}`}
+            className={`text-xs sm:text-sm font-medium ${darkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800'} transition-colors`}
           >
-            View More
+            View All →
           </Link>
         </div>
 
         {attendance.length === 0 ? (
-          <Card className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-            <div className={`p-8 text-center ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+          <Card className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} shadow-sm`}>
+            <div className={`p-8 sm:p-12 text-center ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
               <div className="flex flex-col items-center space-y-3">
-                <div className={`w-12 h-12 rounded-full ${darkMode ? 'bg-gray-700' : 'bg-gray-100'} flex items-center justify-center`}>
-                  <Clock className={`w-6 h-6 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
+                <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full ${darkMode ? 'bg-gray-700' : 'bg-gray-100'} flex items-center justify-center`}>
+                  <Clock className={`w-7 h-7 sm:w-8 sm:h-8 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
                 </div>
-                <p className="font-medium">No attendance records</p>
-                <p className="text-sm">Your check-in/check-out history will appear here</p>
+                <p className="font-medium text-sm sm:text-base">No attendance records yet</p>
+                <p className="text-xs sm:text-sm max-w-xs">Your check-in and check-out history will appear here</p>
               </div>
             </div>
           </Card>
         ) : (
-          <div className="space-y-3">
-            {attendance.map((record) => (
-              <Card key={record.id} className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-                <div className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Calendar className={`h-5 w-5 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
-                      <div>
-                        <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                          {formatDate(record.date)}
-                        </p>
-                        <div className={`flex items-center gap-4 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                          <span>Check-in: {formatTime(record.checkInTime)}</span>
-                          {record.checkOutTime && (
-                            <span>Check-out: {formatTime(record.checkOutTime)}</span>
+          <div className="space-y-2 sm:space-y-3">
+            {attendance.slice(0, 5).map((record: AttendanceRecord) => (
+              <Card key={record.id} className={`${darkMode ? 'bg-gray-800 border-gray-700 hover:bg-gray-750' : 'bg-white border-gray-200 hover:bg-gray-50'} shadow-sm transition-colors`}>
+                <div className="p-3 sm:p-4">
+                  <div className="flex items-start sm:items-center justify-between gap-3">
+                    <div className="flex items-start sm:items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                      <div className={`p-2 rounded-lg flex-shrink-0 ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                        <Calendar className={`h-4 w-4 sm:h-5 sm:w-5 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className={`font-medium text-sm sm:text-base ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                            {formatDate(record.date)}
+                          </p>
+                          {record.is_late && (
+                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${darkMode ? 'bg-orange-900/30 text-orange-400' : 'bg-orange-100 text-orange-700'}`}>
+                              Late
+                            </span>
+                          )}
+                        </div>
+                        <div className={`flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                          <div className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            <span>In: {record.clock_in ? formatTime(record.clock_in) : 'N/A'}</span>
+                          </div>
+                          {record.clock_out && (
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              <span>Out: {formatTime(record.clock_out)}</span>
+                            </div>
                           )}
                         </div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      {record.checkOutTime ? (
-                        <div className={`text-sm font-medium ${darkMode ? 'text-green-400' : 'text-green-600'}`}>
-                          {calculateHours(record.checkInTime, record.checkOutTime)}h
+                    <div className="text-right flex-shrink-0">
+                      {record.clock_out ? (
+                        <div className="flex flex-col items-end gap-1">
+                          <div className={`flex items-center gap-1 text-sm sm:text-base font-semibold ${darkMode ? 'text-green-400' : 'text-green-600'}`}>
+                            <CheckCircle className="h-4 w-4" />
+                            <span>{record.hours_worked || calculateHours(record.clock_in, record.clock_out)}h</span>
+                          </div>
+                          <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+                            Completed
+                          </span>
                         </div>
                       ) : (
-                        <div className={`text-sm ${darkMode ? 'text-orange-400' : 'text-orange-600'}`}>
-                          Active
+                        <div className="flex flex-col items-end gap-1">
+                          <div className={`flex items-center gap-1 text-sm font-medium ${darkMode ? 'text-orange-400' : 'text-orange-600'}`}>
+                            <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
+                            <span>Active</span>
+                          </div>
+                          <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+                            In progress
+                          </span>
                         </div>
                       )}
                     </div>
