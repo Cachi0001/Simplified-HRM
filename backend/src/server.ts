@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import dotenv from 'dotenv';
 import { errorHandler } from './middleware/errorHandler';
 import { requestLogger } from './middleware/requestLogger';
+import { testConnection } from './config/database';
 import authRoutes from './routes/auth.routes';
 import employeeRoutes from './routes/employee.routes';
 import departmentRoutes from './routes/department.routes';
@@ -54,6 +55,13 @@ app.use('/api/purchase', purchaseRoutes);
 app.use('/api/attendance', attendanceRoutes);
 
 app.use(errorHandler);
+
+// Test database connection and start server
+testConnection().then((connected) => {
+  if (!connected) {
+    console.warn('⚠️  Database not connected, but server will start anyway');
+  }
+});
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

@@ -1,14 +1,6 @@
-import { Pool } from 'pg';
+import { pool } from '../config/database';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import dotenv from 'dotenv';
-
-dotenv.config();
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
-});
 
 export interface User {
   id: string;

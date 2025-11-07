@@ -220,79 +220,9 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ darkMo
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'} mb-2`}>
+          <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
             Super Admin Dashboard
           </h1>
-          <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-            Complete system overview and management
-          </p>
-        </div>
-
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className={`p-6 rounded-lg border shadow-sm ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                  Pending Approvals
-                </p>
-                <p className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  {pendingEmployees.length}
-                </p>
-              </div>
-              <div className={`p-3 rounded-full ${darkMode ? 'bg-orange-900/30' : 'bg-orange-100'}`}>
-                <Clock className={`h-6 w-6 ${darkMode ? 'text-orange-400' : 'text-orange-600'}`} />
-              </div>
-            </div>
-          </div>
-
-          <div className={`p-6 rounded-lg border shadow-sm ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                  Total Employees
-                </p>
-                <p className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  {stats.totalEmployees}
-                </p>
-              </div>
-              <div className={`p-3 rounded-full ${darkMode ? 'bg-blue-900/30' : 'bg-blue-100'}`}>
-                <CheckCircle className={`h-6 w-6 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`} />
-              </div>
-            </div>
-          </div>
-
-          <div className={`p-6 rounded-lg border shadow-sm ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                  Administrators
-                </p>
-                <p className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  {stats.admins}
-                </p>
-              </div>
-              <div className={`p-3 rounded-full ${darkMode ? 'bg-purple-900/30' : 'bg-purple-100'}`}>
-                <AlertCircle className={`h-6 w-6 ${darkMode ? 'text-purple-400' : 'text-purple-600'}`} />
-              </div>
-            </div>
-          </div>
-
-          <div className={`p-6 rounded-lg border shadow-sm ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                  HR Staff
-                </p>
-                <p className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  {stats.hrStaff}
-                </p>
-              </div>
-              <div className={`p-3 rounded-full ${darkMode ? 'bg-green-900/30' : 'bg-green-100'}`}>
-                <AlertCircle className={`h-6 w-6 ${darkMode ? 'text-green-400' : 'text-green-600'}`} />
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Success Message */}

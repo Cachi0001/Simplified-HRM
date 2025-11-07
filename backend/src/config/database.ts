@@ -3,46 +3,27 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const pool = new Pool({
+// Simple PostgreSQL pool using Supabase credentials
+export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000,
+  ssl: { rejectUnauthorized: false }
 });
 
-pool.on('error', (err) => {
-  console.error('Unexpected database error:', err);
+// Handle errors
+pool.on('error', (err: any) => {
+  console.error('Database error:', err.message);
 });
 
-export const query = async (text: string, params?: any[]) => {
-  const start = Date.now();
+// Simple connection test
+export const testConnection = async () => {
   try {
-    const res = await pool.query(text, params);
-    const duration = Date.now() - start;
-    console.log('Executed query', { text, duration, rows: res.rowCount });
-    return res;
-  } catch (error) {
-    console.error('Database query error:', error);
-    throw error;
+    const client = await pool.connect();
+    const result = await client.query('SELECT NOW()');
+    console.log('✅ Database connected:', result.rows[0].now);
+    client.release();
+    return true;
+  } catch (error: any) {
+    console.error('❌ Database connection failed:', error.message);
+    return false;
   }
 };
-
-export const getClient = async () => {
-  const client = await pool.connect();
-  const query = client.query.bind(client);
-  const release = client.release.bind(client);
-  
-  const timeout = setTimeout(() => {
-    console.error('Client checkout timeout');
-  }, 5000);
-  
-  client.release = () => {
-    clearTimeout(timeout);
-    return release();
-  };
-  
-  return client;
-};
-
-export default pool;

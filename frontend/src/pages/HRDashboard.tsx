@@ -7,6 +7,7 @@ import { AdminEmployeeManagement } from '../components/dashboard/AdminEmployeeMa
 import { AdminTasks } from '../components/dashboard/AdminTasks';
 import { AdminAttendance } from '../components/dashboard/AdminAttendance';
 import { AdminDepartments } from '../components/dashboard/AdminDepartments';
+import { PendingApprovals } from '../components/dashboard/PendingApprovals';
 import { BottomNavbar } from '../components/layout/BottomNavbar';
 import { DarkModeToggle } from '../components/ui/DarkModeToggle';
 import { NotificationBell } from '../components/dashboard/NotificationBell';
@@ -456,6 +457,14 @@ export default function HRDashboard() {
               </div>
             </div>
             )}
+
+            {/* Pending Employee Approvals */}
+            <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+              <h3 className={`text-xl font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                Pending Employee Approvals
+              </h3>
+              <PendingApprovals darkMode={darkMode} />
+            </div>
           </div>
         )}
 

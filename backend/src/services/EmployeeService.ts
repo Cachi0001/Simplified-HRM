@@ -2,15 +2,7 @@ import { EmployeeRepository, Employee } from '../repositories/EmployeeRepository
 import { UserRepository } from '../repositories/UserRepository';
 import { EmailService } from './EmailService';
 import { NotFoundError, ValidationError } from '../middleware/errorHandler';
-import { Pool } from 'pg';
-import dotenv from 'dotenv';
-
-dotenv.config();
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
-});
+import { pool } from '../config/database';
 
 export class EmployeeService {
   private employeeRepo: EmployeeRepository;
