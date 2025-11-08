@@ -268,4 +268,17 @@ export class EmployeeController {
       next(error);
     }
   };
+
+  updateEmployeeFields = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const employee = await this.employeeService.updateEmployeeFields(req.params.id, req.body);
+      res.json({
+        success: true,
+        data: employee,
+        message: 'Employee updated successfully'
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }

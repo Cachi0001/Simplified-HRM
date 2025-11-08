@@ -61,6 +61,10 @@ export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
       ? '/employee-dashboard'
       : currentUser?.role === 'hr'
       ? '/hr-dashboard'
+      : currentUser?.role === 'teamlead'
+      ? '/teamlead-dashboard'
+      : currentUser?.role === 'superadmin'
+      ? '/super-admin-dashboard'
       : '/dashboard';
 
   // Main navbar items (5 max)

@@ -52,6 +52,9 @@ router.put('/:id/working-days', employeeController.updateWorkingDays);
 // Update employee status (must be before /:id routes)
 router.put('/:id/status', employeeController.updateEmployeeStatus);
 
+// Update employee fields (must be before /:id routes)
+router.put('/:id/fields', employeeController.updateEmployeeFields);
+
 // Get employee by ID (must be LAST among /:id routes)
 router.get('/:id', employeeController.getEmployeeById);
 

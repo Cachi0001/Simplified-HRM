@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle, XCircle, Clock, AlertCircle, RefreshCw, Eye, EyeOff } from 'lucide-react';
+import { CheckCircle, XCircle, AlertCircle, RefreshCw, Eye, EyeOff } from 'lucide-react';
+import { AdminDepartments } from './AdminDepartments';
+import { AdminTasks } from './AdminTasks';
+import { AdminAttendance } from './AdminAttendance';
+import { AdminLeaveRequests } from './AdminLeaveRequests';
+import { AdminEmployeeManagement } from './AdminEmployeeManagement';
+import { OverviewCards } from './OverviewCards';
 import api from '../../lib/api';
 
 const logger = console;
@@ -58,13 +64,37 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ darkMo
     admins: 0,
     hrStaff: 0,
   });
+  const [employeeStats, setEmployeeStats] = useState({
+    total: 0,
+    active: 0,
+    pending: 0
+  });
 
   useEffect(() => {
     loadPendingApprovals();
+    loadEmployeeStats();
     // Set up real-time subscription if needed
-    const interval = setInterval(loadPendingApprovals, 5000); // Refresh every 5 seconds
+    const interval = setInterval(() => {
+      loadPendingApprovals();
+      loadEmployeeStats();
+    }, 30000); // Refresh every 30 seconds
     return () => clearInterval(interval);
   }, []);
+
+  const loadEmployeeStats = async () => {
+    try {
+      const response = await api.get('/employees/stats');
+      if (response.data) {
+        setEmployeeStats({
+          total: response.data.total || 0,
+          active: response.data.active || 0,
+          pending: response.data.pending || 0
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load employee stats:', error);
+    }
+  };
 
   const loadPendingApprovals = async () => {
     try {
@@ -256,6 +286,16 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ darkMo
           </div>
         )}
 
+        {/* Overview Cards */}
+        <section className="mb-8">
+          <OverviewCards
+            total={employeeStats.total}
+            active={employeeStats.active}
+            pending={employeeStats.pending}
+            darkMode={darkMode}
+          />
+        </section>
+
         {/* Pending Approvals */}
         <div className={`rounded-lg border p-6 mb-8 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
           <div className="flex items-center justify-between mb-6">
@@ -436,6 +476,31 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ darkMo
             </div>
           )}
         </div>
+
+        {/* Employee Role Management */}
+        <section className="mb-8">
+          <AdminEmployeeManagement darkMode={darkMode} />
+        </section>
+
+        {/* Leave Requests Management */}
+        <section className="mb-8">
+          <AdminLeaveRequests darkMode={darkMode} />
+        </section>
+
+        {/* Attendance Management */}
+        <section className="mb-8">
+          <AdminAttendance darkMode={darkMode} />
+        </section>
+
+        {/* Task Management */}
+        <section className="mb-8">
+          <AdminTasks darkMode={darkMode} />
+        </section>
+
+        {/* Department Management */}
+        <section className="mb-8">
+          <AdminDepartments darkMode={darkMode} />
+        </section>
 
         {/* Footer */}
         <div className={`text-center text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>

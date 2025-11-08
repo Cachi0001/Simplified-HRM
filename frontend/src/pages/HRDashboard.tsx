@@ -8,6 +8,7 @@ import { AdminTasks } from '../components/dashboard/AdminTasks';
 import { AdminAttendance } from '../components/dashboard/AdminAttendance';
 import { AdminDepartments } from '../components/dashboard/AdminDepartments';
 import { PendingApprovals } from '../components/dashboard/PendingApprovals';
+import { DraggableLogo } from '../components/dashboard/DraggableLogo';
 import { BottomNavbar } from '../components/layout/BottomNavbar';
 import { DarkModeToggle } from '../components/ui/DarkModeToggle';
 import { NotificationBell } from '../components/dashboard/NotificationBell';
@@ -73,7 +74,7 @@ export default function HRDashboard() {
     enabled: !!currentUser,
     refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
     staleTime: 2 * 60 * 1000, // Consider data stale after 2 minutes
-    cacheTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
+    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes (renamed from cacheTime)
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
@@ -87,7 +88,7 @@ export default function HRDashboard() {
     },
     enabled: !!currentUser,
     staleTime: 5 * 60 * 1000, // Consider data stale after 5 minutes
-    cacheTime: 15 * 60 * 1000, // Keep in cache for 15 minutes
+    gcTime: 15 * 60 * 1000, // Keep in cache for 15 minutes (renamed from cacheTime)
     retry: 2,
   });
 
@@ -182,10 +183,10 @@ export default function HRDashboard() {
                     Total Employees
                   </p>
                   <p className={`text-3xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                    {stats.totalEmployees || 0}
+                    {(stats as any)?.totalEmployees || 0}
                   </p>
                   <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                    {stats.activeEmployees || 0} active
+                    {(stats as any)?.activeEmployees || 0} active
                   </p>
                 </div>
                 <div className="bg-blue-100 dark:bg-blue-900 p-3 rounded-lg">
@@ -201,10 +202,10 @@ export default function HRDashboard() {
                     Leave Requests
                   </p>
                   <p className={`text-3xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                    {stats.pendingLeaves || 0}
+                    {(stats as any)?.pendingLeaves || 0}
                   </p>
                   <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                    {stats.totalLeaves || 0} total
+                    {(stats as any)?.totalLeaves || 0} total
                   </p>
                 </div>
                 <div className="bg-yellow-100 dark:bg-yellow-900 p-3 rounded-lg">
@@ -220,10 +221,10 @@ export default function HRDashboard() {
                     Purchase Requests
                   </p>
                   <p className={`text-3xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                    {stats.pendingPurchases || 0}
+                    {(stats as any)?.pendingPurchases || 0}
                   </p>
                   <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                    {stats.totalPurchases || 0} total
+                    {(stats as any)?.totalPurchases || 0} total
                   </p>
                 </div>
                 <div className="bg-purple-100 dark:bg-purple-900 p-3 rounded-lg">
@@ -239,7 +240,7 @@ export default function HRDashboard() {
                     Departments
                   </p>
                   <p className={`text-3xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                    {stats.totalDepartments || 0}
+                    {(stats as any)?.totalDepartments || 0}
                   </p>
                 </div>
                 <div className="bg-green-100 dark:bg-green-900 p-3 rounded-lg">
@@ -288,6 +289,20 @@ export default function HRDashboard() {
         {/* Tab Content */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
+            {/* Check-in/Check-out Section */}
+            <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+              <h2 className={`text-2xl font-semibold mb-6 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                Daily Check-in/Out
+              </h2>
+              <DraggableLogo
+                employeeId={currentUser._id || currentUser.id}
+                darkMode={darkMode}
+                onStatusChange={(status) => {
+                  console.log('Check-in status changed:', status);
+                }}
+              />
+            </div>
+
             {/* Welcome Section with Announcements */}
             <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
               <div className="flex items-center justify-between mb-4">
@@ -320,9 +335,9 @@ export default function HRDashboard() {
                     <div className="flex items-center justify-center py-8">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
                     </div>
-                  ) : announcements && announcements.length > 0 ? (
+                  ) : announcements && (announcements as any[]).length > 0 ? (
                     <div className="space-y-3">
-                      {announcements.slice(0, 3).map((announcement: any) => (
+                      {(announcements as any[]).slice(0, 3).map((announcement: any) => (
                         <div key={announcement.id} className={`p-4 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
                           <h4 className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                             {announcement.title}
@@ -349,9 +364,9 @@ export default function HRDashboard() {
                   <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                     Recent Activities
                   </h3>
-                  {stats?.recentActivities && stats.recentActivities.length > 0 ? (
+                  {(stats as any)?.recentActivities && (stats as any).recentActivities.length > 0 ? (
                     <div className="space-y-3">
-                      {stats.recentActivities.slice(0, 5).map((activity: any) => (
+                      {(stats as any).recentActivities.slice(0, 5).map((activity: any) => (
                         <div key={activity.id} className={`p-3 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
@@ -399,7 +414,7 @@ export default function HRDashboard() {
                       Pending Approvals
                     </p>
                     <p className={`text-2xl font-bold mt-1 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                      {stats.pendingEmployees || 0}
+                      {(stats as any)?.pendingEmployees || 0}
                     </p>
                   </div>
                   <div className="bg-blue-100 dark:bg-blue-900 p-3 rounded-lg">
@@ -415,7 +430,7 @@ export default function HRDashboard() {
                       Leave Requests
                     </p>
                     <p className={`text-2xl font-bold mt-1 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                      {stats.pendingLeaves || 0}
+                      {(stats as any)?.pendingLeaves || 0}
                     </p>
                   </div>
                   <div className="bg-yellow-100 dark:bg-yellow-900 p-3 rounded-lg">

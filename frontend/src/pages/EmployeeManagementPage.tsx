@@ -101,7 +101,13 @@ export const EmployeeManagementPage: React.FC = () => {
         })
       ]);
 
-      setEmployees(employeesData);
+      // Normalize employees to ensure they have an id field
+      const normalizedEmployees = employeesData.map(emp => ({
+        ...emp,
+        id: emp.id || (emp as any)._id || (emp as any).employee_id || ''
+      })).filter(emp => emp.id); // Filter out any without valid ID
+
+      setEmployees(normalizedEmployees);
       setDepartments(departmentsData || []);
     } catch (err) {
       setError('Failed to load employee data. Please try again.');

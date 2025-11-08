@@ -52,7 +52,7 @@ export class EmailService {
           .container { 
             max-width: 600px; 
             margin: 0 auto; 
-            background: #1B263B;
+            background: #97acd2ff;
             border-radius: 12px;
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
             overflow: hidden;

@@ -166,45 +166,24 @@ class AttendanceService {
   /**
    * Check in with location validation
    */
-  async checkIn(): Promise<AttendanceRecord> {
+  async checkIn(locationData?: { location: LocationData }): Promise<AttendanceRecord> {
     try {
       // Check if it's a working day
       if (!this.isWorkingDay()) {
         throw new Error('Check-in is only allowed on working days (Monday to Saturday)');
       }
 
-      // Get current location
-      const location = await this.getCurrentLocation();
+      // Get current location if not provided
+      const location = locationData?.location || await this.getCurrentLocation();
 
-      // Validate location is within office radius
-      if (!this.isWithinOfficeRadius(location)) {
-        const distance = this.calculateDistance(
-          location.latitude,
-          location.longitude,
-          this.OFFICE_LOCATION.latitude,
-          this.OFFICE_LOCATION.longitude
-        );
-        
-        throw new Error(
-          `You must be within ${this.OFFICE_LOCATION.radius}m of the office to check in. ` +
-          `You are currently ${Math.round(distance)}m away.`
-        );
-      }
-
-      // Send check-in request
-      const response = await api.post('/attendance/check-in', {
-        location_latitude: location.latitude,
-        location_longitude: location.longitude,
-        check_in_location: location.address,
-        distance_from_office: this.calculateDistance(
-          location.latitude,
-          location.longitude,
-          this.OFFICE_LOCATION.latitude,
-          this.OFFICE_LOCATION.longitude
-        )
+      // Send check-in request with backend-expected field names
+      const response = await api.post('/attendance/clock-in', {
+        lat: location.latitude,
+        lng: location.longitude,
+        address: location.address
       });
 
-      return response.data.data;
+      return response.data.data || response.data;
     } catch (error) {
       console.error('Check-in failed:', error);
       throw error;
@@ -214,45 +193,24 @@ class AttendanceService {
   /**
    * Check out with location validation
    */
-  async checkOut(): Promise<AttendanceRecord> {
+  async checkOut(locationData?: { location?: LocationData }): Promise<AttendanceRecord> {
     try {
       // Check if it's a working day
       if (!this.isWorkingDay()) {
         throw new Error('Check-out is only allowed on working days (Monday to Saturday)');
       }
 
-      // Get current location
-      const location = await this.getCurrentLocation();
+      // Get current location if not provided
+      const location = locationData?.location || await this.getCurrentLocation();
 
-      // Validate location is within office radius
-      if (!this.isWithinOfficeRadius(location)) {
-        const distance = this.calculateDistance(
-          location.latitude,
-          location.longitude,
-          this.OFFICE_LOCATION.latitude,
-          this.OFFICE_LOCATION.longitude
-        );
-        
-        throw new Error(
-          `You must be within ${this.OFFICE_LOCATION.radius}m of the office to check out. ` +
-          `You are currently ${Math.round(distance)}m away.`
-        );
-      }
-
-      // Send check-out request
-      const response = await api.post('/attendance/check-out', {
-        location_latitude: location.latitude,
-        location_longitude: location.longitude,
-        check_out_location: location.address,
-        distance_from_office: this.calculateDistance(
-          location.latitude,
-          location.longitude,
-          this.OFFICE_LOCATION.latitude,
-          this.OFFICE_LOCATION.longitude
-        )
+      // Send check-out request with backend-expected field names
+      const response = await api.post('/attendance/clock-out', {
+        lat: location.latitude,
+        lng: location.longitude,
+        address: location.address
       });
 
-      return response.data.data;
+      return response.data.data || response.data;
     } catch (error) {
       console.error('Check-out failed:', error);
       throw error;
@@ -262,13 +220,20 @@ class AttendanceService {
   /**
    * Get current attendance status
    */
-  async getCurrentStatus(): Promise<AttendanceRecord | null> {
+  async getCurrentStatus(): Promise<{ status: 'checked_in' | 'checked_out'; checkInTime?: string } | null> {
     try {
-      const response = await api.get('/attendance/current-status');
-      return response.data.data;
+      const response = await api.get('/attendance/today');
+      const data = response.data.data || response.data;
+      
+      if (!data) return { status: 'checked_out' };
+      
+      return {
+        status: data.clock_in && !data.clock_out ? 'checked_in' : 'checked_out',
+        checkInTime: data.clock_in
+      };
     } catch (error) {
       console.error('Failed to get attendance status:', error);
-      return null;
+      return { status: 'checked_out' };
     }
   }
 
@@ -281,8 +246,8 @@ class AttendanceService {
       if (startDate) params.append('start_date', startDate);
       if (endDate) params.append('end_date', endDate);
 
-      const response = await api.get(`/attendance/history?${params.toString()}`);
-      return response.data.data || [];
+      const response = await api.get(`/attendance/my-records?${params.toString()}`);
+      return response.data.data || response.data || [];
     } catch (error) {
       console.error('Failed to get attendance history:', error);
       throw error;
@@ -367,8 +332,8 @@ class AttendanceService {
       const currentStatus = await this.getCurrentStatus();
       
       return {
-        canCheckIn: !currentStatus || !!currentStatus.clock_out,
-        canCheckOut: currentStatus && !!currentStatus.clock_in && !currentStatus.clock_out,
+        canCheckIn: !currentStatus || currentStatus.status === 'checked_out',
+        canCheckOut: currentStatus && currentStatus.status === 'checked_in',
         location
       };
     } catch (error) {

@@ -54,7 +54,8 @@ export const AdminDepartments: React.FC<AdminDepartmentsProps> = ({ darkMode = f
   const fetchDepartments = async () => {
     try {
       const response = await api.get('/departments');
-      setDepartments(response.data.departments || []);
+      // Backend returns { success: true, data: [...] }
+      setDepartments(response.data.data || response.data.departments || []);
     } catch (error) {
       console.error('Error fetching departments:', error);
       addToast('error', 'Failed to fetch departments');
@@ -64,7 +65,8 @@ export const AdminDepartments: React.FC<AdminDepartmentsProps> = ({ darkMode = f
   const fetchEmployees = async () => {
     try {
       const response = await api.get('/employees');
-      setEmployees(response.data.employees || []);
+      // Backend returns { success: true, data: [...] }
+      setEmployees(response.data.data || response.data.employees || []);
     } catch (error) {
       console.error('Error fetching employees:', error);
     } finally {

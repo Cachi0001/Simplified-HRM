@@ -491,20 +491,20 @@ export default function UserSettingsPage({
 
               {/* User Info Card */}
               <div
-                className={`p-4 border-t ${darkMode ? "border-gray-700" : "border-gray-200"}`}
+                className={`p-4 border-t ${darkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-white"}`}
               >
                 <div className="flex items-center gap-3">
                   <div
                     className={`w-10 h-10 rounded-full ${darkMode ? "bg-gray-700" : "bg-gray-200"} flex items-center justify-center`}
                   >
-                    <User size={20} />
+                    <User size={20} className={darkMode ? "text-gray-300" : "text-gray-700"} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">
+                    <p className={`font-medium truncate ${darkMode ? "text-white" : "text-gray-900"}`}>
                       {currentUser?.fullName}
                     </p>
                     <p
-                      className={`text-sm truncate ${darkMode ? "text-gray-400" : "text-gray-500"}`}
+                      className={`text-sm truncate ${darkMode ? "text-gray-400" : "text-gray-600"}`}
                     >
                       {currentUser?.email}
                     </p>

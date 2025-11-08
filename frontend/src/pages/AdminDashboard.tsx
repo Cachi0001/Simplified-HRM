@@ -4,7 +4,8 @@ import { AdminTasks } from '../components/dashboard/AdminTasks';
 import { AdminDepartments } from '../components/dashboard/AdminDepartments';
 import { AdminEmployeeManagement } from '../components/dashboard/AdminEmployeeManagement';
 import { AdminLeaveRequests } from '../components/dashboard/AdminLeaveRequests';
-import { NotificationManager, triggerNotification, NotificationUtils } from '../components/notifications/NotificationManager';
+import { NotificationManager } from '../components/notifications/NotificationManager';
+import { DraggableLogo } from '../components/dashboard/DraggableLogo';
 import { useQuery } from '@tanstack/react-query';
 import { notificationService } from '../services/notificationService';
 import Logo from '../components/ui/Logo';
@@ -183,6 +184,20 @@ export default function AdminDashboard() {
               darkMode={darkMode}
             />
           )}
+        </section>
+
+        {/* Check-in/Check-out Section */}
+        <section className="mb-8">
+          <h2 className={`text-2xl font-semibold mb-6 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+            Daily Check-in/Out
+          </h2>
+          <DraggableLogo
+            employeeId={currentUser._id || currentUser.id}
+            darkMode={darkMode}
+            onStatusChange={(status) => {
+              console.log('Check-in status changed:', status);
+            }}
+          />
         </section>
 
         {/* Pending Approvals */}

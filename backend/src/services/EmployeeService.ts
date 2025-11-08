@@ -270,11 +270,29 @@ export class EmployeeService {
       throw new NotFoundError('Employee not found');
     }
 
+    // Update employee status
     const result = await pool.query(
       `UPDATE employees SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
       [status, employeeId]
     );
 
+    // If status is being set to active, also verify the email
+    if (status === 'active') {
+      await pool.query(
+        `UPDATE users SET email_verified = true WHERE id = $1`,
+        [employee.user_id]
+      );
+    }
+
     return result.rows[0];
+  }
+
+  async updateEmployeeFields(employeeId: string, data: Partial<Employee>): Promise<Employee> {
+    const employee = await this.employeeRepo.findById(employeeId);
+    if (!employee) {
+      throw new NotFoundError('Employee not found');
+    }
+
+    return await this.employeeRepo.updateProfile(employeeId, data);
   }
 }
