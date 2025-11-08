@@ -7,6 +7,8 @@ const purchaseController = new PurchaseController();
 
 router.use(authenticate);
 
+router.get('/', purchaseController.getAllPurchaseRequests);
+
 // Vendor routes
 router.get('/vendors', purchaseController.getVendors);
 

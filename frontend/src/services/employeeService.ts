@@ -81,7 +81,8 @@ class EmployeeService {
   async getDepartments(): Promise<Department[]> {
     try {
       const response = await api.get('/departments');
-      return response.data.data || [];
+      // Backend returns { success: true, data: [...] }
+      return response.data.data || response.data.departments || [];
     } catch (error) {
       console.error('Failed to fetch departments:', error);
       throw new Error('Failed to fetch departments');

@@ -7,6 +7,8 @@ const leaveController = new LeaveController();
 
 router.use(authenticate);
 
+router.get('/', leaveController.getAllLeaveRequests);
+
 router.get('/types', leaveController.getLeaveTypes);
 
 router.post('/request', leaveController.createLeaveRequest);

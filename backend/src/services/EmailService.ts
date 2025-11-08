@@ -45,7 +45,7 @@ export class EmailService {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             line-height: 1.6; 
             color: #E0E1DD; 
-            background: #0D1B2A;
+            background: #cbdbecff;
             margin: 0;
             padding: 20px;
           }
@@ -70,17 +70,17 @@ export class EmailService {
             color: #ffffff;
           }
           .content { 
-            background: #1B263B; 
+            background: #1b393bff; 
             padding: 40px 30px;
           }
           .content h2 {
-            color: #E0E1DD;
+            color: #1c1919ff;
             font-size: 24px;
             margin-top: 0;
             margin-bottom: 20px;
           }
           .content p {
-            color: #E0E1DD;
+            color: #1c1919ff;
             margin-bottom: 15px;
           }
           .content strong {
@@ -151,6 +151,32 @@ export class EmailService {
     `;
   }
 
+  async sendWelcomeAndVerificationEmail(email: string, fullName: string, token: string): Promise<void> {
+    const verificationUrl = `${this.getBaseUrl()}/verify-email?token=${token}`;
+    
+    const content = `
+      <h2>Welcome to Go3net HR System!</h2>
+      <p>Hello ${fullName},</p>
+      <p>Thank you for registering with Go3net HR Management System.</p>
+      <p>Your account has been created and is pending approval from our HR team.</p>
+      
+      <h3 style="margin-top: 24px;">Verify Your Email Address</h3>
+      <p>To complete your registration, please verify your email address by clicking the button below:</p>
+      <a href="${verificationUrl}" class="button" style="background-color: #00BFFF !important; color: #ffffff !important; text-decoration: none !important; display: inline-block; padding: 14px 32px; border-radius: 8px; font-weight: 600; margin: 16px 0;">Verify Email</a>
+      <p>Or copy and paste this link into your browser:</p>
+      <p style="word-break: break-all; background-color: #f3f4f6; padding: 12px; border-radius: 4px;">${verificationUrl}</p>
+      <p style="margin-top: 16px;"><strong>Important:</strong> This verification link will expire in 24 hours.</p>
+      
+      <h3 style="margin-top: 24px;">What's Next?</h3>
+      <p>Once your email is verified and your account is approved by our HR team, you will receive another email notification. After approval, you can log in and access all features of the HR system.</p>
+      
+      <p style="margin-top: 24px;">If you have any questions, please contact our support team.</p>
+      <p style="margin-top: 16px; color: #6b7280; font-size: 14px;">If you didn't create an account, please ignore this email.</p>
+    `;
+    
+    await this.sendEmail(email, 'Welcome to Go3net HR - Verify Your Email', this.getEmailTemplate(content));
+  }
+
   async sendWelcomeEmail(email: string, fullName: string): Promise<void> {
     const content = `
       <h2>Welcome to Go3net HR System!</h2>
@@ -199,7 +225,7 @@ export class EmailService {
   }
 
   async sendApprovalEmail(email: string, fullName: string): Promise<void> {
-    const loginUrl = `${this.getBaseUrl()}/login`;
+    const loginUrl = `${this.getBaseUrl()}/auth`;
     
     const content = `
       <h2>Account Approved!</h2>

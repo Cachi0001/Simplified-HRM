@@ -46,6 +46,14 @@ export class UserRepository {
     return result.rows[0] || null;
   }
 
+  async findByRoles(roles: string[]): Promise<User[]> {
+    const result = await pool.query(
+      'SELECT * FROM users WHERE role = ANY($1)',
+      [roles]
+    );
+    return result.rows;
+  }
+
   async create(data: CreateUserData): Promise<User> {
     const passwordHash = await bcrypt.hash(data.password, 12);
     const verificationToken = crypto.randomBytes(32).toString('hex');

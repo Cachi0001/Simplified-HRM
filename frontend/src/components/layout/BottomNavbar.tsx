@@ -67,7 +67,7 @@ export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
   const navItems: NavItem[] = [
     { icon: LayoutDashboard, label: 'Dashboard', path: dashboardPath },
     { icon: CheckSquare, label: 'Tasks', path: '/tasks' },
-    { icon: Calendar, label: 'Leave', path: '/leave-requests' },
+    { icon: Calendar, label: 'Purchase', path: '/purchase-requests' },
     { icon: Clock, label: 'Attendance', path: '/attendance-report' },
   ];
 

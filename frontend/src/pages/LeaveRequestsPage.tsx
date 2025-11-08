@@ -57,7 +57,7 @@ export function LeaveRequestsPage() {
   const fetchLeaveRequests = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/api/leave/my-requests');
+      const response = await api.get('/leave/my-requests');
       
       if (response.data.success) {
         setLeaveRequests(response.data.data || []);
@@ -92,7 +92,7 @@ export function LeaveRequestsPage() {
       const requestData = transformToBackendFormat(formData);
       // Employee ID will be set by the backend from the authenticated user
       
-      const response = await api.post('/api/leave/request', {
+      const response = await api.post('/leave/request', {
         leaveType: formData.type,
         startDate: formData.startDate,
         endDate: formData.endDate,

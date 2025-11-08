@@ -38,12 +38,12 @@ export class AuthService {
       departmentId: data.departmentId
     });
 
-    await this.emailService.sendWelcomeEmail(data.email, data.fullName);
-    
+    // Send combined welcome + verification email
     if (user.verification_token) {
-      await this.emailService.sendVerificationEmail(data.email, data.fullName, user.verification_token);
+      await this.emailService.sendWelcomeAndVerificationEmail(data.email, data.fullName, user.verification_token);
     }
 
+    // Notify all admins, HR, and superadmins
     await this.notifyAdminsOfNewEmployee(data.fullName, data.email);
 
     return { message: 'Registration successful. Please check your email for verification link.' };
@@ -200,10 +200,16 @@ export class AuthService {
 
   private async notifyAdminsOfNewEmployee(employeeName: string, employeeEmail: string): Promise<void> {
     try {
-      const admins = await this.userRepo.findByEmail('kayode@go3net.com.ng');
+      // Get all users with admin, hr, or superadmin roles
+      const adminUsers = await this.userRepo.findByRoles(['superadmin', 'admin', 'hr']);
       
-      if (admins) {
-        await this.emailService.sendNewEmployeeNotification(admins.email, employeeName, employeeEmail);
+      // Send notification to each admin
+      for (const admin of adminUsers) {
+        try {
+          await this.emailService.sendNewEmployeeNotification(admin.email, employeeName, employeeEmail);
+        } catch (emailError) {
+          console.error(`Failed to send notification to ${admin.email}:`, emailError);
+        }
       }
     } catch (error) {
       console.error('Failed to notify admins:', error);

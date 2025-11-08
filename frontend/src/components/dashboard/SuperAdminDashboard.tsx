@@ -80,12 +80,13 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ darkMo
         
         // Calculate stats using proper API endpoint
         const statsResponse = await api.get('/employees/stats').catch(() => null);
-        if (statsResponse?.data) {
+        if (statsResponse?.data?.data) {
+          const statsData = statsResponse.data.data;
           setStats({
-            totalEmployees: statsResponse.data.total || 0,
-            admins: employees.filter((emp: any) => emp.current_role === 'admin').length,
-            hrStaff: employees.filter((emp: any) => emp.current_role === 'hr').length,
-            approvalRatio: `${employees.length} pending`
+            totalEmployees: statsData.total || 0,
+            admins: statsData.by_role?.admin || 0,
+            hrStaff: statsData.by_role?.hr || 0,
+            approvalRatio: `${statsData.pending || 0} pending`
           });
         }
         

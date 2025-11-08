@@ -18,10 +18,9 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
   onSave,
   darkMode
 }) => {
-  const { currentUser } = useAuth();
+  const { user } = useAuth();
   const [formData, setFormData] = useState<Partial<Employee>>({});
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [managers, setManagers] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'fields' | 'status'>('fields');
@@ -47,16 +46,11 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
 
   const loadDepartmentsAndManagers = async () => {
     try {
-      const [departmentsData, employeesData] = await Promise.all([
-        employeeService.getDepartments(),
-        employeeService.getAllEmployees()
-      ]);
+      const departmentsData = await employeeService.getDepartments();
       setDepartments(departmentsData);
-      // Filter out current employee from managers list
-      setManagers(employeesData.filter(emp => emp.id !== employee?.id));
     } catch (error) {
-      console.error('Failed to load departments and managers:', error);
-      setError('Failed to load departments and managers');
+      console.error('Failed to load departments:', error);
+      setError('Failed to load departments');
     }
   };
 
@@ -312,35 +306,9 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
                     <option value="teamlead">Team Lead</option>
                     <option value="hr">HR</option>
                     <option value="admin">Admin</option>
-                    {currentUser?.role === 'superadmin' && (
+                    {user?.role === 'superadmin' && (
                       <option value="superadmin">Super Admin</option>
                     )}
-                  </select>
-                </div>
-
-                {/* Manager */}
-                <div>
-                  <label className={`block text-sm font-medium mb-1 ${
-                    darkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
-                    Manager
-                  </label>
-                  <select
-                    name="manager_id"
-                    value={formData.manager_id || ''}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      darkMode 
-                        ? 'bg-gray-700 border-gray-600 text-white' 
-                        : 'bg-white border-gray-300 text-gray-900'
-                    }`}
-                  >
-                    <option value="">No Manager</option>
-                    {managers.map(manager => (
-                      <option key={manager.id} value={manager.id}>
-                        {manager.full_name} - {manager.position}
-                      </option>
-                    ))}
                   </select>
                 </div>
 

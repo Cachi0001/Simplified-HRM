@@ -35,10 +35,11 @@ export class DepartmentController {
 
   createDepartment = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const userId = (req as any).user?.userId;
+      // For now, don't pass created_by since it requires employee ID lookup
+      // The database function has it as optional (DEFAULT NULL)
       const data = {
         ...req.body,
-        created_by: userId
+        created_by: null
       };
       
       const department = await this.departmentService.createDepartment(data);
