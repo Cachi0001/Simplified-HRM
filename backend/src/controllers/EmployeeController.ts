@@ -39,6 +39,34 @@ export class EmployeeController {
     }
   };
 
+  getEmployeeStats = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const employees = await this.employeeService.getAllEmployees({});
+      
+      const stats = {
+        total: employees.length,
+        active: employees.filter((e: any) => e.status === 'active').length,
+        pending: employees.filter((e: any) => e.status === 'pending').length,
+        inactive: employees.filter((e: any) => e.status === 'inactive').length,
+        rejected: employees.filter((e: any) => e.status === 'rejected').length,
+        by_role: {
+          employee: employees.filter((e: any) => e.role === 'employee').length,
+          teamlead: employees.filter((e: any) => e.role === 'teamlead').length,
+          hr: employees.filter((e: any) => e.role === 'hr').length,
+          admin: employees.filter((e: any) => e.role === 'admin').length,
+          superadmin: employees.filter((e: any) => e.role === 'superadmin').length,
+        }
+      };
+      
+      res.json({
+        success: true,
+        data: stats
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   getEmployeeById = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const employee = await this.employeeService.getEmployeeById(req.params.id);
@@ -146,6 +174,25 @@ export class EmployeeController {
     }
   };
 
+  getMyWorkingDays = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = (req as any).user?.userId;
+      if (!userId) {
+        throw new ValidationError('User ID not found');
+      }
+      
+      const profileData = await this.employeeService.getMyProfileWithCompletion(userId);
+      res.json({
+        status: 'success',
+        data: {
+          working_days: profileData.profile.working_days || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   updateMyWorkingDays = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = (req as any).user?.userId;
@@ -193,6 +240,29 @@ export class EmployeeController {
       res.json({
         success: true,
         data: employees
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  updateEmployeeStatus = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { status } = req.body;
+      
+      if (!status) {
+        throw new ValidationError('Status is required');
+      }
+
+      if (!['active', 'inactive', 'pending', 'rejected'].includes(status)) {
+        throw new ValidationError('Invalid status value');
+      }
+
+      const employee = await this.employeeService.updateEmployeeStatus(req.params.id, status);
+      res.json({
+        success: true,
+        data: employee,
+        message: `Employee status updated to ${status}`
       });
     } catch (error) {
       next(error);

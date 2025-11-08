@@ -1,4 +1,4 @@
-import pool from '../config/database';
+import { pool } from '../config/database';
 
 export class ProfileRepository {
   async getProfile(employeeId: string) {

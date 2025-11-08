@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { AuthController } from '../controllers/AuthController';
+import { authenticate } from '../middleware/auth';
 
 const router = Router();
 const authController = new AuthController();
@@ -10,5 +11,6 @@ router.get('/verify-email/:token', authController.verifyEmail);
 router.post('/resend-confirmation', authController.resendConfirmationEmail);
 router.post('/forgot-password', authController.requestPasswordReset);
 router.post('/reset-password', authController.resetPassword);
+router.get('/me', authenticate, authController.getCurrentUser);
 
 export default router;

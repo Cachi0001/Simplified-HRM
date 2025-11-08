@@ -51,7 +51,7 @@ const WorkingDaysConfig: React.FC<WorkingDaysConfigProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [workingDaysData, setWorkingDaysData] = useState<WorkingDaysData>({
     working_days: ["monday", "tuesday", "wednesday", "thursday", "friday"],
-    working_hours: { start: "09:00", end: "17:00" },
+    working_hours: { start: "08:30", end: "17:00" },
     timezone: "UTC",
   });
   const [hasChanges, setHasChanges] = useState(false);
@@ -61,7 +61,7 @@ const WorkingDaysConfig: React.FC<WorkingDaysConfigProps> = ({
     const loadWorkingDaysConfig = async () => {
       try {
         setIsLoading(true);
-        const response = await api.get("/employees/me/working-days");
+        const response = await api.get("/me/working-days");
 
         if (response.data.status === "success") {
           const config = response.data.data;

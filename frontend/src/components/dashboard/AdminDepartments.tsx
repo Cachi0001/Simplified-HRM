@@ -1,330 +1,324 @@
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { employeeService } from '../../services/employeeService';
-import { Card } from '../ui/Card';
-import { Button } from '../ui/Button';
-import { Input } from '../ui/Input';
-import { Badge } from '../ui/Badge';
+import React, { useState, useEffect } from 'react';
+import { Plus, Edit, Trash2, Users, Building } from 'lucide-react';
 import { useToast } from '../ui/Toast';
-import { Users, Building, Edit, Check, X } from 'lucide-react';
+import api from '../../lib/api';
+
+interface Department {
+  id: string;
+  name: string;
+  description?: string;
+  manager_id?: string;
+  manager_name?: string;
+  employee_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+interface Employee {
+  id: string;
+  employee_name: string;
+  email: string;
+  department?: string;
+  role: string;
+}
 
 interface AdminDepartmentsProps {
   darkMode?: boolean;
   currentUser?: any;
 }
 
-export function AdminDepartments({ darkMode = false, currentUser }: AdminDepartmentsProps) {
-  const [selectedEmployee, setSelectedEmployee] = useState<string>('');
-  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('');
-  const [showAssignForm, setShowAssignForm] = useState(false);
+const Card: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
+  <div className={`rounded-lg border shadow-sm ${className}`}>
+    {children}
+  </div>
+);
 
-  const queryClient = useQueryClient();
+export const AdminDepartments: React.FC<AdminDepartmentsProps> = ({ darkMode = false, currentUser }) => {
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
+  const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    manager_id: ''
+  });
   const { addToast } = useToast();
 
-  const normalizeId = (value: any): string => {
-    if (!value) return '';
-    if (typeof value === 'string') return value;
-    if (typeof value === 'object') {
-      if (value._id) return normalizeId(value._id);
-      if (value.id) return normalizeId(value.id);
-      if (typeof value.toString === 'function') return value.toString();
+  useEffect(() => {
+    fetchDepartments();
+    fetchEmployees();
+  }, []);
+
+  const fetchDepartments = async () => {
+    try {
+      const response = await api.get('/departments');
+      setDepartments(response.data.departments || []);
+    } catch (error) {
+      console.error('Error fetching departments:', error);
+      addToast('error', 'Failed to fetch departments');
     }
-    return String(value);
   };
 
-  const getEmployeeId = (employee: any) => normalizeId(employee?.id ?? employee?._id ?? '');
+  const fetchEmployees = async () => {
+    try {
+      const response = await api.get('/employees');
+      setEmployees(response.data.employees || []);
+    } catch (error) {
+      console.error('Error fetching employees:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  // Fetch all employees
-  const { data: employees = [], isLoading: employeesLoading } = useQuery({
-    queryKey: ['employees'],
-    queryFn: async () => {
-      const response = await employeeService.getAllEmployees();
-      return response.filter((emp: any) => emp.role !== 'admin');
-    },
-  });
-
-  // Fetch all departments from API
-  const { data: departments = [], isLoading: departmentsLoading } = useQuery({
-    queryKey: ['departments'],
-    queryFn: async () => {
-      return await employeeService.getDepartments();
-    },
-  });
-
-  // Assign department mutation
-  const assignDepartmentMutation = useMutation({
-    mutationFn: async ({ employeeId, departmentId }: { employeeId: string; departmentId: string }) => {
-      return await employeeService.updateEmployeeFields(employeeId, { department_id: departmentId });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['employees'] });
-      setShowAssignForm(false);
-      setSelectedEmployee('');
-      setSelectedDepartmentId('');
-      addToast('success', `Department assigned successfully!`);
-    },
-    onError: (error: any) => {
-      const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || error.message || 'Failed to assign department';
-      addToast('error', errorMessage);
-    },
-  });
-
-  const handleAssignDepartment = () => {
-    if (!selectedEmployee || !selectedDepartmentId) {
-      addToast('error', 'Select an employee and department first.');
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.name.trim()) {
+      addToast('error', 'Department name is required');
       return;
     }
 
-    assignDepartmentMutation.mutate({
-      employeeId: selectedEmployee,
-      departmentId: selectedDepartmentId
-    });
-  };
-
-  const handleQuickAssign = (employeeId: string, department: string) => {
-    if (!employeeId) {
-      addToast('error', 'Invalid employee selected.');
-      return;
-    }
-
-    setQuickAssignDepartment(department);
-    assignDepartmentMutation.mutate({ employeeId, department }, {
-      onSettled: () => {
-        setQuickAssignDepartment(null);
+    try {
+      if (editingDepartment) {
+        // Update department
+        const response = await api.put(`/departments/${editingDepartment.id}`, formData);
+        if (response.data.success) {
+          await fetchDepartments();
+          addToast('success', 'Department updated successfully');
+        }
+      } else {
+        // Create department
+        const response = await api.post('/departments', formData);
+        if (response.data.success) {
+          await fetchDepartments();
+          addToast('success', 'Department created successfully');
+        }
       }
-    });
-  };
-
-  const addCustomDepartment = () => {
-    if (customDepartment.trim()) {
-      setNewDepartment(customDepartment.trim());
-      setCustomDepartment('');
+      
+      // Reset form
+      setFormData({ name: '', description: '', manager_id: '' });
+      setIsCreating(false);
+      setEditingDepartment(null);
+    } catch (error: any) {
+      console.error('Error saving department:', error);
+      addToast('error', error.response?.data?.message || 'Failed to save department');
     }
   };
 
-  const employeesWithoutDepartment = employees.filter(emp => !emp.department);
-  const employeesWithDepartment = employees.filter(emp => emp.department);
+  const handleEdit = (department: Department) => {
+    setEditingDepartment(department);
+    setFormData({
+      name: department.name,
+      description: department.description || '',
+      manager_id: department.manager_id || ''
+    });
+    setIsCreating(true);
+  };
+
+  const handleDelete = async (departmentId: string) => {
+    if (!confirm('Are you sure you want to delete this department?')) {
+      return;
+    }
+
+    try {
+      const response = await api.delete(`/departments/${departmentId}`);
+      if (response.data.success) {
+        await fetchDepartments();
+        addToast('success', 'Department deleted successfully');
+      }
+    } catch (error: any) {
+      console.error('Error deleting department:', error);
+      addToast('error', error.response?.data?.message || 'Failed to delete department');
+    }
+  };
+
+  const handleCancel = () => {
+    setFormData({ name: '', description: '', manager_id: '' });
+    setIsCreating(false);
+    setEditingDepartment(null);
+  };
+
+  if (loading) {
+    return (
+      <div className={`p-6 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+        <div className="animate-pulse">
+          <div className={`h-4 ${darkMode ? 'bg-gray-700' : 'bg-gray-200'} rounded w-1/4 mb-4`}></div>
+          <div className={`h-32 ${darkMode ? 'bg-gray-700' : 'bg-gray-200'} rounded`}></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className={`space-y-6 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Building className={`h-6 w-6 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`} />
-          <h2 className={`text-2xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-            Department Management
-          </h2>
-        </div>
-        <Button onClick={() => setShowAssignForm(!showAssignForm)}>
-          <Edit className="h-4 w-4 mr-2" />
-          Assign Department
-        </Button>
+    <div className={`p-6 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className={`text-2xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+          Department Management
+        </h2>
+        <button
+          onClick={() => setIsCreating(true)}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+        >
+          <Plus className="h-4 w-4" />
+          Add Department
+        </button>
       </div>
 
-      {/* Assign Department Form */}
-      {showAssignForm && (
-        <Card className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-          <div className="p-6">
-            <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-              Assign Department
-            </h3>
+      {/* Create/Edit Form */}
+      {isCreating && (
+        <Card className={`p-6 mb-6 ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
+          <h3 className={`text-lg font-medium mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+            {editingDepartment ? 'Edit Department' : 'Create New Department'}
+          </h3>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                Department Name *
+              </label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  darkMode 
+                    ? 'bg-gray-600 border-gray-500 text-white placeholder-gray-400' 
+                    : 'bg-white border-gray-300 text-gray-900'
+                }`}
+                placeholder="Enter department name"
+                required
+              />
+            </div>
+            
+            <div>
+              <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                Description
+              </label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  darkMode 
+                    ? 'bg-gray-600 border-gray-500 text-white placeholder-gray-400' 
+                    : 'bg-white border-gray-300 text-gray-900'
+                }`}
+                placeholder="Enter department description"
+                rows={3}
+              />
+            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                  Employee *
-                </label>
-                <select
-                  value={selectedEmployee}
-                  onChange={(e) => setSelectedEmployee(e.target.value)}
-                  className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
-                >
-                  <option value="">Select Employee</option>
-                  {employeesWithoutDepartment.map(emp => {
-                    const id = getEmployeeId(emp);
-                    return (
-                      <option key={id || emp.email} value={id}>
-                        {emp.fullName} (No Department)
-                      </option>
-                    );
-                  })}
-                  {employeesWithDepartment.map(emp => {
-                    const id = getEmployeeId(emp);
-                    return (
-                      <option key={id || emp.email} value={id}>
-                        {emp.fullName} ({emp.department})
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-
-              <div>
-                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                  Department *
-                </label>
-                <select
-                  value={selectedDepartmentId}
-                  onChange={(e) => setSelectedDepartmentId(e.target.value)}
-                  className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
-                  disabled={departmentsLoading}
-                >
-                  <option value="">Select Department</option>
-                  {departments.map(dept => (
-                    <option key={dept.id} value={dept.id}>
-                      {dept.name} {dept.team_lead_name ? `(Lead: ${dept.team_lead_name})` : ''}
+            <div>
+              <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                Department Manager
+              </label>
+              <select
+                value={formData.manager_id}
+                onChange={(e) => setFormData({ ...formData, manager_id: e.target.value })}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  darkMode 
+                    ? 'bg-gray-600 border-gray-500 text-white' 
+                    : 'bg-white border-gray-300 text-gray-900'
+                }`}
+              >
+                <option value="">Select a manager (optional)</option>
+                {employees
+                  .filter(emp => ['admin', 'hr', 'teamlead'].includes(emp.role))
+                  .map(emp => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.employee_name} ({emp.role})
                     </option>
-                  ))}
-                </select>
-                {departmentsLoading && (
-                  <p className="text-sm text-gray-500 mt-1">Loading departments...</p>
-                )}
-              </div>
+                  ))
+                }
+              </select>
             </div>
 
             <div className="flex gap-3">
-              <Button onClick={handleAssignDepartment} isLoading={assignDepartmentMutation.isPending} disabled={assignDepartmentMutation.isPending}>
-                <Check className="h-4 w-4 mr-2" />
-                Assign Department
-              </Button>
-              <Button
-                onClick={() => {
-                  setShowAssignForm(false);
-                  setSelectedEmployee('');
-                  setSelectedDepartmentId('');
-                }}
-                disabled={assignDepartmentMutation.isPending}
-                className="border border-gray-300 text-gray-700 hover:bg-gray-50"
+              <button
+                type="submit"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
               >
-                <X className="h-4 w-4 mr-2" />
+                {editingDepartment ? 'Update Department' : 'Create Department'}
+              </button>
+              <button
+                type="button"
+                onClick={handleCancel}
+                className={`px-4 py-2 rounded-lg border transition-colors ${
+                  darkMode 
+                    ? 'border-gray-600 text-gray-300 hover:bg-gray-700' 
+                    : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                }`}
+              >
                 Cancel
-              </Button>
+              </button>
             </div>
-          </div>
-        </Card>
-      )}
-                </Button>
-              ))}
-            </div>
-
-            <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-              💡 Click any department button to quickly assign it to the first employee without a department
-            </p>
-          </div>
+          </form>
         </Card>
       )}
 
-      {/* Department Overview */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Employees Without Department */}
-        <Card className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-          <div className="p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Users className={`h-5 w-5 ${darkMode ? 'text-orange-400' : 'text-orange-600'}`} />
-              <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                No Department ({employeesWithoutDepartment.length})
-              </h3>
+      {/* Departments List */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {departments.map((department) => (
+          <Card key={department.id} className={`p-4 ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200'}`}>
+            <div className="flex justify-between items-start mb-3">
+              <div className="flex items-center gap-2">
+                <Building className={`h-5 w-5 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`} />
+                <h3 className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                  {department.name}
+                </h3>
+              </div>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => handleEdit(department)}
+                  className={`p-1 rounded hover:bg-opacity-20 transition-colors ${
+                    darkMode ? 'text-gray-400 hover:bg-gray-600' : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                  title="Edit department"
+                >
+                  <Edit className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => handleDelete(department.id)}
+                  className={`p-1 rounded hover:bg-opacity-20 transition-colors ${
+                    darkMode ? 'text-red-400 hover:bg-red-900' : 'text-red-600 hover:bg-red-100'
+                  }`}
+                  title="Delete department"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
             </div>
-
-            {employeesLoading ? (
-              <div className="space-y-2">
-                {[1, 2, 3].map(i => (
-                  <div key={`skeleton-${i}`} className={`h-12 rounded animate-pulse ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`} />
-                ))}
+            
+            {department.description && (
+              <p className={`text-sm mb-3 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                {department.description}
+              </p>
+            )}
+            
+            <div className="flex items-center gap-4 text-sm">
+              <div className="flex items-center gap-1">
+                <Users className={`h-4 w-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+                <span className={darkMode ? 'text-gray-300' : 'text-gray-600'}>
+                  {department.employee_count} employees
+                </span>
               </div>
-            ) : employeesWithoutDepartment.length > 0 ? (
-              <div className="space-y-2">
-                {employeesWithoutDepartment.map(emp => (
-                  <div key={getEmployeeId(emp) || emp.email} className={`p-3 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                          {emp.fullName}
-                        </p>
-                        <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                          {emp.email}
-                        </p>
-                      </div>
-                      <Badge className={darkMode ? 'bg-orange-900 text-orange-300' : 'bg-orange-100 text-orange-800'}>
-                        Unassigned
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className={`text-center py-6 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                <Check className={`h-8 w-8 mx-auto mb-2 ${darkMode ? 'text-green-400' : 'text-green-600'}`} />
-                <p className="font-medium">All employees have departments!</p>
+            </div>
+            
+            {department.manager_name && (
+              <div className={`mt-2 text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                <strong>Manager:</strong> {department.manager_name}
               </div>
             )}
-          </div>
-        </Card>
-
-        {/* Department Distribution */}
-        <Card className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-          <div className="p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Building className={`h-5 w-5 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`} />
-              <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                Department Distribution
-              </h3>
-            </div>
-
-            {employeesLoading ? (
-              <div className="space-y-2">
-                {[1, 2, 3].map(i => (
-                  <div key={`skeleton-dept-${i}`} className={`h-8 rounded animate-pulse ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`} />
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {COMMON_DEPARTMENTS.map(dept => {
-                  const count = employeesWithDepartment.filter(emp => emp.department === dept).length;
-                  if (count === 0) return null;
-
-                  return (
-                    <div key={`common-${dept}`} className={`flex items-center justify-between p-2 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
-                      <span className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                        {dept}
-                      </span>
-                      <Badge className={darkMode ? 'bg-blue-900 text-blue-300' : 'bg-blue-100 text-blue-800'}>
-                        {count}
-                      </Badge>
-                    </div>
-                  );
-                })}
-
-                {/* Custom departments */}
-                {Array.from(new Set(employeesWithDepartment
-                  .map(emp => emp.department)
-                  .filter(dept => dept && !COMMON_DEPARTMENTS.includes(dept))
-                )).map(dept => {
-                  const count = employeesWithDepartment.filter(emp => emp.department === dept).length;
-                  return (
-                    <div key={`custom-${dept}`} className={`flex items-center justify-between p-2 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
-                      <span className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                        {dept}
-                      </span>
-                      <Badge className={darkMode ? 'bg-purple-900 text-purple-300' : 'bg-purple-100 text-purple-800'}>
-                        {count}
-                      </Badge>
-                    </div>
-                  );
-                })}
-
-                {employeesWithDepartment.length === 0 && (
-                  <div className={`text-center py-6 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                    <Building className={`h-8 w-8 mx-auto mb-2 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`} />
-                    <p className="font-medium">No departments assigned yet</p>
-                    <p className="text-sm">Start assigning departments to see the distribution</p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </Card>
+          </Card>
+        ))}
       </div>
+
+      {departments.length === 0 && (
+        <div className={`text-center py-8 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+          <Building className="h-12 w-12 mx-auto mb-4 opacity-50" />
+          <p>No departments found. Create your first department to get started.</p>
+        </div>
+      )}
     </div>
   );
-}
+};

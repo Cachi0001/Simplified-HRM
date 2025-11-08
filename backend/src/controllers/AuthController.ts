@@ -86,4 +86,25 @@ export class AuthController {
       next(error);
     }
   };
+
+  getCurrentUser = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        res.status(401).json({
+          success: false,
+          message: 'Not authenticated'
+        });
+        return;
+      }
+
+      const userData = await this.authService.getUserById(user.userId);
+      res.json({
+        success: true,
+        data: userData
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }

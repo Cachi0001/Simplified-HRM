@@ -101,6 +101,17 @@ export class AuthService {
     const user = await this.userRepo.verifyEmail(token);
     
     if (!user) {
+      const userByToken = await this.userRepo.findByVerificationToken(token);
+      
+      if (userByToken) {
+        const employee = await this.employeeRepo.findByUserId(userByToken.id);
+        if (employee) {
+          const newToken = await this.userRepo.regenerateVerificationToken(userByToken.id);
+          await this.emailService.sendVerificationEmail(userByToken.email, employee.full_name, newToken);
+          throw new ValidationError('Verification token expired. A new verification email has been sent to your inbox.');
+        }
+      }
+      
       throw new ValidationError('Invalid or expired verification token');
     }
 
@@ -165,6 +176,26 @@ export class AuthService {
     }
 
     return { message: 'Password reset successfully. You can now log in with your new password.' };
+  }
+
+  async getUserById(userId: string): Promise<any> {
+    const user = await this.userRepo.findById(userId);
+    
+    if (!user) {
+      throw new NotFoundError('User not found');
+    }
+
+    const employee = await this.employeeRepo.findByUserId(userId);
+
+    return {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      email_verified: user.email_verified,
+      fullName: employee?.full_name,
+      employee_id: employee?.id,
+      status: employee?.status
+    };
   }
 
   private async notifyAdminsOfNewEmployee(employeeName: string, employeeEmail: string): Promise<void> {

@@ -3,18 +3,15 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Simple PostgreSQL pool using Supabase credentials
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
 });
 
-// Handle errors
 pool.on('error', (err: any) => {
   console.error('Database error:', err.message);
 });
 
-// Simple connection test
 export const testConnection = async () => {
   try {
     const client = await pool.connect();

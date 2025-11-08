@@ -109,6 +109,12 @@ export class EmployeeService {
 
     updated = personalResult.rows[0];
 
+    // Update working days if provided
+    if (data.working_days || (data as any).work_days) {
+      const workingDays = data.working_days || (data as any).work_days;
+      await this.employeeRepo.updateWorkingDays(employee.id, workingDays);
+    }
+
     // Notify supervisors of profile update
     await pool.query(
       `SELECT notify_supervisors_profile_update($1, $2)`,
@@ -145,6 +151,12 @@ export class EmployeeService {
     if (!response.success) {
       throw new ValidationError(response.message);
     }
+
+    // Verify email when approving
+    await pool.query(
+      `UPDATE users SET email_verified = true WHERE id = $1`,
+      [employee.user_id]
+    );
 
     // Initialize leave balances for the approved employee
     await pool.query(
@@ -250,5 +262,19 @@ export class EmployeeService {
     );
 
     return results;
+  }
+
+  async updateEmployeeStatus(employeeId: string, status: string): Promise<Employee> {
+    const employee = await this.employeeRepo.findById(employeeId);
+    if (!employee) {
+      throw new NotFoundError('Employee not found');
+    }
+
+    const result = await pool.query(
+      `UPDATE employees SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+      [status, employeeId]
+    );
+
+    return result.rows[0];
   }
 }
