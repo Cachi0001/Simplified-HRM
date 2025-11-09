@@ -167,7 +167,7 @@ export function LeaveRequestsPage() {
   const handleDeleteConfirm = async () => {
     try {
       setDeleting(true);
-      const response = await api.delete(`/api/leave/requests/${deleteConfirm.requestId}`);
+      const response = await api.delete(`/leave/requests/${deleteConfirm.requestId}`);
       
       if (response.data.success) {
         setLeaveRequests(leaveRequests.filter(req => req.id !== deleteConfirm.requestId));
@@ -495,10 +495,14 @@ export function LeaveRequestsPage() {
                   )}
 
                   {/* Delete button for request owner */}
-                  {(currentUser?.id === request.employee_id && request.status === 'pending') && (
+                  {((currentUser?.id === request.employee_id || currentUser?.employee_id === request.employee_id) && request.status === 'pending') && (
                     <button
                       onClick={() => handleDeleteClick(request)}
-                      className="text-red-600 hover:text-red-800 transition"
+                      className={`transition-colors duration-200 ${
+                        darkMode 
+                          ? 'text-red-400 hover:text-red-300' 
+                          : 'text-red-600 hover:text-red-800'
+                      }`}
                       title="Delete request"
                     >
                       <Trash2 className="h-5 w-5" />

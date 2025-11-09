@@ -92,7 +92,8 @@ export class AuthService {
         id: user.id,
         email: user.email,
         role: user.role,
-        fullName: employee.full_name
+        fullName: employee.full_name,
+        employeeId: employee.id  // Add employee ID for task filtering
       }
     };
   }

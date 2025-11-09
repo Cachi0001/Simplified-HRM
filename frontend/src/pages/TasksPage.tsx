@@ -1,12 +1,15 @@
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { taskService } from '../services/taskService';
+import { employeeService } from '../services/employeeService';
 import { Badge } from '../components/ui/Badge';
 import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
 import { useToast } from '../components/ui/Toast';
 import { useTheme } from '../contexts/ThemeContext';
 import { BottomNavbar } from '../components/layout/BottomNavbar';
-import { Calendar, User, Clock, Trash2, ArrowLeft } from 'lucide-react';
+import { Calendar, User, Clock, Trash2, ArrowLeft, Plus, Play, Pause, CheckCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { authService } from '../services/authService';
 import Logo from '../components/ui/Logo';
@@ -20,6 +23,7 @@ export function TasksPage() {
   
   const currentUser = authService.getCurrentUserFromStorage();
   const currentUserId = currentUser?.id || (currentUser as any)?._id;
+  const currentEmployeeId = currentUser?.employeeId || currentUser?.id;
   const isEmployee = currentUser?.role === 'employee';
   const isSuperAdmin = currentUser?.role === 'superadmin';
   const canAssignTasks = ['hr', 'admin', 'teamlead', 'superadmin'].includes(currentUser?.role || '');
@@ -30,6 +34,23 @@ export function TasksPage() {
   );
   
   const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
+  const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  
+  const formatDateInput = (date: Date) => date.toISOString().split('T')[0];
+  const tomorrow = (() => {
+    const date = new Date();
+    date.setDate(date.getDate() + 1);
+    return date;
+  })();
+  
+  const [newTask, setNewTask] = useState({
+    title: '',
+    description: '',
+    assigneeId: '',
+    priority: 'normal' as 'low' | 'normal' | 'high' | 'urgent',
+    dueDate: formatDateInput(tomorrow)
+  });
 
   // Fetch tasks assigned TO me (not for superadmin)
   const { data: myTasks = [], isLoading: myTasksLoading } = useQuery({
@@ -43,9 +64,9 @@ export function TasksPage() {
     enabled: !isSuperAdmin, // Don't fetch for superadmin
   });
 
-  // Fetch tasks I assigned to others (only for roles that can assign)
+  // Fetch ALL tasks to filter for "Tasks I Assigned"
   const { data: allTasks = [], isLoading: assignedTasksLoading } = useQuery({
-    queryKey: ['tasks-i-assigned'],
+    queryKey: ['all-tasks'],
     queryFn: async () => {
       console.log('[TasksPage] Fetching all tasks');
       const response = await taskService.getAllTasks();
@@ -55,11 +76,81 @@ export function TasksPage() {
     enabled: canAssignTasks, // Only fetch for roles that can assign tasks
   });
 
-  // Filter to only show tasks created by current user
+  // Filter to only show tasks created by current user (using employee_id)
   const assignedTasks = allTasks.filter((task: any) => {
     const taskCreatorId = task.assignedBy || task.assigned_by;
-    return taskCreatorId === currentUserId;
+    const matches = taskCreatorId === currentEmployeeId || taskCreatorId === currentUserId;
+    
+    // Debug logging
+    if (allTasks.length > 0) {
+      console.log('[Filter Debug]', {
+        taskId: task.id,
+        taskTitle: task.title,
+        taskCreatorId,
+        currentEmployeeId,
+        currentUserId,
+        matches
+      });
+    }
+    
+    return matches;
   });
+  
+  // Log summary
+  console.log('[TasksPage Summary]', {
+    totalTasks: allTasks.length,
+    assignedByMe: assignedTasks.length,
+    assignedToMe: myTasks.length,
+    currentEmployeeId,
+    currentUserId,
+    currentUserRole: currentUser?.role
+  });
+
+  // Fetch employees for task assignment
+  const { data: employees = [] } = useQuery({
+    queryKey: ['employees-for-tasks'],
+    queryFn: async () => {
+      const response = await employeeService.getAllEmployees();
+      
+      // Filter based on role
+      if (currentUser?.role === 'teamlead') {
+        // Team leads see their team members
+        return response.filter((emp: any) => 
+          emp.role === 'employee' || emp.id === currentEmployeeId
+        );
+      }
+      
+      if (currentUser?.role === 'superadmin') {
+        return response; // Superadmin can assign to anyone
+      }
+      
+      // HR/Admin can assign to anyone except superadmin
+      return response.filter((emp: any) => emp.role !== 'superadmin');
+    },
+    enabled: canAssignTasks,
+  });
+
+  // Handle notification highlight
+  useEffect(() => {
+    const highlightId = sessionStorage.getItem('highlight_id');
+    const highlightType = sessionStorage.getItem('highlight_type');
+    
+    if (highlightId && highlightType === 'task' && (myTasks.length > 0 || assignedTasks.length > 0)) {
+      setTimeout(() => {
+        const element = document.getElementById(`task-card-${highlightId}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          element.classList.add('ring-4', 'ring-blue-500', 'ring-opacity-50', 'transition-all');
+          
+          setTimeout(() => {
+            element.classList.remove('ring-4', 'ring-blue-500', 'ring-opacity-50');
+            sessionStorage.removeItem('highlight_id');
+            sessionStorage.removeItem('highlight_type');
+          }, 3000);
+        }
+      }, 500);
+    }
+  }, [myTasks, assignedTasks]);
 
   // Delete task mutation
   const deleteTaskMutation = useMutation({
@@ -67,7 +158,7 @@ export function TasksPage() {
       return await taskService.deleteTask(taskId);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks-i-assigned'] });
+      queryClient.invalidateQueries({ queryKey: ['all-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['my-tasks'] });
       addToast('success', 'Task deleted successfully');
       setDeletingTaskId(null);
@@ -79,10 +170,52 @@ export function TasksPage() {
     },
   });
 
+  // Update task status mutation
+  const updateTaskMutation = useMutation({
+    mutationFn: async ({ taskId, status }: { taskId: string; status: string }) => {
+      return await taskService.updateTaskStatus(taskId, status);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['all-tasks'] });
+      addToast('success', 'Task status updated successfully');
+      setUpdatingTaskId(null);
+    },
+    onError: (error: any) => {
+      const errorMessage = error.message || 'Failed to update task status';
+      addToast('error', errorMessage);
+      setUpdatingTaskId(null);
+    },
+  });
+
+  // Create task mutation
+  const createTaskMutation = useMutation({
+    mutationFn: async (taskData: any) => {
+      return await taskService.createTask(taskData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['all-tasks'] });
+      addToast('success', 'Task created successfully');
+      setShowCreateModal(false);
+      setNewTask({
+        title: '',
+        description: '',
+        assigneeId: '',
+        priority: 'normal',
+        dueDate: formatDateInput(tomorrow)
+      });
+    },
+    onError: (error: any) => {
+      const errorMessage = error.message || 'Failed to create task';
+      addToast('error', errorMessage);
+    },
+  });
+
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'high': return darkMode ? 'bg-red-900 text-red-300' : 'bg-red-100 text-red-800';
-      case 'medium': return darkMode ? 'bg-yellow-900 text-yellow-300' : 'bg-yellow-100 text-yellow-800';
+      case 'urgent': return darkMode ? 'bg-red-900 text-red-300' : 'bg-red-100 text-red-800';
+      case 'high': return darkMode ? 'bg-orange-900 text-orange-300' : 'bg-orange-100 text-orange-800';
+      case 'normal': return darkMode ? 'bg-yellow-900 text-yellow-300' : 'bg-yellow-100 text-yellow-800';
       case 'low': return darkMode ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-800';
       default: return darkMode ? 'bg-gray-900 text-gray-300' : 'bg-gray-100 text-gray-800';
     }
@@ -105,11 +238,50 @@ export function TasksPage() {
     }
   };
 
-  const renderTaskCard = (task: any) => {
+  const handleUpdateTaskStatus = (taskId: string, newStatus: string) => {
+    setUpdatingTaskId(taskId);
+    updateTaskMutation.mutate({ taskId, status: newStatus });
+  };
+
+  const handleCreateTask = () => {
+    if (!newTask.title || !newTask.assigneeId || !newTask.dueDate) {
+      addToast('error', 'Please fill in all required fields');
+      return;
+    }
+
+    // Check if trying to assign to superadmin
+    const selectedEmployee = employees.find((emp: any) => emp.id === newTask.assigneeId);
+    if (selectedEmployee && selectedEmployee.role === 'superadmin') {
+      addToast('error', 'Cannot assign tasks to Superadmin. Please select a different employee.');
+      return;
+    }
+
+    createTaskMutation.mutate({
+      ...newTask,
+      dueDate: new Date(newTask.dueDate).toISOString()
+    });
+  };
+
+  const renderTaskCard = (task: any, showProgressControls = false) => {
     const assigneeName = task.assignee_name || 'Unknown Employee';
     const assignedByName = task.assigned_by_name || 'Unknown';
     const taskCreatorId = task.assignedBy || task.assigned_by;
-    const isCreator = taskCreatorId === currentUserId;
+    const taskAssigneeId = task.assigneeId || task.assignee_id;
+    const isCreator = taskCreatorId === currentEmployeeId || taskCreatorId === currentUserId;
+    const isAssignee = taskAssigneeId === currentEmployeeId || taskAssigneeId === currentUserId;
+    
+    // Debug logging
+    console.log('[TaskCard Debug]', {
+      taskId: task.id,
+      taskAssigneeId,
+      taskCreatorId,
+      currentEmployeeId,
+      currentUserId,
+      isAssignee,
+      isCreator,
+      showProgressControls,
+      status: task.status
+    });
 
     return (
       <Card key={task.id} className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
@@ -155,10 +327,10 @@ export function TasksPage() {
             <div className={`flex items-center gap-2 ${darkMode ? 'text-blue-200' : 'text-blue-700'}`}>
               <User className="h-4 w-4" />
               <span className="font-medium">
-                {activeTab === 'assigned-to-me' ? 'Assigned by:' : 'Assigned to:'}
+                {showProgressControls ? 'Assigned by:' : 'Assigned to:'}
               </span>
               <span className="font-semibold">
-                {activeTab === 'assigned-to-me' ? assignedByName : assigneeName}
+                {showProgressControls ? assignedByName : assigneeName}
               </span>
             </div>
           </div>
@@ -169,6 +341,45 @@ export function TasksPage() {
               <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                 {task.description}
               </p>
+            </div>
+          )}
+
+          {/* Progress Controls - only for assignee on "assigned to me" tab */}
+          {showProgressControls && isAssignee && task.status !== 'completed' && task.status !== 'cancelled' && (
+            <div className="mb-3 flex gap-2 flex-wrap">
+              {task.status === 'pending' && (
+                <Button
+                  onClick={() => handleUpdateTaskStatus(task.id, 'in_progress')}
+                  isLoading={updatingTaskId === task.id}
+                  disabled={updatingTaskId === task.id}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  Start Task
+                </Button>
+              )}
+              {task.status === 'in_progress' && (
+                <>
+                  <Button
+                    onClick={() => handleUpdateTaskStatus(task.id, 'completed')}
+                    isLoading={updatingTaskId === task.id}
+                    disabled={updatingTaskId === task.id}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Complete
+                  </Button>
+                  <Button
+                    onClick={() => handleUpdateTaskStatus(task.id, 'pending')}
+                    isLoading={updatingTaskId === task.id}
+                    disabled={updatingTaskId === task.id}
+                    className="bg-gray-600 hover:bg-gray-700 text-white"
+                  >
+                    <Pause className="h-4 w-4 mr-2" />
+                    Pause
+                  </Button>
+                </>
+              )}
             </div>
           )}
 
@@ -283,9 +494,9 @@ export function TasksPage() {
           </div>
         ) : null}
 
-        {/* Superadmin Header */}
+        {/* Superadmin Header with New Task Button */}
         {isSuperAdmin && (
-          <div className="mb-6">
+          <div className="mb-6 flex justify-between items-center">
             <h2 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
               Tasks I Assigned
               {assignedTasks.length > 0 && (
@@ -296,6 +507,20 @@ export function TasksPage() {
                 </span>
               )}
             </h2>
+            <Button onClick={() => setShowCreateModal(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              New Task
+            </Button>
+          </div>
+        )}
+
+        {/* New Task Button for other roles with "Tasks I Assigned" tab */}
+        {!isEmployee && !isSuperAdmin && activeTab === 'i-assigned' && (
+          <div className="mb-4 flex justify-end">
+            <Button onClick={() => setShowCreateModal(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              New Task
+            </Button>
           </div>
         )}
 
@@ -312,7 +537,7 @@ export function TasksPage() {
               </div>
             ) : myTasks.length > 0 ? (
               <div className="space-y-3">
-                {myTasks.map(renderTaskCard)}
+                {myTasks.map((task) => renderTaskCard(task, true))}
               </div>
             ) : (
               <Card className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
@@ -338,7 +563,7 @@ export function TasksPage() {
               </div>
             ) : assignedTasks.length > 0 ? (
               <div className="space-y-3">
-                {assignedTasks.map(renderTaskCard)}
+                {assignedTasks.map((task) => renderTaskCard(task, false))}
               </div>
             ) : (
               <Card className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
@@ -351,6 +576,121 @@ export function TasksPage() {
           </div>
         )}
       </div>
+
+      {/* Create Task Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto`}>
+            <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+              Create New Task
+            </h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Title *
+                </label>
+                <Input
+                  id="title"
+                  label=""
+                  value={newTask.title}
+                  onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+                  placeholder="Enter task title"
+                />
+              </div>
+              
+              <div>
+                <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Description
+                </label>
+                <textarea
+                  value={newTask.description}
+                  onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    darkMode 
+                      ? 'bg-gray-700 border-gray-600 text-white' 
+                      : 'bg-white border-gray-300 text-gray-900'
+                  }`}
+                  rows={3}
+                  placeholder="Enter task description"
+                />
+              </div>
+              
+              <div>
+                <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Assign to *
+                </label>
+                <select
+                  value={newTask.assigneeId}
+                  onChange={(e) => setNewTask({ ...newTask, assigneeId: e.target.value })}
+                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    darkMode 
+                      ? 'bg-gray-700 border-gray-600 text-white' 
+                      : 'bg-white border-gray-300 text-gray-900'
+                  }`}
+                >
+                  <option value="">Select employee</option>
+                  {employees.map((employee: any) => (
+                    <option key={employee.id} value={employee.id}>
+                      {employee.full_name} ({employee.role})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Priority
+                </label>
+                <select
+                  value={newTask.priority}
+                  onChange={(e) => setNewTask({ ...newTask, priority: e.target.value as 'low' | 'medium' | 'high' })}
+                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    darkMode 
+                      ? 'bg-gray-700 border-gray-600 text-white' 
+                      : 'bg-white border-gray-300 text-gray-900'
+                  }`}
+                >
+                  <option value="low">Low</option>
+                  <option value="normal">Normal</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Due Date *
+                </label>
+                <Input
+                  id="dueDate"
+                  label=""
+                  type="date"
+                  value={newTask.dueDate}
+                  onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
+                  min={formatDateInput(tomorrow)}
+                />
+              </div>
+            </div>
+            
+            <div className="flex gap-3 mt-6">
+              <Button
+                onClick={() => setShowCreateModal(false)}
+                disabled={createTaskMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCreateTask}
+                isLoading={createTaskMutation.isPending}
+                disabled={createTaskMutation.isPending}
+              >
+                Create Task
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Bottom Navigation */}
       <BottomNavbar darkMode={darkMode} />

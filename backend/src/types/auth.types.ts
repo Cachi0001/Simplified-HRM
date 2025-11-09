@@ -20,6 +20,7 @@ export interface AuthResponse {
     email: string;
     role: string;
     fullName: string;
+    employeeId?: string;  // Employee ID for task filtering and other operations
   };
 }
 

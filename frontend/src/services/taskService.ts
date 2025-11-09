@@ -7,7 +7,7 @@ export interface Task {
   assigneeId: string;
   assignedBy: string;
   status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
-  priority: 'low' | 'medium' | 'high';
+  priority: 'low' | 'normal' | 'high' | 'urgent';
   dueDate: string;
   completedAt?: string;
   createdAt: string;
@@ -20,7 +20,7 @@ export interface CreateTaskRequest {
   title: string;
   description?: string;
   assigneeId: string;
-  priority?: 'low' | 'medium' | 'high';
+  priority?: 'low' | 'normal' | 'high' | 'urgent';
   dueDate: string;
 }
 
@@ -28,7 +28,7 @@ export interface UpdateTaskRequest {
   title?: string;
   description?: string;
   status?: 'pending' | 'in_progress' | 'completed' | 'cancelled';
-  priority?: 'low' | 'medium' | 'high';
+  priority?: 'low' | 'normal' | 'high' | 'urgent';
   dueDate?: string;
 }
 
@@ -36,7 +36,7 @@ export interface TaskQuery {
   assigned_to?: string; // Changed from assigneeId to match Supabase schema
   assignedBy?: string; // Changed from assignedBy to match Supabase schema
   status?: 'pending' | 'in_progress' | 'completed' | 'cancelled';
-  priority?: 'low' | 'medium' | 'high';
+  priority?: 'low' | 'normal' | 'high' | 'urgent';
   page?: number;
   limit?: number;
 }
@@ -80,7 +80,7 @@ const normalizeTask = (task: any): Task => ({
   assigneeId: extractId(task?.assigned_to ?? task?.assigneeId ?? task?.assignee_id ?? ''),
   assignedBy: extractId(task?.created_by ?? task?.assignedBy ?? task?.assigned_by ?? ''),
   status: task?.status ?? 'pending',
-  priority: task?.priority ?? 'medium',
+  priority: task?.priority ?? 'normal',
   dueDate: toIsoString(task?.due_date ?? task?.dueDate ?? new Date().toISOString()),
   completedAt: task?.completed_at ? toIsoString(task.completed_at) : task?.completedAt ? toIsoString(task.completedAt) : undefined,
   createdAt: toIsoString(task?.created_at ?? task?.createdAt ?? new Date().toISOString()),
