@@ -341,10 +341,9 @@ export default function UserSettingsPage({
         "Profile updated successfully! Refreshing...",
       );
 
-      // Reload the page after a short delay to reflect changes everywhere
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
+      // Don't reload immediately - let user see the success message
+      // Profile completion will update on next page load
+      console.log('[UserSettings] Profile saved successfully, not reloading to preserve console logs');
     } catch (error: any) {
       console.error("[UserSettings] Error saving profile:", error);
       const errorMessage =

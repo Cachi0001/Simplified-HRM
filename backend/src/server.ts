@@ -14,6 +14,8 @@ import purchaseRoutes from './routes/purchase.routes';
 import attendanceRoutes from './routes/attendance.routes';
 import taskRoutes from './routes/task.routes';
 import dashboardRoutes from './routes/dashboard.routes';
+import notificationRoutes from './routes/notification.routes';
+import cronService from './services/CronService';
 
 dotenv.config();
 
@@ -59,18 +61,35 @@ app.use('/api/purchase', purchaseRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 app.use(errorHandler);
 
 testConnection().then((connected) => {
   if (!connected) {
     console.warn('⚠️ Database not connected, but server will start anyway');
+  } else {
+    // Start cron jobs only if database is connected
+    cronService.start();
   }
 });
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV}`);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM signal received: closing HTTP server');
+  cronService.stop();
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT signal received: closing HTTP server');
+  cronService.stop();
+  process.exit(0);
 });
 
 export default app;

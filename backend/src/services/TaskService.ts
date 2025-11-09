@@ -80,4 +80,26 @@ export class TaskService {
   async getAllTasks(filters?: { status?: string; assigneeId?: string; assignedBy?: string }): Promise<Task[]> {
     return await this.taskRepo.findAll(filters);
   }
+
+  async deleteTask(taskId: string, userId: string): Promise<void> {
+    // Check if user has permission to delete (admin/HR or task creator)
+    const task = await this.taskRepo.findById(taskId);
+    if (!task) {
+      throw new Error('Task not found');
+    }
+
+    const employee = await this.employeeRepo.findByUserId(userId);
+    if (!employee) {
+      throw new Error('Employee not found');
+    }
+
+    // Allow deletion if user is admin/HR/superadmin or if they created the task
+    const canDelete = ['admin', 'hr', 'superadmin'].includes(employee.role) || task.assigned_by === employee.id;
+    
+    if (!canDelete) {
+      throw new Error('You do not have permission to delete this task');
+    }
+
+    await this.taskRepo.delete(taskId);
+  }
 }

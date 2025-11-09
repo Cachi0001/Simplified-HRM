@@ -187,8 +187,23 @@ export default function TasksPage() {
       addToast('success', 'Task deleted successfully!');
     },
     onError: (error: any) => {
-      const errorMessage = error.message || 'Failed to delete task';
-      addToast('error', errorMessage);
+      // Extract detailed error message from response
+      const errorMessage = 
+        error.response?.data?.error?.message || 
+        error.response?.data?.message || 
+        error.message || 
+        'Failed to delete task';
+      
+      // Show user-friendly error message
+      if (errorMessage.includes('permission')) {
+        addToast('error', '⛔ You do not have permission to delete this task. Only the task creator or administrators can delete tasks.');
+      } else if (errorMessage.includes('not found')) {
+        addToast('error', '❌ Task not found. It may have already been deleted.');
+      } else {
+        addToast('error', `❌ ${errorMessage}`);
+      }
+      
+      console.error('[TasksPage] Delete task error:', error);
     },
   });
 
@@ -527,11 +542,9 @@ export default function TasksPage() {
                 return String(value);
               };
 
-              const assigneeId = task.assigneeId ? extractId(task.assigneeId) : null;
-
-              const assignedEmployee = isAdmin && assigneeId ? employees.find(e =>
-                e.id === assigneeId
-              ) : currentUser;
+              // Get employee names from task object (comes from backend JOIN)
+              const assigneeName = (task as any).assignee_name || (task as any).assigneeName || 'Unknown Employee';
+              const creatorName = (task as any).assigned_by_name || (task as any).assignedByName || 'Unknown';
 
               const isHighlighted = taskId && task.id === taskId;
               
@@ -564,21 +577,19 @@ export default function TasksPage() {
                     </div>
                   </div>
 
-                  {/* Assignee Section */}
-                  {assignedEmployee && (
-                    <div className={`mb-3 p-2 rounded ${darkMode ? 'bg-gray-700' : 'bg-blue-50'} border-l-4 ${darkMode ? 'border-blue-400' : 'border-blue-500'}`}>
-                      <div className={`flex items-center gap-2 ${darkMode ? 'text-blue-200' : 'text-blue-700'}`}>
-                        <User className="h-4 w-4" />
-                        <span className="font-medium">Assigned to:</span>
-                        <span className="font-semibold">{assignedEmployee.fullName}</span>
-                      </div>
-                      {assignedEmployee.department && (
-                        <div className={`text-xs ml-6 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                          Department: {assignedEmployee.department}
-                        </div>
-                      )}
+                  {/* Assignee and Creator Section */}
+                  <div className={`mb-3 p-2 rounded ${darkMode ? 'bg-gray-700' : 'bg-blue-50'} border-l-4 ${darkMode ? 'border-blue-400' : 'border-blue-500'}`}>
+                    <div className={`flex items-center gap-2 ${darkMode ? 'text-blue-200' : 'text-blue-700'}`}>
+                      <User className="h-4 w-4" />
+                      <span className="font-medium">Assigned to:</span>
+                      <span className="font-semibold">{assigneeName}</span>
                     </div>
-                  )}
+                    <div className={`flex items-center gap-2 mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                      <User className="h-3 w-3" />
+                      <span className="text-xs">Created by:</span>
+                      <span className="text-xs font-medium">{creatorName}</span>
+                    </div>
+                  </div>
 
                   {/* Description */}
                   {task.description && (

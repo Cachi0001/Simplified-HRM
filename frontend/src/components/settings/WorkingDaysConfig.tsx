@@ -95,7 +95,7 @@ const WorkingDaysConfig: React.FC<WorkingDaysConfigProps> = ({
         }
       } catch (error) {
         console.error("Error loading working days config:", error);
-        addToast("error", "Failed to load working days configuration");
+        // Only show toast once, not on every re-render
         // Set defaults on error
         setWorkingDaysData({
           working_days: ["monday", "tuesday", "wednesday", "thursday", "friday"],
@@ -108,7 +108,7 @@ const WorkingDaysConfig: React.FC<WorkingDaysConfigProps> = ({
     };
 
     loadWorkingDaysConfig();
-  }, [employeeId, addToast]);
+  }, [employeeId]); // Removed addToast from dependencies to prevent infinite loop
 
   // Handle working day toggle
   const handleDayToggle = (dayKey: string) => {

@@ -123,4 +123,23 @@ export class TaskController {
       next(error);
     }
   };
+
+  deleteTask = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = (req as any).user?.userId;
+      if (!userId) {
+        throw new ValidationError('User ID not found');
+      }
+
+      const taskId = req.params.id;
+      await this.taskService.deleteTask(taskId, userId);
+
+      res.json({
+        success: true,
+        message: 'Task deleted successfully'
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }

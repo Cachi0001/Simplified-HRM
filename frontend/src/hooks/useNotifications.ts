@@ -36,9 +36,7 @@ export function useNotifications(userId?: string): UseNotificationsReturn {
     error: realtimeError,
     markAsRead: realtimeMarkAsRead,
     markAllAsRead: realtimeMarkAllAsRead,
-    deleteNotification: realtimeDeleteNotification,
-    getNotificationsByType: realtimeGetNotificationsByType,
-    getUnreadNotifications: realtimeGetUnreadNotifications
+    deleteNotification: realtimeDeleteNotification
   } = useRealtimeNotifications();
 
   // Merge realtime notifications with local state
@@ -181,29 +179,61 @@ export function useNotifications(userId?: string): UseNotificationsReturn {
       markAsRead(notification.id);
     }
 
-    // Navigate if there's an action URL
-    if (notification.actionUrl) {
-      navigate(notification.actionUrl);
-    } else {
-      // Default navigation based on type
-      const defaultUrls: Record<NotificationType, string> = {
-        chat: '/chat',
-        leave: '/leave-requests',
-        purchase: '/purchase-requests',
-        task: '/tasks',
-        birthday: '/team',
-        checkout: '/attendance',
-        system: '/notifications',
-        announcement: '/announcements'
-      };
+    // Get action URL from metadata or determine from notification type/category
+    let targetUrl = notification.metadata?.action_url;
+    const highlightId = notification.metadata?.highlight_id;
 
-      const url = defaultUrls[notification.type] || '/notifications';
-      navigate(url);
+    // If no action_url in metadata, determine from category and type
+    if (!targetUrl) {
+      switch (notification.category) {
+        case 'approval':
+          // Approval notifications go to appropriate request pages
+          if (notification.metadata?.leave_request_id) {
+            targetUrl = '/leave-requests';
+          } else if (notification.metadata?.purchase_request_id) {
+            targetUrl = '/purchase-requests';
+          } else if (notification.type === 'signup') {
+            targetUrl = '/employee-management';
+          } else {
+            targetUrl = '/notifications';
+          }
+          break;
+        case 'task':
+          targetUrl = '/tasks';
+          break;
+        case 'employee':
+          targetUrl = '/employee-management';
+          break;
+        case 'system':
+          // System notifications based on type
+          if (notification.type === 'warning' && notification.message.includes('clock out')) {
+            targetUrl = '/attendance-report';
+          } else {
+            targetUrl = '/notifications';
+          }
+          break;
+        case 'dashboard':
+          targetUrl = '/dashboard';
+          break;
+        default:
+          targetUrl = '/notifications';
+      }
+    }
+
+    // Store highlight information for target page
+    if (highlightId) {
+      sessionStorage.setItem('highlight_id', highlightId);
+      sessionStorage.setItem('highlight_type', notification.category);
+    }
+
+    // Navigate to the target URL
+    if (targetUrl) {
+      navigate(targetUrl);
     }
 
     // Dispatch custom event for other components
     window.dispatchEvent(new CustomEvent('notificationClick', {
-      detail: { notification, url: notification.actionUrl }
+      detail: { notification, url: targetUrl, highlightId }
     }));
   }, [navigate, markAsRead]);
 
@@ -267,17 +297,15 @@ export function useNotifications(userId?: string): UseNotificationsReturn {
 function convertRealtimeNotification(realtimeNotif: any): Go3netNotification {
   return {
     id: realtimeNotif.id,
-    userId: realtimeNotif.user_id,
+    user_id: realtimeNotif.user_id,
     type: realtimeNotif.type as NotificationType,
     title: realtimeNotif.title,
     message: realtimeNotif.message,
     read: realtimeNotif.is_read,
-    createdAt: realtimeNotif.created_at,
-    updatedAt: realtimeNotif.updated_at,
-    actionUrl: realtimeNotif.action_url,
-    relatedId: realtimeNotif.related_id,
-    expiresAt: realtimeNotif.expires_at,
-    priority: 'medium', // Default priority
-    category: realtimeNotif.type
+    created_at: realtimeNotif.created_at,
+    read_at: realtimeNotif.read_at,
+    priority: (realtimeNotif.priority || 'normal') as 'low' | 'normal' | 'high' | 'urgent',
+    category: realtimeNotif.category || 'system',
+    metadata: realtimeNotif.metadata || {}
   };
 }

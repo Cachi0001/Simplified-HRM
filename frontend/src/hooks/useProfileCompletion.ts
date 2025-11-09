@@ -20,24 +20,39 @@ export function useProfileCompletion() {
       // Fetch profile with completion percentage
       const response = await employeeService.getMyProfile();
       
-      // Calculate completion percentage
+      // Calculate completion percentage based on ACTUAL database fields
       const profile = response as any;
       let completed = 0;
-      let total = 9; // Increased to 9 fields
+      let total = 9;
 
-      // Required fields for profile completion
-      if (profile.full_name || profile.fullName) completed++;
+      // Check actual database fields (not profile_picture - that's out of MVP scope)
+      if (profile.full_name) completed++;
       if (profile.email) completed++;
       if (profile.phone) completed++;
       if (profile.address) completed++;
-      if (profile.date_of_birth || profile.dateOfBirth) completed++;
-      if (profile.position) completed++;
-      if (profile.department) completed++; // Added department
-      if (profile.emergency_contact_name || profile.emergencyContactName) completed++;
-      if (profile.emergency_contact_phone || profile.emergencyContactPhone) completed++;
+      if (profile.date_of_birth) completed++;
+      if (profile.position) completed++;  // This is NULL in your DB!
+      if (profile.department_id) completed++;  // UUID field, not department string!
+      if (profile.emergency_contact_name) completed++;
+      if (profile.emergency_contact_phone) completed++;
 
       const percentage = Math.round((completed / total) * 100);
-      console.log('Profile completion check:', { completed, total, percentage, profile });
+      console.log('[ProfileCompletion] Check:', { 
+        completed, 
+        total, 
+        percentage,
+        fields: {
+          full_name: !!profile.full_name,
+          email: !!profile.email,
+          phone: !!profile.phone,
+          address: !!profile.address,
+          date_of_birth: !!profile.date_of_birth,
+          position: !!profile.position,
+          department_id: !!profile.department_id,
+          emergency_contact_name: !!profile.emergency_contact_name,
+          emergency_contact_phone: !!profile.emergency_contact_phone
+        }
+      });
       setCompletionPercentage(percentage);
 
       // Show modal if profile is incomplete

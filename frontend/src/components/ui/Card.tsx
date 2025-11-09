@@ -9,8 +9,12 @@ interface CardProps {
 }
 
 export const Card: React.FC<CardProps> = ({ children, className, darkMode }) => {
+  // Use darkMode prop to determine background color
+  const bgColor = darkMode ? 'bg-gray-800' : 'bg-white';
+  const textColor = darkMode ? 'text-white' : 'text-gray-900';
+  
   return (
-    <div className={`bg-secondary rounded-lg shadow-xl p-8 ${className}`}>
+    <div className={`${bgColor} ${textColor} rounded-lg shadow-xl p-8 ${className}`}>
       {children}
     </div>
   );

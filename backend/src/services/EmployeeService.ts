@@ -70,23 +70,24 @@ export class EmployeeService {
       throw new NotFoundError('User not found');
     }
 
-    // Employees and teamleads can only update personal information
-    // Admins, HR, and superadmins can update work-related information
+    // Employees and teamleads can update position (their job title)
+    // Only Admins, HR, and superadmins can update department, salary, role, team_lead
     const canUpdateWorkInfo = ['superadmin', 'admin', 'hr'].includes(user.role);
 
     let updated: Employee;
 
-    if (canUpdateWorkInfo && (data.position || data.department_id)) {
-      // Admin/HR updating work information
+    // Allow employees to update their position, but only admin can update other work fields
+    if (data.position || (canUpdateWorkInfo && (data.department_id || data.salary || data.team_lead_id || data.role))) {
+      // Update work information
       const result = await pool.query(
         `SELECT * FROM update_employee_work_profile($1, $2, $3, $4, $5, $6)`,
         [
           employee.id,
           data.position || null,
-          data.department_id || null,
-          data.salary || null,
-          data.team_lead_id || null,
-          data.role || null
+          canUpdateWorkInfo ? (data.department_id || null) : null,  // Only admin can change department
+          canUpdateWorkInfo ? (data.salary || null) : null,  // Only admin can change salary
+          canUpdateWorkInfo ? (data.team_lead_id || null) : null,  // Only admin can change team lead
+          canUpdateWorkInfo ? (data.role || null) : null  // Only admin can change role
         ]
       );
       updated = result.rows[0];

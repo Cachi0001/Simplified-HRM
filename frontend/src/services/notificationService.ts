@@ -137,24 +137,46 @@ class NotificationService {
   }
 
   private getNotificationUrl(notification: Go3netNotification): string {
+    // Use action_url from metadata if available
+    if (notification.metadata?.action_url) {
+      return notification.metadata.action_url;
+    }
+
+    // Fallback to category-based routing with valid routes
     switch (notification.category) {
-      case 'dashboard':
-        return '/dashboard';
-      case 'employee':
-        // For employee notifications, navigate to login if it's an approval success
-        if (notification.type === 'approval_success' || notification.message.includes('approved') || notification.message.includes('Welcome')) {
-          return '/auth';
-        }
-        return 'employee-dashboard';
       case 'approval':
-        return '/dashboard#pending-approvals';
-      case 'system':
-        return '/dashboard';
+        // Check what type of approval
+        if (notification.metadata?.leave_request_id) {
+          return '/leave-requests';
+        } else if (notification.metadata?.purchase_request_id) {
+          return '/purchase-requests';
+        } else if (notification.type === 'signup') {
+          return '/employee-management';
+        }
+        return '/notifications';
       case 'task':
         return '/tasks';
-      default:
+      case 'employee':
+        return '/employee-management';
+      case 'system':
+        // Check if it's a checkout reminder
+        if (notification.type === 'warning' && notification.message.includes('clock out')) {
+          return '/attendance-report';
+        }
+        return '/notifications';
+      case 'dashboard':
         return '/dashboard';
+      default:
+        return '/notifications';
     }
+  }
+
+  getNotificationActionUrl(notification: Go3netNotification): string {
+    return this.getNotificationUrl(notification);
+  }
+
+  getHighlightId(notification: Go3netNotification): string | undefined {
+    return notification.metadata?.highlight_id;
   }
 
   private handleNotificationClick(notification: Go3netNotification): void {
@@ -175,25 +197,10 @@ class NotificationService {
   }
 
   async markNotificationAsRead(notificationId: string): Promise<void> {
-    const currentUserRaw = localStorage.getItem('user');
-    if (!currentUserRaw) {
-      return;
-    }
-
     try {
-      const currentUser = JSON.parse(currentUserRaw);
-      const userId = currentUser?.id || currentUser?._id;
-      if (!userId) {
-        return;
-      }
-
-      const existing = this.getReadNotificationIds(userId);
-      if (!existing.includes(notificationId)) {
-        existing.push(notificationId);
-        this.saveReadNotificationIds(userId, existing);
-      }
-    } catch {
-      /* noop */
+      await api.patch(`/notifications/${notificationId}/read`);
+    } catch (error) {
+      console.error('Failed to mark notification as read:', error);
     }
   }
 
@@ -201,114 +208,59 @@ class NotificationService {
     return this.markNotificationAsRead(notificationId);
   }
 
-  async getNotifications(userId?: string): Promise<Go3netNotification[]> {
+  async getNotifications(userId?: string, limit: number = 50, offset: number = 0, unreadOnly: boolean = false): Promise<Go3netNotification[]> {
     try {
-      const allNotifications: Go3netNotification[] = [];
+      const response = await api.get('/notifications', {
+        params: { limit, offset, unreadOnly }
+      });
 
-      // Get current user from localStorage
-      const currentUser = localStorage.getItem('user');
-      if (!currentUser) {
-        return [];
-      }
-
-      const user = JSON.parse(currentUser);
-      const effectiveUserId = userId || user?.id || user?._id;
-      const readIds = effectiveUserId ? this.getReadNotificationIds(effectiveUserId) : [];
-
-      if (user.role === 'admin') {
-        // ADMIN: Fetch pending approvals
-        try {
-          const response = await api.get('/employees/pending');
-          const data = response.data;
-          const pendingEmployees = data.employees || [];
-
-          // Create notifications for each pending approval
-          pendingEmployees.forEach((emp: any, index: number) => {
-            const id = `pending-${emp.id || emp._id}-${Date.now()}-${index}`;
-            allNotifications.push({
-              id,
-              type: 'info' as NotificationType,
-              priority: 'normal',
-              title: 'New Employee Signup',
-              message: `${emp.fullName} (${emp.email}) requires approval`,
-              timestamp: new Date(emp.createdAt || Date.now()),
-              read: readIds.includes(id),
-              targetUserId: emp.id || emp._id,
-              actions: [{ label: 'Review', action: 'review', url: '/dashboard#pending-approvals' }],
-              source: 'system',
-              category: 'approval' as any
-            });
-          });
-        } catch (error) {
-          console.warn('Failed to fetch pending approvals for notifications:', error);
-        }
-      } else if (user.role === 'employee') {
-        // EMPLOYEE: Check if employee is approved and show welcome notification
-        try {
-          // Check employee status via notifications endpoint or keep existing logic
-          const employeeResponse = await api.get(`/employees/me`);
-          const employee = employeeResponse.data.data?.employee;
-
-          if (employee && employee.status === 'active') {
-            // Employee is approved - show welcome notification if not already shown
-            const welcomeNotificationId = `welcome-${user.id}`;
-            const existingWelcomeNotification = allNotifications.find(n => n.id === welcomeNotificationId);
-
-            if (!existingWelcomeNotification) {
-              allNotifications.push({
-                id: welcomeNotificationId,
-                type: 'approval_success' as NotificationType,
-                priority: 'normal',
-                title: 'Welcome to Go3net!',
-                message: `Your account has been approved! You can now access all features.`,
-                timestamp: new Date(),
-                read: readIds.includes(welcomeNotificationId),
-                targetUserId: user.id,
-                actions: [{ label: 'Get Started', action: 'login', url: '/auth' }],
-                source: 'system',
-                category: 'approval' as any
-              });
-            }
-          }
-        } catch (error) {
-          console.warn('Failed to fetch employee status for notifications:', error);
-        }
-
-        // EMPLOYEE: Fetch real task assignments
-        try {
-          // Fetch tasks assigned to this employee
-          const tasksResponse = await api.get(`/tasks?assigneeId=${effectiveUserId}`);
-          const tasks = tasksResponse.data.data?.tasks || tasksResponse.data.tasks || [];
-
-          // Create notifications for tasks that haven't been viewed yet
-          // Filter for pending and in_progress tasks (real assignments)
-          tasks
-            .filter((task: any) => ['pending', 'in_progress'].includes(task.status))
-            .forEach((task: any, index: number) => {
-              const id = `task-${task.id || task._id}-${index}`;
-              allNotifications.push({
-                id,
-                type: 'info' as NotificationType,
-                priority: task.priority === 'high' ? 'high' : 'normal',
-                title: 'New Task Assigned',
-                message: `You have been assigned: ${task.title}`,
-                timestamp: new Date(task.createdAt || Date.now()),
-                read: readIds.includes(id),
-                targetUserId: effectiveUserId,
-                actions: [{ label: 'View Task', action: 'view', url: '/tasks' }],
-                source: 'system',
-                category: 'employee' as any
-              });
-            });
-        } catch (error) {
-          console.warn('Failed to fetch task notifications for employee:', error);
-        }
-      }
-
-      return allNotifications;
+      const notifications = response.data || [];
+      
+      // Transform backend notifications to frontend format
+      return notifications.map((n: any) => ({
+        id: n.id,
+        type: n.type as NotificationType,
+        priority: n.priority,
+        title: n.title,
+        message: n.message,
+        read: n.read,
+        read_at: n.read_at,
+        created_at: n.created_at,
+        timestamp: new Date(n.created_at),
+        category: n.category,
+        metadata: n.metadata || {},
+        source: n.source || 'system',
+        user_id: n.user_id
+      }));
     } catch (error) {
       console.error('Failed to get notifications:', error);
       return [];
+    }
+  }
+
+  async getUnreadCount(): Promise<number> {
+    try {
+      const response = await api.get('/notifications/unread-count');
+      return response.data.count || 0;
+    } catch (error) {
+      console.error('Failed to get unread count:', error);
+      return 0;
+    }
+  }
+
+  async markAllAsRead(): Promise<void> {
+    try {
+      await api.patch('/notifications/mark-all-read');
+    } catch (error) {
+      console.error('Failed to mark all as read:', error);
+    }
+  }
+
+  async deleteNotification(notificationId: string): Promise<void> {
+    try {
+      await api.delete(`/notifications/${notificationId}`);
+    } catch (error) {
+      console.error('Failed to delete notification:', error);
     }
   }
 }

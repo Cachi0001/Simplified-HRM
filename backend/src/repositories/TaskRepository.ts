@@ -80,8 +80,8 @@ export class TaskRepository {
         e1.full_name as assigned_by_name,
         e2.full_name as assignee_name
       FROM tasks t
-      LEFT JOIN employees e1 ON t.assigned_by = e1.user_id
-      LEFT JOIN employees e2 ON t.assignee_id = e2.user_id
+      LEFT JOIN employees e1 ON t.assigned_by = e1.id
+      LEFT JOIN employees e2 ON t.assignee_id = e2.id
       WHERE 1=1
     `;
     const params: any[] = [];
@@ -109,5 +109,9 @@ export class TaskRepository {
 
     const result = await pool.query(queryText, params);
     return result.rows;
+  }
+
+  async delete(taskId: string): Promise<void> {
+    await pool.query('DELETE FROM tasks WHERE id = $1', [taskId]);
   }
 }
