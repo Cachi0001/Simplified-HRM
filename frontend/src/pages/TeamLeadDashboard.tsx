@@ -9,7 +9,7 @@ import { authService } from '../services/authService';
 import { BottomNavbar } from '../components/layout/BottomNavbar';
 import { useToast } from '../components/ui/Toast';
 import { DarkModeToggle } from '../components/ui/DarkModeToggle';
-import { NotificationBell } from '../components/dashboard/NotificationBell';
+import { NotificationBell } from '../components/notifications/NotificationBell';
 import { DraggableLogo } from '../components/dashboard/DraggableLogo';
 import { useTheme } from '../contexts/ThemeContext';
 import { Users, CheckSquare } from 'lucide-react';
@@ -60,10 +60,11 @@ export default function TeamLeadDashboard() {
         );
 
         // Fetch tasks assigned to team members
-        const tasksRes = await api.get('/tasks');
-        const allTasks = tasksRes.data.data || [];
+        const tasksRes = await api.get('/tasks/all');
+        const tasksData = tasksRes.data.data || tasksRes.data || {};
+        const allTasks = Array.isArray(tasksData) ? tasksData : (tasksData.tasks || []);
         const teamTasks = allTasks.filter((task: any) => 
-          teamMembers.some((member: any) => member.id === task.assigned_to)
+          teamMembers.some((member: any) => member.id === task.assigned_to || member.id === task.assignee_id)
         );
         const activeTasks = teamTasks.filter((task: any) => 
           task.status !== 'completed' && task.status !== 'cancelled'
@@ -155,7 +156,7 @@ export default function TeamLeadDashboard() {
           </div>
           <div className="flex items-center space-x-4">
             <DarkModeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
-            <NotificationBell darkMode={darkMode} />
+            <NotificationBell />
           </div>
         </div>
       </header>

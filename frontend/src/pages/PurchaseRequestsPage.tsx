@@ -49,8 +49,38 @@ export function PurchaseRequestsPage() {
       return;
     }
     setCurrentUser(user);
-    fetchPurchaseRequests();
   }, []);
+
+  // Fetch purchase requests after currentUser is set
+  useEffect(() => {
+    if (currentUser) {
+      fetchPurchaseRequests();
+    }
+  }, [currentUser]);
+
+  // Handle notification highlight
+  useEffect(() => {
+    const highlightId = sessionStorage.getItem('highlight_id');
+    const highlightType = sessionStorage.getItem('highlight_type');
+    
+    if (highlightId && highlightType === 'approval' && purchaseRequests.length > 0) {
+      setTimeout(() => {
+        const element = document.getElementById(`purchase-card-${highlightId}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          element.classList.add('ring-4', 'ring-blue-500', 'ring-opacity-50', 'transition-all');
+          
+          setTimeout(() => {
+            element.classList.remove('ring-4', 'ring-blue-500', 'ring-opacity-50');
+            sessionStorage.removeItem('highlight_id');
+            sessionStorage.removeItem('highlight_type');
+          }, 3000);
+        } else {
+          console.warn('Purchase card not found for highlight_id:', highlightId);
+        }
+      }, 500);
+    }
+  }, [purchaseRequests]);
 
   const fetchPurchaseRequests = async () => {
     try {
@@ -512,6 +542,7 @@ export function PurchaseRequestsPage() {
             {purchaseRequests.map((request) => (
               <div
                 key={request.id}
+                id={`purchase-card-${request.id}`}
                 className={`rounded-lg shadow-md hover:shadow-xl transition-all duration-200 p-6 border ${darkMode
                   ? 'bg-gray-800 border-gray-700 hover:bg-gray-750'
                   : 'bg-white border-gray-200 hover:bg-gray-50'
@@ -583,6 +614,27 @@ export function PurchaseRequestsPage() {
                 </div>
 
                 <div className="space-y-4">
+                  {/* Employee Name - Prominent Display */}
+                  {request.employee_name && (
+                    <div className={`p-3 rounded-lg border-l-4 ${
+                      darkMode 
+                        ? 'bg-blue-900/20 border-blue-500' 
+                        : 'bg-blue-50 border-blue-500'
+                    }`}>
+                      <p className={`text-xs font-medium mb-1 ${darkMode ? 'text-blue-300' : 'text-blue-600'}`}>
+                        Requested by
+                      </p>
+                      <p className={`text-sm font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                        {safeString(request.employee_name, 'Unknown Employee')}
+                      </p>
+                      {request.employee_email && (
+                        <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                          {request.employee_email}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   <div>
                     <p className={`text-sm font-medium transition-colors duration-200 ${darkMode ? 'text-gray-400' : 'text-gray-500'
                       }`}>

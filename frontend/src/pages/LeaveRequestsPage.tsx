@@ -52,13 +52,48 @@ export function LeaveRequestsPage() {
       return;
     }
     setCurrentUser(user);
-    fetchLeaveRequests();
   }, []);
+
+  // Fetch leave requests after currentUser is set
+  useEffect(() => {
+    if (currentUser) {
+      fetchLeaveRequests();
+    }
+  }, [currentUser]);
+
+  // Handle notification highlight
+  useEffect(() => {
+    const highlightId = sessionStorage.getItem('highlight_id');
+    const highlightType = sessionStorage.getItem('highlight_type');
+    
+    if (highlightId && highlightType === 'approval' && leaveRequests.length > 0) {
+      setTimeout(() => {
+        const element = document.getElementById(`leave-card-${highlightId}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          element.classList.add('ring-4', 'ring-blue-500', 'ring-opacity-50', 'transition-all');
+          
+          setTimeout(() => {
+            element.classList.remove('ring-4', 'ring-blue-500', 'ring-opacity-50');
+            sessionStorage.removeItem('highlight_id');
+            sessionStorage.removeItem('highlight_type');
+          }, 3000);
+        } else {
+          console.warn('Leave card not found for highlight_id:', highlightId);
+        }
+      }, 500);
+    }
+  }, [leaveRequests]);
 
   const fetchLeaveRequests = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/leave/my-requests');
+      // Use /leave/requests for admin roles to get ALL requests, not just their own
+      const endpoint = currentUser && ['hr', 'admin', 'superadmin'].includes(currentUser.role)
+        ? '/leave/requests'
+        : '/leave/my-requests';
+      
+      const response = await api.get(endpoint);
       
       if (response.data.success) {
         setLeaveRequests(response.data.data || []);
@@ -152,7 +187,7 @@ export function LeaveRequestsPage() {
   const handleApprove = async (requestId: string) => {
     try {
       setApproving(requestId);
-      const response = await api.put(`/api/leave/requests/${requestId}/approve`, {
+      const response = await api.put(`/leave/${requestId}/approve`, {
         comments: 'Approved via dashboard'
       });
       
@@ -165,7 +200,8 @@ export function LeaveRequestsPage() {
       }
     } catch (error: any) {
       console.error('Error approving leave request:', error);
-      addToast('error', error.response?.data?.message || error.message || 'Failed to approve leave request');
+      const errorMsg = error.response?.data?.error?.message || error.response?.data?.message || error.message || 'Failed to approve leave request';
+      addToast('error', errorMsg);
     } finally {
       setApproving(null);
     }
@@ -184,7 +220,7 @@ export function LeaveRequestsPage() {
 
     try {
       setRejecting(showRejectModal);
-      const response = await api.put(`/api/leave/requests/${showRejectModal}/reject`, {
+      const response = await api.put(`/leave/${showRejectModal}/reject`, {
         reason: rejectReason
       });
       
@@ -408,6 +444,7 @@ export function LeaveRequestsPage() {
             {leaveRequests.map((request) => (
               <div
                 key={request.id}
+                id={`leave-card-${request.id}`}
                 className={`rounded-lg shadow-md hover:shadow-lg transition p-6 ${
                   darkMode ? 'bg-gray-800' : 'bg-white'
                 }`}
@@ -470,17 +507,29 @@ export function LeaveRequestsPage() {
                 </div>
 
                 <div className="space-y-3">
+                  {/* Employee Name - Prominent Display */}
                   {request.employee_name && (
-                    <div>
-                      <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Employee</p>
-                      <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                        {safeString(request.employee_name, 'Unknown Employee')}
-                        {request.department && (
-                          <span className={`ml-2 text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                            ({safeString(request.department, 'Unknown Department')})
-                          </span>
-                        )}
+                    <div className={`p-3 rounded-lg border-l-4 ${
+                      darkMode 
+                        ? 'bg-blue-900/20 border-blue-500' 
+                        : 'bg-blue-50 border-blue-500'
+                    }`}>
+                      <p className={`text-xs font-medium mb-1 ${darkMode ? 'text-blue-300' : 'text-blue-600'}`}>
+                        Requested by
                       </p>
+                      <p className={`text-sm font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                        {safeString(request.employee_name, 'Unknown Employee')}
+                      </p>
+                      {request.employee_email && (
+                        <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                          {request.employee_email}
+                        </p>
+                      )}
+                      {request.department && (
+                        <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                          Department: {safeString(request.department, 'Unknown Department')}
+                        </p>
+                      )}
                     </div>
                   )}
                   

@@ -8,7 +8,7 @@ import { authService } from '../services/authService';
 import { BottomNavbar } from '../components/layout/BottomNavbar';
 import { useToast } from '../components/ui/Toast';
 import { DarkModeToggle } from '../components/ui/DarkModeToggle';
-import { NotificationBell } from '../components/dashboard/NotificationBell';
+import { NotificationBell } from '../components/notifications/NotificationBell';
 import { OverviewCards } from '../components/dashboard/OverviewCards';
 import { PendingApprovals } from '../components/dashboard/PendingApprovals';
 import api from '../lib/api';
@@ -153,7 +153,7 @@ export default function SuperAdminDashboardPage() {
           </div>
           <div className="flex items-center space-x-4">
             <DarkModeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
-            <NotificationBell darkMode={darkMode} />
+            <NotificationBell />
           </div>
         </div>
       </header>

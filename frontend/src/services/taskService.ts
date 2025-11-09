@@ -142,7 +142,14 @@ class TaskService {
     const response = await api.get('/tasks/my-tasks');
     console.log('[TaskService] My tasks RAW response:', response.data);
     
-    const tasks = response.data?.data ?? response.data?.tasks ?? response.data ?? [];
+    // Handle nested data structure
+    let tasks = response.data?.data ?? response.data?.tasks ?? response.data ?? [];
+    
+    // If tasks is an object with a tasks property, extract it
+    if (!Array.isArray(tasks) && tasks.tasks) {
+      tasks = tasks.tasks;
+    }
+    
     console.log('[TaskService] Extracted tasks array:', tasks);
     
     const normalizedTasks = Array.isArray(tasks) ? tasks.map(normalizeTask) : [];

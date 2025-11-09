@@ -10,7 +10,7 @@ import HRDashboard from './pages/HRDashboard';
 import TeamLeadDashboard from './pages/TeamLeadDashboard';
 import SuperAdminDashboardPage from './pages/SuperAdminDashboardPage';
 import AttendanceReportPage from './pages/AttendanceReportPage';
-import TasksPage from './pages/TasksPage';
+import {TasksPage} from './pages/TasksPage';
 import UserSettingsPage from './pages/UserSettingsPage';
 import ChatPage from './pages/ChatPage';
 import { LeaveRequestsPage } from './pages/LeaveRequestsPage';

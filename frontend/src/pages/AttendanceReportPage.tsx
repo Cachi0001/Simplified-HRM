@@ -9,7 +9,7 @@ import { RefreshCw, Calendar, Clock, Users, Download, ArrowLeft, MapPin } from '
 import { Link } from 'react-router-dom';
 import Logo from '../components/ui/Logo';
 import { DarkModeToggle } from '../components/ui/DarkModeToggle';
-import { NotificationBell } from '../components/dashboard/NotificationBell';
+import { NotificationBell } from '../components/notifications/NotificationBell';
 import { BottomNavbar } from '../components/layout/BottomNavbar';
 import { useTokenValidation } from '../hooks/useTokenValidation';
 

@@ -8,12 +8,14 @@ import { useToast } from '../components/ui/Toast';
 interface Notification {
   id: string;
   message: string;
-  timestamp: string;
+  timestamp?: string | Date;
+  created_at?: string;
   read: boolean;
   category: string;
   type: string;
   targetUserId?: string;
-  actions?: Array<{ label: string; url: string }>;
+  metadata?: any;
+  actions?: Array<{ label: string; url?: string; action?: string }>;
 }
 
 type FilterType = 'all' | 'unread' | 'read';
@@ -97,25 +99,13 @@ export function NotificationsPage() {
         );
       }
 
-      // Navigate based on notification type
-      let navigateUrl = '/dashboard';
+      // Use the notification service to get the proper URL
+      const navigateUrl = notificationService.getNotificationActionUrl(notification as any);
 
-      if (notification.category === 'employee') {
-        if (notification.type === 'approval_success' || notification.message.includes('approved') || notification.message.includes('Welcome')) {
-          navigateUrl = '/auth';
-        } else {
-          navigateUrl = `/employee/${notification.targetUserId}`;
-        }
-      } else if (notification.category === 'approval') {
-        navigateUrl = '/dashboard#pending-approvals';
-      } else if (notification.category === 'task') {
-        navigateUrl = '/tasks';
-      } else if (notification.actions && notification.actions.length > 0) {
-        const action = notification.actions[0];
-        navigateUrl = action.url || '/dashboard';
+      // Navigate to the URL
+      if (navigateUrl) {
+        navigate(navigateUrl);
       }
-
-      navigate(navigateUrl);
     } catch (error) {
       console.error('Error handling notification click:', error);
       addToast('error', 'Failed to process notification');
@@ -394,8 +384,8 @@ export function NotificationsPage() {
                             {notification.category}
                           </span>
                           <span className="text-xs text-gray-500 dark:text-gray-400">
-                            {new Date(notification.timestamp).toLocaleDateString()} at{' '}
-                            {new Date(notification.timestamp).toLocaleTimeString([], { 
+                            {new Date(notification.timestamp || notification.created_at || '').toLocaleDateString()} at{' '}
+                            {new Date(notification.timestamp || notification.created_at || '').toLocaleTimeString([], { 
                               hour: '2-digit', 
                               minute: '2-digit' 
                             })}

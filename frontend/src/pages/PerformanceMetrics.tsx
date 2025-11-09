@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { BottomNavbar } from '../components/layout/BottomNavbar';
 import { DarkModeToggle } from '../components/ui/DarkModeToggle';
-import { NotificationBell } from '../components/dashboard/NotificationBell';
+import { NotificationBell } from '../components/notifications/NotificationBell';
 import { NotificationManager } from '../components/notifications/NotificationManager';
 import Logo from '../components/ui/Logo';
 import { TrendingUp, Users, Clock, Target, BarChart3, Calendar } from 'lucide-react';
@@ -251,7 +251,7 @@ export default function PerformanceMetrics() {
           </div>
           <div className="flex items-center space-x-4">
             <DarkModeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
-            <NotificationBell darkMode={darkMode} />
+            <NotificationBell />
           </div>
         </div>
       </header>

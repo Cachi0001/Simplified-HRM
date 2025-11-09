@@ -390,17 +390,17 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
                   required
                 >
                   <option value="active">Active</option>
+                  <option value="pending">Pending</option>
                   <option value="inactive">Inactive</option>
                   <option value="rejected">Rejected</option>
-                  <option value="pending">Pending</option>
                 </select>
                 <p className={`text-xs mt-1 ${
                   darkMode ? 'text-gray-400' : 'text-gray-600'
                 }`}>
                   {formData.status === 'active' && 'Employee is active and can access the system'}
+                  {formData.status === 'pending' && 'Employee account is pending approval'}
                   {formData.status === 'inactive' && 'Employee is temporarily inactive (account disabled)'}
                   {formData.status === 'rejected' && 'Employee application was rejected'}
-                  {formData.status === 'pending' && 'Employee account is pending approval'}
                 </p>
               </div>
 

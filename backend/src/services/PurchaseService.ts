@@ -70,6 +70,9 @@ export class PurchaseService {
   }
 
   async approvePurchaseRequest(purchaseRequestId: string, approvedByUserId: string, notes?: string): Promise<{ message: string; purchaseRequest: PurchaseRequest }> {
+    console.log('[PurchaseService] Approving purchase request:', purchaseRequestId);
+    console.log('[PurchaseService] Approver userId from JWT:', approvedByUserId);
+    
     const purchaseRequest = await this.purchaseRepo.getPurchaseRequestById(purchaseRequestId);
     if (!purchaseRequest) {
       throw new NotFoundError('Purchase request not found');
@@ -79,8 +82,14 @@ export class PurchaseService {
       throw new ValidationError(`Cannot approve purchase request with status: ${purchaseRequest.status}`);
     }
 
+    console.log('[PurchaseService] Looking for employee with user_id:', approvedByUserId);
     const approver = await this.employeeRepo.findByUserId(approvedByUserId);
+    console.log('[PurchaseService] Found approver:', approver ? `Yes (id: ${approver.id}, role: ${approver.role})` : 'NO - THIS IS THE PROBLEM');
+    
     if (!approver) {
+      // Log all employees to debug
+      const allEmployees = await this.employeeRepo.findAll({});
+      console.log('[PurchaseService] All employees in database:', allEmployees.map(e => ({ id: e.id, user_id: e.user_id, email: e.email, role: e.role })));
       throw new NotFoundError('Approver not found');
     }
 
@@ -113,6 +122,9 @@ export class PurchaseService {
       throw new ValidationError('Rejection reason is required');
     }
 
+    console.log('[PurchaseService] Rejecting purchase request:', purchaseRequestId);
+    console.log('[PurchaseService] Rejector userId from JWT:', rejectedByUserId);
+
     const purchaseRequest = await this.purchaseRepo.getPurchaseRequestById(purchaseRequestId);
     if (!purchaseRequest) {
       throw new NotFoundError('Purchase request not found');
@@ -122,8 +134,14 @@ export class PurchaseService {
       throw new ValidationError(`Cannot reject purchase request with status: ${purchaseRequest.status}`);
     }
 
+    console.log('[PurchaseService] Looking for employee with user_id:', rejectedByUserId);
     const rejector = await this.employeeRepo.findByUserId(rejectedByUserId);
+    console.log('[PurchaseService] Found rejector:', rejector ? `Yes (id: ${rejector.id}, role: ${rejector.role})` : 'NO - THIS IS THE PROBLEM');
+    
     if (!rejector) {
+      // Log all employees to debug
+      const allEmployees = await this.employeeRepo.findAll({});
+      console.log('[PurchaseService] All employees in database:', allEmployees.map(e => ({ id: e.id, user_id: e.user_id, email: e.email, role: e.role })));
       throw new NotFoundError('Rejector not found');
     }
 

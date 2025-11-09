@@ -87,12 +87,18 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
       
       // If Team Lead, show their team members + themselves
       if (currentUser.role === 'teamlead') {
+        // Use employee_id if available, otherwise use id
+        const employeeId = currentUser.employee_id || currentUser.id;
         const teamMembers = response.filter((emp: any) => 
-          (emp.team_lead_id === currentUser.id || emp.manager_id === currentUser.id) &&
+          (emp.team_lead_id === employeeId || emp.manager_id === employeeId) &&
           emp.role === 'employee'
         );
         // Add self to the list
-        const self = response.find((emp: any) => emp.id === currentUser.employee_id || emp.id === currentUser.id);
+        const self = response.find((emp: any) => 
+          emp.id === employeeId || 
+          emp.user_id === currentUser.id ||
+          emp.id === currentUser.id
+        );
         if (self && !teamMembers.find((emp: any) => emp.id === self.id)) {
           teamMembers.unshift(self);
         }
@@ -168,7 +174,14 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
 
   const handleCreateTask = () => {
     if (!newTask.title || !newTask.assigneeId || !newTask.dueDate) {
-      alert('Please fill in all required fields');
+      addToast('error', 'Please fill in all required fields');
+      return;
+    }
+
+    // Check if trying to assign to superadmin
+    const selectedEmployee = employees.find(emp => normalizeId(emp.id) === newTask.assigneeId);
+    if (selectedEmployee && selectedEmployee.role === 'superadmin') {
+      addToast('error', 'Cannot assign tasks to Superadmin. Please select a different employee.');
       return;
     }
 

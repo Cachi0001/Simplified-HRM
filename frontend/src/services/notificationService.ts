@@ -139,7 +139,32 @@ class NotificationService {
   private getNotificationUrl(notification: Go3netNotification): string {
     // Use action_url from metadata if available
     if (notification.metadata?.action_url) {
-      return notification.metadata.action_url;
+      // Validate the action_url is a valid route
+      const validRoutes = [
+        '/dashboard',
+        '/employee-dashboard',
+        '/hr-dashboard',
+        '/teamlead-dashboard',
+        '/super-admin-dashboard',
+        '/tasks',
+        '/attendance-report',
+        '/settings',
+        '/leave-requests',
+        '/purchase-requests',
+        '/chat',
+        '/notifications',
+        '/employee-management',
+        '/performance-metrics'
+      ];
+
+      const isValidRoute = validRoutes.includes(notification.metadata.action_url) ||
+                          validRoutes.some(route => notification.metadata.action_url?.startsWith(route + '/'));
+
+      if (isValidRoute) {
+        return notification.metadata.action_url;
+      }
+      
+      console.warn(`Invalid action_url in notification metadata: ${notification.metadata.action_url}, using fallback`);
     }
 
     // Fallback to category-based routing with valid routes
@@ -155,17 +180,28 @@ class NotificationService {
         }
         return '/notifications';
       case 'task':
+        // If there's a specific task ID, navigate to that task
+        if (notification.metadata?.task_id) {
+          return `/tasks/${notification.metadata.task_id}`;
+        }
         return '/tasks';
       case 'employee':
         return '/employee-management';
       case 'system':
-        // Check if it's a checkout reminder
-        if (notification.type === 'warning' && notification.message.includes('clock out')) {
+        // Check message content for specific routing
+        const message = notification.message.toLowerCase();
+        if (notification.type === 'warning' && message.includes('clock out')) {
           return '/attendance-report';
+        } else if (message.includes('attendance')) {
+          return '/attendance-report';
+        } else if (message.includes('chat') || message.includes('message')) {
+          return '/chat';
         }
         return '/notifications';
       case 'dashboard':
-        return '/dashboard';
+        // Don't navigate to a specific dashboard - return notifications page
+        // User should stay on their current dashboard
+        return '/notifications';
       default:
         return '/notifications';
     }
@@ -176,7 +212,12 @@ class NotificationService {
   }
 
   getHighlightId(notification: Go3netNotification): string | undefined {
-    return notification.metadata?.highlight_id;
+    // Try highlight_id first, then fall back to request IDs
+    return notification.metadata?.highlight_id || 
+           notification.metadata?.leave_request_id || 
+           notification.metadata?.purchase_request_id ||
+           notification.metadata?.task_id ||
+           notification.metadata?.employee_id;
   }
 
   private handleNotificationClick(notification: Go3netNotification): void {

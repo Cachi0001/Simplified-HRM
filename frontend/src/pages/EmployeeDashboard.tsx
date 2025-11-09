@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { EmployeeOverviewCards } from '../components/dashboard/EmployeeOverviewCards';
 import { EmployeeTasks } from '../components/dashboard/EmployeeTasks';
 import { DraggableLogo } from '../components/dashboard/DraggableLogo';
-import { NotificationBell } from '../components/dashboard/NotificationBell';
+import { NotificationBell } from '../components/notifications/NotificationBell';
 import { DarkModeToggle } from '../components/ui/DarkModeToggle';
 import { NotificationManager } from '../components/notifications/NotificationManager';
 import { ProfileCompletionModal } from '../components/profile/ProfileCompletionModal';
@@ -258,7 +258,7 @@ export default function EmployeeDashboard() {
           </div>
           <div className="flex items-center space-x-4">
             <DarkModeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
-            <NotificationBell darkMode={darkMode} />
+            <NotificationBell />
           </div>
         </div>
       </header>

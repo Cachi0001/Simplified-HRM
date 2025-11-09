@@ -187,7 +187,7 @@ export function useNotifications(userId?: string): UseNotificationsReturn {
     if (!targetUrl) {
       switch (notification.category) {
         case 'approval':
-          // Approval notifications go to appropriate request pages
+          // Approval notifications go to appropriate request pages based on metadata
           if (notification.metadata?.leave_request_id) {
             targetUrl = '/leave-requests';
           } else if (notification.metadata?.purchase_request_id) {
@@ -195,29 +195,73 @@ export function useNotifications(userId?: string): UseNotificationsReturn {
           } else if (notification.type === 'signup') {
             targetUrl = '/employee-management';
           } else {
+            // Default to notifications page for unknown approval types
             targetUrl = '/notifications';
           }
           break;
         case 'task':
-          targetUrl = '/tasks';
+          // If there's a specific task ID, navigate to that task
+          if (notification.metadata?.task_id) {
+            targetUrl = `/tasks/${notification.metadata.task_id}`;
+          } else {
+            targetUrl = '/tasks';
+          }
           break;
         case 'employee':
           targetUrl = '/employee-management';
           break;
         case 'system':
-          // System notifications based on type
-          if (notification.type === 'warning' && notification.message.includes('clock out')) {
+          // System notifications based on type and content
+          if (notification.type === 'warning' && notification.message.toLowerCase().includes('clock out')) {
             targetUrl = '/attendance-report';
+          } else if (notification.message.toLowerCase().includes('attendance')) {
+            targetUrl = '/attendance-report';
+          } else if (notification.message.toLowerCase().includes('chat') || notification.message.toLowerCase().includes('message')) {
+            targetUrl = '/chat';
           } else {
+            // Default to notifications page for other system notifications
             targetUrl = '/notifications';
           }
           break;
         case 'dashboard':
-          targetUrl = '/dashboard';
+          // Don't navigate to a specific dashboard - stay on current page
+          // User is already on their appropriate dashboard
+          targetUrl = null;
           break;
         default:
+          // Always fallback to notifications page
           targetUrl = '/notifications';
       }
+    }
+
+    // Validate that the target URL exists in our routes
+    const validRoutes = [
+      '/dashboard',
+      '/employee-dashboard',
+      '/hr-dashboard',
+      '/teamlead-dashboard',
+      '/super-admin-dashboard',
+      '/tasks',
+      '/attendance-report',
+      '/settings',
+      '/leave-requests',
+      '/purchase-requests',
+      '/chat',
+      '/notifications',
+      '/employee-management',
+      '/performance-metrics'
+    ];
+
+    // Check if targetUrl starts with any valid route (for dynamic routes like /tasks/:id)
+    const isValidRoute = targetUrl && (
+      validRoutes.includes(targetUrl) ||
+      validRoutes.some(route => targetUrl.startsWith(route + '/'))
+    );
+
+    // If invalid route, fallback to notifications page
+    if (targetUrl && !isValidRoute) {
+      console.warn(`Invalid notification target URL: ${targetUrl}, redirecting to /notifications`);
+      targetUrl = '/notifications';
     }
 
     // Store highlight information for target page
@@ -226,7 +270,7 @@ export function useNotifications(userId?: string): UseNotificationsReturn {
       sessionStorage.setItem('highlight_type', notification.category);
     }
 
-    // Navigate to the target URL
+    // Navigate to the target URL only if it's valid
     if (targetUrl) {
       navigate(targetUrl);
     }

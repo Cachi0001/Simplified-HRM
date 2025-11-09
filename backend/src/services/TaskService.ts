@@ -94,10 +94,11 @@ export class TaskService {
     }
 
     // Allow deletion if user is admin/HR/superadmin or if they created the task
-    const canDelete = ['admin', 'hr', 'superadmin'].includes(employee.role) || task.assigned_by === employee.id;
+    const isCreator = task.assigned_by === employee.id;
+    const isAdmin = ['admin', 'hr', 'superadmin'].includes(employee.role);
     
-    if (!canDelete) {
-      throw new Error('You do not have permission to delete this task');
+    if (!isCreator && !isAdmin) {
+      throw new Error('You cannot delete this task because you are not the creator. Only the task creator or administrators can delete tasks.');
     }
 
     await this.taskRepo.delete(taskId);

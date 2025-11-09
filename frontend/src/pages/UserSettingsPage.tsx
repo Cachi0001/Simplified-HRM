@@ -10,7 +10,7 @@ import { useToast } from "../components/ui/Toast";
 import { DarkModeToggle } from "../components/ui/DarkModeToggle";
 import Logo from "../components/ui/Logo";
 import { BottomNavbar } from "../components/layout/BottomNavbar";
-import { NotificationBell } from "../components/dashboard/NotificationBell";
+import { NotificationBell } from "../components/notifications/NotificationBell";
 import { ProfileFieldRestrictions } from "../components/profile/ProfileFieldRestrictions";
 import WorkingDaysConfig from "../components/settings/WorkingDaysConfig";
 import {
@@ -466,7 +466,7 @@ export default function UserSettingsPage({
             <h1 className="text-xl font-bold">Settings</h1>
           </div>
           <div className="flex items-center gap-3">
-            <NotificationBell darkMode={darkMode} />
+            <NotificationBell />
             <DarkModeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
           </div>
         </div>
