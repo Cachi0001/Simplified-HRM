@@ -315,6 +315,7 @@ export default function UserSettingsPage({
         address: formData.address,
         department: formData.department,
         position: formData.position,
+        date_of_birth: formData.dateOfBirth, // Add date of birth
         emergency_contact_name: formData.emergencyContactName,
         emergency_contact_phone: formData.emergencyContactPhone,
       });

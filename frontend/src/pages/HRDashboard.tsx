@@ -231,7 +231,7 @@ export default function HRDashboard() {
           <div className="flex flex-wrap border-b border-gray-200 dark:border-gray-700">
             {[
               { id: 'overview', label: 'Overview', icon: Users },
-              { id: 'employees', label: 'Employee Management', icon: Users },
+              // { id: 'employees', label: 'Employee Management', icon: Users }, // Temporarily disabled
               { id: 'tasks', label: 'Task Management', icon: CheckSquare },
               { id: 'departments', label: 'Departments', icon: Building },
               { id: 'attendance', label: 'Attendance', icon: Calendar },
@@ -358,7 +358,7 @@ export default function HRDashboard() {
           </div>
         )}
 
-        {activeTab === 'employees' && <AdminEmployeeManagement darkMode={darkMode} />}
+        {/* {activeTab === 'employees' && <AdminEmployeeManagement darkMode={darkMode} />} */}
         {activeTab === 'tasks' && <AdminTasks darkMode={darkMode} />}
         {activeTab === 'departments' && <AdminDepartments darkMode={darkMode} currentUser={currentUser} />}
         {activeTab === 'attendance' && <AdminAttendance darkMode={darkMode} />}

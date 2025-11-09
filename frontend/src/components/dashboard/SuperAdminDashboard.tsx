@@ -287,10 +287,10 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ darkMo
 
 
 
-        {/* Employee Role Management */}
-        <section className="mb-8">
+        {/* Employee Role Management - Temporarily Disabled */}
+        {/* <section className="mb-8">
           <AdminEmployeeManagement darkMode={darkMode} />
-        </section>
+        </section> */}
 
         {/* Leave Requests Management */}
         <section className="mb-8">

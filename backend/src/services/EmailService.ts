@@ -70,7 +70,7 @@ export class EmailService {
             color: #ffffff;
           }
           .content { 
-            background: #1b393bff; 
+            background: #ffffff; 
             padding: 40px 30px;
           }
           .content h2 {
@@ -80,11 +80,12 @@ export class EmailService {
             margin-bottom: 20px;
           }
           .content p {
-            color: #1c1919ff;
+            color: #333333;
             margin-bottom: 15px;
           }
           .content strong {
-            color: #ffffff;
+            color: #1c1919ff;
+            font-weight: 600;
           }
           a[class="button"] { 
             display: inline-block; 
