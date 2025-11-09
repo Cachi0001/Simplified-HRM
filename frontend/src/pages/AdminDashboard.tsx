@@ -82,13 +82,14 @@ export default function AdminDashboard() {
       try {
         console.log('Fetching employee stats...');
         const response = await api.get('/employees/stats');
-        console.log('Employee stats data:', response.data);
+        console.log('Employee stats response:', response.data);
 
-        const data = response.data;
+        // Backend returns { success: true, data: { total, active, pending, ... } }
+        const statsData = response.data.data || response.data;
         return {
-          total: data.total || 0,
-          active: data.active || 0,
-          pending: data.pending || 0
+          total: statsData.total || 0,
+          active: statsData.active || 0,
+          pending: statsData.pending || 0
         };
       } catch (error) {
         console.error('Failed to fetch employee stats:', error);

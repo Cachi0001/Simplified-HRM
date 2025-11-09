@@ -78,13 +78,23 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
     },
   });
 
-  // Fetch employees for assignment
+  // Fetch employees for assignment - Team Leads only see their team
   const { data: employees = [] } = useQuery({
-    queryKey: ['employees'],
+    queryKey: ['employees-for-tasks'],
     queryFn: async () => {
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
       const response = await employeeService.getAllEmployees();
-      // Filter out admin users for display purposes
-      const nonAdminEmployees = response.filter((emp: any) => emp.role !== 'admin');
+      
+      // If Team Lead, only show their team members
+      if (currentUser.role === 'teamlead') {
+        return response.filter((emp: any) => 
+          (emp.team_lead_id === currentUser.id || emp.manager_id === currentUser.id) &&
+          emp.role === 'employee'
+        );
+      }
+      
+      // For HR/Admin/SuperAdmin, filter out admin users
+      const nonAdminEmployees = response.filter((emp: any) => emp.role !== 'admin' && emp.role !== 'superadmin');
       return nonAdminEmployees;
     },
   });

@@ -66,6 +66,11 @@ export default function EmployeeDashboard() {
         console.log('📡 Fetching fresh user data from backend to verify approval status...');
         try {
           const freshUser = await authService.getCurrentUser();
+          
+          if (!freshUser) {
+            throw new Error('No user data received from backend');
+          }
+          
           console.log('✅ Fresh user data received:', { status: freshUser.status, role: freshUser.role });
 
           // Update localStorage with fresh data
@@ -90,7 +95,7 @@ export default function EmployeeDashboard() {
           console.error('⚠️ Backend fetch failed:', backendErr);
           
           // If stored user appears to be approved, allow access (last known good state)
-          if (storedUser.status === 'active') {
+          if (storedUser?.status === 'active') {
             console.log('⚠️ Using stored user (backend unavailable but user appears approved)');
             setCurrentUser(storedUser);
           } else {

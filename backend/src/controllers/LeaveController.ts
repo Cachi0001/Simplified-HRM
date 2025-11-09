@@ -43,6 +43,24 @@ export class LeaveController {
     }
   };
 
+  getAvailableLeaveTypes = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = (req as any).user?.userId;
+      if (!userId) {
+        throw new ValidationError('User ID not found');
+      }
+
+      const leaveTypes = await this.leaveService.getAvailableLeaveTypes(userId);
+
+      res.json({
+        success: true,
+        data: leaveTypes
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   getMyLeaveRequests = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = (req as any).user?.userId;

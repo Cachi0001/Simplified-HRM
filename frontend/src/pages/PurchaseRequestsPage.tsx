@@ -5,6 +5,7 @@ import { authService } from '../services/authService';
 import { purchaseService, PurchaseRequest, CreatePurchaseRequestData } from '../services/purchaseService';
 import { useToast } from '../components/ui/Toast';
 import { useTheme } from '../contexts/ThemeContext';
+import { BottomNavbar } from '../components/layout/BottomNavbar';
 import LoadingButton from '../components/ui/LoadingButton';
 import { ConfirmationDialog } from '../components/ui/ConfirmationDialog';
 import { safeString, safeNumber, formatCurrency, safeDateFormat } from '../utils/safeFormatting';
@@ -725,6 +726,12 @@ export function PurchaseRequestsPage() {
         type="danger"
         loading={deleting}
       />
+
+      {/* Bottom Navigation */}
+      <BottomNavbar darkMode={darkMode} />
+      
+      {/* Spacer for fixed navbar */}
+      <div className="h-20"></div>
     </div>
   );
 }

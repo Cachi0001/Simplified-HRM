@@ -73,6 +73,14 @@ export class LeaveRepository {
     return result.rows[0] || null;
   }
 
+  async getAvailableLeaveTypes(employeeId: string): Promise<any[]> {
+    const result = await pool.query(
+      `SELECT * FROM get_available_leave_types($1)`,
+      [employeeId]
+    );
+    return result.rows;
+  }
+
   async getLeaveBalances(employeeId: string, year?: number): Promise<LeaveBalance[]> {
     const result = await pool.query(
       `SELECT * FROM get_leave_balances($1, $2)`,

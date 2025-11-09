@@ -16,13 +16,24 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
 
-  // Fetch all employees for filtering
+  // Fetch all employees for filtering - Team Leads only see their team
   const { data: employees = [], isLoading: employeesLoading } = useQuery({
-    queryKey: ['employees'],
+    queryKey: ['employees-for-attendance'],
     queryFn: async () => {
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
       const response = await employeeService.getAllEmployees();
-      // Filter out admin users for display purposes
-      const nonAdminEmployees = response.employees.filter((emp: any) => emp.role !== 'admin');
+      const allEmployees = response.employees || response;
+      
+      // If Team Lead, only show their team members
+      if (currentUser.role === 'teamlead') {
+        return allEmployees.filter((emp: any) => 
+          (emp.team_lead_id === currentUser.id || emp.manager_id === currentUser.id) &&
+          emp.role === 'employee'
+        );
+      }
+      
+      // For HR/Admin/SuperAdmin, filter out admin users
+      const nonAdminEmployees = allEmployees.filter((emp: any) => emp.role !== 'admin' && emp.role !== 'superadmin');
       return nonAdminEmployees;
     },
   });

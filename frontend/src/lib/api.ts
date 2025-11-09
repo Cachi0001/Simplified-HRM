@@ -408,7 +408,42 @@ api.interceptors.response.use(
     }
     // CASE 7: Server errors (500)
     else if (error.response?.status >= 500) {
-      applyFriendlyMessage(error, `Server error. Our team has been notified. Please try again later. (Error ID: ${errorId})`);
+      // Check for specific database constraint errors
+      const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || '';
+      
+      if (errorMessage.includes('duplicate key value') && errorMessage.includes('departments_name_key')) {
+        error.message = 'A department with this name already exists. Please use a different name.';
+        if (error.response?.data) {
+          error.response.data.message = error.message;
+        }
+      } else if (errorMessage.includes('duplicate key value')) {
+        // Generic duplicate key error
+        error.message = 'This value already exists. Please use a different value.';
+        if (error.response?.data) {
+          error.response.data.message = error.message;
+        }
+      } else if (errorMessage.includes('violates foreign key constraint')) {
+        error.message = 'Cannot perform this action due to related data. Please check dependencies.';
+        if (error.response?.data) {
+          error.response.data.message = error.message;
+        }
+      } else if (errorMessage.includes('violates check constraint')) {
+        error.message = 'Invalid data provided. Please check your input.';
+        if (error.response?.data) {
+          error.response.data.message = error.message;
+        }
+      } else if (errorMessage.includes('invalid input syntax for type uuid')) {
+        // Extract what was passed as UUID
+        const match = errorMessage.match(/invalid input syntax for type uuid: "([^"]+)"/);
+        const invalidValue = match ? match[1] : 'the provided value';
+        error.message = `Invalid ID format: "${invalidValue}". This appears to be a technical error. Please refresh the page and try again.`;
+        if (error.response?.data) {
+          error.response.data.message = error.message;
+        }
+      } else {
+        // Generic server error
+        applyFriendlyMessage(error, `Server error. Our team has been notified. Please try again later. (Error ID: ${errorId})`);
+      }
     }
     // CASE 8: Connection refused
     else if (error.response?.status === 0 || error.response?.status === 'ECONNREFUSED') {

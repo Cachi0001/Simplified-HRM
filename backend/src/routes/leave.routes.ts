@@ -11,6 +11,8 @@ router.get('/', leaveController.getAllLeaveRequests);
 
 router.get('/types', leaveController.getLeaveTypes);
 
+router.get('/available-types', leaveController.getAvailableLeaveTypes);
+
 router.post('/request', leaveController.createLeaveRequest);
 
 router.get('/my-requests', leaveController.getMyLeaveRequests);

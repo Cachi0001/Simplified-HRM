@@ -29,7 +29,6 @@ router.put('/my-profile', employeeController.updateMyProfile);
 router.put('/me', employeeController.updateMyProfile);
 
 // Update my working days
-router.put('/my-working-days', employeeController.updateMyWorkingDays);
 router.get('/me/working-days', employeeController.getMyWorkingDays);
 router.put('/me/working-days', employeeController.updateMyWorkingDays);
 

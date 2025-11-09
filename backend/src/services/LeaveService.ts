@@ -42,6 +42,15 @@ export class LeaveService {
     return result;
   }
 
+  async getAvailableLeaveTypes(userId: string): Promise<any[]> {
+    const employee = await this.employeeRepo.findByUserId(userId);
+    if (!employee) {
+      throw new NotFoundError('Employee profile not found');
+    }
+
+    return await this.leaveRepo.getAvailableLeaveTypes(employee.id);
+  }
+
   async getMyLeaveRequests(userId: string, status?: string): Promise<LeaveRequest[]> {
     const employee = await this.employeeRepo.findByUserId(userId);
     if (!employee) {

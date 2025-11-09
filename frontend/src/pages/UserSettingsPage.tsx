@@ -314,18 +314,33 @@ export default function UserSettingsPage({
 
       console.log("[UserSettings] Profile updated successfully:", response);
 
-      // Update localStorage with new user info
-      const updatedUser = {
-        ...currentUser,
-        fullName: formData.fullName,
-        email: formData.email,
-      };
-      localStorage.setItem("currentUser", JSON.stringify(updatedUser));
-      setCurrentUser(updatedUser);
+      // Fetch fresh user data from backend to update localStorage
+      try {
+        const freshUser = await authService.getCurrentUser();
+        localStorage.setItem("user", JSON.stringify(freshUser));
+        setCurrentUser(freshUser);
+        
+        // Also update formData to reflect the changes
+        setFormData({
+          ...formData,
+          fullName: freshUser.fullName || formData.fullName,
+          email: freshUser.email || formData.email,
+        });
+      } catch (refreshError) {
+        console.warn("Could not refresh user data:", refreshError);
+        // Fallback: update with form data
+        const updatedUser = {
+          ...currentUser,
+          fullName: formData.fullName,
+          email: formData.email,
+        };
+        localStorage.setItem("user", JSON.stringify(updatedUser));
+        setCurrentUser(updatedUser);
+      }
 
       addToast(
         "success",
-        "Profile updated successfully! Administrators have been notified of your changes.",
+        "Profile updated successfully! Your changes are now visible.",
       );
     } catch (error: any) {
       console.error("[UserSettings] Error saving profile:", error);

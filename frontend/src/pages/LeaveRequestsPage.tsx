@@ -4,6 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { useToast } from '../components/ui/Toast';
 import { useTheme } from '../contexts/ThemeContext';
+import { BottomNavbar } from '../components/layout/BottomNavbar';
 import LoadingButton from '../components/ui/LoadingButton';
 import { ConfirmationDialog } from '../components/ui/ConfirmationDialog';
 import api from '../lib/api';
@@ -589,6 +590,12 @@ export function LeaveRequestsPage() {
         type="danger"
         loading={deleting}
       />
+
+      {/* Bottom Navigation */}
+      <BottomNavbar darkMode={darkMode} />
+      
+      {/* Spacer for fixed navbar */}
+      <div className="h-20"></div>
     </div>
   );
 }
