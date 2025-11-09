@@ -75,40 +75,25 @@ export class TaskRepository {
   }
 
   async findAll(filters?: { status?: string; assigneeId?: string; assignedBy?: string }): Promise<Task[]> {
-    let queryText = `
-      SELECT t.*, 
-        e1.full_name as assigned_by_name,
-        e2.full_name as assignee_name
-      FROM tasks t
-      LEFT JOIN employees e1 ON t.assigned_by = e1.id
-      LEFT JOIN employees e2 ON t.assignee_id = e2.id
-      WHERE 1=1
-    `;
-    const params: any[] = [];
-    let paramCount = 1;
-
+    // Use the database function that includes JOINs for employee names
+    const result = await pool.query(
+      'SELECT * FROM get_all_tasks_with_names()'
+    );
+    
+    let tasks = result.rows;
+    
+    // Apply filters in memory if provided
     if (filters?.status) {
-      queryText += ` AND t.status = $${paramCount}`;
-      params.push(filters.status);
-      paramCount++;
+      tasks = tasks.filter(t => t.status === filters.status);
     }
-
     if (filters?.assigneeId) {
-      queryText += ` AND t.assignee_id = $${paramCount}`;
-      params.push(filters.assigneeId);
-      paramCount++;
+      tasks = tasks.filter(t => t.assignee_id === filters.assigneeId);
     }
-
     if (filters?.assignedBy) {
-      queryText += ` AND t.assigned_by = $${paramCount}`;
-      params.push(filters.assignedBy);
-      paramCount++;
+      tasks = tasks.filter(t => t.assigned_by === filters.assignedBy);
     }
-
-    queryText += ' ORDER BY t.created_at DESC';
-
-    const result = await pool.query(queryText, params);
-    return result.rows;
+    
+    return tasks;
   }
 
   async delete(taskId: string): Promise<void> {

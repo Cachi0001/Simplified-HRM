@@ -213,26 +213,26 @@ export const NotificationBell: React.FC = () => {
         <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[600px] flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">Notifications</h3>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
+              <h3 className="text-lg font-semibold text-gray-900">Notifications</h3>
               {unreadCount > 0 && (
                 <button
                   onClick={handleMarkAllAsRead}
                   disabled={isLoading}
-                  className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1 disabled:opacity-50"
+                  className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1 disabled:opacity-50 px-2 py-1 rounded hover:bg-blue-50 transition-colors"
                   title="Mark all as read"
                 >
-                  <CheckCheck className="w-4 h-4" />
+                  <CheckCheck className="w-3 h-3" />
                   Mark all read
                 </button>
               )}
-              <button
-                onClick={() => setIsOpen(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
             </div>
+            <button
+              onClick={() => setIsOpen(false)}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
           {/* Notifications List */}

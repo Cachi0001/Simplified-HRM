@@ -12,6 +12,8 @@ export interface Task {
   completedAt?: string;
   createdAt: string;
   updatedAt: string;
+  assignee_name?: string;
+  assigned_by_name?: string;
 }
 
 export interface CreateTaskRequest {
@@ -75,14 +77,16 @@ const normalizeTask = (task: any): Task => ({
   id: extractId(task?._id ?? task?.id ?? ''),
   title: task?.title ?? '',
   description: task?.description ?? undefined,
-  assigneeId: extractId(task?.assigned_to ?? task?.assigneeId ?? ''),
-  assignedBy: extractId(task?.created_by ?? task?.assignedBy ?? ''),
+  assigneeId: extractId(task?.assigned_to ?? task?.assigneeId ?? task?.assignee_id ?? ''),
+  assignedBy: extractId(task?.created_by ?? task?.assignedBy ?? task?.assigned_by ?? ''),
   status: task?.status ?? 'pending',
   priority: task?.priority ?? 'medium',
   dueDate: toIsoString(task?.due_date ?? task?.dueDate ?? new Date().toISOString()),
   completedAt: task?.completed_at ? toIsoString(task.completed_at) : task?.completedAt ? toIsoString(task.completedAt) : undefined,
   createdAt: toIsoString(task?.created_at ?? task?.createdAt ?? new Date().toISOString()),
-  updatedAt: toIsoString(task?.updated_at ?? task?.updatedAt ?? new Date().toISOString())
+  updatedAt: toIsoString(task?.updated_at ?? task?.updatedAt ?? new Date().toISOString()),
+  assignee_name: task?.assignee_name ?? undefined,
+  assigned_by_name: task?.assigned_by_name ?? undefined
 });
 
 class TaskService {
@@ -136,12 +140,15 @@ class TaskService {
   async getMyTasks(): Promise<Task[]> {
     console.log('[TaskService] Fetching my tasks from /tasks/my-tasks');
     const response = await api.get('/tasks/my-tasks');
-    console.log('[TaskService] My tasks response:', response.data);
+    console.log('[TaskService] My tasks RAW response:', response.data);
     
     const tasks = response.data?.data ?? response.data?.tasks ?? response.data ?? [];
+    console.log('[TaskService] Extracted tasks array:', tasks);
+    
     const normalizedTasks = Array.isArray(tasks) ? tasks.map(normalizeTask) : [];
     
-    console.log('[TaskService] Normalized tasks:', normalizedTasks.length, 'tasks');
+    console.log('[TaskService] Normalized tasks:', normalizedTasks);
+    console.log('[TaskService] First task sample:', normalizedTasks[0]);
     return normalizedTasks;
   }
 

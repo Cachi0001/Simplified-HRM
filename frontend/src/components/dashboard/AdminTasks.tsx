@@ -362,14 +362,9 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
       ) : filteredTasks.length > 0 ? (
         <div className="space-y-3">
           {filteredTasks.map((task, index) => {
-            const rawAssignee = task.assigneeId ?? null;
-            const assigneeId = rawAssignee
-              ? (typeof rawAssignee === 'object' ? normalizeId(rawAssignee) : normalizeId(rawAssignee))
-              : '';
-
-            const assignedEmployee = assigneeId
-              ? employees.find(e => normalizeId(e.id) === assigneeId)
-              : undefined;
+            // Use the assignee_name from the database JOIN
+            const assigneeName = task.assignee_name || 'Unknown Employee';
+            const assignedByName = task.assigned_by_name || 'Unknown';
 
             return (
               <Card key={task.id || `task-${index}`} className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
@@ -396,13 +391,11 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
                     <div className={`flex items-center gap-2 ${darkMode ? 'text-blue-200' : 'text-blue-700'}`}>
                       <User className="h-4 w-4" />
                       <span className="font-medium">Assigned to:</span>
-                      <span className="font-semibold">{assignedEmployee?.full_name || 'Unknown Employee'}</span>
+                      <span className="font-semibold">{assigneeName}</span>
                     </div>
-                    {assignedEmployee?.department && (
-                      <div className={`text-xs ml-6 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                        Department: {assignedEmployee.department}
-                      </div>
-                    )}
+                    <div className={`text-xs ml-6 mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                      Created by: {assignedByName}
+                    </div>
                   </div>
 
                   {/* Description */}

@@ -86,6 +86,9 @@ export class LeaveService {
   }
 
   async approveLeaveRequest(leaveRequestId: string, approvedByUserId: string, comments?: string): Promise<{ message: string; leaveRequest: LeaveRequest }> {
+    console.log('[LeaveService] Approving leave request:', leaveRequestId);
+    console.log('[LeaveService] Approver userId from JWT:', approvedByUserId);
+    
     const leaveRequest = await this.leaveRepo.getLeaveRequestById(leaveRequestId);
     if (!leaveRequest) {
       throw new NotFoundError('Leave request not found');
@@ -95,8 +98,14 @@ export class LeaveService {
       throw new ValidationError(`Cannot approve leave request with status: ${leaveRequest.status}`);
     }
 
+    console.log('[LeaveService] Looking for employee with user_id:', approvedByUserId);
     const approver = await this.employeeRepo.findByUserId(approvedByUserId);
+    console.log('[LeaveService] Found approver:', approver ? `Yes (id: ${approver.id}, role: ${approver.role})` : 'NO - THIS IS THE PROBLEM');
+    
     if (!approver) {
+      // Log all employees to debug
+      const allEmployees = await this.employeeRepo.findAll({});
+      console.log('[LeaveService] All employees in database:', allEmployees.map(e => ({ id: e.id, user_id: e.user_id, email: e.email, role: e.role })));
       throw new NotFoundError('Approver not found');
     }
 
