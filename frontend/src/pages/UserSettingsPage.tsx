@@ -68,6 +68,8 @@ export default function UserSettingsPage({
     department: "",
     position: "",
     dateOfBirth: "",
+    emergencyContactName: "",
+    emergencyContactPhone: "",
   });
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -124,6 +126,8 @@ export default function UserSettingsPage({
               department: employee.department || "",
               position: employee.position || "",
               dateOfBirth: (employee as any).dateOfBirth || (employee as any).date_of_birth || "",
+              emergencyContactName: (employee as any).emergencyContactName || (employee as any).emergency_contact_name || "",
+              emergencyContactPhone: (employee as any).emergencyContactPhone || (employee as any).emergency_contact_phone || "",
             });
           }
         } catch (profileError) {
@@ -311,6 +315,8 @@ export default function UserSettingsPage({
         address: formData.address,
         department: formData.department,
         position: formData.position,
+        emergency_contact_name: formData.emergencyContactName,
+        emergency_contact_phone: formData.emergencyContactPhone,
       });
 
       console.log("[UserSettings] Profile updated successfully:", response);
@@ -709,6 +715,48 @@ export default function UserSettingsPage({
                         value={formData.address}
                         onChange={handleFormChange}
                         placeholder="Street address"
+                        darkMode={darkMode}
+                      />
+                    </div>
+
+                    {/* Emergency Contact Section */}
+                    <div className="md:col-span-2 pt-4 border-t border-gray-200">
+                      <h3 className={`text-lg font-semibold mb-4 ${darkMode ? "text-white" : "text-gray-900"}`}>
+                        Emergency Contact Information
+                      </h3>
+                    </div>
+
+                    <div>
+                      <label
+                        className={`block text-sm font-medium mb-2 ${darkMode ? "text-gray-300" : "text-gray-700"}`}
+                      >
+                        Emergency Contact Name
+                      </label>
+                      <Input
+                        id="emergencyContactName"
+                        label=""
+                        name="emergencyContactName"
+                        value={formData.emergencyContactName}
+                        onChange={handleFormChange}
+                        placeholder="Full name of emergency contact"
+                        darkMode={darkMode}
+                      />
+                    </div>
+
+                    <div>
+                      <label
+                        className={`block text-sm font-medium mb-2 ${darkMode ? "text-gray-300" : "text-gray-700"}`}
+                      >
+                        Emergency Contact Phone
+                      </label>
+                      <Input
+                        id="emergencyContactPhone"
+                        label=""
+                        name="emergencyContactPhone"
+                        type="tel"
+                        value={formData.emergencyContactPhone}
+                        onChange={handleFormChange}
+                        placeholder="+1 (555) 000-0000"
                         darkMode={darkMode}
                       />
                     </div>

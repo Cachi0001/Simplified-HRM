@@ -50,7 +50,17 @@ export const EmployeeManagementPage: React.FC = () => {
   useEffect(() => {
     const authorizedRoles = ['superadmin', 'admin', 'hr'];
     if (!user || !authorizedRoles.includes(user.role)) {
-      navigate('/dashboard', {
+      // Redirect to appropriate dashboard based on role
+      const dashboardMap: Record<string, string> = {
+        'superadmin': '/super-admin-dashboard',
+        'admin': '/dashboard',
+        'hr': '/hr-dashboard',
+        'teamlead': '/teamlead-dashboard',
+        'employee': '/employee-dashboard'
+      };
+      const targetDashboard = dashboardMap[user?.role || 'employee'] || '/employee-dashboard';
+      
+      navigate(targetDashboard, {
         replace: true,
         state: { error: 'You do not have permission to access employee management.' }
       });

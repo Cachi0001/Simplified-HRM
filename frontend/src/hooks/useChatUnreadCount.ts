@@ -42,7 +42,7 @@ export function useChatUnreadCount(): UseChatUnreadCountReturn {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to get total unread count';
       setError(errorMessage);
-      console.error(errorMessage);
+      // Silently fail - chat is optional
     }
   }, []);
 
@@ -54,7 +54,7 @@ export function useChatUnreadCount(): UseChatUnreadCountReturn {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to get chat unread count';
       setError(errorMessage);
-      console.error(errorMessage);
+      // Silently fail - chat is optional
       return 0;
     }
   }, []);
@@ -84,8 +84,14 @@ export function useChatUnreadCount(): UseChatUnreadCountReturn {
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to get unread counts';
-      setError(errorMessage);
-      console.error('Failed to get unread counts:', errorMessage, err);
+      // Don't set error state for endpoint not found - just log it
+      if (!errorMessage.includes('endpoint not found')) {
+        setError(errorMessage);
+      }
+      // Silently fail - chat is optional
+      // Set counts to empty array on error
+      setUnreadCounts([]);
+      setTotalUnreadCount(0);
     } finally {
       setIsLoading(false);
     }
@@ -116,7 +122,7 @@ export function useChatUnreadCount(): UseChatUnreadCountReturn {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to mark chat as read';
       setError(errorMessage);
-      console.error('Failed to mark chat as read:', errorMessage, err);
+      // Silently fail - chat is optional
       throw err;
     }
   }, [unreadCounts]);
@@ -211,7 +217,7 @@ export function useChatUnreadCount(): UseChatUnreadCountReturn {
             setIsRealTimeConnected(true);
             setError(null);
           } else if (status === 'CHANNEL_ERROR' || status === 'CLOSED') {
-            setError('Failed to subscribe to unread count updates');
+            // Silently fail - chat is optional
             setIsRealTimeConnected(false);
             // Attempt a simple retry with backoff cap
             setTimeout(() => {
@@ -226,8 +232,7 @@ export function useChatUnreadCount(): UseChatUnreadCountReturn {
       subscriptionRef.current = subscription;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      // Downgrade to warn to reduce console noise
-      console.warn('Failed to subscribe to unread counts:', errorMessage);
+      // Silently fail - chat is optional
       setError(errorMessage);
       setIsRealTimeConnected(false);
     }
@@ -240,7 +245,7 @@ export function useChatUnreadCount(): UseChatUnreadCountReturn {
         await supabase.removeChannel(subscriptionRef.current);
         subscriptionRef.current = null;
         setIsRealTimeConnected(false);
-        console.info('🔌 Unsubscribed from unread count updates');
+        // Silently unsubscribe
       } catch (err) {
         console.error('Error unsubscribing from unread counts:', err);
       }
