@@ -5,7 +5,6 @@ export class CronService {
   private checkoutReminderJob: cron.ScheduledTask | null = null;
   private cleanupJob: cron.ScheduledTask | null = null;
 
-  // Start all cron jobs
   start(): void {
     this.startCheckoutReminderJob();
     this.startCleanupJob();

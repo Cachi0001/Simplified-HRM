@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, X, Check, CheckCheck, Trash2 } from 'lucide-react';
+import { Bell, X, CheckCheck, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { notificationService } from '@/services/notificationService';
 import { Go3netNotification } from '@/types/notification';
@@ -41,10 +41,39 @@ export const NotificationBell: React.FC = () => {
     };
   }, [isOpen]);
 
+  const playNotificationSound = () => {
+    try {
+      // Create a simple notification sound using Web Audio API
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.value = 800;
+      oscillator.type = 'sine';
+      
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.5);
+    } catch (error) {
+      console.warn('Could not play notification sound:', error);
+    }
+  };
+
   const loadNotifications = async () => {
     try {
       const data = await notificationService.getNotifications(undefined, 50, 0, false);
+      const previousCount = notifications.length;
       setNotifications(data);
+      
+      // Play sound if new notifications arrived
+      if (data.length > previousCount && data.some(n => !n.read)) {
+        playNotificationSound();
+      }
     } catch (error) {
       console.error('Failed to load notifications:', error);
     }
@@ -74,13 +103,16 @@ export const NotificationBell: React.FC = () => {
     const highlightId = notificationService.getHighlightId(notification);
 
     if (url) {
-      navigate(url);
-      
       // Store highlight ID in session storage for the target page to use
       if (highlightId) {
         sessionStorage.setItem('highlight_id', highlightId);
         sessionStorage.setItem('highlight_type', notification.category);
+        console.log('Stored highlight_id:', highlightId, 'for category:', notification.category);
+      } else {
+        console.warn('No highlight_id found in notification metadata:', notification.metadata);
       }
+      
+      navigate(url);
     }
 
     setIsOpen(false);

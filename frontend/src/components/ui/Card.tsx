@@ -9,9 +9,10 @@ interface CardProps {
 }
 
 export const Card: React.FC<CardProps> = ({ children, className, darkMode }) => {
-  // Use darkMode prop to determine background color
-  const bgColor = darkMode ? 'bg-gray-800' : 'bg-white';
-  const textColor = darkMode ? 'text-white' : 'text-gray-900';
+  // Only apply dark mode styling if explicitly passed and true
+  // Otherwise use the default bg-secondary for auth cards
+  const bgColor = darkMode === true ? 'bg-gray-800' : darkMode === false ? 'bg-white' : 'bg-secondary';
+  const textColor = darkMode === true ? 'text-white' : darkMode === false ? 'text-gray-900' : '';
   
   return (
     <div className={`${bgColor} ${textColor} rounded-lg shadow-xl p-8 ${className}`}>
