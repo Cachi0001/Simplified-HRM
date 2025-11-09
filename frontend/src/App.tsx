@@ -99,6 +99,11 @@ function AppContent() {
               <TasksPage />
             </ProtectedRoute>
           } />
+          <Route path="/tasks/:taskId" element={
+            <ProtectedRoute>
+              <TasksPage />
+            </ProtectedRoute>
+          } />
           <Route path="/attendance-report" element={
             <ProtectedRoute>
               <AttendanceReportPage />

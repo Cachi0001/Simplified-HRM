@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { taskService } from '../services/taskService';
 import { employeeService } from '../services/employeeService';
@@ -33,6 +34,9 @@ import { notificationService } from '../services/notificationService';
 import { useTokenValidation } from '../hooks/useTokenValidation';
 
 export default function TasksPage() {
+  const { taskId } = useParams<{ taskId?: string }>();
+  const highlightedTaskRef = useRef<HTMLDivElement>(null);
+  
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('darkMode');
     return saved ? JSON.parse(saved) : false;
@@ -108,23 +112,41 @@ export default function TasksPage() {
   };
 
   // Fetch tasks based on user role
-  const { data: tasks = [], isLoading: tasksLoading } = useQuery({
+  const { data: tasks = [], isLoading: tasksLoading, error: tasksError } = useQuery({
     queryKey: ['tasks', searchQuery, statusFilter, isAdmin],
     queryFn: async () => {
-      if (searchQuery) {
-        return await taskService.searchTasks(searchQuery);
-      }
+      console.log('[TasksPage] Fetching tasks, isAdmin:', isAdmin, 'searchQuery:', searchQuery);
+      
+      try {
+        if (searchQuery) {
+          const results = await taskService.searchTasks(searchQuery);
+          console.log('[TasksPage] Search results:', results.length);
+          return results;
+        }
 
-      if (isAdmin) {
-        const response = await taskService.getAllTasks();
-        return response.tasks || [];
-      } else {
-        const myTasks = await taskService.getMyTasks();
-        return Array.isArray(myTasks) ? myTasks : [];
+        if (isAdmin) {
+          const response = await taskService.getAllTasks();
+          console.log('[TasksPage] Admin tasks response:', response);
+          return response.tasks || [];
+        } else {
+          const myTasks = await taskService.getMyTasks();
+          console.log('[TasksPage] My tasks:', myTasks);
+          return Array.isArray(myTasks) ? myTasks : [];
+        }
+      } catch (error) {
+        console.error('[TasksPage] Error fetching tasks:', error);
+        throw error;
       }
     },
     enabled: !!currentUser,
   });
+  
+  // Log tasks error
+  useEffect(() => {
+    if (tasksError) {
+      console.error('[TasksPage] Tasks query error:', tasksError);
+    }
+  }, [tasksError]);
 
   // Fetch employees for admin task assignment
   const { data: employees = [] } = useQuery({
@@ -275,6 +297,15 @@ export default function TasksPage() {
       });
     }
   }, [currentUser]);
+
+  // Scroll to highlighted task when taskId is present and tasks are loaded
+  useEffect(() => {
+    if (taskId && !tasksLoading && highlightedTaskRef.current) {
+      setTimeout(() => {
+        highlightedTaskRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 300);
+    }
+  }, [taskId, tasksLoading]);
 
   if (!currentUser) {
     return (
@@ -502,10 +533,15 @@ export default function TasksPage() {
                 e.id === assigneeId
               ) : currentUser;
 
+              const isHighlighted = taskId && task.id === taskId;
+              
               return (
                 <div
                   key={task.id || `task-${index}`}
-                  className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-lg p-4 transform transition-all duration-300 hover:scale-[1.02] hover:shadow-xl animate-slide-in`}
+                  ref={isHighlighted ? highlightedTaskRef : null}
+                  className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-lg p-4 transform transition-all duration-300 hover:scale-[1.02] hover:shadow-xl animate-slide-in ${
+                    isHighlighted ? 'ring-4 ring-blue-500 ring-opacity-50 bg-blue-50 dark:bg-blue-900' : ''
+                  }`}
                   style={{
                     animationDelay: `${index * 100}ms`
                   }}

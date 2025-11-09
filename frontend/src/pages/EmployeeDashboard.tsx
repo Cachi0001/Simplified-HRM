@@ -4,7 +4,9 @@ import { EmployeeTasks } from '../components/dashboard/EmployeeTasks';
 import { DraggableLogo } from '../components/dashboard/DraggableLogo';
 import { NotificationBell } from '../components/dashboard/NotificationBell';
 import { DarkModeToggle } from '../components/ui/DarkModeToggle';
-import { NotificationManager, triggerNotification, NotificationUtils } from '../components/notifications/NotificationManager';
+import { NotificationManager } from '../components/notifications/NotificationManager';
+import { ProfileCompletionModal } from '../components/profile/ProfileCompletionModal';
+import { useProfileCompletion } from '../hooks/useProfileCompletion';
 import { useQuery } from '@tanstack/react-query';
 import { notificationService } from '../services/notificationService';
 import Logo from '../components/ui/Logo';
@@ -22,6 +24,7 @@ export default function EmployeeDashboard() {
   });
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const { showModal, completionPercentage, closeModal } = useProfileCompletion();
 
   // Save dark mode preference whenever it changes
   useEffect(() => {
@@ -129,7 +132,7 @@ export default function EmployeeDashboard() {
     queryFn: async () => {
       const userId = currentUser?._id || currentUser?.id;
       if (!userId) {
-        console.log('No user ID available, using fallback data');
+        console.log('[EmployeeDashboard] No user ID available, using fallback data');
         return {
           totalTasks: 0,
           completedTasks: 0,
@@ -140,39 +143,45 @@ export default function EmployeeDashboard() {
       }
 
       try {
-        console.log('Fetching employee stats for user:', userId);
+        console.log('[EmployeeDashboard] Fetching employee stats for user:', userId);
 
         const [tasks, attendanceResponse] = await Promise.all([
           taskService.getMyTasks(),
-          api.get('/attendance/history')
+          api.get('/attendance/my-records')
         ]);
 
-        const attendances = attendanceResponse.data?.data?.attendances || attendanceResponse.data?.attendances || [];
+        console.log('[EmployeeDashboard] Tasks received:', tasks);
+        console.log('[EmployeeDashboard] Attendance response:', attendanceResponse.data);
 
-        const totalTasks = tasks.length;
-        const completedTasks = tasks.filter((t) => t.status === 'completed').length;
-        const pendingTasks = tasks.filter((t) => t.status === 'pending').length;
+        const attendances = attendanceResponse.data?.data || attendanceResponse.data || [];
 
-        const attendanceDays = attendances.length;
-        const totalHours = attendances.reduce((acc: number, record: any) => {
-          if (record.checkInTime && record.checkOutTime) {
-            const checkIn = new Date(record.checkInTime);
-            const checkOut = new Date(record.checkOutTime);
+        const totalTasks = Array.isArray(tasks) ? tasks.length : 0;
+        const completedTasks = Array.isArray(tasks) ? tasks.filter((t) => t.status === 'completed').length : 0;
+        const pendingTasks = Array.isArray(tasks) ? tasks.filter((t) => t.status === 'pending').length : 0;
+
+        const attendanceDays = Array.isArray(attendances) ? attendances.length : 0;
+        const totalHours = Array.isArray(attendances) ? attendances.reduce((acc: number, record: any) => {
+          if (record.clock_in && record.clock_out) {
+            const checkIn = new Date(record.clock_in);
+            const checkOut = new Date(record.clock_out);
             const hours = (checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60);
             return acc + hours;
           }
           return acc;
-        }, 0);
+        }, 0) : 0;
 
-        return {
+        const stats = {
           totalTasks,
           completedTasks,
           pendingTasks,
           attendanceDays,
           totalHours: Math.round(totalHours * 10) / 10
         };
+        
+        console.log('[EmployeeDashboard] Calculated stats:', stats);
+        return stats;
       } catch (error) {
-        console.error('Failed to fetch employee stats:', error);
+        console.error('[EmployeeDashboard] Failed to fetch employee stats:', error);
         return {
           totalTasks: 0,
           completedTasks: 0,
@@ -309,6 +318,14 @@ export default function EmployeeDashboard() {
 
       {/* Bottom Navigation */}
       <BottomNavbar darkMode={darkMode} />
+
+      {/* Profile Completion Modal */}
+      <ProfileCompletionModal
+        isOpen={showModal}
+        onClose={closeModal}
+        completionPercentage={completionPercentage}
+        userName={currentUser?.fullName || currentUser?.full_name || 'User'}
+      />
     </div>
   );
 }

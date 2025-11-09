@@ -17,14 +17,15 @@ export function useTokenValidation(options: UseTokenValidationOptions = {}) {
     queryFn: async () => {
       try {
         // Make a simple request to check if token is still valid
-        await api.get('/auth/me');
+        // Use profile endpoint instead of /auth/me
+        await api.get('/employees/my-profile');
         return true;
       } catch (error: any) {
-        console.log('Token validation failed:', error.response?.status);
+        console.log('[TokenValidation] Token check failed:', error.response?.status);
 
         // If it's a 401 (unauthorized) error, the token has expired
         if (error.response?.status === 401) {
-          console.log('Token expired, logging out user');
+          console.log('[TokenValidation] Token expired (401), logging out user');
           authService.logout();
 
           if (onTokenExpired) {
@@ -40,21 +41,17 @@ export function useTokenValidation(options: UseTokenValidationOptions = {}) {
     },
     enabled: authService.isAuthenticated(),
     refetchInterval: checkInterval,
-    retry: 1,
-    refetchOnWindowFocus: true
+    retry: false, // Don't retry failed requests
+    refetchOnWindowFocus: false, // Don't check on window focus - causes issues
+    staleTime: checkInterval // Consider data fresh for the check interval
   });
 
-  // Also check token validity on component mount
+  // Don't check immediately on mount - causes logout on refresh
+  // The refetchInterval will handle periodic checks
   useEffect(() => {
+    // Only log that validation is enabled
     if (authService.isAuthenticated()) {
-      // Check immediately on mount
-      api.get('/auth/me').catch((error: any) => {
-        if (error.response?.status === 401) {
-          console.log('Token expired on mount, logging out user');
-          authService.logout();
-          window.location.href = '/auth';
-        }
-      });
+      console.log('[TokenValidation] Token validation enabled with interval:', checkInterval);
     }
-  }, []);
+  }, [checkInterval]);
 }

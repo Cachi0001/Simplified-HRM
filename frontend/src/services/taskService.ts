@@ -97,14 +97,20 @@ class TaskService {
 
   async getAllTasks(query?: TaskQuery): Promise<{ tasks: Task[]; total: number; page: number; limit: number }> {
     const params = new URLSearchParams();
-    if (query?.assigned_to) params.append('assigned_to', query.assigned_to);
-    if (query?.assignedBy) params.append('created_by', query.assignedBy);
+    if (query?.assigned_to) params.append('assigneeId', query.assigned_to); // Backend expects assigneeId
+    if (query?.assignedBy) params.append('assignedBy', query.assignedBy);
     if (query?.status) params.append('status', query.status);
     if (query?.priority) params.append('priority', query.priority);
     if (query?.page) params.append('page', query.page.toString());
     if (query?.limit) params.append('limit', query.limit.toString());
 
-    const response = await api.get(`/tasks?${params.toString()}`);
+    const queryString = params.toString();
+    const url = queryString ? `/tasks/all?${queryString}` : '/tasks/all';
+    
+    console.log('[TaskService] Fetching all tasks from:', url);
+    const response = await api.get(url);
+    console.log('[TaskService] All tasks response:', response.data);
+    
     const data = response.data?.data ?? response.data;
 
     return {
@@ -128,9 +134,15 @@ class TaskService {
   }
 
   async getMyTasks(): Promise<Task[]> {
+    console.log('[TaskService] Fetching my tasks from /tasks/my-tasks');
     const response = await api.get('/tasks/my-tasks');
+    console.log('[TaskService] My tasks response:', response.data);
+    
     const tasks = response.data?.data ?? response.data?.tasks ?? response.data ?? [];
-    return Array.isArray(tasks) ? tasks.map(normalizeTask) : [];
+    const normalizedTasks = Array.isArray(tasks) ? tasks.map(normalizeTask) : [];
+    
+    console.log('[TaskService] Normalized tasks:', normalizedTasks.length, 'tasks');
+    return normalizedTasks;
   }
 
   async updateTask(id: string, taskData: UpdateTaskRequest): Promise<{ message: string; task: Task }> {

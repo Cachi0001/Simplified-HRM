@@ -14,12 +14,8 @@ export function useProfileCompletion() {
     try {
       setIsLoading(true);
       
-      // Check if user has dismissed the modal in this session
-      const dismissed = sessionStorage.getItem('profileModalDismissed');
-      if (dismissed === 'true') {
-        setIsLoading(false);
-        return;
-      }
+      // Always check profile completion on every login/token update
+      // No session-based dismissal - modal shows until profile is 100% complete
 
       // Fetch profile with completion percentage
       const response = await employeeService.getMyProfile();
@@ -27,18 +23,21 @@ export function useProfileCompletion() {
       // Calculate completion percentage
       const profile = response as any;
       let completed = 0;
-      let total = 8;
+      let total = 9; // Increased to 9 fields
 
-      if (profile.full_name) completed++;
+      // Required fields for profile completion
+      if (profile.full_name || profile.fullName) completed++;
       if (profile.email) completed++;
       if (profile.phone) completed++;
       if (profile.address) completed++;
-      if (profile.date_of_birth) completed++;
+      if (profile.date_of_birth || profile.dateOfBirth) completed++;
       if (profile.position) completed++;
-      if (profile.emergency_contact_name) completed++;
-      if (profile.emergency_contact_phone) completed++;
+      if (profile.department) completed++; // Added department
+      if (profile.emergency_contact_name || profile.emergencyContactName) completed++;
+      if (profile.emergency_contact_phone || profile.emergencyContactPhone) completed++;
 
       const percentage = Math.round((completed / total) * 100);
+      console.log('Profile completion check:', { completed, total, percentage, profile });
       setCompletionPercentage(percentage);
 
       // Show modal if profile is incomplete
@@ -54,8 +53,7 @@ export function useProfileCompletion() {
 
   const handleCloseModal = () => {
     setShowModal(false);
-    // Mark as dismissed for this session only
-    sessionStorage.setItem('profileModalDismissed', 'true');
+    // Don't store dismissal - modal will show again on next login if incomplete
   };
 
   return {

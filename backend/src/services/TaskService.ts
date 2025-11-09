@@ -33,6 +33,11 @@ export class TaskService {
       throw new Error('Assigner employee not found');
     }
     
+    // Prevent self-assignment
+    if (assigneeEmployee.id === assignerEmployee.id || assigneeEmployee.user_id === assignerEmployee.user_id) {
+      throw new Error('Cannot assign task to yourself');
+    }
+    
     // Use employee IDs
     const taskData = {
       ...data,

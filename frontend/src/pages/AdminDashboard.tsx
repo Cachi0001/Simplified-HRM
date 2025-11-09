@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { AdminAttendance } from '../components/dashboard/AdminAttendance';
 import { AdminTasks } from '../components/dashboard/AdminTasks';
 import { AdminDepartments } from '../components/dashboard/AdminDepartments';
-import { AdminEmployeeManagement } from '../components/dashboard/AdminEmployeeManagement';
+// import { AdminEmployeeManagement } from '../components/dashboard/AdminEmployeeManagement'; // Temporarily disabled
 import { AdminLeaveRequests } from '../components/dashboard/AdminLeaveRequests';
 import { NotificationManager } from '../components/notifications/NotificationManager';
 import { DraggableLogo } from '../components/dashboard/DraggableLogo';
@@ -214,10 +214,10 @@ export default function AdminDashboard() {
           <AdminLeaveRequests darkMode={darkMode} />
         </section>
 
-        {/* Employee Role Management */}
-        <section className="mb-8">
+        {/* Employee Role Management - Temporarily Disabled */}
+        {/* <section className="mb-8">
           <AdminEmployeeManagement darkMode={darkMode} />
-        </section>
+        </section> */}
 
         {/* Attendance Management */}
         <section className="mb-8">

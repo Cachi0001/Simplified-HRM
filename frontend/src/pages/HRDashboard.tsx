@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { authService } from '../services/authService';
 import { AdminLeaveRequests } from '../components/dashboard/AdminLeaveRequests';
-import { AdminEmployeeManagement } from '../components/dashboard/AdminEmployeeManagement';
+// import { AdminEmployeeManagement } from '../components/dashboard/AdminEmployeeManagement'; // Temporarily disabled
 import { AdminTasks } from '../components/dashboard/AdminTasks';
 import { AdminAttendance } from '../components/dashboard/AdminAttendance';
 import { AdminDepartments } from '../components/dashboard/AdminDepartments';
@@ -14,7 +14,7 @@ import { DarkModeToggle } from '../components/ui/DarkModeToggle';
 import { NotificationBell } from '../components/dashboard/NotificationBell';
 import { NotificationManager } from '../components/notifications/NotificationManager';
 import Logo from '../components/ui/Logo';
-import { Clock, Users, FileText, CheckSquare, Building, Calendar, AlertCircle, TrendingUp, MessageSquare, Plus } from 'lucide-react';
+import { Clock, Users, FileText, CheckSquare, Building, Calendar } from 'lucide-react';
 import { useTokenValidation } from '../hooks/useTokenValidation';
 import api from '../lib/api';
 
@@ -64,7 +64,7 @@ export default function HRDashboard() {
   });
 
   // Fetch dashboard stats
-  const { data: stats, isLoading: statsLoading, error: statsError } = useQuery({
+  const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['dashboard-stats', selectedTimeRange],
     queryFn: async () => {
       const response = await api.get(`/dashboard/stats?timeRange=${selectedTimeRange}`);
@@ -151,7 +151,8 @@ export default function HRDashboard() {
         {/* Stats Cards */}
         {stats && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+            {/* Total Employees Card - Temporarily Disabled */}
+            {/* <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
               <div className="flex items-center justify-between">
                 <div>
                   <p className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
@@ -168,7 +169,7 @@ export default function HRDashboard() {
                   <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                 </div>
               </div>
-            </div>
+            </div> */}
 
             <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
               <div className="flex items-center justify-between">
@@ -282,7 +283,8 @@ export default function HRDashboard() {
             {/* Quick Stats Grid */}
             {stats && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+              {/* Pending Approvals Card - Temporarily Disabled */}
+              {/* <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
                 <div className="flex items-center justify-between">
                   <div>
                     <p className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
@@ -296,7 +298,7 @@ export default function HRDashboard() {
                     <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                   </div>
                 </div>
-              </div>
+              </div> */}
 
               <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
                 <div className="flex items-center justify-between">

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../lib/api';
 import { useToast } from '../ui/Toast';
@@ -31,29 +31,51 @@ export const AdminLeaveRequests: React.FC<AdminLeaveRequestsProps> = ({ darkMode
   const queryClient = useQueryClient();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
+  const [rejectionReason, setRejectionReason] = useState<string>('');
+  const [showRejectModal, setShowRejectModal] = useState<string | null>(null);
   
   // Get current user to make query key unique
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
   const userId = currentUser?.id || currentUser?._id || 'anonymous';
 
   // Fetch leave requests with unique query key to prevent conflicts
-  const { data: leaveRequests = [], isLoading } = useQuery({
+  const { data: leaveRequests = [], isLoading, error: queryError } = useQuery({
     queryKey: ['admin-leave-requests', userId || 'anonymous'],
     queryFn: async () => {
-      const response = await api.get('/leave');
-      // Handle the nested data structure: response.data.data.leaveRequests
-      const data = response.data.data || response.data;
-      return Array.isArray(data) ? data : (data?.leaveRequests || []);
+      console.log('[AdminLeaveRequests] Fetching leave requests from /leave/requests');
+      try {
+        // Use /leave/requests to get ALL requests (not just my requests)
+        const response = await api.get('/leave/requests');
+        console.log('[AdminLeaveRequests] API Response:', response.data);
+        
+        // Handle the nested data structure: response.data.data
+        const data = response.data.data || response.data;
+        const requests = Array.isArray(data) ? data : [];
+        
+        console.log('[AdminLeaveRequests] Parsed requests:', requests.length, 'requests');
+        return requests;
+      } catch (error: any) {
+        console.error('[AdminLeaveRequests] Error fetching requests:', error);
+        console.error('[AdminLeaveRequests] Error response:', error.response?.data);
+        throw error;
+      }
     },
     staleTime: 30000, // Cache for 30 seconds to prevent excessive API calls
     refetchOnWindowFocus: false, // Don't refetch when window regains focus
   });
+  
+  // Log query error if any
+  useEffect(() => {
+    if (queryError) {
+      console.error('[AdminLeaveRequests] Query error:', queryError);
+    }
+  }, [queryError]);
 
   // Approve leave request
   const approveMutation = useMutation({
     mutationFn: async (requestId: string) => {
       const response = await api.put(`/leave/${requestId}/approve`, {
-        approval_comments: 'Approved from dashboard'
+        comments: 'Approved from dashboard'
       });
       return response.data;
     },
@@ -63,22 +85,25 @@ export const AdminLeaveRequests: React.FC<AdminLeaveRequestsProps> = ({ darkMode
     },
     onError: (error: any) => {
       console.error('Approve error:', error);
-      addToast('error', error.response?.data?.error?.message || error.response?.data?.message || 'Failed to approve leave request');
+      const errorMsg = error.response?.data?.error?.message || error.response?.data?.message || 'Failed to approve leave request';
+      console.error('Full error details:', error.response?.data);
+      addToast('error', errorMsg);
     }
   });
 
   // Reject leave request
   const rejectMutation = useMutation({
-    mutationFn: async (requestId: string) => {
+    mutationFn: async ({ requestId, reason }: { requestId: string; reason: string }) => {
       const response = await api.put(`/leave/${requestId}/reject`, {
-        approved_by: userId,
-        rejection_reason: 'Rejected from dashboard'
+        reason: reason || 'Rejected from dashboard'
       });
       return response.data;
     },
     onSuccess: () => {
       addToast('success', 'Leave request rejected');
       queryClient.invalidateQueries({ queryKey: ['admin-leave-requests', userId] });
+      setShowRejectModal(null);
+      setRejectionReason('');
     },
     onError: (error: any) => {
       console.error('Reject error:', error);
@@ -114,8 +139,10 @@ export const AdminLeaveRequests: React.FC<AdminLeaveRequestsProps> = ({ darkMode
   const getDaysDuration = (startDate: string, endDate: string) => {
     const start = new Date(startDate);
     const end = new Date(endDate);
-    const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-    return days;
+    // Calculate the difference in days (inclusive of both start and end dates)
+    const diffTime = end.getTime() - start.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    return diffDays;
   };
 
   return (
@@ -198,7 +225,11 @@ export const AdminLeaveRequests: React.FC<AdminLeaveRequestsProps> = ({ darkMode
                     )}
                     <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                       {request.type && `${request.type.charAt(0).toUpperCase() + request.type.slice(1)} Leave • `}
-                      {formatDate(request.start_date)} - {formatDate(request.end_date)} ({getDaysDuration(request.start_date, request.end_date)} days)
+                      {formatDate(request.start_date)} - {formatDate(request.end_date)}
+                    </p>
+                    <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'} mt-1`}>
+                      📅 {getDaysDuration(request.start_date, request.end_date)} calendar days
+                      {(request as any).days_requested && ` • 💼 ${(request as any).days_requested} working days`}
                     </p>
                   </div>
                 </div>
@@ -223,22 +254,71 @@ export const AdminLeaveRequests: React.FC<AdminLeaveRequestsProps> = ({ darkMode
                   </div>
 
                   {request.status === 'pending' && (
-                    <div className="flex gap-3 mt-4">
-                      <button
-                        onClick={() => approveMutation.mutate(request.id || request._id)}
-                        disabled={approveMutation.isPending}
-                        className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
-                      >
-                        ✓ Approve
-                      </button>
-                      <button
-                        onClick={() => rejectMutation.mutate(request.id || request._id)}
-                        disabled={rejectMutation.isPending}
-                        className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
-                      >
-                        ✗ Reject
-                      </button>
-                    </div>
+                    <>
+                      {showRejectModal === (request.id || request._id) ? (
+                        <div className="mt-4">
+                          <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            Rejection Reason *
+                          </label>
+                          <textarea
+                            value={rejectionReason}
+                            onChange={(e) => setRejectionReason(e.target.value)}
+                            placeholder="Please provide a reason for rejection..."
+                            rows={3}
+                            className={`w-full p-3 rounded-lg border ${
+                              darkMode
+                                ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                                : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                            } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                          />
+                          <div className="flex gap-3 mt-3">
+                            <button
+                              onClick={() => {
+                                if (!rejectionReason.trim()) {
+                                  addToast('error', 'Please provide a rejection reason');
+                                  return;
+                                }
+                                rejectMutation.mutate({ requestId: request.id || request._id, reason: rejectionReason });
+                              }}
+                              disabled={rejectMutation.isPending || !rejectionReason.trim()}
+                              className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
+                            >
+                              {rejectMutation.isPending ? 'Rejecting...' : 'Confirm Rejection'}
+                            </button>
+                            <button
+                              onClick={() => {
+                                setShowRejectModal(null);
+                                setRejectionReason('');
+                              }}
+                              className={`flex-1 font-semibold py-2 px-4 rounded-lg transition-colors ${
+                                darkMode
+                                  ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                                  : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+                              }`}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex gap-3 mt-4">
+                          <button
+                            onClick={() => approveMutation.mutate(request.id || request._id)}
+                            disabled={approveMutation.isPending}
+                            className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            {approveMutation.isPending ? 'Approving...' : '✓ Approve'}
+                          </button>
+                          <button
+                            onClick={() => setShowRejectModal(request.id || request._id)}
+                            disabled={rejectMutation.isPending}
+                            className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            ✗ Reject
+                          </button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               )}

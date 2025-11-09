@@ -51,7 +51,7 @@ const WorkingDaysConfig: React.FC<WorkingDaysConfigProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [workingDaysData, setWorkingDaysData] = useState<WorkingDaysData>({
     working_days: ["monday", "tuesday", "wednesday", "thursday", "friday"],
-    working_hours: { start: "08:30", end: "17:00" },
+    working_hours: { start: "08:35", end: "17:00" },
     timezone: "UTC",
   });
   const [hasChanges, setHasChanges] = useState(false);
@@ -87,7 +87,7 @@ const WorkingDaysConfig: React.FC<WorkingDaysConfigProps> = ({
               "friday",
             ],
             working_hours: employee.working_hours || {
-              start: "09:00",
+              start: "08:35",
               end: "17:00",
             },
             timezone: employee.timezone || "UTC",
@@ -99,7 +99,7 @@ const WorkingDaysConfig: React.FC<WorkingDaysConfigProps> = ({
         // Set defaults on error
         setWorkingDaysData({
           working_days: ["monday", "tuesday", "wednesday", "thursday", "friday"],
-          working_hours: { start: "09:00", end: "17:00" },
+          working_hours: { start: "08:35", end: "17:00" },
           timezone: "UTC",
         });
       } finally {
@@ -185,6 +185,8 @@ const WorkingDaysConfig: React.FC<WorkingDaysConfigProps> = ({
 
       const response = await api.put("/employees/me/working-days", {
         workingDays: workingDaysData.working_days,
+        workingHours: workingDaysData.working_hours,
+        timezone: workingDaysData.timezone,
       });
 
       if (response.data.success) {
@@ -208,7 +210,7 @@ const WorkingDaysConfig: React.FC<WorkingDaysConfigProps> = ({
   const handleReset = () => {
     setWorkingDaysData({
       working_days: ["monday", "tuesday", "wednesday", "thursday", "friday"],
-      working_hours: { start: "09:00", end: "17:00" },
+      working_hours: { start: "08:35", end: "17:00" },
       timezone: "UTC",
     });
     setHasChanges(true);

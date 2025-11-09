@@ -12,7 +12,7 @@ import { DarkModeToggle } from '../components/ui/DarkModeToggle';
 import { NotificationBell } from '../components/dashboard/NotificationBell';
 import { DraggableLogo } from '../components/dashboard/DraggableLogo';
 import { useTheme } from '../contexts/ThemeContext';
-import { Users, CheckSquare, Clock, TrendingUp } from 'lucide-react';
+import { Users, CheckSquare } from 'lucide-react';
 import api from '../lib/api';
 import { useTokenValidation } from '../hooks/useTokenValidation';
 
@@ -46,7 +46,7 @@ export default function TeamLeadDashboard() {
     }
   }, []);
 
-  const { data: stats, isLoading: statsLoading, error: statsError } = useQuery({
+  const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['teamlead-stats', currentUser?.id],
     queryFn: async () => {
       try {
@@ -135,7 +135,7 @@ export default function TeamLeadDashboard() {
   }
 
   console.log('Rendering TeamLeadDashboard for user:', currentUser.fullName);
-  console.log('Stats loading:', statsLoading, 'Stats error:', statsError, 'Stats data:', stats);
+  console.log('Stats loading:', statsLoading, 'Stats data:', stats);
 
   return (
     <div className={`min-h-screen transition-colors duration-300 ${darkMode ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}>

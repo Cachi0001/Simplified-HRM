@@ -240,13 +240,22 @@ export class EmployeeService {
     return result.rows[0];
   }
 
-  async updateMyWorkingDays(userId: string, workingDays: string[]): Promise<Employee> {
+  async updateMyWorkingDays(userId: string, workingDays: string[], workingHours?: { start: string; end: string }, timezone?: string): Promise<Employee> {
     const employee = await this.employeeRepo.findByUserId(userId);
     if (!employee) {
       throw new NotFoundError('Employee profile not found');
     }
 
-    return await this.updateWorkingDays(employee.id, workingDays);
+    // Update working days, hours, and timezone
+    const updateData: any = { working_days: workingDays };
+    if (workingHours) {
+      updateData.working_hours = workingHours;
+    }
+    if (timezone) {
+      updateData.timezone = timezone;
+    }
+
+    return await this.employeeRepo.updateProfile(employee.id, updateData);
   }
 
   async bulkUpdateEmployees(updates: Array<{ id: string; data: Partial<Employee> }>): Promise<Array<{ id: string; success: boolean; employee?: Employee; error?: string }>> {

@@ -200,13 +200,13 @@ export class EmployeeController {
         throw new ValidationError('User ID not found');
       }
 
-      const { workingDays } = req.body;
+      const { workingDays, workingHours, timezone } = req.body;
       
       if (!Array.isArray(workingDays)) {
         throw new ValidationError('Working days must be an array');
       }
       
-      const employee = await this.employeeService.updateMyWorkingDays(userId, workingDays);
+      const employee = await this.employeeService.updateMyWorkingDays(userId, workingDays, workingHours, timezone);
       res.json({
         success: true,
         data: employee
