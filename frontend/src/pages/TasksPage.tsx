@@ -23,10 +23,21 @@ export function TasksPage() {
   
   const currentUser = authService.getCurrentUserFromStorage();
   const currentUserId = currentUser?.id || (currentUser as any)?._id;
-  const currentEmployeeId = currentUser?.employeeId || currentUser?.id;
   const isEmployee = currentUser?.role === 'employee';
   const isSuperAdmin = currentUser?.role === 'superadmin';
   const canAssignTasks = ['hr', 'admin', 'teamlead', 'superadmin'].includes(currentUser?.role || '');
+  
+  // Fetch current employee profile to get the correct employee ID
+  const { data: currentEmployeeProfile } = useQuery({
+    queryKey: ['current-employee-profile'],
+    queryFn: async () => {
+      const response = await employeeService.getMyProfile();
+      return response;
+    },
+  });
+  
+  // Use employeeId from user object if available, otherwise from profile, fallback to user ID
+  const currentEmployeeId = currentUser?.employeeId || currentEmployeeProfile?.id || currentUser?.id;
   
   // Default tab: employees only see "assigned-to-me", others see "i-assigned" first
   const [activeTab, setActiveTab] = useState<'assigned-to-me' | 'i-assigned'>(
@@ -644,7 +655,7 @@ export function TasksPage() {
                 </label>
                 <select
                   value={newTask.priority}
-                  onChange={(e) => setNewTask({ ...newTask, priority: e.target.value as 'low' | 'medium' | 'high' })}
+                  onChange={(e) => setNewTask({ ...newTask, priority: e.target.value as 'low' | 'normal' | 'high' | 'urgent' })}
                   className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                     darkMode 
                       ? 'bg-gray-700 border-gray-600 text-white' 
