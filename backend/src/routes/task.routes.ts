@@ -17,5 +17,6 @@ router.get('/', taskController.getMyTasks);
 // Dynamic routes last
 router.get('/:id', taskController.getTaskById);
 router.put('/:id/status', taskController.updateTaskStatus);
+router.patch('/:id/status', taskController.updateTaskStatus);
 
 export default router;

@@ -52,7 +52,10 @@ export class TaskController {
 
       res.json({
         success: true,
-        data: tasks
+        data: {
+          tasks: tasks || [],
+          total: tasks?.length || 0
+        }
       });
     } catch (error) {
       next(error);
@@ -111,7 +114,10 @@ export class TaskController {
 
       res.json({
         success: true,
-        data: tasks
+        data: {
+          tasks: tasks || [],
+          total: tasks?.length || 0
+        }
       });
     } catch (error) {
       next(error);

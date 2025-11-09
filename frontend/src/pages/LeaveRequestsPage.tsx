@@ -206,9 +206,19 @@ export function LeaveRequestsPage() {
   };
 
   const canApproveReject = (request: LeaveRequest) => {
-    return currentUser && 
-           ['hr', 'admin', 'superadmin'].includes(currentUser.role) && 
-           request.status === 'pending';
+    if (!currentUser || request.status !== 'pending') return false;
+    
+    // Users cannot approve their own requests
+    const isOwnRequest = request.employee_id === currentUser.id || 
+                         request.employee_id === currentUser.employee_id;
+    
+    if (isOwnRequest) {
+      // Only superadmin can approve their own requests
+      return currentUser.role === 'superadmin';
+    }
+    
+    // HR, Admin, and SuperAdmin can approve others' requests
+    return ['hr', 'admin', 'superadmin'].includes(currentUser.role);
   };
 
   const getStatusIcon = (status: string) => {

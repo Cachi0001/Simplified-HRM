@@ -223,9 +223,9 @@ export const AdminDepartments: React.FC<AdminDepartmentsProps> = ({ darkMode = f
                     : 'bg-white border-gray-300 text-gray-900'
                 }`}
               >
-                <option value="">Select a manager (optional)</option>
+                <option value="">Select a team lead (optional)</option>
                 {employees
-                  .filter(emp => ['admin', 'hr', 'teamlead'].includes(emp.role))
+                  .filter(emp => emp.role === 'employee' || emp.role === 'teamlead')
                   .map(emp => (
                     <option key={emp.id} value={emp.id}>
                       {emp.employee_name} ({emp.role})

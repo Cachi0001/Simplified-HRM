@@ -111,11 +111,9 @@ export default function UserSettingsPage({
         setCurrentUser(user);
         setUserRole(user.role as "employee" | "hr" | "admin");
 
-        // Fetch full employee details
-        if (user.id) {
-          const employee = await employeeService.getEmployee(
-            user.id,
-          );
+        // Fetch full employee details using getMyProfile
+        try {
+          const employee = await employeeService.getMyProfile();
 
           if (employee) {
             setFormData({
@@ -125,9 +123,12 @@ export default function UserSettingsPage({
               address: employee.address || "",
               department: employee.department || "",
               position: employee.position || "",
-              dateOfBirth: (employee as any).hireDate || (employee as any).hire_date || "",
+              dateOfBirth: (employee as any).dateOfBirth || (employee as any).date_of_birth || "",
             });
           }
+        } catch (profileError) {
+          console.error("Error loading employee profile:", profileError);
+          // Continue without profile data - user can still update settings
         }
 
         // Load preferences from localStorage
@@ -314,34 +315,29 @@ export default function UserSettingsPage({
 
       console.log("[UserSettings] Profile updated successfully:", response);
 
-      // Fetch fresh user data from backend to update localStorage
-      try {
-        const freshUser = await authService.getCurrentUser();
-        localStorage.setItem("user", JSON.stringify(freshUser));
-        setCurrentUser(freshUser);
-        
-        // Also update formData to reflect the changes
-        setFormData({
-          ...formData,
-          fullName: freshUser.fullName || formData.fullName,
-          email: freshUser.email || formData.email,
-        });
-      } catch (refreshError) {
-        console.warn("Could not refresh user data:", refreshError);
-        // Fallback: update with form data
-        const updatedUser = {
-          ...currentUser,
-          fullName: formData.fullName,
-          email: formData.email,
-        };
-        localStorage.setItem("user", JSON.stringify(updatedUser));
-        setCurrentUser(updatedUser);
-      }
+      // Update localStorage with new data immediately
+      const updatedUser = {
+        ...currentUser,
+        fullName: formData.fullName,
+        full_name: formData.fullName,
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address,
+        position: formData.position,
+        department: formData.department,
+      };
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+      setCurrentUser(updatedUser);
 
       addToast(
         "success",
-        "Profile updated successfully! Your changes are now visible.",
+        "Profile updated successfully! Refreshing...",
       );
+
+      // Reload the page after a short delay to reflect changes everywhere
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     } catch (error: any) {
       console.error("[UserSettings] Error saving profile:", error);
       const errorMessage =
@@ -587,7 +583,10 @@ export default function UserSettingsPage({
                       <label
                         className={`block text-sm font-medium mb-2 ${darkMode ? "text-gray-300" : "text-gray-700"}`}
                       >
-                        Email *
+                        Email * 
+                        <span className={`text-xs ml-2 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                          (Cannot be changed - used for login)
+                        </span>
                       </label>
                       <Input
                         id="email"
@@ -597,10 +596,13 @@ export default function UserSettingsPage({
                         value={formData.email}
                         onChange={handleFormChange}
                         placeholder="your.email@company.com"
-                        disabled={userRole === "admin"}
+                        disabled={true}
                         darkMode={darkMode}
-                        className={formErrors.email ? "border-red-500" : ""}
+                        className={`${formErrors.email ? "border-red-500" : ""} cursor-not-allowed opacity-60`}
                       />
+                      <p className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                        Your email is your login credential and cannot be changed for security reasons.
+                      </p>
                       {formErrors.email && (
                         <p className="text-red-500 text-sm mt-1">
                           {formErrors.email}

@@ -117,9 +117,10 @@ export default function TasksPage() {
 
       if (isAdmin) {
         const response = await taskService.getAllTasks();
-        return response.tasks;
+        return response.tasks || [];
       } else {
-        return await taskService.getMyTasks();
+        const myTasks = await taskService.getMyTasks();
+        return Array.isArray(myTasks) ? myTasks : [];
       }
     },
     enabled: !!currentUser,

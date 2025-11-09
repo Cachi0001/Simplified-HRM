@@ -149,9 +149,26 @@ export const EmployeeManagementPage: React.FC = () => {
   };
 
   const handleEmployeeUpdate = (updatedEmployee: Employee) => {
+    // Validate the updated employee has required fields
+    if (!updatedEmployee || !updatedEmployee.id) {
+      console.error('Invalid employee data received:', updatedEmployee);
+      setShowEditModal(false);
+      setManagingEmployee(null);
+      // Reload employees to ensure data consistency
+      loadData();
+      return;
+    }
+
     // Update local state with the updated employee data
     setEmployees(prev =>
-      prev.map(emp => emp.id === updatedEmployee.id ? updatedEmployee : emp)
+      prev.map(emp => {
+        // Safety check: ensure emp exists and has an id
+        if (!emp || !emp.id) {
+          console.warn('Found invalid employee in list:', emp);
+          return emp; // Keep the invalid entry for now
+        }
+        return emp.id === updatedEmployee.id ? updatedEmployee : emp;
+      }).filter(emp => emp && emp.id) // Remove any invalid entries
     );
 
     setShowEditModal(false);
@@ -305,18 +322,20 @@ export const EmployeeManagementPage: React.FC = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredEmployees.map((employee) => (
-              <EmployeeCard
-                key={employee.id}
-                employee={employee}
-                darkMode={darkMode}
-                isHighlighted={highlightedEmployeeId === employee.id}
-                onStatusManage={handleManageEmployeeStatus}
-                currentUserRole={user?.role || 'employee'}
-                onSelect={handleSelectEmployee}
-                isSelected={selectedEmployees.includes(employee.id)}
-              />
-            ))}
+            {filteredEmployees
+              .filter(employee => employee && employee.id) // Safety filter
+              .map((employee) => (
+                <EmployeeCard
+                  key={employee.id}
+                  employee={employee}
+                  darkMode={darkMode}
+                  isHighlighted={highlightedEmployeeId === employee.id}
+                  onStatusManage={handleManageEmployeeStatus}
+                  currentUserRole={user?.role || 'employee'}
+                  onSelect={handleSelectEmployee}
+                  isSelected={selectedEmployees.includes(employee.id)}
+                />
+              ))}
           </div>
         )}
       </div>

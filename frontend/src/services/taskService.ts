@@ -129,8 +129,8 @@ class TaskService {
 
   async getMyTasks(): Promise<Task[]> {
     const response = await api.get('/tasks/my-tasks');
-    const tasks = response.data?.data?.tasks ?? response.data?.tasks ?? [];
-    return tasks.map(normalizeTask);
+    const tasks = response.data?.data ?? response.data?.tasks ?? response.data ?? [];
+    return Array.isArray(tasks) ? tasks.map(normalizeTask) : [];
   }
 
   async updateTask(id: string, taskData: UpdateTaskRequest): Promise<{ message: string; task: Task }> {

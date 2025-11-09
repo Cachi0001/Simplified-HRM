@@ -23,7 +23,7 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'fields' | 'status'>('fields');
+  const [activeTab, setActiveTab] = useState<'fields' | 'status' | 'personal'>('fields');
 
   useEffect(() => {
     if (employee) {
@@ -117,7 +117,7 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
     switch (status) {
       case 'active': return 'text-green-600 bg-green-100';
       case 'inactive': return 'text-yellow-600 bg-yellow-100';
-      case 'terminated': return 'text-red-600 bg-red-100';
+      case 'rejected': return 'text-red-600 bg-red-100';
       case 'pending': return 'text-blue-600 bg-blue-100';
       default: return 'text-gray-600 bg-gray-100';
     }
@@ -213,6 +213,16 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
               }`}
             >
               Status Management
+            </button>
+            <button
+              onClick={() => setActiveTab('personal')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'personal'
+                  ? 'border-blue-500 text-blue-600'
+                  : `border-transparent ${darkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'}`
+              }`}
+            >
+              Personal Information
             </button>
           </nav>
         </div>
@@ -381,7 +391,7 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
                 >
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
-                  <option value="terminated">Terminated</option>
+                  <option value="rejected">Rejected</option>
                   <option value="pending">Pending</option>
                 </select>
                 <p className={`text-xs mt-1 ${
@@ -389,7 +399,7 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
                 }`}>
                   {formData.status === 'active' && 'Employee is active and can access the system'}
                   {formData.status === 'inactive' && 'Employee is temporarily inactive (account disabled)'}
-                  {formData.status === 'terminated' && 'Employee is terminated (account permanently disabled)'}
+                  {formData.status === 'rejected' && 'Employee application was rejected'}
                   {formData.status === 'pending' && 'Employee account is pending approval'}
                 </p>
               </div>
@@ -397,14 +407,14 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
               {/* Warning for status changes */}
               {formData.status !== employee.status && (
                 <div className={`p-3 rounded border-l-4 ${
-                  formData.status === 'terminated' 
+                  formData.status === 'rejected' 
                     ? 'bg-red-50 border-red-400 text-red-700' 
                     : formData.status === 'inactive'
                     ? 'bg-yellow-50 border-yellow-400 text-yellow-700'
                     : 'bg-blue-50 border-blue-400 text-blue-700'
                 }`}>
                   <p className="text-sm font-medium">
-                    {formData.status === 'terminated' && 'Warning: This will permanently disable the employee\'s account.'}
+                    {formData.status === 'rejected' && 'Warning: This will reject the employee\'s application.'}
                     {formData.status === 'inactive' && 'This will temporarily disable the employee\'s account.'}
                     {formData.status === 'active' && 'This will enable the employee\'s account.'}
                     {formData.status === 'pending' && 'This will set the employee\'s account to pending approval.'}
@@ -429,7 +439,7 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
                 <button
                   type="submit"
                   className={`px-4 py-2 text-sm font-medium text-white rounded-md ${
-                    formData.status === 'terminated'
+                    formData.status === 'rejected'
                       ? 'bg-red-600 hover:bg-red-700'
                       : formData.status === 'inactive'
                       ? 'bg-yellow-600 hover:bg-yellow-700'
@@ -441,6 +451,143 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
                 </button>
               </div>
             </form>
+          )}
+
+          {activeTab === 'personal' && (
+            <div className="space-y-6">
+              {/* Personal Information - Read Only */}
+              <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700/50' : 'bg-blue-50'}`}>
+                <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  📋 This information is managed by the employee and is read-only for administrators.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Full Name */}
+                <div>
+                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    Full Name
+                  </label>
+                  <div className={`px-3 py-2 rounded-md ${darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-900'}`}>
+                    {employee.full_name || 'Not provided'}
+                  </div>
+                </div>
+
+                {/* Email */}
+                <div>
+                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    Email Address
+                  </label>
+                  <div className={`px-3 py-2 rounded-md ${darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-900'}`}>
+                    {employee.email || 'Not provided'}
+                  </div>
+                </div>
+
+                {/* Phone */}
+                <div>
+                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    Phone Number
+                  </label>
+                  <div className={`px-3 py-2 rounded-md ${darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-900'}`}>
+                    {employee.phone || 'Not provided'}
+                  </div>
+                </div>
+
+                {/* Date of Birth */}
+                <div>
+                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    Date of Birth
+                  </label>
+                  <div className={`px-3 py-2 rounded-md ${darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-900'}`}>
+                    {employee.date_of_birth ? new Date(employee.date_of_birth).toLocaleDateString() : 'Not provided'}
+                  </div>
+                </div>
+
+                {/* Address */}
+                <div className="md:col-span-2">
+                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    Address
+                  </label>
+                  <div className={`px-3 py-2 rounded-md ${darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-900'}`}>
+                    {employee.address || 'Not provided'}
+                  </div>
+                </div>
+
+                {/* Emergency Contact Name */}
+                <div>
+                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    Emergency Contact Name
+                  </label>
+                  <div className={`px-3 py-2 rounded-md ${darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-900'}`}>
+                    {employee.emergency_contact_name || 'Not provided'}
+                  </div>
+                </div>
+
+                {/* Emergency Contact Phone */}
+                <div>
+                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    Emergency Contact Phone
+                  </label>
+                  <div className={`px-3 py-2 rounded-md ${darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-900'}`}>
+                    {employee.emergency_contact_phone || 'Not provided'}
+                  </div>
+                </div>
+
+                {/* Hire Date */}
+                <div>
+                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    Hire Date
+                  </label>
+                  <div className={`px-3 py-2 rounded-md ${darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-900'}`}>
+                    {employee.hire_date ? new Date(employee.hire_date).toLocaleDateString() : 'Not provided'}
+                  </div>
+                </div>
+
+                {/* Last Updated */}
+                <div>
+                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    Profile Last Updated
+                  </label>
+                  <div className={`px-3 py-2 rounded-md ${darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-900'}`}>
+                    {employee.updated_at ? new Date(employee.updated_at).toLocaleString() : 'Not available'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Profile Completion */}
+              {employee.profile_completed !== undefined && (
+                <div className={`p-4 rounded-lg border ${
+                  employee.profile_completed 
+                    ? darkMode ? 'bg-green-900/20 border-green-800' : 'bg-green-50 border-green-200'
+                    : darkMode ? 'bg-yellow-900/20 border-yellow-800' : 'bg-yellow-50 border-yellow-200'
+                }`}>
+                  <p className={`text-sm font-medium ${
+                    employee.profile_completed 
+                      ? darkMode ? 'text-green-400' : 'text-green-800'
+                      : darkMode ? 'text-yellow-400' : 'text-yellow-800'
+                  }`}>
+                    {employee.profile_completed 
+                      ? '✓ Profile is complete' 
+                      : '⚠ Profile is incomplete - Employee should update their information'}
+                  </p>
+                </div>
+              )}
+
+              {/* Close Button */}
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className={`px-4 py-2 text-sm font-medium rounded-md border ${
+                    darkMode
+                      ? 'border-gray-600 text-gray-300 hover:bg-gray-700'
+                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                  } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
           )}
         </div>
       </div>

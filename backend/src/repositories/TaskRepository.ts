@@ -29,10 +29,10 @@ export class TaskRepository {
     const result = await pool.query(
       `SELECT * FROM assign_task_with_validation($1, $2, $3, $4, $5, $6)`,
       [
-        data.assignedBy,
-        data.assigneeId,
         data.title,
         data.description || '',
+        data.assigneeId,
+        data.assignedBy,
         data.dueDate || null,
         data.priority
       ]

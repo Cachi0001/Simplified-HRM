@@ -20,9 +20,9 @@ export const ProfileFieldRestrictions: React.FC<ProfileFieldRestrictionsProps> =
         };
       case 'hr':
         return {
-          allowed: ['Full Name', 'Phone', 'Address', 'Date of Birth', 'Profile Picture', 'Position', 'Department (others)'],
-          restricted: ['Department (own)', 'Role (limited)'],
-          requiresApproval: ['Role changes for others']
+          allowed: ['All fields'],
+          restricted: [],
+          requiresApproval: []
         };
       case 'admin':
       case 'superadmin':
@@ -42,7 +42,7 @@ export const ProfileFieldRestrictions: React.FC<ProfileFieldRestrictionsProps> =
 
   const restrictions = getFieldRestrictions();
 
-  if (userRole === 'admin' || userRole === 'superadmin') {
+  if (userRole === 'admin' || userRole === 'superadmin' || userRole === 'hr') {
     return (
       <div className={`p-4 rounded-lg border ${
         darkMode
@@ -54,7 +54,7 @@ export const ProfileFieldRestrictions: React.FC<ProfileFieldRestrictionsProps> =
           <div>
             <h4 className="font-medium">Full Access</h4>
             <p className="text-sm mt-1">
-              As an {userRole}, you have full access to edit all profile fields.
+              As {userRole === 'hr' ? 'an HR' : `an ${userRole}`}, you have full access to edit all profile fields.
             </p>
           </div>
         </div>

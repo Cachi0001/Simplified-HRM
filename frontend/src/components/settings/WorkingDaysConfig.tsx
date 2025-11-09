@@ -61,50 +61,47 @@ const WorkingDaysConfig: React.FC<WorkingDaysConfigProps> = ({
     const loadWorkingDaysConfig = async () => {
       try {
         setIsLoading(true);
-        const response = await api.get("/employees/me/working-days");
+        
+        // Use my-profile endpoint which is faster and more reliable
+        const response = await api.get("/employees/my-profile");
 
-        if (response.data.status === "success") {
-          const config = response.data.data;
+        if (response.data.success) {
+          const employee = response.data.data;
+          
+          // Parse working_days if it's a string
+          let workingDays = employee.working_days || employee.work_days;
+          if (typeof workingDays === 'string') {
+            try {
+              workingDays = JSON.parse(workingDays);
+            } catch (e) {
+              workingDays = ["monday", "tuesday", "wednesday", "thursday", "friday"];
+            }
+          }
+          
           setWorkingDaysData({
-            working_days: config.working_days || [
+            working_days: Array.isArray(workingDays) ? workingDays : [
               "monday",
               "tuesday",
               "wednesday",
               "thursday",
               "friday",
             ],
-            working_hours: config.working_hours || {
+            working_hours: employee.working_hours || {
               start: "09:00",
               end: "17:00",
             },
-            timezone: config.timezone || "UTC",
+            timezone: employee.timezone || "UTC",
           });
         }
       } catch (error) {
         console.error("Error loading working days config:", error);
-        // Fallback to profile endpoint
-        try {
-          const profileResponse = await api.get("/employees/me");
-          if (profileResponse.data.status === "success") {
-            const employee = profileResponse.data.data.employee;
-            setWorkingDaysData({
-              working_days: employee.work_days || [
-                "monday",
-                "tuesday",
-                "wednesday",
-                "thursday",
-                "friday",
-              ],
-              working_hours: employee.working_hours || {
-                start: "09:00",
-                end: "17:00",
-              },
-              timezone: employee.timezone || "UTC",
-            });
-          }
-        } catch (fallbackError) {
-          addToast("error", "Failed to load working days configuration");
-        }
+        addToast("error", "Failed to load working days configuration");
+        // Set defaults on error
+        setWorkingDaysData({
+          working_days: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+          working_hours: { start: "09:00", end: "17:00" },
+          timezone: "UTC",
+        });
       } finally {
         setIsLoading(false);
       }
@@ -186,13 +183,11 @@ const WorkingDaysConfig: React.FC<WorkingDaysConfigProps> = ({
     try {
       setIsSaving(true);
 
-      const response = await api.put("/employees/me", {
-        work_days: workingDaysData.working_days,
-        working_hours: workingDaysData.working_hours,
-        timezone: workingDaysData.timezone,
+      const response = await api.put("/employees/me/working-days", {
+        workingDays: workingDaysData.working_days,
       });
 
-      if (response.data.status === "success") {
+      if (response.data.success) {
         setHasChanges(false);
         addToast("success", "Working days configuration saved successfully!");
       }

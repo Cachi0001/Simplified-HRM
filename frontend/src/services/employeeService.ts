@@ -27,6 +27,7 @@ export interface Employee {
   user_is_active?: boolean;
   user_email_verified?: boolean;
   profile_updated_at?: string;
+  profile_completed?: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -140,7 +141,24 @@ class EmployeeService {
         status: newStatus,
         reason: reason
       });
-      return response.data;
+      
+      console.log('[employeeService] updateEmployeeStatus response:', response.data);
+      
+      // Backend returns { success: true, data: employee }
+      // Transform to { success: true, employee: ... }
+      if (!response.data.data) {
+        console.error('[employeeService] No employee data in response:', response.data);
+        return {
+          success: false,
+          error: 'No employee data returned from server'
+        };
+      }
+      
+      return {
+        success: response.data.success,
+        employee: response.data.data,
+        change_log: response.data.change_log
+      };
     } catch (error: any) {
       console.error('Failed to update employee status:', error);
       const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || error.message || 'Failed to update employee status';
@@ -164,7 +182,23 @@ class EmployeeService {
   }> {
     try {
       const response = await api.put(`/employees/${employeeId}/fields`, fields);
-      return response.data;
+      
+      console.log('[employeeService] updateEmployeeFields response:', response.data);
+      
+      // Backend returns { success: true, data: employee }
+      // Transform to { success: true, employee: ... }
+      if (!response.data.data) {
+        console.error('[employeeService] No employee data in response:', response.data);
+        return {
+          success: false,
+          error: 'No employee data returned from server'
+        };
+      }
+      
+      return {
+        success: response.data.success,
+        employee: response.data.data
+      };
     } catch (error: any) {
       console.error('Failed to update employee fields:', error);
       const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || error.message || 'Failed to update employee fields';

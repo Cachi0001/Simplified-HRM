@@ -85,17 +85,28 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
       const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
       const response = await employeeService.getAllEmployees();
       
-      // If Team Lead, only show their team members
+      // If Team Lead, show their team members + themselves
       if (currentUser.role === 'teamlead') {
-        return response.filter((emp: any) => 
+        const teamMembers = response.filter((emp: any) => 
           (emp.team_lead_id === currentUser.id || emp.manager_id === currentUser.id) &&
           emp.role === 'employee'
         );
+        // Add self to the list
+        const self = response.find((emp: any) => emp.id === currentUser.employee_id || emp.id === currentUser.id);
+        if (self && !teamMembers.find((emp: any) => emp.id === self.id)) {
+          teamMembers.unshift(self);
+        }
+        return teamMembers;
       }
       
-      // For HR/Admin/SuperAdmin, filter out admin users
-      const nonAdminEmployees = response.filter((emp: any) => emp.role !== 'admin' && emp.role !== 'superadmin');
-      return nonAdminEmployees;
+      // For HR/Admin/SuperAdmin, show all employees including themselves
+      // Only exclude superadmin from being assigned tasks by non-superadmins
+      if (currentUser.role === 'superadmin') {
+        return response; // Superadmin can assign to anyone
+      }
+      
+      // HR/Admin can assign to anyone except superadmin
+      return response.filter((emp: any) => emp.role !== 'superadmin');
     },
   });
 

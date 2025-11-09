@@ -13,6 +13,7 @@ import leaveRoutes from './routes/leave.routes';
 import purchaseRoutes from './routes/purchase.routes';
 import attendanceRoutes from './routes/attendance.routes';
 import taskRoutes from './routes/task.routes';
+import dashboardRoutes from './routes/dashboard.routes';
 
 dotenv.config();
 
@@ -57,6 +58,7 @@ app.use('/api/leave', leaveRoutes);
 app.use('/api/purchase', purchaseRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/tasks', taskRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 app.use(errorHandler);
 

@@ -14,18 +14,45 @@ export class TaskService {
   }
 
   async createTask(data: CreateTaskData): Promise<Task> {
-    const task = await this.taskRepo.create(data);
+    // Try to find by employee ID first, then by user ID
+    let assigneeEmployee = await this.employeeRepo.findById(data.assigneeId);
+    if (!assigneeEmployee) {
+      assigneeEmployee = await this.employeeRepo.findByUserId(data.assigneeId);
+    }
     
-    const assignee = await this.employeeRepo.findByUserId(data.assigneeId);
-    const assigner = await this.employeeRepo.findByUserId(data.assignedBy);
+    let assignerEmployee = await this.employeeRepo.findById(data.assignedBy);
+    if (!assignerEmployee) {
+      assignerEmployee = await this.employeeRepo.findByUserId(data.assignedBy);
+    }
     
-    if (assignee && assigner) {
+    if (!assigneeEmployee) {
+      throw new Error('Assignee employee not found');
+    }
+    
+    if (!assignerEmployee) {
+      throw new Error('Assigner employee not found');
+    }
+    
+    // Use employee IDs
+    const taskData = {
+      ...data,
+      assigneeId: assigneeEmployee.id,
+      assignedBy: assignerEmployee.id
+    };
+    
+    const task = await this.taskRepo.create(taskData);
+    
+    // Send email notification
+    try {
       await this.emailService.sendTaskAssignedEmail(
-        assignee.email,
-        assignee.full_name,
+        assigneeEmployee.email,
+        assigneeEmployee.full_name,
         data.title,
         data.dueDate?.toISOString()
       );
+    } catch (emailError) {
+      console.error('Failed to send task email:', emailError);
+      // Don't fail task creation if email fails
     }
     
     return task;

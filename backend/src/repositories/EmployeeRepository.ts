@@ -56,7 +56,7 @@ export class EmployeeRepository {
 
   async findByUserId(userId: string): Promise<Employee | null> {
     const result = await pool.query(
-      'SELECT * FROM get_employee_by_user_id($1)',
+      'SELECT * FROM employees WHERE user_id = $1',
       [userId]
     );
     return result.rows[0] || null;

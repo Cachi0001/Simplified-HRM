@@ -108,11 +108,6 @@ api.interceptors.request.use(
       // Log ALL API requests for debugging
       const fullUrl = `${config.baseURL}/${config.url}`;
       console.log(`🌐 API Request [${requestId}]: ${config.method?.toUpperCase()} ${fullUrl}`);
-
-      // Only log chat-related API requests
-      if (config.url?.includes('chat') || config.url?.includes('message')) {
-        console.log(`💬 Chat API [${requestId}]: ${config.method?.toUpperCase()} ${fullUrl}`);
-      }
     }
 
     // Add auth token if available

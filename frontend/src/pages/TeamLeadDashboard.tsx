@@ -170,7 +170,7 @@ export default function TeamLeadDashboard() {
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Team Members Card */}
               <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
                 <div className="flex items-center justify-between">
@@ -201,40 +201,6 @@ export default function TeamLeadDashboard() {
                   </div>
                   <div className={`p-3 rounded-lg ${darkMode ? 'bg-green-900' : 'bg-green-100'}`}>
                     <CheckSquare className={`w-6 h-6 ${darkMode ? 'text-green-400' : 'text-green-600'}`} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Completion Rate Card */}
-              <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                      Completion Rate
-                    </p>
-                    <p className={`text-3xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                      {stats?.completionRate || 0}%
-                    </p>
-                  </div>
-                  <div className={`p-3 rounded-lg ${darkMode ? 'bg-purple-900' : 'bg-purple-100'}`}>
-                    <TrendingUp className={`w-6 h-6 ${darkMode ? 'text-purple-400' : 'text-purple-600'}`} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Present Today Card */}
-              <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                      Present Today
-                    </p>
-                    <p className={`text-3xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                      {stats?.presentToday || 0}
-                    </p>
-                  </div>
-                  <div className={`p-3 rounded-lg ${darkMode ? 'bg-orange-900' : 'bg-orange-100'}`}>
-                    <Clock className={`w-6 h-6 ${darkMode ? 'text-orange-400' : 'text-orange-600'}`} />
                   </div>
                 </div>
               </div>

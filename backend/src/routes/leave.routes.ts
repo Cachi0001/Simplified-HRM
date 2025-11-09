@@ -26,8 +26,10 @@ router.get('/requests', leaveController.getAllLeaveRequests);
 router.get('/requests/:id', leaveController.getLeaveRequestById);
 
 router.put('/requests/:id/approve', leaveController.approveLeaveRequest);
+router.put('/:id/approve', leaveController.approveLeaveRequest);
 
 router.put('/requests/:id/reject', leaveController.rejectLeaveRequest);
+router.put('/:id/reject', leaveController.rejectLeaveRequest);
 
 router.put('/requests/:id/cancel', leaveController.cancelLeaveRequest);
 
