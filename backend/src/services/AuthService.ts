@@ -50,17 +50,14 @@ export class AuthService {
   }
 
   async login(data: LoginData): Promise<AuthResponse> {
-    const user = await this.userRepo.validatePassword(data.email, data.password);
+    // Optimized: Single query to get both user and employee data using JOIN
+    const user = await this.userRepo.validatePasswordWithEmployee(data.email, data.password);
     
-    if (!user) {
+    if (!user || !user.employee) {
       throw new AuthenticationError('Invalid email or password');
     }
 
-    const employee = await this.employeeRepo.findByUserId(user.id);
-    
-    if (!employee) {
-      throw new NotFoundError('Employee profile not found');
-    }
+    const employee = user.employee;
 
     // Check employee status BEFORE email verification
     if (employee.status === 'pending') {

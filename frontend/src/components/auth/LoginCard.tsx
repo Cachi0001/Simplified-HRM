@@ -57,67 +57,26 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
         fullResponse: response
       });
 
-      // Redirect based on user role with immediate navigation
-      if (user.role === 'admin') {
-        addToast('success', 'Login successful! Redirecting to dashboard...');
-        setTimeout(() => {
-          try {
-            navigate('/dashboard', { replace: true });
-          } catch (error) {
-            console.error('Navigation error:', error);
-            window.location.href = '/dashboard';
-          }
-        }, 1000);
-      } else if (user.role === 'employee') {
-        addToast('success', 'Login successful! Redirecting to dashboard...');
-        setTimeout(() => {
-          try {
-            navigate('/employee-dashboard', { replace: true });
-          } catch (error) {
-            console.error('Navigation error:', error);
-            window.location.href = '/employee-dashboard';
-          }
-        }, 1000);
-      } else if (user.role === 'superadmin') {
-        addToast('success', 'Login successful! Redirecting to super admin dashboard...');
-        setTimeout(() => {
-          try {
-            navigate('/super-admin-dashboard', { replace: true });
-          } catch (error) {
-            console.error('Navigation error:', error);
-            window.location.href = '/super-admin-dashboard';
-          }
-        }, 1000);
-      } else if (user.role === 'hr') {
-        addToast('success', 'Login successful! Redirecting to HR dashboard...');
-        setTimeout(() => {
-          try {
-            navigate('/hr-dashboard', { replace: true });
-          } catch (error) {
-            console.error('Navigation error:', error);
-            window.location.href = '/hr-dashboard';
-          }
-        }, 1000);
-      } else if (user.role === 'teamlead') {
-        addToast('success', 'Login successful! Redirecting to team lead dashboard...');
-        setTimeout(() => {
-          try {
-            navigate('/teamlead-dashboard', { replace: true });
-          } catch (error) {
-            console.error('Navigation error:', error);
-            window.location.href = '/teamlead-dashboard';
-          }
-        }, 1000);
-      } else {
-        addToast('success', 'Login successful! Redirecting...');
-        setTimeout(() => {
-          try {
-            navigate('/', { replace: true });
-          } catch (error) {
-            console.error('Navigation error:', error);
-            window.location.href = '/';
-          }
-        }, 1000);
+      // Optimized: Immediate navigation without artificial delay
+      addToast('success', 'Login successful!');
+      
+      // Determine dashboard route based on role
+      const dashboardRoutes: Record<string, string> = {
+        'admin': '/dashboard',
+        'employee': '/employee-dashboard',
+        'superadmin': '/super-admin-dashboard',
+        'hr': '/hr-dashboard',
+        'teamlead': '/teamlead-dashboard'
+      };
+      
+      const targetRoute = dashboardRoutes[user.role] || '/';
+      
+      // Navigate immediately for faster UX
+      try {
+        navigate(targetRoute, { replace: true });
+      } catch (error) {
+        console.error('Navigation error:', error);
+        window.location.href = targetRoute;
       }
 
       // Clear any pending confirmation data since user is now logged in

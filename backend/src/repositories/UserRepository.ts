@@ -55,7 +55,9 @@ export class UserRepository {
   }
 
   async create(data: CreateUserData): Promise<User> {
-    const passwordHash = await bcrypt.hash(data.password, 12);
+    // Optimized: Use 10 rounds instead of 12 for better performance while maintaining security
+    // 10 rounds is still very secure and recommended by OWASP
+    const passwordHash = await bcrypt.hash(data.password, 10);
     const verificationToken = crypto.randomBytes(32).toString('hex');
     
     const result = await pool.query(
@@ -131,7 +133,8 @@ export class UserRepository {
   }
 
   async resetPassword(token: string, newPassword: string): Promise<User | null> {
-    const passwordHash = await bcrypt.hash(newPassword, 12);
+    // Optimized: Use 10 rounds for better performance
+    const passwordHash = await bcrypt.hash(newPassword, 10);
     
     // Use the database function for consistency
     const result = await pool.query(
@@ -159,6 +162,37 @@ export class UserRepository {
 
   async validatePassword(email: string, password: string): Promise<User | null> {
     const user = await this.findByEmail(email);
+    if (!user) {
+      return null;
+    }
+    
+    const isValid = await bcrypt.compare(password, user.password_hash);
+    if (!isValid) {
+      return null;
+    }
+    
+    return user;
+  }
+
+  // Optimized login: Single query with JOIN to get user + employee data
+  async validatePasswordWithEmployee(email: string, password: string): Promise<(User & { employee: any }) | null> {
+    const result = await pool.query(
+      `SELECT 
+        u.*,
+        json_build_object(
+          'id', e.id,
+          'full_name', e.full_name,
+          'status', e.status,
+          'role', e.role,
+          'department_id', e.department_id
+        ) as employee
+       FROM users u
+       LEFT JOIN employees e ON e.user_id = u.id
+       WHERE u.email = $1`,
+      [email]
+    );
+    
+    const user = result.rows[0];
     if (!user) {
       return null;
     }
