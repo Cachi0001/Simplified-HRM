@@ -78,13 +78,40 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(requestLogger);
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
+// Health check endpoint with database status
+app.get('/api/health', async (req, res) => {
   console.log('🏥 Health check requested');
+  
+  // Check database connection
+  let dbStatus = 'unknown';
+  let dbError = null;
+  try {
+    await testConnection();
+    dbStatus = 'connected';
+  } catch (error: any) {
+    dbStatus = 'disconnected';
+    dbError = error.message;
+  }
+  
   res.json({ 
-    status: 'ok', 
+    status: dbStatus === 'connected' ? 'ok' : 'degraded',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV,
+    database: {
+      status: dbStatus,
+      error: dbError,
+      hasUrl: !!process.env.DATABASE_URL,
+      urlPreview: process.env.DATABASE_URL ? 
+        `${process.env.DATABASE_URL.substring(0, 20)}...${process.env.DATABASE_URL.substring(process.env.DATABASE_URL.length - 10)}` : 
+        'NOT_SET'
+    },
+    env: {
+      DATABASE_URL: !!process.env.DATABASE_URL,
+      JWT_SECRET: !!process.env.JWT_SECRET,
+      SUPABASE_URL: !!process.env.SUPABASE_URL,
+      SUPABASE_ANON_KEY: !!process.env.SUPABASE_ANON_KEY,
+      SUPABASE_SERVICE_ROLE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+    },
     cors: {
       origin: req.headers.origin,
       allowed: allowedOrigins
