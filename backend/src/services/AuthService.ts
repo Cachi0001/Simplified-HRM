@@ -38,13 +38,16 @@ export class AuthService {
       departmentId: data.departmentId
     });
 
-    // Send combined welcome + verification email
+    // Optimized: Send emails asynchronously without blocking the response
+    // This makes signup much faster for the user
     if (user.verification_token) {
-      await this.emailService.sendWelcomeAndVerificationEmail(data.email, data.fullName, user.verification_token);
+      this.emailService.sendWelcomeAndVerificationEmail(data.email, data.fullName, user.verification_token)
+        .catch(err => console.error('Failed to send verification email:', err));
     }
 
-    // Notify all admins, HR, and superadmins
-    await this.notifyAdminsOfNewEmployee(data.fullName, data.email);
+    // Notify admins asynchronously (don't wait for this to complete)
+    this.notifyAdminsOfNewEmployee(data.fullName, data.email)
+      .catch(err => console.error('Failed to notify admins:', err));
 
     return { message: 'Registration successful. Please check your email for verification link.' };
   }

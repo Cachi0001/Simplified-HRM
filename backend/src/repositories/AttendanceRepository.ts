@@ -37,77 +37,35 @@ export interface ClockOutData {
 
 export class AttendanceRepository {
   async clockIn(data: ClockInData): Promise<Attendance> {
-    const today = new Date().toISOString().split('T')[0];
-    
-    const lateStatus = await pool.query(
-      'SELECT calculate_late_status($1) as result',
-      [new Date()]
-    );
-    
-    const lateInfo = lateStatus.rows[0].result;
-    
+    // Optimized: Use single database function call instead of multiple queries
     const result = await pool.query(
-      `INSERT INTO attendance (
-        employee_id, date, clock_in, 
-        clock_in_lat, clock_in_lng, clock_in_address,
-        is_late, late_minutes, status
-      ) VALUES ($1, $2, NOW(), $3, $4, $5, $6, $7, $8)
-      ON CONFLICT (employee_id, date) 
-      DO UPDATE SET 
-        clock_in = NOW(),
-        clock_in_lat = $3,
-        clock_in_lng = $4,
-        clock_in_address = $5,
-        is_late = $6,
-        late_minutes = $7,
-        status = $8,
-        updated_at = NOW()
-      RETURNING *`,
-      [
-        data.employee_id,
-        today,
-        data.lat,
-        data.lng,
-        data.address,
-        lateInfo.is_late,
-        lateInfo.late_minutes,
-        lateInfo.is_late ? 'late' : 'present'
-      ]
+      'SELECT optimized_clock_in($1, $2, $3, $4) as result',
+      [data.employee_id, data.lat, data.lng, data.address || null]
     );
     
-    return result.rows[0];
+    const response = result.rows[0].result;
+    
+    if (!response.success) {
+      throw new Error(response.message || 'Clock-in failed');
+    }
+    
+    return response.data;
   }
 
   async clockOut(data: ClockOutData): Promise<Attendance> {
-    const today = new Date().toISOString().split('T')[0];
-    
-    const attendance = await pool.query(
-      'SELECT * FROM attendance WHERE employee_id = $1 AND date = $2',
-      [data.employee_id, today]
+    // Optimized: Use single database function call instead of multiple queries
+    const result = await pool.query(
+      'SELECT optimized_clock_out($1, $2, $3, $4) as result',
+      [data.employee_id, data.lat, data.lng, data.address || null]
     );
     
-    if (!attendance.rows[0]) {
-      throw new Error('No clock-in record found for today');
+    const response = result.rows[0].result;
+    
+    if (!response.success) {
+      throw new Error(response.message || 'Clock-out failed');
     }
     
-    const clockInTime = new Date(attendance.rows[0].clock_in);
-    const clockOutTime = new Date();
-    const hoursWorked = (clockOutTime.getTime() - clockInTime.getTime()) / (1000 * 60 * 60);
-    
-    const result = await pool.query(
-      `UPDATE attendance 
-       SET clock_out = NOW(),
-           clock_out_lat = $1,
-           clock_out_lng = $2,
-           clock_out_address = $3,
-           hours_worked = $4,
-           updated_at = NOW()
-       WHERE employee_id = $5 AND date = $6
-       RETURNING *`,
-      [data.lat, data.lng, data.address, hoursWorked.toFixed(2), data.employee_id, today]
-    );
-    
-    return result.rows[0];
+    return response.data;
   }
 
   async getMyRecords(employeeId: string, startDate?: Date, endDate?: Date): Promise<Attendance[]> {
@@ -126,11 +84,10 @@ export class AttendanceRepository {
   }
 
   async getTodayAttendance(employeeId: string): Promise<Attendance | null> {
-    const today = new Date().toISOString().split('T')[0];
-    
+    // Optimized: Use dedicated function for today's attendance lookup
     const result = await pool.query(
-      'SELECT * FROM attendance WHERE employee_id = $1 AND date = $2',
-      [employeeId, today]
+      'SELECT * FROM get_today_attendance($1)',
+      [employeeId]
     );
     
     return result.rows[0] || null;
