@@ -69,12 +69,13 @@ export function TeamLeadTasks({ currentUser, darkMode }: TeamLeadTasksProps) {
 
   const loadTeamEmployees = async () => {
     try {
-      const response = await apiClient.get(`/departments/${currentUser.department_id}/employees`);
+      const response = await apiClient.get('/employees/for-tasks');
       if (response.status === 'success' && response.data) {
         const responseData = response.data as { data?: any[] };
         setEmployees(responseData.data || []);
       }
     } catch (error) {
+      console.error('Failed to load employees:', error);
       addToast('error', 'Failed to load team employees');
     }
   };
