@@ -2,7 +2,7 @@ import { transporter, emailConfig } from '../config/email';
 
 export class EmailService {
   private readonly frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-  private readonly productionUrl = process.env.PRODUCTION_FRONTEND_URL || 'https://go3net.com';
+  private readonly productionUrl = process.env.FRONTEND_URL_PROD || process.env.PRODUCTION_FRONTEND_URL || 'https://go3net.vercel.app';
 
   private getBaseUrl(): string {
     return process.env.NODE_ENV === 'production' ? this.productionUrl : this.frontendUrl;
