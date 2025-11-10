@@ -20,26 +20,11 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "backend/api/index.ts",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, Accept",
-        "Access-Control-Allow-Credentials": "true"
-      }
+      "dest": "backend/api/index.ts"
     },
     {
       "src": "/(.*)",
-      "dest": "frontend/dist/index.html"
-    }
-  ],
-  "env": {
-    "NODE_ENV": "production"
-  },
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "backend/api/index.ts"
+      "dest": "frontend/dist/$1"
     }
   ]
 }
