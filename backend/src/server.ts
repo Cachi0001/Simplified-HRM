@@ -15,6 +15,7 @@ import attendanceRoutes from './routes/attendance.routes';
 import taskRoutes from './routes/task.routes';
 import dashboardRoutes from './routes/dashboard.routes';
 import notificationRoutes from './routes/notification.routes';
+import performanceRoutes from './routes/performance.routes';
 import cronService from './services/CronService';
 
 dotenv.config();
@@ -138,6 +139,7 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/performance', performanceRoutes);
 
 app.use(errorHandler);
 

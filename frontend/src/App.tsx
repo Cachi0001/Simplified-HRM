@@ -17,7 +17,7 @@ import { LeaveRequestsPage } from './pages/LeaveRequestsPage';
 import { PurchaseRequestsPage } from './pages/PurchaseRequestsPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { EmployeeManagementPage } from './pages/EmployeeManagementPage';
-import PerformanceMetrics from './pages/PerformanceMetrics';
+import PerformanceMetricsPage from './pages/PerformanceMetricsPage';
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
 import { ToastProvider } from './components/ui/Toast';
@@ -148,7 +148,7 @@ function AppContent() {
           } />
           <Route path="/performance-metrics" element={
             <ProtectedRoute>
-              <PerformanceMetrics />
+              <PerformanceMetricsPage />
             </ProtectedRoute>
           } />
           <Route path="/api-test" element={<ApiConnectionTest />} />
