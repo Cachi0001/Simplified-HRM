@@ -141,18 +141,33 @@ app.use('/api/notifications', notificationRoutes);
 
 app.use(errorHandler);
 
-// Initialize database connection
-testConnection().then((connected) => {
-  if (!connected) {
-    console.warn('⚠️ Database not connected, but server will start anyway');
-  } else {
-    console.log('✅ Database connected successfully');
-    // Start cron jobs only if database is connected and not in serverless
-    if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
-      cronService.start();
+// Initialize database connection with retry for serverless cold starts
+const initializeDatabase = async () => {
+  try {
+    const connected = await testConnection();
+    if (!connected) {
+      console.warn('⚠️ Database not connected, but server will start anyway');
+    } else {
+      console.log('✅ Database connected successfully');
+      // Start cron jobs only if database is connected and not in serverless
+      if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+        cronService.start();
+      }
     }
+  } catch (error: any) {
+    console.error('❌ Database connection error:', error.message);
+    console.warn('⚠️ Server will start anyway, database will connect on first request');
   }
-});
+};
+
+// Don't block startup on database connection in serverless
+if (process.env.VERCEL) {
+  // In Vercel, initialize async without blocking
+  initializeDatabase().catch(console.error);
+} else {
+  // In local/traditional hosting, wait for connection
+  initializeDatabase();
+}
 
 // Only start server if not in serverless environment
 if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
