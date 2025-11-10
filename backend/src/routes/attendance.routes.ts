@@ -15,4 +15,6 @@ router.get('/my-records', attendanceController.getMyRecords);
 
 router.get('/today', attendanceController.getTodayStatus);
 
+router.get('/report', attendanceController.getAttendanceReport);
+
 export default router;

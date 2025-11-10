@@ -88,4 +88,8 @@ export class AttendanceService {
   async getTodayStatus(employeeId: string): Promise<Attendance | null> {
     return await this.attendanceRepo.getTodayAttendance(employeeId);
   }
+
+  async getAttendanceReport(employeeId?: string, startDate?: Date, endDate?: Date): Promise<any[]> {
+    return await this.attendanceRepo.getAttendanceReport(employeeId, startDate, endDate);
+  }
 }

@@ -156,11 +156,11 @@ class AttendanceService {
   }
 
   /**
-   * Check if today is a working day (Monday to Saturday)
+   * Check if today is a working day (Monday to Friday)
    */
   private isWorkingDay(date: Date = new Date()): boolean {
     const day = date.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-    return day >= 1 && day <= 6; // Monday to Saturday
+    return day >= 1 && day <= 5; // Monday to Friday
   }
 
   /**
@@ -170,7 +170,7 @@ class AttendanceService {
     try {
       // Check if it's a working day
       if (!this.isWorkingDay()) {
-        throw new Error('Check-in is only allowed on working days (Monday to Saturday)');
+        throw new Error('Check-in is only allowed on working days (Monday to Friday)');
       }
 
       // Get current location if not provided
@@ -197,7 +197,7 @@ class AttendanceService {
     try {
       // Check if it's a working day
       if (!this.isWorkingDay()) {
-        throw new Error('Check-out is only allowed on working days (Monday to Saturday)');
+        throw new Error('Check-out is only allowed on working days (Monday to Friday)');
       }
 
       // Get current location if not provided
@@ -272,6 +272,24 @@ class AttendanceService {
   }
 
   /**
+   * Get attendance report for admin (all employees or specific employee)
+   */
+  async getAttendanceReport(employeeId?: string, startDate?: Date, endDate?: Date): Promise<any[]> {
+    try {
+      const params = new URLSearchParams();
+      if (employeeId) params.append('employee_id', employeeId);
+      if (startDate) params.append('start_date', startDate.toISOString().split('T')[0]);
+      if (endDate) params.append('end_date', endDate.toISOString().split('T')[0]);
+
+      const response = await api.get(`/attendance/report?${params.toString()}`);
+      return response.data.data || response.data || [];
+    } catch (error) {
+      console.error('Failed to get attendance report:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Request location permission
    */
   async requestLocationPermission(): Promise<boolean> {
@@ -304,7 +322,7 @@ class AttendanceService {
         return {
           canCheckIn: false,
           canCheckOut: false,
-          reason: 'Attendance actions are only allowed on working days (Monday to Saturday)'
+          reason: 'Attendance actions are only allowed on working days (Monday to Friday)'
         };
       }
 

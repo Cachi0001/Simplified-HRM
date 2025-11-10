@@ -21,20 +21,18 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
     queryKey: ['employees-for-attendance'],
     queryFn: async () => {
       const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-      const response = await employeeService.getAllEmployees();
-      const allEmployees = response.employees || response;
+      const allEmployees = await employeeService.getAllEmployees();
       
       // If Team Lead, only show their team members
       if (currentUser.role === 'teamlead') {
-        return allEmployees.filter((emp: any) => 
-          (emp.team_lead_id === currentUser.id || emp.manager_id === currentUser.id) &&
+        return allEmployees.filter((emp) => 
+          (emp.manager_id === currentUser.id) &&
           emp.role === 'employee'
         );
       }
       
       // For HR/Admin/SuperAdmin, filter out admin users
-      const nonAdminEmployees = allEmployees.filter((emp: any) => emp.role !== 'admin' && emp.role !== 'superadmin');
-      return nonAdminEmployees;
+      return allEmployees.filter((emp) => emp.role !== 'admin' && emp.role !== 'superadmin');
     },
   });
 
@@ -151,7 +149,7 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
                 <option value="">All Employees</option>
                 {employees.map(emp => (
                   <option key={emp.id} value={emp.id}>
-                    {emp.fullName} ({emp.department || 'No Department'})
+                    {emp.full_name} ({emp.department || 'No Department'})
                   </option>
                 ))}
               </select>

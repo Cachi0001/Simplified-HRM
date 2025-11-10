@@ -98,4 +98,26 @@ export class AttendanceController {
       next(error);
     }
   };
+
+  getAttendanceReport = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { employeeId, startDate, endDate } = req.query;
+
+      const start = startDate ? new Date(startDate as string) : undefined;
+      const end = endDate ? new Date(endDate as string) : undefined;
+
+      const report = await this.attendanceService.getAttendanceReport(
+        employeeId as string | undefined,
+        start,
+        end
+      );
+
+      res.json({
+        success: true,
+        data: report
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }

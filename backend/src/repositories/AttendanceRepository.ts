@@ -153,4 +153,59 @@ export class AttendanceRepository {
     
     return result.rows[0].result;
   }
+
+  async getAttendanceReport(employeeId?: string, startDate?: Date, endDate?: Date): Promise<any[]> {
+    const start = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const end = endDate || new Date();
+    
+    let query = `
+      SELECT 
+        a.id,
+        a.employee_id,
+        a.date,
+        a.clock_in,
+        a.clock_out,
+        a.hours_worked,
+        a.status,
+        a.is_late,
+        a.late_minutes,
+        e.full_name as employee_name,
+        e.department
+      FROM attendance a
+      LEFT JOIN employees e ON a.employee_id = e.id
+      WHERE a.date BETWEEN $1 AND $2
+    `;
+    
+    const params: any[] = [start, end];
+    
+    if (employeeId) {
+      query += ' AND a.employee_id = $3';
+      params.push(employeeId);
+    }
+    
+    query += ' ORDER BY a.date DESC, e.full_name ASC';
+    
+    const result = await pool.query(query, params);
+    
+    // Transform to match frontend expectations
+    return result.rows.map(row => ({
+      _id: {
+        employeeId: row.employee_id,
+        employeeName: row.employee_name,
+        date: row.date
+      },
+      employeeId: row.employee_id,
+      employeeName: row.employee_name,
+      department: row.department,
+      date: row.date,
+      checkInTime: row.clock_in,
+      checkOutTime: row.clock_out,
+      totalHours: row.hours_worked ? parseFloat(row.hours_worked) : 0,
+      status: row.clock_out ? 'checked_out' : 'checked_in',
+      isLate: row.is_late,
+      lateMinutes: row.late_minutes,
+      locationStatus: 'onsite', // Default, can be enhanced
+      distanceFromOffice: null
+    }));
+  }
 }

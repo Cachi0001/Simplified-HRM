@@ -48,8 +48,8 @@ export default function AttendanceReportPage({ darkMode: initialDarkMode = false
   const { data: employees = [], isLoading: employeesLoading } = useQuery({
     queryKey: ['employees'],
     queryFn: async () => {
-      const response = await employeeService.getAllEmployees();
-      return response.employees.filter((emp: any) => emp.role !== 'admin');
+      const allEmployees = await employeeService.getAllEmployees();
+      return allEmployees.filter((emp) => emp.role !== 'admin');
     },
     enabled: currentUser.role === 'admin',
   });
