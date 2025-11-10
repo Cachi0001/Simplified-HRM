@@ -215,6 +215,67 @@ export class NotificationService {
       console.error(`Failed to send email notification:`, error);
     }
   }
+
+  // Birthday notification methods
+  async sendBirthdayNotifications(): Promise<number> {
+    try {
+      const result = await pool.query(`SELECT send_birthday_notifications() as count`);
+      const count = parseInt(result.rows[0].count);
+
+      // Get celebrants and send emails
+      const celebrants = await pool.query(`SELECT * FROM get_employees_with_birthday_today()`);
+      
+      for (const celebrant of celebrants.rows) {
+        try {
+          // Send birthday email to celebrant
+          await this.emailService.sendBirthdayEmail(
+            celebrant.email,
+            celebrant.full_name,
+            celebrant.age
+          );
+
+          // Get all other employees to send announcement
+          const employees = await pool.query(
+            `SELECT e.email, e.full_name 
+             FROM employees e 
+             INNER JOIN users u ON e.user_id = u.id
+             WHERE e.status = 'active' 
+             AND u.is_active = TRUE 
+             AND e.id != $1`,
+            [celebrant.employee_id]
+          );
+
+          // Send birthday announcement to all employees
+          for (const employee of employees.rows) {
+            try {
+              await this.emailService.sendBirthdayAnnouncementEmail(
+                employee.email,
+                employee.full_name,
+                celebrant.full_name
+              );
+            } catch (error) {
+              console.error(`Failed to send birthday announcement to ${employee.email}:`, error);
+            }
+          }
+        } catch (error) {
+          console.error(`Failed to send birthday emails for ${celebrant.full_name}:`, error);
+        }
+      }
+
+      return count;
+    } catch (error) {
+      console.error('Error sending birthday notifications:', error);
+      throw error;
+    }
+  }
+
+  async getUpcomingBirthdays(daysAhead: number = 7) {
+    const result = await pool.query(
+      `SELECT * FROM get_upcoming_birthdays($1)`,
+      [daysAhead]
+    );
+    return result.rows;
+  }
 }
 
 export default new NotificationService();

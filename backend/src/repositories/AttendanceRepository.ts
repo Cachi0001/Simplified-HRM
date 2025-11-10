@@ -170,9 +170,10 @@ export class AttendanceRepository {
         a.is_late,
         a.late_minutes,
         e.full_name as employee_name,
-        e.department
+        d.name as department_name
       FROM attendance a
       LEFT JOIN employees e ON a.employee_id = e.id
+      LEFT JOIN departments d ON e.department_id = d.id
       WHERE a.date BETWEEN $1 AND $2
     `;
     
@@ -196,7 +197,7 @@ export class AttendanceRepository {
       },
       employeeId: row.employee_id,
       employeeName: row.employee_name,
-      department: row.department,
+      department: row.department_name,
       date: row.date,
       checkInTime: row.clock_in,
       checkOutTime: row.clock_out,

@@ -366,4 +366,87 @@ export class EmailService {
     
     await this.sendEmail(email, `New Announcement: ${title} - Go3net HR`, this.getEmailTemplate(emailContent));
   }
+
+  // Birthday email to celebrant
+  async sendBirthdayEmail(email: string, fullName: string, age: number): Promise<void> {
+    const emailContent = `
+      <div style="text-align: center; padding: 40px 20px;">
+        <div style="font-size: 80px; margin-bottom: 20px;">🎉🎂🎈</div>
+        <h1 style="color: #1e3a8a; font-size: 36px; margin-bottom: 20px;">
+          Happy Birthday ${fullName}!
+        </h1>
+        <p style="font-size: 24px; color: #3b82f6; margin-bottom: 30px;">
+          🎊 Celebrating ${age} amazing years! 🎊
+        </p>
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                    padding: 30px; 
+                    border-radius: 15px; 
+                    margin: 30px 0;
+                    color: white;">
+          <p style="font-size: 18px; line-height: 1.8; margin: 0;">
+            Wishing you a wonderful day filled with joy, laughter, and celebration! 🎉<br><br>
+            May this year bring you success, happiness, and all the things you've been dreaming of. 🌟<br><br>
+            Thank you for being an amazing part of our team! 💙
+          </p>
+        </div>
+        <p style="font-size: 16px; color: #64748b; margin-top: 30px;">
+          From all of us at Go3net HR Team 🎈
+        </p>
+      </div>
+    `;
+
+    await this.sendEmail(email, `🎉 Happy Birthday ${fullName}! 🎂`, this.getEmailTemplate(emailContent));
+  }
+
+  // Birthday announcement to other employees
+  async sendBirthdayAnnouncementEmail(email: string, recipientName: string, celebrantName: string): Promise<void> {
+    const emailContent = `
+      <div style="padding: 30px 20px;">
+        <div style="text-align: center; margin-bottom: 30px;">
+          <div style="font-size: 60px; margin-bottom: 15px;">🎂🎉</div>
+          <h2 style="color: #1e3a8a; font-size: 28px; margin-bottom: 10px;">
+            Birthday Celebration!
+          </h2>
+        </div>
+        
+        <p style="font-size: 16px; color: #1f2937; margin-bottom: 20px;">
+          Hi ${recipientName},
+        </p>
+        
+        <div style="background: #f0f9ff; 
+                    border-left: 4px solid #3b82f6; 
+                    padding: 20px; 
+                    border-radius: 8px;
+                    margin: 20px 0;">
+          <p style="font-size: 18px; color: #1e40af; margin: 0; font-weight: 500;">
+            🎈 It's <strong>${celebrantName}'s</strong> birthday today! 🎈
+          </p>
+        </div>
+        
+        <p style="font-size: 16px; color: #4b5563; line-height: 1.6;">
+          Let's make their day special! Take a moment to wish them a happy birthday and celebrate this special occasion together. 🎊
+        </p>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${this.getBaseUrl()}/employee-management" 
+             style="display: inline-block;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    padding: 15px 40px;
+                    text-decoration: none;
+                    border-radius: 8px;
+                    font-weight: 600;
+                    font-size: 16px;">
+            Send Birthday Wishes 🎉
+          </a>
+        </div>
+        
+        <p style="font-size: 14px; color: #9ca3af; text-align: center; margin-top: 30px;">
+          Celebrating together makes us stronger! 💙
+        </p>
+      </div>
+    `;
+
+    await this.sendEmail(email, `🎂 ${celebrantName}'s Birthday Today!`, this.getEmailTemplate(emailContent));
+  }
 }

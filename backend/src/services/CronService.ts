@@ -4,10 +4,12 @@ import notificationService from './NotificationService';
 export class CronService {
   private checkoutReminderJob: cron.ScheduledTask | null = null;
   private cleanupJob: cron.ScheduledTask | null = null;
+  private birthdayJob: cron.ScheduledTask | null = null;
 
   start(): void {
     this.startCheckoutReminderJob();
     this.startCleanupJob();
+    this.startBirthdayJob();
     console.log('✅ Cron jobs started');
   }
 
@@ -20,6 +22,10 @@ export class CronService {
     if (this.cleanupJob) {
       this.cleanupJob.stop();
       console.log('⏹️  Cleanup job stopped');
+    }
+    if (this.birthdayJob) {
+      this.birthdayJob.stop();
+      console.log('⏹️  Birthday job stopped');
     }
   }
 
@@ -60,6 +66,28 @@ export class CronService {
     console.log('✅ Notification cleanup job scheduled (Daily at 2:00 AM)');
   }
 
+  // Birthday notification job - runs daily at 9:00 AM
+  private startBirthdayJob(): void {
+    // 0 9 * * * = At 9:00 AM every day
+    this.birthdayJob = cron.schedule('0 9 * * *', async () => {
+      try {
+        console.log('🎂 Running birthday notification job...');
+        const count = await notificationService.sendBirthdayNotifications();
+        if (count > 0) {
+          console.log(`✅ Sent birthday notifications for ${count} celebrant(s)`);
+        } else {
+          console.log('ℹ️  No birthdays today');
+        }
+      } catch (error) {
+        console.error('❌ Error in birthday notification job:', error);
+      }
+    }, {
+      timezone: 'Africa/Lagos' // Adjust to your timezone
+    });
+
+    console.log('✅ Birthday notification job scheduled (Daily at 9:00 AM)');
+  }
+
   // Manual trigger for testing
   async triggerCheckoutReminder(): Promise<number> {
     console.log('🔔 Manually triggering checkout reminder...');
@@ -72,6 +100,13 @@ export class CronService {
     console.log('🧹 Manually triggering cleanup...');
     const count = await notificationService.cleanupOldNotifications(90);
     console.log(`✅ Cleaned up ${count} old notifications`);
+    return count;
+  }
+
+  async triggerBirthdayNotifications(): Promise<number> {
+    console.log('🎂 Manually triggering birthday notifications...');
+    const count = await notificationService.sendBirthdayNotifications();
+    console.log(`✅ Sent birthday notifications for ${count} celebrant(s)`);
     return count;
   }
 }
