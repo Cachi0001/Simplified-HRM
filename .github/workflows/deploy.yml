@@ -33,7 +33,7 @@ jobs:
       run: cd frontend && npm install
 
     - name: Install backend dependencies
-      run: cd backend/api && npm install
+      run: cd backend && npm install
 
     - name: Run frontend tests
       run: cd frontend && npm run test:run
@@ -50,8 +50,7 @@ jobs:
         ls -la backend/api/
         echo "Verifying critical files..."
         test -f vercel.json && echo "✅ vercel.json exists"
-        test -f backend/api/index.js && echo "✅ backend/api/index.js exists"
-        test -f backend/api/config/supabase.js && echo "✅ supabase config exists"
+        test -f backend/api/index.ts && echo "✅ backend/api/index.ts exists"
         test -f frontend/dist/index.html && echo "✅ frontend build exists"
 
   deploy-preview:
