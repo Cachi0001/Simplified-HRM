@@ -32,100 +32,28 @@ export function useChatUnreadCount(): UseChatUnreadCountReturn {
   const subscriptionRef = useRef<any>(null);
 
   const getTotalUnreadCount = useCallback(async () => {
-    try {
-      setError(null);
-      const response = await api.get('/chat/unread-count/total');
-      
-      if (response.data?.data?.unreadCount !== undefined) {
-        setTotalUnreadCount(response.data.data.unreadCount);
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to get total unread count';
-      setError(errorMessage);
-      // Silently fail - chat is optional
-    }
+    // Chat feature disabled
+    setTotalUnreadCount(0);
+    return;
   }, []);
 
   const getChatUnreadCount = useCallback(async (chatId: string): Promise<number> => {
-    try {
-      setError(null);
-      const response = await api.get(`/chat/${chatId}/unread-count`);
-      return response.data?.data?.unreadCount || 0;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to get chat unread count';
-      setError(errorMessage);
-      // Silently fail - chat is optional
-      return 0;
-    }
+    // Chat feature disabled
+    return 0;
   }, []);
 
   const getAllUnreadCounts = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      const response = await api.get('/chat/unread-counts');
-      
-      if (response.data?.data?.unreadCounts) {
-        // Ensure unreadCounts is an array
-        const counts = Array.isArray(response.data.data.unreadCounts) 
-          ? response.data.data.unreadCounts 
-          : [];
-        
-        setUnreadCounts(counts);
-        
-        // Calculate total - only if we have a valid array
-        const total = Array.isArray(counts) 
-          ? counts.reduce(
-              (sum: number, uc: UnreadCount) => sum + (uc.unread_count || 0),
-              0
-            )
-          : 0;
-        setTotalUnreadCount(total);
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to get unread counts';
-      // Don't set error state for endpoint not found - just log it
-      if (!errorMessage.includes('endpoint not found')) {
-        setError(errorMessage);
-      }
-      // Silently fail - chat is optional
-      // Set counts to empty array on error
-      setUnreadCounts([]);
-      setTotalUnreadCount(0);
-    } finally {
-      setIsLoading(false);
-    }
+    // Chat feature disabled - return early
+    setUnreadCounts([]);
+    setTotalUnreadCount(0);
+    setIsLoading(false);
+    return;
   }, []);
 
   const markChatAsRead = useCallback(async (chatId: string) => {
-    try {
-      setError(null);
-      await api.patch(`/chat/${chatId}/read`, {});
-      
-      // Update local state
-      setUnreadCounts(prev => {
-        if (!Array.isArray(prev)) return [];
-        return prev.map(uc =>
-          uc.chat_id === chatId
-            ? { ...uc, unread_count: 0 }
-            : uc
-        );
-      });
-      
-      // Recalculate total - ensure we have a valid array
-      const validCounts = Array.isArray(unreadCounts) ? unreadCounts : [];
-      const total = validCounts.reduce(
-        (sum, uc) => sum + (uc.chat_id === chatId ? 0 : uc.unread_count),
-        0
-      );
-      setTotalUnreadCount(total);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to mark chat as read';
-      setError(errorMessage);
-      // Silently fail - chat is optional
-      throw err;
-    }
-  }, [unreadCounts]);
+    // Chat feature disabled
+    return;
+  }, []);
 
   const refreshUnreadCounts = useCallback(async () => {
     await getAllUnreadCounts();
@@ -165,78 +93,9 @@ export function useChatUnreadCount(): UseChatUnreadCountReturn {
   }, []);
 
   const subscribeToRealtimeUpdates = useCallback(async () => {
-    try {
-      const { supabase } = await import('../lib/supabase');
-      if (subscriptionRef.current) {
-        // Already subscribed
-        return;
-      }
-
-      // Less noisy log
-      // console.debug('Subscribing to unread count updates');
-
-      const subscription = supabase
-        .channel('unread_counts')
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'chat_messages',
-          },
-          (payload: any) => {
-            // console.debug('New message - updating unread count');
-            incrementUnreadCount(payload.new.chat_id);
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'chat_unread_counts',
-          },
-          (payload: any) => {
-            // console.debug('Unread count updated');
-            const { chat_id, unread_count } = payload.new;
-            setUnreadCounts(prev => {
-              const existingIndex = prev.findIndex(uc => uc.chat_id === chat_id);
-              const updated = existingIndex >= 0
-                ? (() => { const copy = [...prev]; copy[existingIndex] = { chat_id, unread_count }; return copy; })()
-                : [...prev, { chat_id, unread_count }];
-              // Also update total based on updated array
-              const total = updated.reduce((sum, uc) => sum + (uc.unread_count || 0), 0);
-              setTotalUnreadCount(total);
-              return updated;
-            });
-          }
-        )
-        .subscribe(async (status: string) => {
-          // console.debug(`Unread count subscription status: ${status}`);
-          if (status === 'SUBSCRIBED') {
-            setIsRealTimeConnected(true);
-            setError(null);
-          } else if (status === 'CHANNEL_ERROR' || status === 'CLOSED') {
-            // Silently fail - chat is optional
-            setIsRealTimeConnected(false);
-            // Attempt a simple retry with backoff cap
-            setTimeout(() => {
-              // Only retry if not already subscribed
-              if (!subscriptionRef.current) {
-                subscribeToRealtimeUpdates();
-              }
-            }, 2000);
-          }
-        });
-
-      subscriptionRef.current = subscription;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      // Silently fail - chat is optional
-      setError(errorMessage);
-      setIsRealTimeConnected(false);
-    }
-  }, [incrementUnreadCount]);
+    // Chat feature disabled
+    return;
+  }, []);
 
   const unsubscribeFromRealtimeUpdates = useCallback(async () => {
     if (subscriptionRef.current) {
