@@ -67,15 +67,8 @@ app.use(cors({
   maxAge: 86400 // 24 hours
 }));
 
-// CORS preflight handler - Express 5 compatible
-app.options('/(.*)', (req, res) => {
-  console.log('🔄 CORS preflight from:', req.headers.origin);
-  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.sendStatus(200);
-});
+// CORS preflight is handled by the cors middleware above
+// No need for manual OPTIONS handler
 
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
