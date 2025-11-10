@@ -6,6 +6,9 @@ import { AdminTasks } from './AdminTasks';
 import { AdminAttendance } from './AdminAttendance';
 import { AdminLeaveRequests } from './AdminLeaveRequests';
 import { AdminEmployeeManagement } from './AdminEmployeeManagement';
+import { NotificationManager } from '../notifications/NotificationManager';
+import { ProfileCompletionModal } from '../profile/ProfileCompletionModal';
+import { useProfileCompletion } from '../../hooks/useProfileCompletion';
 
 const logger = console;
 
@@ -48,6 +51,7 @@ interface SuperAdminDashboardProps {
 }
 
 export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ darkMode = false }) => {
+  const { showModal, completionPercentage, closeModal } = useProfileCompletion();
   const [pendingEmployees, setPendingEmployees] = useState<PendingEmployee[]>([]);
   const [approvalHistory, setApprovalHistory] = useState<ApprovalHistoryByEmployee>({});
   const [loading, setLoading] = useState(true);
@@ -317,6 +321,16 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ darkMo
           <p>Last updated: {new Date().toLocaleTimeString()}</p>
         </div>
       </div>
+
+      {/* Notification Manager */}
+      <NotificationManager />
+
+      {/* Profile Completion Modal */}
+      <ProfileCompletionModal
+        completionPercentage={completionPercentage}
+        isOpen={showModal}
+        onClose={closeModal}
+      />
     </div>
   );
 };
