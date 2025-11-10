@@ -104,7 +104,7 @@ const NotificationUtils = {
     id: `signup-${employeeId}-${Date.now()}`,
     type: 'signup',
     priority: 'normal',
-    title: 'New Employee Signup',
+    title: 'New Staff Signup',
     message: `${employeeName} has signed up for an account`,
     timestamp: new Date(),
     read: false,

@@ -28,7 +28,7 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
     { value: 'admin', label: 'Admin' },
     { value: 'hr', label: 'HR' },
     { value: 'teamlead', label: 'Team Lead' },
-    { value: 'employee', label: 'Employee' }
+    { value: 'employee', label: 'Staff' }
   ];
 
   return (
@@ -121,7 +121,7 @@ export const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
         <div className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
           <span className="flex items-center">
             <Filter className="h-4 w-4 mr-1" />
-            Use filters to narrow down the employee list
+            Use filters to narrow down the staff list
           </span>
         </div>
       </div>

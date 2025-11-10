@@ -350,10 +350,10 @@ export default function HRDashboard() {
             </div>
             )}
 
-            {/* Pending Employee Approvals */}
+            {/* Pending Staff Approvals */}
             <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
               <h3 className={`text-xl font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                Pending Employee Approvals
+                Pending Staff Approvals
               </h3>
               <PendingApprovals darkMode={darkMode} />
             </div>

@@ -43,7 +43,7 @@ export function ApprovalModal({
       {
         value: 'employee',
         label: 'Staff',
-        description: 'Basic employee access with standard permissions',
+        description: 'Basic staff access with standard permissions',
         disabled: false,
         icon: User
       },
@@ -154,7 +154,7 @@ export function ApprovalModal({
           }`}>
           <div>
             <h2 className={`text-base font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-              Approve Employee
+              Approve Staff Member
             </h2>
           </div>
           <button
@@ -193,7 +193,7 @@ export function ApprovalModal({
                 <span className="font-medium">Access Restricted</span>
               </div>
               <p className="text-sm mt-1">
-                Only superadmin users can approve or reject superadmin employee registrations.
+                Only superadmin users can approve or reject superadmin staff registrations.
               </p>
             </div>
           ) : !showRejectForm ? (
@@ -319,7 +319,7 @@ export function ApprovalModal({
                 <textarea
                   value={rejectionReason}
                   onChange={(e) => setRejectionReason(e.target.value)}
-                  placeholder="Please provide a reason for rejecting this employee..."
+                  placeholder="Please provide a reason for rejecting this staff member..."
                   rows={4}
                   className={`w-full px-3 py-2 border rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 ${darkMode
                     ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'

@@ -325,7 +325,7 @@ export default function PerformanceMetrics() {
             <div className="flex items-center justify-between">
               <div>
                 <p className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                  Total Employees
+                  Total Staff
                 </p>
                 <p className={`text-3xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                   {filteredMetrics.length}

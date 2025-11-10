@@ -83,13 +83,13 @@ export const AdminEmployeeManagement = ({ darkMode }: AdminEmployeeManagementPro
       return response.data;
     },
     onSuccess: () => {
-      addToast('success', 'Employee approved successfully');
+      addToast('success', 'Staff member approved successfully');
       setShowApprovalModal(false);
       setSelectedEmployee(null);
       queryClient.invalidateQueries({ queryKey: ['employees-management'] });
     },
     onError: (error: any) => {
-      addToast('error', error.response?.data?.error?.message || error.response?.data?.message || 'Failed to approve employee');
+      addToast('error', error.response?.data?.error?.message || error.response?.data?.message || 'Failed to approve staff member');
     }
   });
 
@@ -102,13 +102,13 @@ export const AdminEmployeeManagement = ({ darkMode }: AdminEmployeeManagementPro
       return response.data;
     },
     onSuccess: () => {
-      addToast('success', 'Employee rejected');
+      addToast('success', 'Staff member rejected');
       setShowApprovalModal(false);
       setSelectedEmployee(null);
       queryClient.invalidateQueries({ queryKey: ['employees-management'] });
     },
     onError: (error: any) => {
-      addToast('error', error.response?.data?.error?.message || error.response?.data?.message || 'Failed to reject employee');
+      addToast('error', error.response?.data?.error?.message || error.response?.data?.message || 'Failed to reject staff member');
     }
   });
 
@@ -221,7 +221,7 @@ export const AdminEmployeeManagement = ({ darkMode }: AdminEmployeeManagementPro
       <div className="flex items-center space-x-2 mb-6">
         <Users size={24} className={darkMode ? 'text-purple-400' : 'text-purple-600'} />
         <h2 className={`text-2xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-          Employee Management
+          Staff Management
         </h2>
       </div>
 
@@ -255,7 +255,7 @@ export const AdminEmployeeManagement = ({ darkMode }: AdminEmployeeManagementPro
           <option value="all">All Roles</option>
           <option value="admin">Admin</option>
           <option value="hr">HR</option>
-          <option value="employee">Employee</option>
+          <option value="employee">Staff</option>
         </select>
 
         {/* Filter by Status */}
@@ -279,18 +279,18 @@ export const AdminEmployeeManagement = ({ darkMode }: AdminEmployeeManagementPro
           darkMode ? 'bg-gray-700' : 'bg-gray-100'
         }`}>
           <span className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-            {filteredEmployees.length} {filteredEmployees.length === 1 ? 'employee' : 'employees'}
+            {filteredEmployees.length} {filteredEmployees.length === 1 ? 'staff member' : 'staff members'}
           </span>
         </div>
       </div>
 
 
 
-      {/* Employee List */}
+      {/* Staff List */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[600px] overflow-y-auto">
         {filteredEmployees.length === 0 ? (
           <div className={`col-span-full text-center py-8 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-            <p>No employees found</p>
+            <p>No staff members found</p>
             <p className="text-sm mt-2">Try adjusting your filters</p>
           </div>
         ) : (

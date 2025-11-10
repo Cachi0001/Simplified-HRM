@@ -28,6 +28,7 @@ import ApiConnectionTest from './components/ApiConnectionTest';
 // import { FloatingChatWidget } from './components/chat/FloatingChatWidget'; // Temporarily hidden
 import { ChatDemo } from './components/demo/ChatDemo';
 import ErrorBoundary from './components/ErrorBoundary';
+import { ConnectionIndicator } from './components/ui/ConnectionIndicator';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -59,6 +60,7 @@ function AppContent() {
 
   return (
     <div className="flex flex-col min-h-screen bg-primary">
+      <ConnectionIndicator />
       {!isDashboardPage && <Header />}
       {/* Temporarily hidden - focusing on core functionality */}
       {/* {isAuthenticated && isDashboardPage && <FloatingChatWidget />} */}

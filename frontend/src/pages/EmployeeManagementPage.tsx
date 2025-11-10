@@ -252,14 +252,14 @@ export const EmployeeManagementPage: React.FC = () => {
               <div className="flex items-center ml-4">
                 <Users className={`h-8 w-8 mr-3 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`} />
                 <h1 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  Employee Management
+                  Staff Management
                 </h1>
               </div>
             </div>
 
             <div className="flex items-center space-x-4">
               <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                {filteredEmployees.length} of {employees.length} employees
+                {filteredEmployees.length} of {employees.length} staff members
               </span>
 
               <button
@@ -323,11 +323,11 @@ export const EmployeeManagementPage: React.FC = () => {
           </div>
         )}
 
-        {/* Employee Grid */}
+        {/* Staff Grid */}
         {filteredEmployees.length === 0 ? (
           <div className={`text-center py-12 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
             <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p className="text-lg">No employees found</p>
+            <p className="text-lg">No staff members found</p>
             <p className="text-sm">Try adjusting your search or filter criteria</p>
           </div>
         ) : (

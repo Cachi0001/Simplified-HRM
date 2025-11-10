@@ -204,7 +204,7 @@ export default function AdminDashboard() {
         {/* Pending Approvals */}
         <section className="mb-8">
           <h2 className={`text-2xl font-semibold mb-6 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-            Pending Employee Approvals
+            Pending Staff Approvals
           </h2>
           <PendingApprovals darkMode={darkMode} />
         </section>

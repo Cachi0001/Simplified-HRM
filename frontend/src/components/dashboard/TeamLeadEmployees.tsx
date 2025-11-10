@@ -77,11 +77,11 @@ export function TeamLeadEmployees({ currentUser, darkMode }: TeamLeadEmployeesPr
         <div className="flex items-center gap-2">
           <Users className="h-5 w-5 text-blue-600" />
           <h2 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-            Department Employees
+            Department Staff
           </h2>
         </div>
         <div className="text-sm text-gray-500">
-          {filteredEmployees.length} employee{filteredEmployees.length !== 1 ? 's' : ''}
+          {filteredEmployees.length} staff member{filteredEmployees.length !== 1 ? 's' : ''}
         </div>
       </div>
 
@@ -91,7 +91,7 @@ export function TeamLeadEmployees({ currentUser, darkMode }: TeamLeadEmployeesPr
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Search employees..."
+            placeholder="Search staff..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
@@ -103,13 +103,13 @@ export function TeamLeadEmployees({ currentUser, darkMode }: TeamLeadEmployeesPr
         </div>
       </div>
 
-      {/* Employees List */}
+      {/* Staff List */}
       <div className="space-y-3">
         {filteredEmployees.length === 0 ? (
           <div className="text-center py-8">
             <Users className="h-12 w-12 text-gray-400 mx-auto mb-3" />
             <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-              {searchQuery ? 'No employees found matching your search' : 'No employees in your department'}
+              {searchQuery ? 'No staff members found matching your search' : 'No staff members in your department'}
             </p>
           </div>
         ) : (

@@ -122,7 +122,7 @@ export function PendingApprovals({ darkMode = false }: PendingApprovalsProps) {
               <Check className={`w-6 h-6 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
             </div>
             <p className="font-medium">No pending approvals</p>
-            <p className="text-sm">All employee requests have been processed</p>
+            <p className="text-sm">All staff requests have been processed</p>
           </div>
         </div>
       </Card>

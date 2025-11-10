@@ -104,9 +104,9 @@ export function MoreSection({ darkMode = false, isOpen, onClose }: MoreSectionPr
     // Management Section (Admin/HR only)
     {
       icon: Users,
-      label: 'Employee Management',
+      label: 'Staff Management',
       path: '/employee-management',
-      description: 'Manage employee records and approvals',
+      description: 'Manage staff records and approvals',
       category: 'management',
       roles: ['superadmin', 'admin', 'hr']
     },
@@ -115,7 +115,7 @@ export function MoreSection({ darkMode = false, isOpen, onClose }: MoreSectionPr
       icon: BarChart3,
       label: 'Performance Metrics',
       path: '/performance-metrics',
-      description: 'View employee performance analytics',
+      description: 'View staff performance analytics',
       category: 'reports',
       roles: ['superadmin', 'admin', 'hr']
     },
@@ -274,7 +274,7 @@ export function MoreSection({ darkMode = false, isOpen, onClose }: MoreSectionPr
                 ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
                 : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
             }`}>
-              {currentUser?.role || 'Employee'}
+              {currentUser?.role || 'Staff'}
             </span>
           </div>
         </div>

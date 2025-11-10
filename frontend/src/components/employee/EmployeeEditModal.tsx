@@ -142,7 +142,7 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
         <div className={`px-6 py-4 border-b ${
           darkMode ? 'border-gray-700' : 'border-gray-200'
         }`}>
-          <h2 className="text-xl font-semibold">Edit Employee</h2>
+          <h2 className="text-xl font-semibold">Edit Staff Member</h2>
           <p className={`text-sm mt-1 ${
             darkMode ? 'text-gray-400' : 'text-gray-600'
           }`}>
@@ -312,7 +312,7 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
                     }`}
                   >
                     <option value="">Select Role</option>
-                    <option value="employee">Employee</option>
+                    <option value="employee">Staff</option>
                     <option value="teamlead">Team Lead</option>
                     <option value="hr">HR</option>
                     <option value="admin">Admin</option>
@@ -376,7 +376,7 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
                 <label className={`block text-sm font-medium mb-2 ${
                   darkMode ? 'text-gray-300' : 'text-gray-700'
                 }`}>
-                  Employee Status
+                  Staff Member Status
                 </label>
                 <select
                   name="status"
@@ -397,10 +397,10 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
                 <p className={`text-xs mt-1 ${
                   darkMode ? 'text-gray-400' : 'text-gray-600'
                 }`}>
-                  {formData.status === 'active' && 'Employee is active and can access the system'}
-                  {formData.status === 'pending' && 'Employee account is pending approval'}
-                  {formData.status === 'inactive' && 'Employee is temporarily inactive (account disabled)'}
-                  {formData.status === 'rejected' && 'Employee application was rejected'}
+                  {formData.status === 'active' && 'Staff member is active and can access the system'}
+                  {formData.status === 'pending' && 'Staff member account is pending approval'}
+                  {formData.status === 'inactive' && 'Staff member is temporarily inactive (account disabled)'}
+                  {formData.status === 'rejected' && 'Staff member application was rejected'}
                 </p>
               </div>
 
@@ -414,10 +414,10 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
                     : 'bg-blue-50 border-blue-400 text-blue-700'
                 }`}>
                   <p className="text-sm font-medium">
-                    {formData.status === 'rejected' && 'Warning: This will reject the employee\'s application.'}
-                    {formData.status === 'inactive' && 'This will temporarily disable the employee\'s account.'}
-                    {formData.status === 'active' && 'This will enable the employee\'s account.'}
-                    {formData.status === 'pending' && 'This will set the employee\'s account to pending approval.'}
+                    {formData.status === 'rejected' && 'Warning: This will reject the staff member\'s application.'}
+                    {formData.status === 'inactive' && 'This will temporarily disable the staff member\'s account.'}
+                    {formData.status === 'active' && 'This will enable the staff member\'s account.'}
+                    {formData.status === 'pending' && 'This will set the staff member\'s account to pending approval.'}
                   </p>
                 </div>
               )}
@@ -458,7 +458,7 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
               {/* Personal Information - Read Only */}
               <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700/50' : 'bg-blue-50'}`}>
                 <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                  📋 This information is managed by the employee and is read-only for administrators.
+                  📋 This information is managed by the staff member and is read-only for administrators.
                 </p>
               </div>
 
@@ -568,7 +568,7 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
                   }`}>
                     {employee.profile_completed 
                       ? '✓ Profile is complete' 
-                      : '⚠ Profile is incomplete - Employee should update their information'}
+                      : '⚠ Profile is incomplete - Staff member should update their information'}
                   </p>
                 </div>
               )}

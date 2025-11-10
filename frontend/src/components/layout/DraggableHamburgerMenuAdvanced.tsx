@@ -126,7 +126,7 @@ export function DraggableHamburgerMenuAdvanced({ darkMode = false }: DraggableHa
     },
     {
       icon: Users,
-      label: 'Employees',
+      label: 'Staff',
       onClick: () => {
         if (currentUser?.role === 'admin' || currentUser?.role === 'hr') {
           navigate('/employees');

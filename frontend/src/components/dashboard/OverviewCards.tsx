@@ -25,7 +25,7 @@ export function OverviewCards({ total, active, pending, darkMode = false }: Over
 
   const cards = [
     {
-      title: 'Total Employees',
+      title: 'Total Staff',
       value: total,
       icon: Users,
       color: darkMode ? 'text-blue-400' : 'text-blue-600',

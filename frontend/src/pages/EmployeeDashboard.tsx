@@ -249,7 +249,7 @@ export default function EmployeeDashboard() {
             <Logo className="h-8 w-auto" />
             <div>
               <h1 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                Employee Dashboard
+                Staff Dashboard
               </h1>
               <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                 Welcome back, {currentUser.fullName}
