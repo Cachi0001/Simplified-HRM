@@ -68,7 +68,7 @@ app.use(cors({
 }));
 
 // Additional CORS headers for preflight
-app.options('*', (req, res) => {
+app.options('/(.*)', (req, res) => {
   console.log('🔄 OPTIONS preflight request from:', req.headers.origin);
   res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
