@@ -45,7 +45,6 @@ export class AuthService {
         .catch(err => console.error('Failed to send verification email:', err));
     }
 
-    // Notify admins asynchronously (don't wait for this to complete)
     this.notifyAdminsOfNewEmployee(data.fullName, data.email)
       .catch(err => console.error('Failed to notify admins:', err));
 
