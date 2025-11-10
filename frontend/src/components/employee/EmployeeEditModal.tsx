@@ -56,6 +56,13 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
+    
+    // Prevent non-superadmin from changing role if employee is superadmin
+    if (name === 'role' && employee?.role === 'superadmin' && user?.role !== 'superadmin') {
+      setError('Only superadmin users can modify superadmin roles');
+      return;
+    }
+    
     setFormData(prev => ({
       ...prev,
       [name]: name === 'salary' ? (value ? parseFloat(value) : undefined) : value
@@ -65,6 +72,12 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
   const handleFieldsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!employee) return;
+
+    // Prevent non-superadmin from modifying superadmin employees
+    if (employee.role === 'superadmin' && user?.role !== 'superadmin') {
+      setError('You do not have permission to modify superadmin staff members');
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -94,6 +107,12 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
   const handleStatusSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!employee || !formData.status) return;
+
+    // Prevent non-superadmin from modifying superadmin employees
+    if (employee.role === 'superadmin' && user?.role !== 'superadmin') {
+      setError('You do not have permission to modify superadmin staff members');
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -149,6 +168,18 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
             Manage {employee.full_name}'s work information
           </p>
         </div>
+
+        {/* Superadmin Protection Warning */}
+        {employee.role === 'superadmin' && user?.role !== 'superadmin' && (
+          <div className="px-6 py-3 bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800">
+            <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
+              <span className="text-lg">🔒</span>
+              <p className="text-sm font-medium">
+                This is a superadmin account. Only superadmin users can modify superadmin staff members.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Employee Info */}
         <div className={`px-6 py-4 border-b ${
@@ -301,25 +332,47 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
                   }`}>
                     Role
                   </label>
-                  <select
-                    name="role"
-                    value={formData.role || ''}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      darkMode 
-                        ? 'bg-gray-700 border-gray-600 text-white' 
-                        : 'bg-white border-gray-300 text-gray-900'
-                    }`}
-                  >
-                    <option value="">Select Role</option>
-                    <option value="employee">Staff</option>
-                    <option value="teamlead">Team Lead</option>
-                    <option value="hr">HR</option>
-                    <option value="admin">Admin</option>
-                    {user?.role === 'superadmin' && (
-                      <option value="superadmin">Super Admin</option>
-                    )}
-                  </select>
+                  {employee?.role === 'superadmin' && user?.role !== 'superadmin' ? (
+                    // Disabled dropdown for superadmin employees when current user is not superadmin
+                    <div className="relative">
+                      <select
+                        name="role"
+                        value={formData.role || ''}
+                        disabled
+                        className={`w-full px-3 py-2 border rounded-md cursor-not-allowed opacity-60 ${
+                          darkMode 
+                            ? 'bg-gray-700 border-gray-600 text-white' 
+                            : 'bg-gray-100 border-gray-300 text-gray-500'
+                        }`}
+                      >
+                        <option value="superadmin">Super Admin</option>
+                      </select>
+                      <p className={`text-xs mt-1 ${darkMode ? 'text-red-400' : 'text-red-600'}`}>
+                        🔒 Only superadmin can modify superadmin roles
+                      </p>
+                    </div>
+                  ) : (
+                    // Normal dropdown for other roles
+                    <select
+                      name="role"
+                      value={formData.role || ''}
+                      onChange={handleInputChange}
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                        darkMode 
+                          ? 'bg-gray-700 border-gray-600 text-white' 
+                          : 'bg-white border-gray-300 text-gray-900'
+                      }`}
+                    >
+                      <option value="">Select Role</option>
+                      <option value="employee">Staff</option>
+                      <option value="teamlead">Team Lead</option>
+                      <option value="hr">HR</option>
+                      <option value="admin">Admin</option>
+                      {user?.role === 'superadmin' && (
+                        <option value="superadmin">Super Admin</option>
+                      )}
+                    </select>
+                  )}
                 </div>
 
                 {/* Salary */}
