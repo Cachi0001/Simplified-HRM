@@ -2,21 +2,27 @@
   "version": 2,
   "builds": [
     {
-      "src": "package.json",
+      "src": "frontend/package.json",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": "frontend/dist"
+        "distDir": "dist"
       }
     },
     {
-      "src": "backend/api/index.js",
+      "src": "backend/api/index.ts",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "backend/api/index.js"
+      "dest": "backend/api/index.ts",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, Accept",
+        "Access-Control-Allow-Credentials": "true"
+      }
     },
     {
       "src": "/(.*)",
@@ -27,17 +33,15 @@
     "NODE_ENV": "production"
   },
   "functions": {
-    "backend/api/index.js": {
-      "maxDuration": 30
+    "backend/api/index.ts": {
+      "maxDuration": 30,
+      "memory": 1024
     }
   },
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/backend/api/index.js"
+      "destination": "backend/api/index.ts"
     }
-  ],
-  "outputDirectory": "frontend/dist",
-  "buildCommand": "npm run vercel-build",
-  "installCommand": "npm install --no-optional"
+  ]
 }

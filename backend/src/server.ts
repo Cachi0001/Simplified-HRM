@@ -22,33 +22,88 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(helmet());
+// Allowed origins for CORS
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://go3nethrm.vercel.app',
+  'https://go3nethrm-backend.vercel.app',
+  process.env.FRONTEND_URL,
+  process.env.FRONTEND_URL_PROD,
+  process.env.FRONTEND_URL_CUSTOM,
+  'https://go3net.com',
+  'https://www.go3net.com',
+  'https://admin.go3net.com',
+  'https://app.go3net.com',
+  'https://hr.go3net.com',
+  'https://hrm.go3net.com'
+].filter(Boolean);
+
+// Enhanced CORS configuration with logging
 app.use(cors({
-  origin: [
-    process.env.FRONTEND_URL || 'http://localhost:5173',
-    process.env.FRONTEND_URL_PROD || '',
-    process.env.FRONTEND_URL_CUSTOM || '',
-    'https://go3net.com',
-    'https://www.go3net.com',
-    'https://admin.go3net.com',
-    'https://app.go3net.com',
-    'https://hr.go3net.com',
-    'https://hrm.go3net.com'
-  ].filter(Boolean),
+  origin: (origin, callback) => {
+    console.log('🌐 CORS Request from origin:', origin || 'no-origin');
+    
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) {
+      console.log('✅ CORS: Allowing request with no origin');
+      return callback(null, true);
+    }
+    
+    if (allowedOrigins.includes(origin)) {
+      console.log('✅ CORS: Origin allowed:', origin);
+      callback(null, true);
+    } else {
+      console.log('❌ CORS: Origin blocked:', origin);
+      console.log('📋 Allowed origins:', allowedOrigins);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  maxAge: 86400 // 24 hours
+}));
+
+// Additional CORS headers for preflight
+app.options('*', (req, res) => {
+  console.log('🔄 OPTIONS preflight request from:', req.headers.origin);
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.sendStatus(200);
+});
+
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(requestLogger);
 
+// Health check endpoint
 app.get('/api/health', (req, res) => {
+  console.log('🏥 Health check requested');
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV 
+    environment: process.env.NODE_ENV,
+    cors: {
+      origin: req.headers.origin,
+      allowed: allowedOrigins
+    }
+  });
+});
+
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({
+    message: 'Go3Net HRM API',
+    version: '1.0.0',
+    status: 'running'
   });
 });
 
@@ -65,19 +120,27 @@ app.use('/api/notifications', notificationRoutes);
 
 app.use(errorHandler);
 
+// Initialize database connection
 testConnection().then((connected) => {
   if (!connected) {
     console.warn('⚠️ Database not connected, but server will start anyway');
   } else {
-    // Start cron jobs only if database is connected
-    cronService.start();
+    console.log('✅ Database connected successfully');
+    // Start cron jobs only if database is connected and not in serverless
+    if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+      cronService.start();
+    }
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV}`);
-});
+// Only start server if not in serverless environment
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
+    console.log(`🔒 CORS enabled for:`, allowedOrigins);
+  });
+}
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
