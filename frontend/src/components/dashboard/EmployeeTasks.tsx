@@ -15,7 +15,6 @@ const fetchEmployeeTasks = async (employeeId: string) => {
   try {
     return await taskService.getMyTasks();
   } catch (error) {
-    console.error('Failed to fetch employee tasks:', error);
     return [];
   }
 };
@@ -41,7 +40,6 @@ export function EmployeeTasks({ employeeId, darkMode = false }: EmployeeTasksPro
     onError: (error: any) => {
       const message = error?.response?.data?.message || error?.message || 'Failed to update task status';
       addToast('error', message);
-      console.error('Task status update failed:', error);
     }
   });
 
@@ -116,8 +114,8 @@ export function EmployeeTasks({ employeeId, darkMode = false }: EmployeeTasksPro
                   </span>
                   {task.priority && (
                     <span className={`text-xs px-2 py-1 rounded ${
-                      task.priority === 'high' ? (darkMode ? 'bg-red-900 text-red-300' : 'bg-red-100 text-red-800') :
-                      task.priority === 'medium' ? (darkMode ? 'bg-yellow-900 text-yellow-300' : 'bg-yellow-100 text-yellow-800') :
+                      task.priority === 'urgent' ? (darkMode ? 'bg-red-900 text-red-300' : 'bg-red-100 text-red-800') :
+                      task.priority === 'normal' ? (darkMode ? 'bg-yellow-900 text-yellow-300' : 'bg-yellow-100 text-yellow-800') :
                       (darkMode ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-800')
                     }`}>
                       {task.priority.toUpperCase()} Priority

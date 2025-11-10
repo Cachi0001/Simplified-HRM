@@ -36,15 +36,15 @@ export function TeamLeadEmployees({ currentUser, darkMode }: TeamLeadEmployeesPr
       // Load employees from the team lead's department
       const response = await apiClient.get(`/employees/department/${currentUser?.department_id}`);
       
-      if (response.status === 'success') {
+      if (response.status === 'success' && response.data) {
         // Filter out the team lead themselves
-        const departmentEmployees = (response.data?.data || []).filter(
+        const responseData = response.data as { data?: Employee[] };
+        const departmentEmployees = (responseData.data || []).filter(
           (emp: Employee) => emp.id !== currentUser?.id && emp.role === 'employee'
         );
         setEmployees(departmentEmployees);
       }
     } catch (error) {
-      console.error('Failed to load department employees:', error);
       addToast('error', 'Failed to load department employees');
     } finally {
       setLoading(false);

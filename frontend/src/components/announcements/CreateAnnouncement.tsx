@@ -29,7 +29,7 @@ const CreateAnnouncement: React.FC<CreateAnnouncementProps> = ({
   const [formData, setFormData] = useState<CreateAnnouncementRequest>({
     title: '',
     content: '',
-    priority: 'medium',
+    priority: 'normal',
     target_type: 'all',
     target_ids: [],
     scheduled_at: undefined,

@@ -96,7 +96,7 @@ export const useAnnouncements = (initialFilters: AnnouncementFilters = {}) => {
   // Remove reaction
   const removeReaction = useCallback(async (announcementId: string, reactionType: string) => {
     try {
-      await announcementService.removeReaction(announcementId, reactionType);
+      await announcementService.removeReaction(announcementId);
       
       // Update local state optimistically
       setAnnouncements(prev => prev.map(announcement => {

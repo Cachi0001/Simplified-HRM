@@ -27,11 +27,11 @@ export function TeamLeadOverview({ currentUser, darkMode }: TeamLeadOverviewProp
       
       // Load team members
       const teamResponse = await apiClient.get(`/departments/${currentUser.department_id}/employees`);
-      const teamMembers = teamResponse.data || [];
+      const teamMembers: any[] = Array.isArray(teamResponse.data) ? teamResponse.data : [];
       
       // Load tasks assigned by this team lead
       const tasksResponse = await apiClient.get(`/tasks/assigned-by/${currentUser.id}`);
-      const tasks = tasksResponse.data || [];
+      const tasks: any[] = Array.isArray(tasksResponse.data) ? tasksResponse.data : [];
       
       // Calculate stats
       const activeTasks = tasks.filter((task: any) => 
@@ -48,10 +48,10 @@ export function TeamLeadOverview({ currentUser, darkMode }: TeamLeadOverviewProp
 
       // Load pending approvals (leave requests, etc.)
       const approvalsResponse = await apiClient.get(`/approvals/pending/${currentUser.id}`);
-      const pendingApprovals = approvalsResponse.data?.length || 0;
+      const pendingApprovals = Array.isArray(approvalsResponse.data) ? approvalsResponse.data.length : 0;
 
       setStats({
-        totalTeamMembers: teamMembers.length,
+        totalTeamMembers: teamMembers?.length,
         activeTasks,
         completedTasks,
         overdueTasks,

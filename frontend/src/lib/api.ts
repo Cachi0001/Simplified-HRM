@@ -225,7 +225,6 @@ api.interceptors.response.use(
     // CASE 0: HTML error responses (server returned HTML instead of JSON)
     if (error.response?.data && typeof error.response.data === 'string' && 
         error.response.data.includes('<!DOCTYPE html>')) {
-      console.error(`❌ HTML error response detected [${errorId}]:`, error.response.data.substring(0, 200));
       
       // Extract error message from HTML if possible
       const match = error.response.data.match(/<pre>(.*?)<\/pre>/);
@@ -253,7 +252,6 @@ api.interceptors.response.use(
     // Special handling for password reset endpoints
     if (error.config?.url?.includes('auth/reset-password/') ||
         error.config?.url?.includes('auth/forgot-password')) {
-      console.log(`🔑 Password reset request failed [${requestId}] [${errorId}]`);
     }
 
     // CASE 1: Network errors (no response from server)
@@ -271,13 +269,13 @@ api.interceptors.response.use(
       
       // Check for specific network error types
       if (error.message.includes('Network Error') || error.message.includes('ERR_NETWORK')) {
-        error.message = `🌐 No internet connection detected. Please check your network and try again. (Error ID: ${errorId})`;
+        error.message = `🌐 No internet connection detected. Please check your network and try again.`;
       } else if (error.message.includes('timeout') || error.code === 'ECONNABORTED') {
-        error.message = `⏰ Request timed out. The server is taking too long to respond. Please check your connection and try again. (Error ID: ${errorId})`;
+        error.message = `⏰ Request timed out. The server is taking too long to respond. Please check your connection and try again.`;
       } else if (error.message.includes('CORS')) {
-        error.message = `🔒 Cross-origin request blocked. This is a technical issue. Please contact support with Error ID: ${errorId}`;
+        error.message = `🔒 Cross-origin request blocked. This is a technical issue. Please contact support `;
       } else {
-        error.message = `🌐 Network error occurred. Please check your internet connection and try again. (Error ID: ${errorId})`;
+        error.message = `🌐 Network error occurred. Please check your internet connection and try again.`;
       }
       return Promise.reject(error);
     }
@@ -289,7 +287,6 @@ api.interceptors.response.use(
       // Check if this is the common "Unexpected token 'T', 'The page c'" error
       // which happens when HTML is returned instead of JSON
       if (error.message.includes("Unexpected token 'T', 'The page c'")) {
-        console.log(`🔍 Detected HTML response instead of JSON [${errorId}]`);
         error.message = `The server returned an HTML page instead of JSON data. This usually means the server is not running correctly or the API endpoint is incorrect. Please try again later or contact support with Error ID: ${errorId}`;
       } else {
         // For other JSON parse errors
@@ -325,14 +322,12 @@ api.interceptors.response.use(
       // Check for email verification error
       if (error.response?.data?.message?.includes('verify your email') ||
           error.response?.data?.errorType === 'email_not_confirmed') {
-        console.log(`🔑 Login attempt with unverified email [${requestId}]`);
         error.message = 'Please verify your email address before logging in.';
         return Promise.reject(error);
       }
 
       // Check for pending approval
       if (error.response?.data?.message?.includes('pending approval')) {
-        console.log(`🔑 Login attempt with pending approval [${requestId}]`);
         error.message = 'Your account is pending admin approval. Please wait for approval email.';
         return Promise.reject(error);
       }

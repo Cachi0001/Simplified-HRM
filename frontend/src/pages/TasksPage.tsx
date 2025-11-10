@@ -146,22 +146,41 @@ export function TasksPage() {
     const highlightId = sessionStorage.getItem('highlight_id');
     const highlightType = sessionStorage.getItem('highlight_type');
     
-    if (highlightId && highlightType === 'task' && (myTasks.length > 0 || assignedTasks.length > 0)) {
-      setTimeout(() => {
-        const element = document.getElementById(`task-card-${highlightId}`);
-        if (element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          element.classList.add('ring-4', 'ring-blue-500', 'ring-opacity-50', 'transition-all');
-          
-          setTimeout(() => {
-            element.classList.remove('ring-4', 'ring-blue-500', 'ring-opacity-50');
+    if (highlightId && highlightType === 'task') {
+      // Check if this is a task assigned TO me (employee receiving notification)
+      const isAssignedToMe = myTasks.some((task: any) => task.id === highlightId);
+      const isAssignedByMe = assignedTasks.some((task: any) => task.id === highlightId);
+      
+      // Switch to the appropriate tab
+      if (isAssignedToMe && activeTab !== 'assigned-to-me') {
+        setActiveTab('assigned-to-me');
+      } else if (isAssignedByMe && activeTab !== 'i-assigned') {
+        setActiveTab('i-assigned');
+      }
+      
+      // Wait for tab switch and tasks to render, then highlight
+      if (isAssignedToMe || isAssignedByMe) {
+        setTimeout(() => {
+          const element = document.getElementById(`task-card-${highlightId}`);
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            element.classList.add('ring-4', 'ring-blue-500', 'ring-opacity-50', 'transition-all');
+            
+            setTimeout(() => {
+              element.classList.remove('ring-4', 'ring-blue-500', 'ring-opacity-50');
+              sessionStorage.removeItem('highlight_id');
+              sessionStorage.removeItem('highlight_type');
+            }, 3000);
+          } else {
+            // If element not found, clear the session storage to avoid infinite loop
+            console.warn('Task card not found for highlight:', highlightId);
             sessionStorage.removeItem('highlight_id');
             sessionStorage.removeItem('highlight_type');
-          }, 3000);
-        }
-      }, 500);
+          }
+        }, 800); // Increased delay to allow tab switch animation
+      }
     }
-  }, [myTasks, assignedTasks]);
+  }, [myTasks, assignedTasks, activeTab]);
 
   // Delete task mutation
   const deleteTaskMutation = useMutation({

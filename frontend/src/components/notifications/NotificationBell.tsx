@@ -3,8 +3,13 @@ import { Bell, X, CheckCheck, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { notificationService } from '@/services/notificationService';
 import { Go3netNotification } from '@/types/notification';
+import { useTheme } from '@/contexts/ThemeContext';
 
-export const NotificationBell: React.FC = () => {
+interface NotificationBellProps {
+  darkMode?: boolean;
+}
+
+export const NotificationBell: React.FC<NotificationBellProps> = ({ darkMode: propDarkMode }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Go3netNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -12,28 +17,9 @@ export const NotificationBell: React.FC = () => {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   
-  // Get dark mode from localStorage
-  const [darkMode, setDarkMode] = useState(() => {
-    const saved = localStorage.getItem('darkMode');
-    return saved ? JSON.parse(saved) : false;
-  });
-
-  // Listen for dark mode changes
-  useEffect(() => {
-    const handleStorageChange = () => {
-      const saved = localStorage.getItem('darkMode');
-      setDarkMode(saved ? JSON.parse(saved) : false);
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    // Also listen for custom dark mode toggle event
-    window.addEventListener('darkModeToggle', handleStorageChange);
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('darkModeToggle', handleStorageChange);
-    };
-  }, []);
+  // Use prop if provided, otherwise use theme context
+  const { darkMode: contextDarkMode } = useTheme();
+  const darkMode = propDarkMode !== undefined ? propDarkMode : contextDarkMode;
 
   useEffect(() => {
     loadNotifications();

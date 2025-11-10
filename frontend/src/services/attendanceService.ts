@@ -277,11 +277,14 @@ class AttendanceService {
   async getAttendanceReport(employeeId?: string, startDate?: Date, endDate?: Date): Promise<any[]> {
     try {
       const params = new URLSearchParams();
-      if (employeeId) params.append('employee_id', employeeId);
-      if (startDate) params.append('start_date', startDate.toISOString().split('T')[0]);
-      if (endDate) params.append('end_date', endDate.toISOString().split('T')[0]);
+      if (employeeId) params.append('employeeId', employeeId);
+      if (startDate) params.append('startDate', startDate.toISOString().split('T')[0]);
+      if (endDate) params.append('endDate', endDate.toISOString().split('T')[0]);
 
-      const response = await api.get(`/attendance/report?${params.toString()}`);
+      const queryString = params.toString();
+      const url = queryString ? `/attendance/report?${queryString}` : '/attendance/report';
+      
+      const response = await api.get(url);
       return response.data.data || response.data || [];
     } catch (error) {
       console.error('Failed to get attendance report:', error);

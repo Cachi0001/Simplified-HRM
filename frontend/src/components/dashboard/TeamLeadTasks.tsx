@@ -56,11 +56,11 @@ export function TeamLeadTasks({ currentUser, darkMode }: TeamLeadTasksProps) {
     try {
       setLoading(true);
       const response = await apiClient.get('/tasks/assigned-by-me');
-      if (response.status === 'success') {
-        setTasks(response.data?.data || []);
+      if (response.status === 'success' && response.data) {
+        const responseData = response.data as { data?: any[] };
+        setTasks(responseData.data || []);
       }
     } catch (error) {
-      console.error('Failed to load tasks:', error);
       addToast('error', 'Failed to load tasks');
     } finally {
       setLoading(false);
@@ -70,11 +70,11 @@ export function TeamLeadTasks({ currentUser, darkMode }: TeamLeadTasksProps) {
   const loadTeamEmployees = async () => {
     try {
       const response = await apiClient.get(`/departments/${currentUser.department_id}/employees`);
-      if (response.status === 'success') {
-        setEmployees(response.data?.data || []);
+      if (response.status === 'success' && response.data) {
+        const responseData = response.data as { data?: any[] };
+        setEmployees(responseData.data || []);
       }
     } catch (error) {
-      console.error('Failed to load team employees:', error);
       addToast('error', 'Failed to load team employees');
     }
   };
@@ -105,7 +105,6 @@ export function TeamLeadTasks({ currentUser, darkMode }: TeamLeadTasksProps) {
         loadTasks();
       }
     } catch (error) {
-      console.error('Failed to create task:', error);
       addToast('error', 'Failed to create task');
     }
   };
@@ -118,7 +117,6 @@ export function TeamLeadTasks({ currentUser, darkMode }: TeamLeadTasksProps) {
         loadTasks();
       }
     } catch (error) {
-      console.error('Failed to update task:', error);
       addToast('error', 'Failed to update task');
     }
   };

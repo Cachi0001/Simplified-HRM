@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { attendanceService } from '../services/attendanceService';
 import { employeeService } from '../services/employeeService';
@@ -12,22 +12,10 @@ import { DarkModeToggle } from '../components/ui/DarkModeToggle';
 import { NotificationBell } from '../components/notifications/NotificationBell';
 import { BottomNavbar } from '../components/layout/BottomNavbar';
 import { useTokenValidation } from '../hooks/useTokenValidation';
+import { useTheme } from '../contexts/ThemeContext';
 
-interface AttendanceReportPageProps {
-  darkMode?: boolean;
-}
-
-export default function AttendanceReportPage({ darkMode: initialDarkMode = false }: AttendanceReportPageProps) {
-  const [darkMode, setDarkMode] = useState(() => {
-    // Load dark mode preference from localStorage
-    const saved = localStorage.getItem('darkMode');
-    return saved ? JSON.parse(saved) : initialDarkMode;
-  });
-
-  // Save dark mode preference whenever it changes
-  useEffect(() => {
-    localStorage.setItem('darkMode', JSON.stringify(darkMode));
-  }, [darkMode]);
+export default function AttendanceReportPage() {
+  const { darkMode, setDarkMode } = useTheme();
 
   const [selectedEmployee, setSelectedEmployee] = useState<string>('');
   const [startDate, setStartDate] = useState<string>('');
@@ -250,8 +238,11 @@ export default function AttendanceReportPage({ darkMode: initialDarkMode = false
               ))}
             </div>
           ) : report && report.length > 0 ? (
-            report.map((record: any, index: number) => (
-              <Card key={index} className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+            <div className="space-y-4">
+              {report.map((record: any, index: number) => {
+                const uniqueKey = `${record?.employeeId || record?._id?.employeeId || 'unknown'}-${record?.date || record?._id?.date || index}`;
+                return (
+                <Card key={uniqueKey} className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
                 <div className="p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -306,7 +297,9 @@ export default function AttendanceReportPage({ darkMode: initialDarkMode = false
                   </div>
                 </div>
               </Card>
-            ))
+            );
+            })}
+            </div>
           ) : (
             <Card className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
               <div className={`p-8 text-center ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>

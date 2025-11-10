@@ -36,82 +36,41 @@ export const AdminEmployeeManagement = ({ darkMode }: AdminEmployeeManagementPro
     queryKey: ['employees-management'],
     queryFn: async () => {
       try {
-        console.log('🔍 Making API call to /employees...');
-        console.log('🔑 Auth token:', localStorage.getItem('accessToken') ? 'Present' : 'Missing');
-        
         const response = await api.get('/employees?limit=100');
-        console.log('📡 API Response received:', {
-          status: response.status,
-          statusText: response.statusText,
-          dataKeys: Object.keys(response.data || {}),
-          dataType: typeof response.data,
-          isArray: Array.isArray(response.data)
-        });
-        
-        // Log the actual structure
-        console.log('📊 Full response.data:', response.data);
       
         // Handle different response structures
         let employeesData = [];
         if (response.data?.data && Array.isArray(response.data.data)) {
-          // Standard API format: { status: 'success', data: [...] }
           employeesData = response.data.data;
-          console.log('✅ Using response.data.data format');
         } else if (Array.isArray(response.data)) {
-          // Direct array format
           employeesData = response.data;
-          console.log('✅ Using direct array format');
         } else {
-          console.log('❌ Unexpected response format:', response.data);
           employeesData = [];
         }
         
-        console.log('📋 Processed employees data:', {
-          count: employeesData.length,
-          firstEmployee: employeesData[0],
-          sample: employeesData.slice(0, 2)
-        });
-        
         // Validate and normalize employee data
         const normalizedEmployees = employeesData.filter((emp: any) => {
-          const hasId = emp && (emp.id || emp._id);
-          if (!hasId) {
-            console.log('⚠️ Employee missing ID:', emp);
-          }
-          return hasId;
-        }).map((emp: any) => {
-          const normalized = {
-            id: emp.id || emp._id || '',
-            fullName: emp.full_name || emp.fullName || '',
-            email: emp.email || '',
-            phone: emp.phone || '',
-            department: emp.department || '',
-            role: emp.role || 'employee',
-            status: emp.status || 'pending',
-            hireDate: emp.hire_date || emp.hireDate || emp.created_at || emp.createdAt || new Date().toISOString(),
-            createdAt: emp.created_at || emp.createdAt || new Date().toISOString(),
-            profilePicture: emp.profile_picture || emp.profilePicture || undefined
-        };
-        console.log('Normalized employee:', { original: emp, normalized });
-        return normalized;
-      });
+          return emp && (emp.id || emp._id);
+        }).map((emp: any) => ({
+          id: emp.id || emp._id || '',
+          fullName: emp.full_name || emp.fullName || '',
+          email: emp.email || '',
+          phone: emp.phone || '',
+          department: emp.department || '',
+          role: emp.role || 'employee',
+          status: emp.status || 'pending',
+          hireDate: emp.hire_date || emp.hireDate || emp.created_at || emp.createdAt || new Date().toISOString(),
+          createdAt: emp.created_at || emp.createdAt || new Date().toISOString(),
+          profilePicture: emp.profile_picture || emp.profilePicture || undefined
+        }));
       
-      console.log('Normalized employees:', normalizedEmployees);
       return normalizedEmployees;
       } catch (apiError) {
-        console.error('API call failed:', apiError);
         throw apiError;
       }
     },
     retry: 1,
-    staleTime: 0, // Always fetch fresh data for debugging
-    onError: (error) => {
-      console.error('❌ Employee query failed:', error);
-      addToast('error', `Failed to load employees: ${error.message}`);
-    },
-    onSuccess: (data) => {
-      console.log('✅ Employee query succeeded:', { count: data?.length, data });
-    }
+    staleTime: 0
   });
 
   // Approve employee with role mutation
@@ -153,32 +112,18 @@ export const AdminEmployeeManagement = ({ darkMode }: AdminEmployeeManagementPro
     }
   });
 
-  // Filter and search employees - SIMPLIFIED FOR DEBUGGING
+  // Filter and search employees
   const filteredEmployees = useMemo(() => {
-    console.log('=== FILTERING DEBUG ===');
-    console.log('Raw employees:', employees);
-    console.log('Employees count:', employees?.length);
-    console.log('Is array?', Array.isArray(employees));
-    
     if (!Array.isArray(employees)) {
-      console.log('❌ Employees is not an array, returning empty');
       return [];
     }
     
     if (employees.length === 0) {
-      console.log('❌ Employees array is empty');
       return [];
     }
     
-    // For debugging, let's just return all employees without filtering
-    console.log('✅ Returning all employees for debugging');
-    return employees;
-    
-    // Original filtering logic (commented out for debugging)
-    /*
     const filtered = employees.filter((emp: Employee) => {
       if (!emp || typeof emp !== 'object') {
-        console.log('Invalid employee object:', emp);
         return false;
       }
       
@@ -193,11 +138,11 @@ export const AdminEmployeeManagement = ({ darkMode }: AdminEmployeeManagementPro
     });
     
     return filtered;
-    */
   }, [employees, searchTerm, filterRole, filterStatus]);
 
   // Handle employee approval
   const handleApprove = (employeeId: string) => {
+    if (!Array.isArray(employees)) return;
     const employee = employees.find(emp => emp.id === employeeId);
     if (employee) {
       setSelectedEmployee(employee);
@@ -207,6 +152,7 @@ export const AdminEmployeeManagement = ({ darkMode }: AdminEmployeeManagementPro
 
   // Handle employee rejection
   const handleReject = (employeeId: string) => {
+    if (!Array.isArray(employees)) return;
     const employee = employees.find(emp => emp.id === employeeId);
     if (employee) {
       setSelectedEmployee(employee);
