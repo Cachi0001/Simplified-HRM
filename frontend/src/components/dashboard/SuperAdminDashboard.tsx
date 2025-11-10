@@ -332,7 +332,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ darkMo
         completionPercentage={completionPercentage}
         isOpen={showModal}
         onClose={closeModal}
-        userName={currentUser?.fullName || currentUser?.full_name || 'User'}
+        userName={currentUser?.fullName || currentUser?.fullName || 'User'}
       />
     </div>
   );
