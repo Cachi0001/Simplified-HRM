@@ -26,6 +26,7 @@ const PORT = process.env.PORT || 3000;
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
+  'https://go3net.vercel.app',
   'https://go3nethrm.vercel.app',
   'https://go3nethrm-backend.vercel.app',
   process.env.FRONTEND_URL,
