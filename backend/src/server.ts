@@ -67,9 +67,9 @@ app.use(cors({
   maxAge: 86400 // 24 hours
 }));
 
-// Additional CORS headers for preflight
+// CORS preflight handler - Express 5 compatible
 app.options('/(.*)', (req, res) => {
-  console.log('🔄 OPTIONS preflight request from:', req.headers.origin);
+  console.log('🔄 CORS preflight from:', req.headers.origin);
   res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
