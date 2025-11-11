@@ -24,7 +24,6 @@ const LoginCard: React.FC<LoginCardProps> = ({ onSwitchToSignup, onSwitchToForgo
     e.preventDefault();
     e.stopPropagation();
 
-    // Double prevention - ensure no form submission
     if (e.target !== e.currentTarget) {
       return;
     }
