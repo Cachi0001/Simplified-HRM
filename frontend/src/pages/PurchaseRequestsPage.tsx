@@ -9,6 +9,7 @@ import { BottomNavbar } from '../components/layout/BottomNavbar';
 import LoadingButton from '../components/ui/LoadingButton';
 import { ConfirmationDialog } from '../components/ui/ConfirmationDialog';
 import { safeString, safeNumber, formatCurrency, safeDateFormat } from '../utils/safeFormatting';
+import { useNotificationHighlight } from '../hooks/useNotificationHighlight';
 
 export function PurchaseRequestsPage() {
   const [purchaseRequests, setPurchaseRequests] = useState<PurchaseRequest[]>([]);
@@ -41,6 +42,9 @@ export function PurchaseRequestsPage() {
   const navigate = useNavigate();
   const { addToast } = useToast();
   const { darkMode } = useTheme();
+  
+  // Add notification highlight hook
+  useNotificationHighlight(purchaseRequests);
 
   useEffect(() => {
     const user = authService.getCurrentUserFromStorage();
