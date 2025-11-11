@@ -181,6 +181,7 @@ export const EmployeeApprovalCard: React.FC<EmployeeApprovalCardProps> = ({
               type="tel"
               value={editData.phone}
               onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
+              placeholder="+234 803 123 4567"
               className={`w-full px-3 py-2 rounded-lg border ${
                 darkMode
                   ? 'bg-gray-700 border-gray-600 text-white'

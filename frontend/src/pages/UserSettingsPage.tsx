@@ -622,7 +622,7 @@ export default function UserSettingsPage() {
                         type="tel"
                         value={formData.phone}
                         onChange={handleFormChange}
-                        placeholder="+1 (555) 000-0000"
+                        placeholder="+234 803 123 4567"
                         darkMode={darkMode}
                       />
                     </div>
@@ -749,7 +749,7 @@ export default function UserSettingsPage() {
                         type="tel"
                         value={formData.emergencyContactPhone}
                         onChange={handleFormChange}
-                        placeholder="+1 (555) 000-0000"
+                        placeholder="+234 803 123 4567"
                         darkMode={darkMode}
                       />
                     </div>

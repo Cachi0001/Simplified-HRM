@@ -251,7 +251,9 @@ export class NotificationService {
               await this.emailService.sendBirthdayAnnouncementEmail(
                 employee.email,
                 employee.full_name,
-                celebrant.full_name
+                celebrant.full_name,
+                celebrant.date_of_birth,
+                celebrant.age
               );
             } catch (error) {
               console.error(`Failed to send birthday announcement to ${employee.email}:`, error);

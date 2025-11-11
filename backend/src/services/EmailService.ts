@@ -399,7 +399,10 @@ export class EmailService {
   }
 
   // Birthday announcement to other employees
-  async sendBirthdayAnnouncementEmail(email: string, recipientName: string, celebrantName: string): Promise<void> {
+  async sendBirthdayAnnouncementEmail(email: string, recipientName: string, celebrantName: string, birthDate?: string, age?: number): Promise<void> {
+    const birthDateFormatted = birthDate ? new Date(birthDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '';
+    const ageText = age ? ` turning ${age} years old` : '';
+    
     const emailContent = `
       <div style="padding: 30px 20px;">
         <div style="text-align: center; margin-bottom: 30px;">
@@ -421,6 +424,7 @@ export class EmailService {
           <p style="font-size: 18px; color: #1e40af; margin: 0; font-weight: 500;">
             🎈 It's <strong>${celebrantName}'s</strong> birthday today! 🎈
           </p>
+          ${birthDateFormatted ? `<p style="font-size: 14px; color: #3b82f6; margin: 10px 0 0 0;">Born on ${birthDateFormatted}${ageText}</p>` : ''}
         </div>
         
         <p style="font-size: 16px; color: #4b5563; line-height: 1.6;">
