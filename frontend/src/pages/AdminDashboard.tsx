@@ -6,6 +6,7 @@ import { AdminDepartments } from '../components/dashboard/AdminDepartments';
 import { AdminLeaveRequests } from '../components/dashboard/AdminLeaveRequests';
 import { NotificationManager } from '../components/notifications/NotificationManager';
 import { DraggableLogo } from '../components/dashboard/DraggableLogo';
+import { BulkLeaveReset } from '../components/leave/BulkLeaveReset';
 import { useQuery } from '@tanstack/react-query';
 import { notificationService } from '../services/notificationService';
 import Logo from '../components/ui/Logo';
@@ -16,16 +17,12 @@ import { DarkModeToggle } from '../components/ui/DarkModeToggle';
 import { NotificationBell } from '../components/notifications/NotificationBell';
 import { OverviewCards } from '../components/dashboard/OverviewCards';
 import { PendingApprovals } from '../components/dashboard/PendingApprovals';
+import { useTheme } from '../contexts/ThemeContext';
 import api from '../lib/api';
 import { useTokenValidation } from '../hooks/useTokenValidation';
 
 export default function AdminDashboard() {
-  const [darkMode, setDarkMode] = useState(() => {
-    // Load dark mode preference from localStorage
-    const saved = localStorage.getItem('darkMode');
-    return saved ? JSON.parse(saved) : false;
-  });
-
+  const { darkMode, setDarkMode } = useTheme();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,11 +35,6 @@ export default function AdminDashboard() {
       addToast('warning', 'Your session has expired. Redirecting to login...');
     }
   });
-
-  // Save dark mode preference whenever it changes
-  useEffect(() => {
-    localStorage.setItem('darkMode', JSON.stringify(darkMode));
-  }, [darkMode]);
 
   // Get current user from localStorage since we're using custom auth
   useEffect(() => {
@@ -209,9 +201,16 @@ export default function AdminDashboard() {
           <PendingApprovals darkMode={darkMode} />
         </section>
 
-        {/* Leave Requests Management */}
+        {/* Leave Management */}
         <section className="mb-8">
-          <AdminLeaveRequests darkMode={darkMode} />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <div className="lg:col-span-2">
+              <AdminLeaveRequests darkMode={darkMode} />
+            </div>
+            <div>
+              <BulkLeaveReset darkMode={darkMode} />
+            </div>
+          </div>
         </section>
 
         {/* Employee Role Management - Temporarily Disabled */}

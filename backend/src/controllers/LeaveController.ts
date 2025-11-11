@@ -262,4 +262,69 @@ export class LeaveController {
       next(error);
     }
   };
+
+  resetLeaveBalance = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = (req as any).user?.userId;
+      const userRole = (req as any).user?.role;
+      
+      if (!userId) {
+        throw new ValidationError('User ID not found');
+      }
+
+      // Check if user has permission
+      if (!['admin', 'hr', 'superadmin'].includes(userRole)) {
+        res.status(403).json({
+          success: false,
+          message: 'Only Admin, HR, or SuperAdmin can reset leave balances'
+        });
+        return;
+      }
+
+      const { employeeId } = req.params;
+      const { year } = req.body;
+
+      const result = await this.leaveService.resetLeaveBalance(employeeId, userId, year);
+
+      res.json({
+        success: true,
+        message: result.message,
+        data: result
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  bulkResetLeaveBalances = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = (req as any).user?.userId;
+      const userRole = (req as any).user?.role;
+      
+      if (!userId) {
+        throw new ValidationError('User ID not found');
+      }
+
+      // Check if user has permission
+      if (!['admin', 'hr', 'superadmin'].includes(userRole)) {
+        res.status(403).json({
+          success: false,
+          message: 'Only Admin, HR, or SuperAdmin can reset leave balances'
+        });
+        return;
+      }
+
+      const { year } = req.body;
+
+      const result = await this.leaveService.bulkResetLeaveBalances(userId, year);
+
+      res.json({
+        success: true,
+        message: result.message,
+        data: result
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }

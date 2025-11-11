@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { authService } from '../services/authService';
+import { useTheme } from '../contexts/ThemeContext';
 import { AdminLeaveRequests } from '../components/dashboard/AdminLeaveRequests';
 // import { AdminEmployeeManagement } from '../components/dashboard/AdminEmployeeManagement'; // Temporarily disabled
 import { AdminTasks } from '../components/dashboard/AdminTasks';
@@ -20,10 +21,7 @@ import api from '../lib/api';
 
 export default function HRDashboard() {
   const navigate = useNavigate();
-  const [darkMode, setDarkMode] = useState(() => {
-    const saved = localStorage.getItem('darkMode');
-    return saved ? JSON.parse(saved) : false;
-  });
+  const { darkMode, setDarkMode } = useTheme();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedTimeRange, setSelectedTimeRange] = useState('30');

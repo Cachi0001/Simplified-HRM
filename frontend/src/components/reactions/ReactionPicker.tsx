@@ -84,11 +84,11 @@ const ReactionPicker: React.FC<ReactionPickerProps> = ({
     
     switch (pickerPosition) {
       case 'left':
-        return `${baseClasses} left-0`;
+        return `${baseClasses} left-0 sm:left-0 right-auto`;
       case 'right':
-        return `${baseClasses} right-0`;
+        return `${baseClasses} right-0 sm:right-0 left-auto`;
       default:
-        return `${baseClasses} left-1/2 transform -translate-x-1/2`;
+        return `${baseClasses} left-1/2 transform -translate-x-1/2 max-w-[calc(100vw-2rem)]`;
     }
   };
 

@@ -244,14 +244,14 @@ export default function AttendanceReportPage() {
                 return (
                 <Card key={uniqueKey} className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
                 <div className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Users className={`h-5 w-5 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
-                      <div>
-                        <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex items-start gap-3 min-w-0 flex-1">
+                      <Users className={`h-5 w-5 flex-shrink-0 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
+                      <div className="min-w-0 flex-1">
+                        <p className={`font-medium truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                           {getEmployeeName(record)}
                         </p>
-                        <div className={`flex items-center flex-wrap gap-3 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                        <div className={`flex items-center flex-wrap gap-2 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                           <span className="flex items-center gap-1">
                             <Calendar className="h-4 w-4" />
                             {formatDate(record?._id?.date ?? record?.date)}
@@ -284,7 +284,7 @@ export default function AttendanceReportPage() {
                         </div>
                       </div>
                     </div>
-                    <div className="text-right">
+                    <div className="flex sm:flex-col items-center sm:items-end gap-2 sm:gap-1 flex-shrink-0">
                       <div className={`text-sm font-medium ${record?.status === 'checked_out' ? (darkMode ? 'text-green-400' : 'text-green-600') : (darkMode ? 'text-orange-400' : 'text-orange-600')}`}>
                         {record?.status === 'checked_out' ? 'Completed' : 'Active'}
                       </div>

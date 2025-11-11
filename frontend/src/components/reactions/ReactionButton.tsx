@@ -127,7 +127,7 @@ const ReactionButton: React.FC<ReactionButtonProps> = ({
 
       {/* Reaction tooltip */}
       {hoveredReaction && (
-        <div className={`absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 px-2 py-1 rounded text-xs whitespace-nowrap z-40 ${
+        <div className={`absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 px-2 py-1 rounded text-xs whitespace-nowrap z-40 max-w-[calc(100vw-2rem)] ${
           darkMode ? 'bg-gray-900 text-white' : 'bg-gray-800 text-white'
         }`}>
           {hoveredReaction.charAt(0).toUpperCase() + hoveredReaction.slice(1)} reaction

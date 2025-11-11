@@ -12,24 +12,16 @@ import { notificationService } from '../services/notificationService';
 import Logo from '../components/ui/Logo';
 import { authService } from '../services/authService';
 import { BottomNavbar } from '../components/layout/BottomNavbar';
+import { useTheme } from '../contexts/ThemeContext';
 import api from '../lib/api';
 import { taskService } from '../services/taskService';
 import { useTokenValidation } from '../hooks/useTokenValidation';
 
 export default function EmployeeDashboard() {
-  const [darkMode, setDarkMode] = useState(() => {
-    // Load dark mode preference from localStorage
-    const saved = localStorage.getItem('darkMode');
-    return saved ? JSON.parse(saved) : false;
-  });
+  const { darkMode, setDarkMode } = useTheme();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const { showModal, completionPercentage, closeModal } = useProfileCompletion();
-
-  // Save dark mode preference whenever it changes
-  useEffect(() => {
-    localStorage.setItem('darkMode', JSON.stringify(darkMode));
-  }, [darkMode]);
 
   // Get current user - fetch from backend to ensure fresh approval status
   useEffect(() => {

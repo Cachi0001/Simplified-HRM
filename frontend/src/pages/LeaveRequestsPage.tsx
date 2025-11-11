@@ -7,17 +7,19 @@ import { useTheme } from '../contexts/ThemeContext';
 import { BottomNavbar } from '../components/layout/BottomNavbar';
 import LoadingButton from '../components/ui/LoadingButton';
 import { ConfirmationDialog } from '../components/ui/ConfirmationDialog';
+import { BulkLeaveReset } from '../components/leave/BulkLeaveReset';
+import { EmployeeLeaveBalances } from '../components/leave/EmployeeLeaveBalances';
 import api from '../lib/api';
 import { 
   LeaveRequest, 
-  LeaveRequestFormData,
-  LeaveRequestResponse,
-  transformToBackendFormat,
-  transformFromBackendFormat
+  LeaveRequestFormData
 } from '../types/leave';
 import { safeString, safeNumber, safeDateFormat } from '../utils/safeFormatting';
 
+type TabType = 'approvals' | 'management';
+
 export function LeaveRequestsPage() {
+  const [activeTab, setActiveTab] = useState<TabType>('approvals');
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -123,10 +125,6 @@ export function LeaveRequestsPage() {
 
     try {
       setSubmitting(true);
-      
-      // Transform form data to backend format
-      const requestData = transformToBackendFormat(formData);
-      // Employee ID will be set by the backend from the authenticated user
       
       const response = await api.post('/leave/request', {
         leaveType: formData.type,
@@ -289,9 +287,9 @@ export function LeaveRequestsPage() {
             <Link to="/dashboard" className={`${darkMode ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}>
               <ArrowLeft className="h-5 w-5" />
             </Link>
-            <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Leave Requests</h1>
+            <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Leave Management</h1>
           </div>
-          {!isCreating && currentUser?.role !== 'superadmin' && (
+          {!isCreating && currentUser?.role !== 'superadmin' && activeTab === 'approvals' && (
             <button
               onClick={() => setIsCreating(true)}
               className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
@@ -302,276 +300,325 @@ export function LeaveRequestsPage() {
           )}
         </div>
 
-        {/* Create Form */}
-        {isCreating && (
-          <div className={`rounded-lg shadow-md p-6 mb-8 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-            <h2 className={`text-xl font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Create Leave Request</h2>
-            <form onSubmit={handleCreateLeaveRequest} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                    Leave Type
-                  </label>
-                  <select
-                    value={formData.type}
-                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      darkMode 
-                        ? 'bg-gray-700 border-gray-600 text-white' 
-                        : 'bg-white border-gray-300 text-gray-900'
-                    }`}
-                    required
-                  >
-                    <option value="annual">Annual Leave</option>
-                    <option value="sick">Sick Leave</option>
-                    <option value="personal">Personal Leave</option>
-                    <option value="maternity">Maternity Leave</option>
-                    <option value="paternity">Paternity Leave</option>
-                    <option value="emergency">Emergency Leave</option>
-                  </select>
-                </div>
-                <div>
-                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                    Start Date
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.startDate}
-                    onChange={(e) =>
-                      setFormData({ ...formData, startDate: e.target.value })
-                    }
-                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      darkMode 
-                        ? 'bg-gray-700 border-gray-600 text-white' 
-                        : 'bg-white border-gray-300 text-gray-900'
-                    }`}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                    End Date
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.endDate}
-                    onChange={(e) =>
-                      setFormData({ ...formData, endDate: e.target.value })
-                    }
-                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      darkMode 
-                        ? 'bg-gray-700 border-gray-600 text-white' 
-                        : 'bg-white border-gray-300 text-gray-900'
-                    }`}
-                    required
-                  />
-                </div>
-              </div>
-              <div>
-                <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                  Reason *
-                </label>
-                <textarea
-                  value={formData.reason}
-                  onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    darkMode 
-                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
-                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
-                  }`}
-                  rows={3}
-                  placeholder="Enter reason for leave..."
-                  required
-                />
-              </div>
-              <div>
-                <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                  Additional Notes
-                </label>
-                <textarea
-                  value={formData.notes || ''}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    darkMode 
-                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
-                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
-                  }`}
-                  rows={2}
-                  placeholder="Any additional information (optional)..."
-                />
-              </div>
-              <div className="flex gap-2">
-                <LoadingButton
-                  type="submit"
-                  loading={submitting}
-                  className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition font-medium"
-                  loadingText="Submitting..."
-                >
-                  Submit Request
-                </LoadingButton>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsCreating(false);
-                    setFormData({ startDate: '', endDate: '', reason: '', type: 'annual', notes: '' });
-                  }}
-                  className={`flex-1 px-4 py-2 rounded-lg transition font-medium ${
-                    darkMode 
-                      ? 'bg-gray-600 text-white hover:bg-gray-500' 
-                      : 'bg-gray-300 text-gray-900 hover:bg-gray-400'
-                  }`}
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
+        {/* Tabs - Only show for admin roles */}
+        {['admin', 'hr', 'superadmin'].includes(currentUser?.role) && (
+          <div className={`flex space-x-1 mb-8 p-1 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-gray-200'}`}>
+            <button
+              onClick={() => setActiveTab('approvals')}
+              className={`flex-1 px-6 py-3 rounded-lg font-medium transition-all ${
+                activeTab === 'approvals'
+                  ? darkMode
+                    ? 'bg-blue-600 text-white shadow-lg'
+                    : 'bg-white text-blue-600 shadow-lg'
+                  : darkMode
+                  ? 'text-gray-400 hover:text-white'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Leave Approvals
+            </button>
+            <button
+              onClick={() => setActiveTab('management')}
+              className={`flex-1 px-6 py-3 rounded-lg font-medium transition-all ${
+                activeTab === 'management'
+                  ? darkMode
+                    ? 'bg-blue-600 text-white shadow-lg'
+                    : 'bg-white text-blue-600 shadow-lg'
+                  : darkMode
+                  ? 'text-gray-400 hover:text-white'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Leave Balance Management
+            </button>
           </div>
         )}
 
-        {/* Leave Requests List */}
-        {loading ? (
-          <div className="text-center py-12">
-            <AlertCircle className={`h-12 w-12 mx-auto mb-4 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
-            <p className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Loading leave requests...</p>
-          </div>
-        ) : leaveRequests.length === 0 ? (
-          <div className={`text-center py-12 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-            <AlertCircle className={`h-12 w-12 mx-auto mb-4 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
-            <p className={darkMode ? 'text-gray-400' : 'text-gray-600'}>No leave requests found</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {leaveRequests.map((request) => (
-              <div
-                key={request.id}
-                id={`leave-card-${request.id}`}
-                className={`rounded-lg shadow-md hover:shadow-lg transition p-6 ${
-                  darkMode ? 'bg-gray-800' : 'bg-white'
-                }`}
-              >
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex items-center gap-2">
-                    {getStatusIcon(safeString(request.status, 'pending'))}
-                    <span className={getStatusBadge(safeString(request.status, 'pending'))}>
-                      {safeString(request.status, 'pending').charAt(0).toUpperCase() + safeString(request.status, 'pending').slice(1)}
-                    </span>
-                  </div>
-                  {/* Approve/Reject buttons for HR/Admin/SuperAdmin */}
-                  {canApproveReject(request) && (
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => handleApprove(request.id)}
-                        disabled={approving === request.id}
-                        className={`p-2 rounded-lg transition-colors duration-200 ${
-                          darkMode 
-                            ? 'bg-green-900 text-green-400 hover:bg-green-800 disabled:bg-gray-700 disabled:text-gray-500' 
-                            : 'bg-green-100 text-green-600 hover:bg-green-200 disabled:bg-gray-100 disabled:text-gray-400'
-                        }`}
-                        title="Approve request"
-                      >
-                        {approving === request.id ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
-                        ) : (
-                          <Check className="h-4 w-4" />
-                        )}
-                      </button>
-                      <button
-                        onClick={() => handleRejectClick(request.id)}
-                        disabled={rejecting === request.id}
-                        className={`p-2 rounded-lg transition-colors duration-200 ${
-                          darkMode 
-                            ? 'bg-red-900 text-red-400 hover:bg-red-800 disabled:bg-gray-700 disabled:text-gray-500' 
-                            : 'bg-red-100 text-red-600 hover:bg-red-200 disabled:bg-gray-100 disabled:text-gray-400'
-                        }`}
-                        title="Reject request"
-                      >
-                        {rejecting === request.id ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
-                        ) : (
-                          <X className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Delete button for request owner */}
-                  {((currentUser?.id === request.employee_id || currentUser?.employee_id === request.employee_id) && request.status === 'pending') && (
-                    <button
-                      onClick={() => handleDeleteClick(request)}
-                      className={`transition-colors duration-200 ${
-                        darkMode 
-                          ? 'text-red-400 hover:text-red-300' 
-                          : 'text-red-600 hover:text-red-800'
-                      }`}
-                      title="Delete request"
-                    >
-                      <Trash2 className="h-5 w-5" />
-                    </button>
-                  )}
-                </div>
-
-                <div className="space-y-3">
-                  {/* Employee Name - Prominent Display */}
-                  {request.employee_name && (
-                    <div className={`p-3 rounded-lg border-l-4 ${
-                      darkMode 
-                        ? 'bg-blue-900/20 border-blue-500' 
-                        : 'bg-blue-50 border-blue-500'
-                    }`}>
-                      <p className={`text-xs font-medium mb-1 ${darkMode ? 'text-blue-300' : 'text-blue-600'}`}>
-                        Requested by
-                      </p>
-                      <p className={`text-sm font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                        {safeString(request.employee_name, 'Unknown Employee')}
-                      </p>
-                      {request.employee_email && (
-                        <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                          {request.employee_email}
-                        </p>
-                      )}
-                      {request.department && (
-                        <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                          Department: {safeString(request.department, 'Unknown Department')}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  
-                  {request.type && (
+        {/* Tab Content */}
+        {activeTab === 'approvals' ? (
+          <>
+            {/* Create Form */}
+            {isCreating && (
+              <div className={`rounded-lg shadow-md p-6 mb-8 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                <h2 className={`text-xl font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Create Leave Request</h2>
+                <form onSubmit={handleCreateLeaveRequest} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Type</p>
-                      <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                        {safeString(request.type, 'leave').charAt(0).toUpperCase() + safeString(request.type, 'leave').slice(1)} Leave
-                      </p>
+                      <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                        Leave Type
+                      </label>
+                      <select
+                        value={formData.type}
+                        onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                          darkMode 
+                            ? 'bg-gray-700 border-gray-600 text-white' 
+                            : 'bg-white border-gray-300 text-gray-900'
+                        }`}
+                        required
+                      >
+                        <option value="annual">Annual Leave</option>
+                        <option value="sick">Sick Leave</option>
+                        <option value="personal">Personal Leave</option>
+                        <option value="maternity">Maternity Leave</option>
+                        <option value="paternity">Paternity Leave</option>
+                        <option value="emergency">Emergency Leave</option>
+                      </select>
                     </div>
-                  )}
-                  
-                  <div>
-                    <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Period</p>
-                    <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                      {safeDateFormat(request.start_date)} - {safeDateFormat(request.end_date)}
-                      {request.days_requested && (
-                        <span className={`ml-2 text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                          ({safeNumber(request.days_requested, 0)} days)
-                        </span>
-                      )}
-                    </p>
+                    <div>
+                      <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                        Start Date
+                      </label>
+                      <input
+                        type="date"
+                        value={formData.startDate}
+                        onChange={(e) =>
+                          setFormData({ ...formData, startDate: e.target.value })
+                        }
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                          darkMode 
+                            ? 'bg-gray-700 border-gray-600 text-white' 
+                            : 'bg-white border-gray-300 text-gray-900'
+                        }`}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                        End Date
+                      </label>
+                      <input
+                        type="date"
+                        value={formData.endDate}
+                        onChange={(e) =>
+                          setFormData({ ...formData, endDate: e.target.value })
+                        }
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                          darkMode 
+                            ? 'bg-gray-700 border-gray-600 text-white' 
+                            : 'bg-white border-gray-300 text-gray-900'
+                        }`}
+                        required
+                      />
+                    </div>
                   </div>
-
                   <div>
-                    <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Reason</p>
-                    <p className={`text-sm line-clamp-3 ${darkMode ? 'text-gray-300' : 'text-gray-900'}`}>{safeString(request.reason, 'No reason provided')}</p>
+                    <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      Reason *
+                    </label>
+                    <textarea
+                      value={formData.reason}
+                      onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                        darkMode 
+                          ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                          : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                      }`}
+                      rows={3}
+                      placeholder="Enter reason for leave..."
+                      required
+                    />
                   </div>
-
                   <div>
-                    <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Submitted</p>
-                    <p className={`text-sm ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                      {safeDateFormat(request.created_at)}
-                    </p>
+                    <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      Additional Notes
+                    </label>
+                    <textarea
+                      value={formData.notes || ''}
+                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                        darkMode 
+                          ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                          : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                      }`}
+                      rows={2}
+                      placeholder="Any additional information (optional)..."
+                    />
                   </div>
-                </div>
+                  <div className="flex gap-2">
+                    <LoadingButton
+                      type="submit"
+                      loading={submitting}
+                      className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition font-medium"
+                      loadingText="Submitting..."
+                    >
+                      Submit Request
+                    </LoadingButton>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCreating(false);
+                        setFormData({ startDate: '', endDate: '', reason: '', type: 'annual', notes: '' });
+                      }}
+                      className={`flex-1 px-4 py-2 rounded-lg transition font-medium ${
+                        darkMode 
+                          ? 'bg-gray-600 text-white hover:bg-gray-500' 
+                          : 'bg-gray-300 text-gray-900 hover:bg-gray-400'
+                      }`}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
               </div>
-            ))}
+            )}
+
+            {/* Leave Requests List */}
+            {loading ? (
+              <div className="text-center py-12">
+                <AlertCircle className={`h-12 w-12 mx-auto mb-4 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
+                <p className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Loading leave requests...</p>
+              </div>
+            ) : leaveRequests.length === 0 ? (
+              <div className={`text-center py-12 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                <AlertCircle className={`h-12 w-12 mx-auto mb-4 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
+                <p className={darkMode ? 'text-gray-400' : 'text-gray-600'}>No leave requests found</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {leaveRequests.map((request) => (
+                  <div
+                    key={request.id}
+                    id={`leave-card-${request.id}`}
+                    className={`rounded-lg shadow-md hover:shadow-lg transition p-6 ${
+                      darkMode ? 'bg-gray-800' : 'bg-white'
+                    }`}
+                  >
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="flex items-center gap-2">
+                        {getStatusIcon(safeString(request.status, 'pending'))}
+                        <span className={getStatusBadge(safeString(request.status, 'pending'))}>
+                          {safeString(request.status, 'pending').charAt(0).toUpperCase() + safeString(request.status, 'pending').slice(1)}
+                        </span>
+                      </div>
+                      {/* Approve/Reject buttons for HR/Admin/SuperAdmin */}
+                      {canApproveReject(request) && (
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleApprove(request.id)}
+                            disabled={approving === request.id}
+                            className={`p-2 rounded-lg transition-colors duration-200 ${
+                              darkMode 
+                                ? 'bg-green-900 text-green-400 hover:bg-green-800 disabled:bg-gray-700 disabled:text-gray-500' 
+                                : 'bg-green-100 text-green-600 hover:bg-green-200 disabled:bg-gray-100 disabled:text-gray-400'
+                            }`}
+                            title="Approve request"
+                          >
+                            {approving === request.id ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                            ) : (
+                              <Check className="h-4 w-4" />
+                            )}
+                          </button>
+                          <button
+                            onClick={() => handleRejectClick(request.id)}
+                            disabled={rejecting === request.id}
+                            className={`p-2 rounded-lg transition-colors duration-200 ${
+                              darkMode 
+                                ? 'bg-red-900 text-red-400 hover:bg-red-800 disabled:bg-gray-700 disabled:text-gray-500' 
+                                : 'bg-red-100 text-red-600 hover:bg-red-200 disabled:bg-gray-100 disabled:text-gray-400'
+                            }`}
+                            title="Reject request"
+                          >
+                            {rejecting === request.id ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                            ) : (
+                              <X className="h-4 w-4" />
+                            )}
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Delete button for request owner */}
+                      {((currentUser?.id === request.employee_id || currentUser?.employee_id === request.employee_id) && request.status === 'pending') && (
+                        <button
+                          onClick={() => handleDeleteClick(request)}
+                          className={`transition-colors duration-200 ${
+                            darkMode 
+                              ? 'text-red-400 hover:text-red-300' 
+                              : 'text-red-600 hover:text-red-800'
+                          }`}
+                          title="Delete request"
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="space-y-3">
+                      {/* Employee Name - Prominent Display */}
+                      {request.employee_name && (
+                        <div className={`p-3 rounded-lg border-l-4 ${
+                          darkMode 
+                            ? 'bg-blue-900/20 border-blue-500' 
+                            : 'bg-blue-50 border-blue-500'
+                        }`}>
+                          <p className={`text-xs font-medium mb-1 ${darkMode ? 'text-blue-300' : 'text-blue-600'}`}>
+                            Requested by
+                          </p>
+                          <p className={`text-sm font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                            {safeString(request.employee_name, 'Unknown Employee')}
+                          </p>
+                          {request.employee_email && (
+                            <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                              {request.employee_email}
+                            </p>
+                          )}
+                          {request.department && (
+                            <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                              Department: {safeString(request.department, 'Unknown Department')}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      
+                      {request.type && (
+                        <div>
+                          <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Type</p>
+                          <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                            {safeString(request.type, 'leave').charAt(0).toUpperCase() + safeString(request.type, 'leave').slice(1)} Leave
+                          </p>
+                        </div>
+                      )}
+                      
+                      <div>
+                        <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Period</p>
+                        <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                          {safeDateFormat(request.start_date)} - {safeDateFormat(request.end_date)}
+                          {request.days_requested && (
+                            <span className={`ml-2 text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                              ({safeNumber(request.days_requested, 0)} days)
+                            </span>
+                          )}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Reason</p>
+                        <p className={`text-sm line-clamp-3 ${darkMode ? 'text-gray-300' : 'text-gray-900'}`}>{safeString(request.reason, 'No reason provided')}</p>
+                      </div>
+
+                      <div>
+                        <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Submitted</p>
+                        <p className={`text-sm ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                          {safeDateFormat(request.created_at)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          /* Leave Balance Management Tab */
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <EmployeeLeaveBalances darkMode={darkMode} />
+            </div>
+            <div>
+              <BulkLeaveReset darkMode={darkMode} />
+            </div>
           </div>
         )}
       </div>

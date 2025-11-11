@@ -123,7 +123,12 @@ export class EmployeeRepository {
     Object.entries(data).forEach(([key, value]) => {
       if (value !== undefined) {
         fields.push(`${key} = $${paramCount}`);
-        values.push(value);
+        // Convert objects and arrays to JSON strings for JSONB columns (like working_hours, working_days)
+        if (typeof value === 'object' && value !== null) {
+          values.push(JSON.stringify(value));
+        } else {
+          values.push(value);
+        }
         paramCount++;
       }
     });

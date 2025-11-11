@@ -161,7 +161,7 @@ export const AdminDepartments: React.FC<AdminDepartmentsProps> = ({ darkMode = f
         </h2>
         <button
           onClick={() => setIsCreating(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 text-sm rounded-lg flex items-center gap-1.5 transition-colors"
         >
           <Plus className="h-4 w-4" />
           Add Department

@@ -216,4 +216,34 @@ export class LeaveService {
 
     return { message: result.message };
   }
+
+  async resetLeaveBalance(employeeId: string, resetById: string, year?: number): Promise<any> {
+    const resetByEmployee = await this.employeeRepo.findByUserId(resetById);
+    if (!resetByEmployee) {
+      throw new NotFoundError('Reset by employee not found');
+    }
+
+    const result = await this.leaveRepo.resetLeaveBalance(employeeId, resetByEmployee.id, year);
+    
+    if (!result.success) {
+      throw new ValidationError(result.message);
+    }
+
+    return result;
+  }
+
+  async bulkResetLeaveBalances(resetById: string, year?: number): Promise<any> {
+    const resetByEmployee = await this.employeeRepo.findByUserId(resetById);
+    if (!resetByEmployee) {
+      throw new NotFoundError('Reset by employee not found');
+    }
+
+    const result = await this.leaveRepo.bulkResetLeaveBalances(resetByEmployee.id, year);
+    
+    if (!result.success) {
+      throw new ValidationError(result.message);
+    }
+
+    return result;
+  }
 }

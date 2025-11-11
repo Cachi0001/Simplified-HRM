@@ -37,4 +37,8 @@ router.get('/balances/:employeeId', leaveController.getLeaveBalances);
 
 router.delete('/requests/:id', leaveController.deleteLeaveRequest);
 
+// Admin/HR/SuperAdmin only routes
+router.post('/reset/:employeeId', leaveController.resetLeaveBalance);
+router.post('/reset-all', leaveController.bulkResetLeaveBalances);
+
 export default router;

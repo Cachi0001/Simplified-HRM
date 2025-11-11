@@ -11,15 +11,12 @@ import { DarkModeToggle } from '../components/ui/DarkModeToggle';
 import { NotificationBell } from '../components/notifications/NotificationBell';
 import { OverviewCards } from '../components/dashboard/OverviewCards';
 import { PendingApprovals } from '../components/dashboard/PendingApprovals';
+import { useTheme } from '../contexts/ThemeContext';
 import api from '../lib/api';
 import { useTokenValidation } from '../hooks/useTokenValidation';
 
 export default function SuperAdminDashboardPage() {
-  const [darkMode, setDarkMode] = useState(() => {
-    // Load dark mode preference from localStorage
-    const saved = localStorage.getItem('darkMode');
-    return saved ? JSON.parse(saved) : false;
-  });
+  const { darkMode, setDarkMode } = useTheme();
 
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);

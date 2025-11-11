@@ -189,10 +189,10 @@ export function MoreSection({ darkMode = false, isOpen, onClose }: MoreSectionPr
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center px-2 sm:px-4">
       <div
         ref={menuRef}
-        className={`w-full max-w-md mx-4 mb-20 ${
+        className={`w-full max-w-md mb-20 ${
           darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
         } border rounded-t-2xl shadow-2xl max-h-[70vh] overflow-hidden flex flex-col`}
       >

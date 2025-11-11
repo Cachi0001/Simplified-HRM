@@ -13,6 +13,7 @@ import { BottomNavbar } from "../components/layout/BottomNavbar";
 import { NotificationBell } from "../components/notifications/NotificationBell";
 import { ProfileFieldRestrictions } from "../components/profile/ProfileFieldRestrictions";
 import WorkingDaysConfig from "../components/settings/WorkingDaysConfig";
+import { useTheme } from "../contexts/ThemeContext";
 import {
   User,
   Mail,
@@ -31,19 +32,12 @@ import {
   Calendar,
 } from "lucide-react";
 
-interface UserSettingsProps {
-  darkMode?: boolean;
-}
-
-
-
 const ROLES = ["employee", "hr", "admin"];
 
-export default function UserSettingsPage({
-  darkMode: initialDarkMode = false,
-}: UserSettingsProps) {
+export default function UserSettingsPage() {
   const navigate = useNavigate();
   const { addToast } = useToast();
+  const { darkMode, setDarkMode } = useTheme();
 
   // State Management
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -52,7 +46,6 @@ export default function UserSettingsPage({
   );
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [darkMode, setDarkMode] = useState(initialDarkMode);
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [activeTab, setActiveTab] = useState<

@@ -256,7 +256,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ darkMode: pr
       </button>
 
       {isOpen && (
-        <div className={`absolute right-0 mt-2 w-[calc(100vw-2rem)] sm:w-96 max-w-md rounded-lg shadow-xl border z-50 max-h-[600px] flex flex-col ${
+        <div className={`fixed sm:absolute left-4 right-4 sm:left-auto sm:right-0 mt-2 sm:w-96 max-w-md rounded-lg shadow-xl border z-50 max-h-[600px] flex flex-col ${
           darkMode 
             ? 'bg-gray-800 border-gray-700' 
             : 'bg-white border-gray-200'

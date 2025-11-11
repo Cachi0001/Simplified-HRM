@@ -135,4 +135,22 @@ export class LeaveRepository {
     );
     return result.rows[0].result;
   }
+
+  async resetLeaveBalance(employeeId: string, resetById: string, year?: number): Promise<any> {
+    const result = await pool.query(
+      'SELECT reset_leave_balance($1, $2, $3) as result',
+      [employeeId, resetById, year || null]
+    );
+    
+    return result.rows[0].result;
+  }
+
+  async bulkResetLeaveBalances(resetById: string, year?: number): Promise<any> {
+    const result = await pool.query(
+      'SELECT bulk_reset_leave_balances($1, $2) as result',
+      [resetById, year || null]
+    );
+    
+    return result.rows[0].result;
+  }
 }

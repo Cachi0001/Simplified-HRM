@@ -88,7 +88,7 @@ export function ReadReceipt({
       {renderStatusIcon()}
 
       {showDetails && (readBy.length > 0 || status) && (
-        <div className="absolute bottom-full right-0 mb-2 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded px-3 py-2 whitespace-nowrap z-10 shadow-lg border border-gray-700 dark:border-gray-600">
+        <div className="absolute bottom-full right-0 sm:right-0 left-auto sm:left-auto mb-2 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded px-3 py-2 whitespace-nowrap z-10 shadow-lg border border-gray-700 dark:border-gray-600 max-w-[calc(100vw-2rem)]">
           <div className="font-semibold mb-1">{getStatusText()}</div>
           {readBy.length > 0 && (
             <div className="space-y-1 border-t border-gray-700 pt-1 mt-1">
