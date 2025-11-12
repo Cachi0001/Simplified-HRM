@@ -17,6 +17,9 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ darkMode: pr
   const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   
+  // Track played notification IDs to prevent duplicate sounds
+  const playedNotificationIds = useRef<Set<string>>(new Set());
+  
   // Use prop if provided, otherwise use theme context
   const { darkMode: contextDarkMode } = useTheme();
   const darkMode = propDarkMode !== undefined ? propDarkMode : contextDarkMode;
@@ -76,11 +79,18 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ darkMode: pr
   const loadNotifications = async () => {
     try {
       const data = await notificationService.getNotifications(undefined, 50, 0, false);
-      const previousCount = notifications.length;
       setNotifications(data);
       
-      // Play sound if new notifications arrived
-      if (data.length > previousCount && data.some(n => !n.read)) {
+      // Play sound only for NEW unread notifications that haven't been played before
+      const newUnreadNotifications = data.filter(n => 
+        !n.read && !playedNotificationIds.current.has(n.id)
+      );
+      
+      if (newUnreadNotifications.length > 0) {
+        // Mark these notifications as "sound played"
+        newUnreadNotifications.forEach(n => playedNotificationIds.current.add(n.id));
+        
+        // Play sound once
         playNotificationSound();
       }
     } catch (error) {

@@ -16,7 +16,8 @@ interface Department {
 
 interface Employee {
   id: string;
-  employee_name: string;
+  employee_name?: string;
+  full_name?: string;
   email: string;
   department?: string;
   role: string;
@@ -225,10 +226,10 @@ export const AdminDepartments: React.FC<AdminDepartmentsProps> = ({ darkMode = f
               >
                 <option value="">Select a team lead (optional)</option>
                 {employees
-                  .filter(emp => emp.role === 'employee' || emp.role === 'teamlead')
+                  .filter(emp => ['employee', 'teamlead', 'hr', 'admin'].includes(emp.role))
                   .map(emp => (
                     <option key={emp.id} value={emp.id}>
-                      {emp.employee_name} ({emp.role})
+                      {emp.employee_name || emp.full_name || emp.email} ({emp.role})
                     </option>
                   ))
                 }

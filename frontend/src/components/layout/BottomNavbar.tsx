@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { authService } from '../../services/authService';
 import { useChatUnreadCount } from '../../hooks/useChatUnreadCount';
+import { usePurchaseRequestCount } from '../../hooks/usePurchaseRequestCount';
 import { MoreSection } from './MoreSection';
 
 interface BottomNavbarProps {
@@ -37,6 +38,7 @@ export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
     return saved ? JSON.parse(saved) : false;
   });
   const { totalUnreadCount, refreshUnreadCounts } = useChatUnreadCount();
+  const { pendingCount: purchasePendingCount } = usePurchaseRequestCount();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -96,7 +98,15 @@ export function BottomNavbar({ darkMode = false }: BottomNavbarProps) {
                     : (localDarkMode ? 'text-gray-400 hover:text-white hover:bg-gray-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50')
                 }`}
               >
-                <item.icon className="h-5 w-5 mb-1" />
+                <div className="relative">
+                  <item.icon className="h-5 w-5 mb-1" />
+                  {/* Show badge for Purchase Requests if there are pending requests */}
+                  {item.label === 'Purchase' && purchasePendingCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center">
+                      {purchasePendingCount > 9 ? '9+' : purchasePendingCount}
+                    </span>
+                  )}
+                </div>
                 <span className="sr-only">{item.label}</span>
                 <span className="text-xs font-medium">{item.label}</span>
               </button>
