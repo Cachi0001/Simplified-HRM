@@ -186,7 +186,21 @@ export const EmployeeCard: React.FC<EmployeeCardProps> = ({
 
       {/* Status Management Button */}
       <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-        {['superadmin', 'super-admin', 'admin', 'hr'].includes(currentUserRole) ? (
+        {/* Check if current user can manage this employee */}
+        {employee.role === 'superadmin' && currentUserRole !== 'superadmin' ? (
+          // Superadmin employee - only viewable by other superadmins
+          <div className={`
+            w-full flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium
+            ${darkMode 
+              ? 'bg-purple-900/30 text-purple-400 border border-purple-700 cursor-not-allowed' 
+              : 'bg-purple-50 text-purple-700 border border-purple-200 cursor-not-allowed'
+            }
+          `}>
+            <User className="h-4 w-4 mr-2" />
+            🔒 View Only (Superadmin)
+          </div>
+        ) : ['superadmin', 'super-admin', 'admin', 'hr'].includes(currentUserRole) ? (
+          // Regular employee - manageable by authorized roles
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -205,6 +219,7 @@ export const EmployeeCard: React.FC<EmployeeCardProps> = ({
             Manage Status
           </button>
         ) : (
+          // Unauthorized user
           <div className={`
             w-full flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium
             ${darkMode 

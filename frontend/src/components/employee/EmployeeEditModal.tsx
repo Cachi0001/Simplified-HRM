@@ -26,6 +26,9 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'fields' | 'status' | 'personal'>('fields');
+  
+  // Check if current user can edit this employee
+  const isReadOnly = employee?.role === 'superadmin' && user?.role !== 'superadmin';
 
   useEffect(() => {
     if (employee) {
@@ -179,22 +182,30 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
         <div className={`px-6 py-4 border-b ${
           darkMode ? 'border-gray-700' : 'border-gray-200'
         }`}>
-          <h2 className="text-xl font-semibold">Edit Staff Member</h2>
+          <h2 className="text-xl font-semibold">
+            {isReadOnly ? 'View Staff Member' : 'Edit Staff Member'}
+          </h2>
           <p className={`text-sm mt-1 ${
             darkMode ? 'text-gray-400' : 'text-gray-600'
           }`}>
-            Manage {employee.full_name}'s work information
+            {isReadOnly 
+              ? `View ${employee.full_name}'s information (read-only)`
+              : `Manage ${employee.full_name}'s work information`
+            }
           </p>
         </div>
 
         {/* Superadmin Protection Warning */}
-        {employee.role === 'superadmin' && user?.role !== 'superadmin' && (
-          <div className="px-6 py-3 bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800">
-            <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
+        {isReadOnly && (
+          <div className="px-6 py-3 bg-purple-50 dark:bg-purple-900/20 border-b border-purple-200 dark:border-purple-800">
+            <div className="flex items-center gap-2 text-purple-700 dark:text-purple-400">
               <span className="text-lg">🔒</span>
-              <p className="text-sm font-medium">
-                This is a superadmin account. Only superadmin users can modify superadmin staff members.
-              </p>
+              <div>
+                <p className="text-sm font-bold">Read-Only Mode</p>
+                <p className="text-xs mt-1">
+                  This is a superadmin account. Only superadmin users can modify superadmin staff members. You can view their information but cannot make changes.
+                </p>
+              </div>
             </div>
           </div>
         )}
@@ -251,7 +262,7 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
                   : `border-transparent ${darkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'}`
               }`}
             >
-              Work Information
+              {isReadOnly ? 'Work Information' : 'Work Information'}
             </button>
             <button
               onClick={() => setActiveTab('status')}
@@ -261,7 +272,7 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
                   : `border-transparent ${darkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'}`
               }`}
             >
-              Status Management
+              {isReadOnly ? 'Status' : 'Status Management'}
             </button>
             <button
               onClick={() => setActiveTab('personal')}
@@ -307,10 +318,17 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
                     name="department_id"
                     value={formData.department_id || ''}
                     onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    disabled={isReadOnly}
+                    className={`w-full px-3 py-2 border rounded-md ${
+                      isReadOnly 
+                        ? 'cursor-not-allowed opacity-60' 
+                        : 'focus:outline-none focus:ring-2 focus:ring-blue-500'
+                    } ${
                       darkMode 
                         ? 'bg-gray-700 border-gray-600 text-white' 
-                        : 'bg-white border-gray-300 text-gray-900'
+                        : isReadOnly 
+                          ? 'bg-gray-100 border-gray-300 text-gray-500'
+                          : 'bg-white border-gray-300 text-gray-900'
                     }`}
                   >
                     <option value="">Select Department</option>
@@ -334,10 +352,17 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
                     name="position"
                     value={formData.position || ''}
                     onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    disabled={isReadOnly}
+                    className={`w-full px-3 py-2 border rounded-md ${
+                      isReadOnly 
+                        ? 'cursor-not-allowed opacity-60' 
+                        : 'focus:outline-none focus:ring-2 focus:ring-blue-500'
+                    } ${
                       darkMode 
                         ? 'bg-gray-700 border-gray-600 text-white' 
-                        : 'bg-white border-gray-300 text-gray-900'
+                        : isReadOnly 
+                          ? 'bg-gray-100 border-gray-300 text-gray-500'
+                          : 'bg-white border-gray-300 text-gray-900'
                     }`}
                     placeholder="e.g., Software Engineer"
                   />
@@ -405,10 +430,17 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
                     name="salary"
                     value={formData.salary || ''}
                     onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    disabled={isReadOnly}
+                    className={`w-full px-3 py-2 border rounded-md ${
+                      isReadOnly 
+                        ? 'cursor-not-allowed opacity-60' 
+                        : 'focus:outline-none focus:ring-2 focus:ring-blue-500'
+                    } ${
                       darkMode 
                         ? 'bg-gray-700 border-gray-600 text-white' 
-                        : 'bg-white border-gray-300 text-gray-900'
+                        : isReadOnly 
+                          ? 'bg-gray-100 border-gray-300 text-gray-500'
+                          : 'bg-white border-gray-300 text-gray-900'
                     }`}
                     placeholder="e.g., 50000"
                     step="0.01"
@@ -428,15 +460,17 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
                   } focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   disabled={loading}
                 >
-                  Cancel
+                  {isReadOnly ? 'Close' : 'Cancel'}
                 </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-                  disabled={loading}
-                >
-                  {loading ? 'Updating...' : 'Update Information'}
-                </button>
+                {!isReadOnly && (
+                  <button
+                    type="submit"
+                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                    disabled={loading}
+                  >
+                    {loading ? 'Updating...' : 'Update Information'}
+                  </button>
+                )}
               </div>
             </form>
           )}
@@ -453,10 +487,17 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
                   name="status"
                   value={formData.status || ''}
                   onChange={handleInputChange}
-                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  disabled={isReadOnly}
+                  className={`w-full px-3 py-2 border rounded-md ${
+                    isReadOnly 
+                      ? 'cursor-not-allowed opacity-60' 
+                      : 'focus:outline-none focus:ring-2 focus:ring-blue-500'
+                  } ${
                     darkMode 
                       ? 'bg-gray-700 border-gray-600 text-white' 
-                      : 'bg-white border-gray-300 text-gray-900'
+                      : isReadOnly 
+                        ? 'bg-gray-100 border-gray-300 text-gray-500'
+                        : 'bg-white border-gray-300 text-gray-900'
                   }`}
                   required
                 >
@@ -476,7 +517,7 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
               </div>
 
               {/* Warning for status changes */}
-              {formData.status !== employee.status && (
+              {!isReadOnly && formData.status !== employee.status && (
                 <div className={`p-3 rounded border-l-4 ${
                   formData.status === 'rejected' 
                     ? 'bg-red-50 border-red-400 text-red-700' 
@@ -505,21 +546,23 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
                   } focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   disabled={loading}
                 >
-                  Cancel
+                  {isReadOnly ? 'Close' : 'Cancel'}
                 </button>
-                <button
-                  type="submit"
-                  className={`px-4 py-2 text-sm font-medium text-white rounded-md ${
-                    formData.status === 'rejected'
-                      ? 'bg-red-600 hover:bg-red-700'
-                      : formData.status === 'inactive'
-                      ? 'bg-yellow-600 hover:bg-yellow-700'
-                      : 'bg-blue-600 hover:bg-blue-700'
-                  } focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50`}
-                  disabled={loading || formData.status === employee.status}
-                >
-                  {loading ? 'Updating...' : 'Update Status'}
-                </button>
+                {!isReadOnly && (
+                  <button
+                    type="submit"
+                    className={`px-4 py-2 text-sm font-medium text-white rounded-md ${
+                      formData.status === 'rejected'
+                        ? 'bg-red-600 hover:bg-red-700'
+                        : formData.status === 'inactive'
+                        ? 'bg-yellow-600 hover:bg-yellow-700'
+                        : 'bg-blue-600 hover:bg-blue-700'
+                    } focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50`}
+                    disabled={loading || formData.status === employee.status}
+                  >
+                    {loading ? 'Updating...' : 'Update Status'}
+                  </button>
+                )}
               </div>
             </form>
           )}
