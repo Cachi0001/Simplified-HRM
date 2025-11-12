@@ -45,10 +45,12 @@ export function EmployeeLeaveBalances({ darkMode = false }: EmployeeLeaveBalance
     },
   });
 
-  const filteredEmployees = employees?.filter((emp: any) =>
-    emp.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    emp.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  const filteredEmployees = employees?.filter((emp: any) => {
+    const name = emp.fullName || emp.full_name || '';
+    const email = emp.email || '';
+    return name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+           email.toLowerCase().includes(searchTerm.toLowerCase());
+  }) || [];
 
   return (
     <Card className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
@@ -102,7 +104,7 @@ export function EmployeeLeaveBalances({ darkMode = false }: EmployeeLeaveBalance
               <LeaveBalanceManager
                 key={employee.id}
                 employeeId={employee.id}
-                employeeName={employee.fullName}
+                employeeName={employee.fullName || employee.full_name || 'Unknown Employee'}
                 currentBalance={employee.leaveBalance?.remaining_days || 0}
                 darkMode={darkMode}
               />
