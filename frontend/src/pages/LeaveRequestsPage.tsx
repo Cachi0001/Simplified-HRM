@@ -113,13 +113,27 @@ export function LeaveRequestsPage() {
   const handleCreateLeaveRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validation: Check required fields
     if (!formData.startDate || !formData.endDate || !formData.reason || !formData.type) {
       addToast('error', 'Please fill all required fields');
       return;
     }
 
-    if (new Date(formData.startDate) > new Date(formData.endDate)) {
-      addToast('error', 'End date must be after start date');
+    // Validation: Check if start date is in the past
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Reset time to start of day
+    const startDate = new Date(formData.startDate);
+    startDate.setHours(0, 0, 0, 0);
+    
+    if (startDate < today) {
+      addToast('error', 'Cannot request leave for past dates. Please select a future date.');
+      return;
+    }
+
+    // Validation: Check if end date is after start date
+    const endDate = new Date(formData.endDate);
+    if (startDate > endDate) {
+      addToast('error', 'End date must be after or equal to start date');
       return;
     }
 
@@ -137,17 +151,34 @@ export function LeaveRequestsPage() {
       if (response.data.success) {
         // Refresh the list
         await fetchLeaveRequests();
+        // Reset form
+        setFormData({ startDate: '', endDate: '', reason: '', type: 'annual', notes: '' });
+        setIsCreating(false);
+        addToast('success', 'Leave request created successfully');
       } else {
-        throw new Error('Failed to create leave request');
+        throw new Error(response.data.message || 'Failed to create leave request');
       }
-      
-      // Reset form
-      setFormData({ startDate: '', endDate: '', reason: '', type: 'annual', notes: '' });
-      setIsCreating(false);
-      addToast('success', 'Leave request created successfully');
     } catch (error: any) {
       console.error('Error creating leave request:', error);
-      const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || error.message || 'Failed to create leave request';
+      
+      // Enhanced error handling
+      let errorMessage = 'Failed to create leave request';
+      
+      if (error.response?.data) {
+        // Check for different error formats
+        if (error.response.data.error) {
+          if (typeof error.response.data.error === 'string') {
+            errorMessage = error.response.data.error;
+          } else if (error.response.data.error.message) {
+            errorMessage = error.response.data.error.message;
+          }
+        } else if (error.response.data.message) {
+          errorMessage = error.response.data.message;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       addToast('error', errorMessage);
     } finally {
       setSubmitting(false);
@@ -372,6 +403,7 @@ export function LeaveRequestsPage() {
                       <input
                         type="date"
                         value={formData.startDate}
+                        min={new Date().toISOString().split('T')[0]}
                         onChange={(e) =>
                           setFormData({ ...formData, startDate: e.target.value })
                         }
@@ -390,6 +422,7 @@ export function LeaveRequestsPage() {
                       <input
                         type="date"
                         value={formData.endDate}
+                        min={formData.startDate || new Date().toISOString().split('T')[0]}
                         onChange={(e) =>
                           setFormData({ ...formData, endDate: e.target.value })
                         }

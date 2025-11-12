@@ -81,6 +81,26 @@ export class TaskService {
     return await this.taskRepo.findAll(filters);
   }
 
+  async getTasksForUser(userId: string, filters?: { status?: string; assigneeId?: string; assignedBy?: string }): Promise<Task[]> {
+    // Get employee record for the user
+    const employee = await this.employeeRepo.findByUserId(userId);
+    if (!employee) {
+      throw new Error('Employee not found');
+    }
+
+    // Get all tasks
+    const allTasks = await this.taskRepo.findAll(filters);
+
+    // Filter tasks based on user's involvement:
+    // - Tasks assigned TO the user
+    // - Tasks assigned BY the user
+    const userTasks = allTasks.filter(task => 
+      task.assignee_id === employee.id || task.assigned_by === employee.id
+    );
+
+    return userTasks;
+  }
+
   async deleteTask(taskId: string, userId: string): Promise<void> {
     // Check if user has permission to delete (admin/HR or task creator)
     const task = await this.taskRepo.findById(taskId);

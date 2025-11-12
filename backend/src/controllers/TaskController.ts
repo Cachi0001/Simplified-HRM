@@ -104,9 +104,15 @@ export class TaskController {
 
   getAllTasks = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      const userId = (req as any).user?.userId;
+      if (!userId) {
+        throw new ValidationError('User ID not found');
+      }
+
       const { status, assigneeId, assignedBy } = req.query;
       
-      const tasks = await this.taskService.getAllTasks({
+      // Get tasks filtered by user's involvement (assigned to them or assigned by them)
+      const tasks = await this.taskService.getTasksForUser(userId, {
         status: status as string,
         assigneeId: assigneeId as string,
         assignedBy: assignedBy as string
