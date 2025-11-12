@@ -23,7 +23,7 @@ export function useProfileCompletion() {
       // Calculate completion percentage based on ACTUAL database fields
       const profile = response as any;
       let completed = 0;
-      let total = 9;
+      let total = 8;  // Reduced from 9 to 8 (removed department_id requirement)
 
       // Check actual database fields (not profile_picture - that's out of MVP scope)
       if (profile.full_name) completed++;
@@ -32,7 +32,7 @@ export function useProfileCompletion() {
       if (profile.address) completed++;
       if (profile.date_of_birth) completed++;
       if (profile.position) completed++;  // This is NULL in your DB!
-      if (profile.department_id) completed++;  // UUID field, not department string!
+      // if (profile.department_id) completed++;  // COMMENTED OUT - Not required for superadmin/CEO roles
       if (profile.emergency_contact_name) completed++;
       if (profile.emergency_contact_phone) completed++;
 
@@ -48,7 +48,7 @@ export function useProfileCompletion() {
           address: !!profile.address,
           date_of_birth: !!profile.date_of_birth,
           position: !!profile.position,
-          department_id: !!profile.department_id,
+          // department_id: !!profile.department_id,  // COMMENTED OUT
           emergency_contact_name: !!profile.emergency_contact_name,
           emergency_contact_phone: !!profile.emergency_contact_phone
         }

@@ -1,6 +1,7 @@
 import React from 'react';
 import { User, Mail, Phone, MapPin, Calendar, Settings, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { Employee } from '../../services/employeeService';
+import { getDisplayName } from '../../utils/userDisplay';
 
 interface EmployeeCardProps {
   employee: Employee;
@@ -10,6 +11,8 @@ interface EmployeeCardProps {
   onSelect: (employeeId: string, selected: boolean) => void;
   isSelected: boolean;
   currentUserRole: string;
+  currentUserId?: string;
+  currentEmployeeId?: string;
 }
 
 export const EmployeeCard: React.FC<EmployeeCardProps> = ({
@@ -19,8 +22,16 @@ export const EmployeeCard: React.FC<EmployeeCardProps> = ({
   onStatusManage,
   onSelect,
   isSelected,
-  currentUserRole
+  currentUserRole,
+  currentUserId,
+  currentEmployeeId
 }) => {
+  const displayName = getDisplayName(
+    employee.full_name,
+    employee.user_id || employee.id,
+    currentUserId,
+    currentEmployeeId
+  );
   const getRoleColor = (role: string) => {
     switch (role) {
       case 'superadmin':
@@ -115,7 +126,14 @@ export const EmployeeCard: React.FC<EmployeeCardProps> = ({
         </div>
         <div className="ml-3 flex-1">
           <h3 className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-            {employee.full_name}
+            {displayName}
+            {displayName === 'You' && (
+              <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-medium ${
+                darkMode ? 'bg-purple-900 text-purple-300' : 'bg-purple-100 text-purple-800'
+              }`}>
+                YOU
+              </span>
+            )}
           </h3>
           <div className="flex items-center space-x-2">
             {getStatusIcon(employee.status)}

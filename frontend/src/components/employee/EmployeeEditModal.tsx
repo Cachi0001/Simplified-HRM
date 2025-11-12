@@ -38,7 +38,8 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
         role: employee.role,
         manager_id: employee.manager_id,
         salary: employee.salary,
-        status: employee.status
+        status: employee.status,
+        lead_department_id: employee.lead_department_id || ''
       });
     }
   }, [employee]);
@@ -417,6 +418,44 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
                     </select>
                   )}
                 </div>
+
+                {/* Lead Department - Only show when role is teamlead */}
+                {formData.role === 'teamlead' && (
+                  <div className="md:col-span-2">
+                    <label className={`block text-sm font-medium mb-1 ${
+                      darkMode ? 'text-gray-300' : 'text-gray-700'
+                    }`}>
+                      Lead Department
+                    </label>
+                    <select
+                      name="lead_department_id"
+                      value={formData.lead_department_id || ''}
+                      onChange={handleInputChange}
+                      disabled={isReadOnly}
+                      className={`w-full px-3 py-2 border rounded-md ${
+                        isReadOnly 
+                          ? 'cursor-not-allowed opacity-60' 
+                          : 'focus:outline-none focus:ring-2 focus:ring-blue-500'
+                      } ${
+                        darkMode 
+                          ? 'bg-gray-700 border-gray-600 text-white' 
+                          : isReadOnly 
+                            ? 'bg-gray-100 border-gray-300 text-gray-500'
+                            : 'bg-white border-gray-300 text-gray-900'
+                      }`}
+                    >
+                      <option value="">Select Department to Lead (Optional)</option>
+                      {Array.isArray(departments) && departments.map(dept => (
+                        <option key={dept.id} value={dept.id}>
+                          {dept.name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                      Assign this team lead to manage a specific department
+                    </p>
+                  </div>
+                )}
 
                 {/* Salary */}
                 <div className="md:col-span-2">

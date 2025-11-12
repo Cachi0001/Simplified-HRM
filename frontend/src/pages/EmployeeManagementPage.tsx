@@ -352,6 +352,8 @@ export const EmployeeManagementPage: React.FC = () => {
                   isHighlighted={highlightedEmployeeId === employee.id}
                   onStatusManage={handleManageEmployeeStatus}
                   currentUserRole={user?.role || 'employee'}
+                  currentUserId={user?.id}
+                  currentEmployeeId={user?.employee_id}
                   onSelect={handleSelectEmployee}
                   isSelected={selectedEmployees.includes(employee.id)}
                 />

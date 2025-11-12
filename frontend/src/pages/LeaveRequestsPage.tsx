@@ -39,7 +39,7 @@ export function LeaveRequestsPage() {
     startDate: '',
     endDate: '',
     reason: '',
-    type: 'annual',
+    type: 'Annual Leave',
     notes: ''
   });
 
@@ -152,7 +152,7 @@ export function LeaveRequestsPage() {
         // Refresh the list
         await fetchLeaveRequests();
         // Reset form
-        setFormData({ startDate: '', endDate: '', reason: '', type: 'annual', notes: '' });
+        setFormData({ startDate: '', endDate: '', reason: '', type: 'Annual Leave', notes: '' });
         setIsCreating(false);
         addToast('success', 'Leave request created successfully');
       } else {
@@ -273,13 +273,12 @@ export function LeaveRequestsPage() {
   const canApproveReject = (request: LeaveRequest) => {
     if (!currentUser || request.status !== 'pending') return false;
     
-    // Users cannot approve their own requests
+    // Users cannot approve their own requests (including superadmin, HR, and admin)
     const isOwnRequest = request.employee_id === currentUser.id || 
                          request.employee_id === currentUser.employee_id;
     
     if (isOwnRequest) {
-      // Only superadmin can approve their own requests
-      return currentUser.role === 'superadmin';
+      return false; // No one can approve their own leave request
     }
     
     // HR, Admin, and SuperAdmin can approve others' requests
@@ -388,12 +387,7 @@ export function LeaveRequestsPage() {
                         }`}
                         required
                       >
-                        <option value="annual">Annual Leave</option>
-                        <option value="sick">Sick Leave</option>
-                        <option value="personal">Personal Leave</option>
-                        <option value="maternity">Maternity Leave</option>
-                        <option value="paternity">Paternity Leave</option>
-                        <option value="emergency">Emergency Leave</option>
+                        <option value="Annual Leave">Annual Leave</option>
                       </select>
                     </div>
                     <div>
@@ -481,7 +475,7 @@ export function LeaveRequestsPage() {
                       type="button"
                       onClick={() => {
                         setIsCreating(false);
-                        setFormData({ startDate: '', endDate: '', reason: '', type: 'annual', notes: '' });
+                        setFormData({ startDate: '', endDate: '', reason: '', type: 'Annual Leave', notes: '' });
                       }}
                       className={`flex-1 px-4 py-2 rounded-lg transition font-medium ${
                         darkMode 
@@ -523,6 +517,14 @@ export function LeaveRequestsPage() {
                         <span className={getStatusBadge(safeString(request.status, 'pending'))}>
                           {safeString(request.status, 'pending').charAt(0).toUpperCase() + safeString(request.status, 'pending').slice(1)}
                         </span>
+                        {/* Show "Your Request" badge for own requests */}
+                        {(currentUser?.id === request.employee_id || currentUser?.employee_id === request.employee_id) && (
+                          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                            darkMode ? 'bg-purple-900 text-purple-300' : 'bg-purple-100 text-purple-800'
+                          }`}>
+                            Your Request
+                          </span>
+                        )}
                       </div>
                       {/* Approve/Reject buttons for HR/Admin/SuperAdmin */}
                       {canApproveReject(request) && (

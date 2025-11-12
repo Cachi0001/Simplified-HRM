@@ -7,6 +7,7 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { useToast } from '../components/ui/Toast';
+import { ConfirmationDialog } from '../components/ui/ConfirmationDialog';
 import { useTheme } from '../contexts/ThemeContext';
 import { BottomNavbar } from '../components/layout/BottomNavbar';
 import { Calendar, User, Clock, Trash2, ArrowLeft, Plus, Play, Pause, CheckCircle } from 'lucide-react';
@@ -15,6 +16,7 @@ import { authService } from '../services/authService';
 import Logo from '../components/ui/Logo';
 import { DarkModeToggle } from '../components/ui/DarkModeToggle';
 import { NotificationBell } from '../components/notifications/NotificationBell';
+import { getDisplayName } from '../utils/userDisplay';
 
 export function TasksPage() {
   const { darkMode, setDarkMode } = useTheme();
@@ -47,6 +49,11 @@ export function TasksPage() {
   const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; taskId: string; taskName: string }>({
+    isOpen: false,
+    taskId: '',
+    taskName: ''
+  });
   
   const formatDateInput = (date: Date) => date.toISOString().split('T')[0];
   const tomorrow = (() => {
@@ -261,11 +268,18 @@ export function TasksPage() {
     }
   };
 
-  const handleDeleteTask = (taskId: string) => {
-    if (confirm('Are you sure you want to delete this task?')) {
-      setDeletingTaskId(taskId);
-      deleteTaskMutation.mutate(taskId);
-    }
+  const handleDeleteTask = (task: any) => {
+    setDeleteConfirm({
+      isOpen: true,
+      taskId: task.id,
+      taskName: task.title
+    });
+  };
+
+  const handleDeleteConfirm = () => {
+    setDeletingTaskId(deleteConfirm.taskId);
+    deleteTaskMutation.mutate(deleteConfirm.taskId);
+    setDeleteConfirm({ isOpen: false, taskId: '', taskName: '' });
   };
 
   const handleUpdateTaskStatus = (taskId: string, newStatus: string) => {
@@ -310,6 +324,10 @@ export function TasksPage() {
     const isCreator = taskCreatorId === currentEmployeeId || taskCreatorId === currentUserId;
     const isAssignee = taskAssigneeId === currentEmployeeId || taskAssigneeId === currentUserId;
     
+    // Get display names with "You" label
+    const displayAssigneeName = getDisplayName(assigneeName, taskAssigneeId, currentUserId, currentEmployeeId);
+    const displayAssignedByName = getDisplayName(assignedByName, taskCreatorId, currentUserId, currentEmployeeId);
+    
     // Debug logging
     console.log('[TaskCard Debug]', {
       taskId: task.id,
@@ -344,7 +362,7 @@ export function TasksPage() {
             {/* Delete button - only for task creator */}
             {isCreator && (
               <button
-                onClick={() => handleDeleteTask(task.id)}
+                onClick={() => handleDeleteTask(task)}
                 disabled={deletingTaskId === task.id}
                 className={`p-2 rounded-lg transition-colors ${
                   darkMode
@@ -370,8 +388,15 @@ export function TasksPage() {
                 {showProgressControls ? 'Assigned by:' : 'Assigned to:'}
               </span>
               <span className="font-semibold">
-                {showProgressControls ? assignedByName : assigneeName}
+                {showProgressControls ? displayAssignedByName : displayAssigneeName}
               </span>
+              {((showProgressControls && displayAssignedByName === 'You') || (!showProgressControls && displayAssigneeName === 'You')) && (
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                  darkMode ? 'bg-purple-900 text-purple-300' : 'bg-purple-100 text-purple-800'
+                }`}>
+                  YOU
+                </span>
+              )}
             </div>
           </div>
 
@@ -670,11 +695,20 @@ export function TasksPage() {
                   }`}
                 >
                   <option value="">Select employee</option>
-                  {employees.map((employee: any) => (
-                    <option key={employee.id} value={employee.id}>
-                      {employee.full_name} ({employee.role})
-                    </option>
-                  ))}
+                  {employees.map((employee: any) => {
+                    const displayName = getDisplayName(
+                      employee.full_name,
+                      employee.id,
+                      currentUserId,
+                      currentEmployeeId
+                    );
+                    const isYou = displayName === 'You';
+                    return (
+                      <option key={employee.id} value={employee.id}>
+                        {isYou ? `${employee.full_name} (YOU - ${employee.role})` : `${employee.full_name} (${employee.role})`}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
               
@@ -737,6 +771,18 @@ export function TasksPage() {
       
       {/* Spacer for fixed navbar */}
       <div className="h-20"></div>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, taskId: '', taskName: '' })}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Task"
+        message={`Are you sure you want to delete "${deleteConfirm.taskName}"? This action cannot be undone.`}
+        confirmText="Delete"
+        type="danger"
+        loading={deletingTaskId === deleteConfirm.taskId}
+      />
     </div>
   );
 }

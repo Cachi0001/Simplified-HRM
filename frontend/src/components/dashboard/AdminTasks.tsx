@@ -7,6 +7,7 @@ import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { useToast } from '../ui/Toast';
+import { getDisplayName } from '../../utils/userDisplay';
 import {
   Plus,
   Search,
@@ -264,9 +265,18 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
                   <option value="">Select Employee</option>
                   {employees.map(emp => {
                     const value = normalizeId(emp.id);
+                    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+                    const displayName = getDisplayName(
+                      emp.full_name,
+                      value,
+                      currentUser.id,
+                      currentUser.employee_id
+                    );
+                    const isYou = displayName === 'You';
+                    
                     return (
                       <option key={value} value={value}>
-                        {emp.full_name} ({emp.department || 'No Department'})
+                        {isYou ? `${emp.full_name} (YOU - ${emp.department || 'No Department'})` : `${emp.full_name} (${emp.department || 'No Department'})`}
                       </option>
                     );
                   })}

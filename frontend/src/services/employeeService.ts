@@ -28,6 +28,7 @@ export interface Employee {
   user_email_verified?: boolean;
   profile_updated_at?: string;
   profile_completed?: boolean;
+  lead_department_id?: string; // Department this employee leads (for team leads)
   created_at?: string;
   updated_at?: string;
 }

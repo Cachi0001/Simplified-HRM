@@ -31,6 +31,7 @@ export interface Employee {
   profile_completed?: boolean;
   manager_id?: string;
   team_lead_id?: string;
+  lead_department_id?: string; // Department this employee leads (for team leads)
   salary?: number;
   work_days?: string[];
   working_days?: any;

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Search, Filter, Calendar, User, AlertCircle, CheckCircle, Clock, X } from 'lucide-react';
 import { apiClient } from '../../services/apiClient';
 import { useToast } from '../ui/Toast';
+import { getDisplayName } from '../../utils/userDisplay';
 
 interface Task {
   id: string;
@@ -381,11 +382,21 @@ export function TeamLeadTasks({ currentUser, darkMode }: TeamLeadTasksProps) {
                   }`}
                 >
                   <option value="">Select employee</option>
-                  {employees.map(employee => (
-                    <option key={employee.id} value={employee.id}>
-                      {employee.full_name}
-                    </option>
-                  ))}
+                  {employees.map(employee => {
+                    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+                    const displayName = getDisplayName(
+                      employee.full_name,
+                      employee.id,
+                      currentUser.id,
+                      currentUser.employee_id
+                    );
+                    const isYou = displayName === 'You';
+                    return (
+                      <option key={employee.id} value={employee.id}>
+                        {isYou ? `${employee.full_name} (YOU)` : employee.full_name}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
