@@ -6,6 +6,7 @@ import { EmployeeCard } from '../components/employee/EmployeeCard';
 import { EmployeeEditModal } from '../components/employee/EmployeeEditModal';
 import { SearchAndFilters } from '../components/employee/SearchAndFilters';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../components/ui/Toast';
 import Logo from '../components/ui/Logo';
 
 export const EmployeeManagementPage: React.FC = () => {
@@ -16,6 +17,7 @@ export const EmployeeManagementPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
+  const { addToast } = useToast();
 
   // State management
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -107,6 +109,7 @@ export const EmployeeManagementPage: React.FC = () => {
         employeeService.getAllEmployees(),
         employeeService.getDepartments().catch(err => {
           console.error('Failed to load departments:', err);
+          addToast('warning', 'Failed to load departments');
           return []; // Return empty array if departments fail to load
         })
       ]);
@@ -119,8 +122,14 @@ export const EmployeeManagementPage: React.FC = () => {
 
       setEmployees(normalizedEmployees);
       setDepartments(departmentsData || []);
-    } catch (err) {
-      setError('Failed to load employee data. Please try again.');
+      
+      if (normalizedEmployees.length > 0) {
+        addToast('success', `Loaded ${normalizedEmployees.length} staff members`);
+      }
+    } catch (err: any) {
+      const errorMessage = err.message || 'Failed to load employee data. Please try again.';
+      setError(errorMessage);
+      addToast('error', errorMessage);
       console.error('Error loading data:', err);
     } finally {
       setLoading(false);
@@ -162,6 +171,7 @@ export const EmployeeManagementPage: React.FC = () => {
     // Validate the updated employee has required fields
     if (!updatedEmployee || !updatedEmployee.id) {
       console.error('Invalid employee data received:', updatedEmployee);
+      addToast('error', 'Failed to update employee: Invalid data received');
       setShowEditModal(false);
       setManagingEmployee(null);
       // Reload employees to ensure data consistency
@@ -185,7 +195,7 @@ export const EmployeeManagementPage: React.FC = () => {
     setManagingEmployee(null);
     
     // Show success message
-    console.log('Employee updated successfully');
+    addToast('success', `${updatedEmployee.full_name}'s profile updated successfully`);
   };
 
   const handleSelectEmployee = (employeeId: string, selected: boolean) => {

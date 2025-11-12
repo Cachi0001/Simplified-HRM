@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Employee, Department } from '../../services/employeeService';
 import { employeeService } from '../../services/employeeService';
 import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../ui/Toast';
 
 interface EmployeeEditModalProps {
   employee: Employee | null;
@@ -19,6 +20,7 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
   darkMode
 }) => {
   const { user } = useAuth();
+  const { addToast } = useToast();
   const [formData, setFormData] = useState<Partial<Employee>>({});
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(false);
@@ -50,7 +52,9 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
       setDepartments(departmentsData);
     } catch (error) {
       console.error('Failed to load departments:', error);
-      setError('Failed to load departments');
+      const errorMsg = 'Failed to load departments';
+      setError(errorMsg);
+      addToast('error', errorMsg);
     }
   };
 
@@ -59,7 +63,9 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
     
     // Prevent non-superadmin from changing role if employee is superadmin
     if (name === 'role' && employee?.role === 'superadmin' && user?.role !== 'superadmin') {
-      setError('Only superadmin users can modify superadmin roles');
+      const errorMsg = 'Only superadmin users can modify superadmin roles';
+      setError(errorMsg);
+      addToast('error', errorMsg);
       return;
     }
     
@@ -75,7 +81,9 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
 
     // Prevent non-superadmin from modifying superadmin employees
     if (employee.role === 'superadmin' && user?.role !== 'superadmin') {
-      setError('You do not have permission to modify superadmin staff members');
+      const errorMsg = 'You do not have permission to modify superadmin staff members';
+      setError(errorMsg);
+      addToast('error', errorMsg);
       return;
     }
 
@@ -92,10 +100,13 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
       });
 
       if (result.success) {
+        addToast('success', `${employee.full_name}'s work information updated successfully`);
         onSave(result.employee);
         onClose();
       } else {
-        setError(result.error || 'Failed to update employee');
+        const errorMsg = result.error || 'Failed to update employee';
+        setError(errorMsg);
+        addToast('error', errorMsg);
       }
     } catch (error) {
       handleError(error, 'update employee fields');
@@ -110,7 +121,9 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
 
     // Prevent non-superadmin from modifying superadmin employees
     if (employee.role === 'superadmin' && user?.role !== 'superadmin') {
-      setError('You do not have permission to modify superadmin staff members');
+      const errorMsg = 'You do not have permission to modify superadmin staff members';
+      setError(errorMsg);
+      addToast('error', errorMsg);
       return;
     }
 
@@ -120,10 +133,14 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
     try {
       const result = await employeeService.updateEmployeeStatus(employee.id, formData.status);
       if (result.success) {
+        const statusText = formData.status.charAt(0).toUpperCase() + formData.status.slice(1);
+        addToast('success', `${employee.full_name}'s status updated to ${statusText}`);
         onSave(result.employee);
         onClose();
       } else {
-        setError(result.error || 'Failed to update employee status');
+        const errorMsg = result.error || 'Failed to update employee status';
+        setError(errorMsg);
+        addToast('error', errorMsg);
       }
     } catch (error) {
       handleError(error, 'update employee status');
@@ -149,6 +166,7 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
     console.error(`EmployeeEditModal ${context}:`, error);
     const errorMessage = error?.response?.data?.message || error?.message || `Failed to ${context}`;
     setError(errorMessage);
+    addToast('error', errorMessage);
   };
 
   return (
