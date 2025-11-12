@@ -178,6 +178,16 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
       return;
     }
 
+    // Get current user
+    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+    const currentEmployeeId = currentUser.employee_id || currentUser.id;
+
+    // Check if trying to assign to self
+    if (newTask.assigneeId === currentEmployeeId || newTask.assigneeId === currentUser.id) {
+      addToast('error', 'Cannot assign tasks to yourself. Please select a different employee.');
+      return;
+    }
+
     // Check if trying to assign to superadmin
     const selectedEmployee = employees.find(emp => normalizeId(emp.id) === newTask.assigneeId);
     if (selectedEmployee && selectedEmployee.role === 'superadmin') {

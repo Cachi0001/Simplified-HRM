@@ -87,6 +87,13 @@ export function TeamLeadTasks({ currentUser, darkMode }: TeamLeadTasksProps) {
         return;
       }
 
+      // Check if trying to assign to self
+      const currentEmployeeId = currentUser.employee_id || currentUser.id;
+      if (newTask.assignee_id === currentEmployeeId || newTask.assignee_id === currentUser.id) {
+        addToast('error', 'Cannot assign tasks to yourself. Please select a different employee.');
+        return;
+      }
+
       const response = await apiClient.post('/tasks', {
         ...newTask,
         assigner_id: currentUser.id,
@@ -105,8 +112,9 @@ export function TeamLeadTasks({ currentUser, darkMode }: TeamLeadTasksProps) {
         });
         loadTasks();
       }
-    } catch (error) {
-      addToast('error', 'Failed to create task');
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to create task';
+      addToast('error', errorMessage);
     }
   };
 
