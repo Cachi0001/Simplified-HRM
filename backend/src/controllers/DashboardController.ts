@@ -48,6 +48,23 @@ export class DashboardController {
         WHERE created_at >= $1
       `, [startDate]);
 
+      // Get department count
+      const departmentResult = await pool.query(`
+        SELECT COUNT(*) as total_departments
+        FROM departments
+        WHERE deleted_at IS NULL
+      `);
+
+      // Get attendance stats
+      const attendanceResult = await pool.query(`
+        SELECT 
+          COUNT(*) as total_attendance,
+          COUNT(*) FILTER (WHERE is_late = true) as late_count,
+          AVG(hours_worked) as avg_hours
+        FROM attendance
+        WHERE date >= $1
+      `, [startDate]);
+
       const stats = {
         totalEmployees: parseInt(employeeResult.rows[0].total_employees) || 0,
         activeEmployees: parseInt(employeeResult.rows[0].active_employees) || 0,
@@ -61,6 +78,10 @@ export class DashboardController {
         totalTasks: parseInt(taskResult.rows[0].total_tasks) || 0,
         pendingTasks: parseInt(taskResult.rows[0].pending_tasks) || 0,
         completedTasks: parseInt(taskResult.rows[0].completed_tasks) || 0,
+        totalDepartments: parseInt(departmentResult.rows[0].total_departments) || 0,
+        totalAttendance: parseInt(attendanceResult.rows[0].total_attendance) || 0,
+        lateCount: parseInt(attendanceResult.rows[0].late_count) || 0,
+        avgHours: parseFloat(attendanceResult.rows[0].avg_hours) || 0,
       };
 
       res.json({

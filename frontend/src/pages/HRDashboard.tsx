@@ -148,13 +148,13 @@ export default function HRDashboard() {
 
         {/* Stats Cards */}
         {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            {/* Total Employees Card - Temporarily Disabled */}
-            {/* <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            {/* Total Staff Card */}
+            <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
               <div className="flex items-center justify-between">
                 <div>
                   <p className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                    Total Employees
+                    Total Staff
                   </p>
                   <p className={`text-3xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                     {(stats as any)?.totalEmployees || 0}
@@ -167,8 +167,26 @@ export default function HRDashboard() {
                   <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                 </div>
               </div>
-            </div> */}
+            </div>
 
+            {/* Departments Card */}
+            <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    Departments
+                  </p>
+                  <p className={`text-3xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                    {(stats as any)?.totalDepartments || 0}
+                  </p>
+                </div>
+                <div className="bg-green-100 dark:bg-green-900 p-3 rounded-lg">
+                  <Building className="w-6 h-6 text-green-600 dark:text-green-400" />
+                </div>
+              </div>
+            </div>
+
+            {/* Leave Requests Card */}
             <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
               <div className="flex items-center justify-between">
                 <div>
@@ -188,6 +206,7 @@ export default function HRDashboard() {
               </div>
             </div>
 
+            {/* Purchase Requests Card */}
             <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
               <div className="flex items-center justify-between">
                 <div>
@@ -203,22 +222,6 @@ export default function HRDashboard() {
                 </div>
                 <div className="bg-purple-100 dark:bg-purple-900 p-3 rounded-lg">
                   <FileText className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-                </div>
-              </div>
-            </div>
-
-            <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                    Departments
-                  </p>
-                  <p className={`text-3xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                    {(stats as any)?.totalDepartments || 0}
-                  </p>
-                </div>
-                <div className="bg-green-100 dark:bg-green-900 p-3 rounded-lg">
-                  <Building className="w-6 h-6 text-green-600 dark:text-green-400" />
                 </div>
               </div>
             </div>
