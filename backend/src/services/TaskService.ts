@@ -26,16 +26,19 @@ export class TaskService {
     }
     
     if (!assigneeEmployee) {
-      throw new Error('Assignee employee not found');
+      const { NotFoundError } = require('../middleware/errorHandler');
+      throw new NotFoundError('Assignee employee not found');
     }
     
     if (!assignerEmployee) {
-      throw new Error('Assigner employee not found');
+      const { NotFoundError } = require('../middleware/errorHandler');
+      throw new NotFoundError('Assigner employee not found');
     }
     
     // Prevent self-assignment
     if (assigneeEmployee.id === assignerEmployee.id || assigneeEmployee.user_id === assignerEmployee.user_id) {
-      throw new Error('Cannot assign task to yourself');
+      const { ValidationError } = require('../middleware/errorHandler');
+      throw new ValidationError('Cannot assign tasks to yourself. Please select a different employee.');
     }
     
     // Use employee IDs

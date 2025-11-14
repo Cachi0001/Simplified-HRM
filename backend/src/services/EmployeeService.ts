@@ -159,14 +159,24 @@ export class EmployeeService {
       [employee.user_id]
     );
 
-    // Initialize leave balances for the approved employee
-    await pool.query(
-      `SELECT initialize_leave_balances($1)`,
-      [employeeId]
-    );
+    // Initialize leave balances for the approved employee (with error handling)
+    try {
+      await pool.query(
+        `SELECT initialize_leave_balances($1)`,
+        [employeeId]
+      );
+    } catch (balanceError) {
+      console.warn('Leave balance initialization warning (may already exist):', balanceError);
+      // Don't fail approval if balances already exist
+    }
 
     // Send approval email
-    await this.emailService.sendApprovalEmail(employee.email, employee.full_name);
+    try {
+      await this.emailService.sendApprovalEmail(employee.email, employee.full_name);
+    } catch (emailError) {
+      console.error('Failed to send approval email:', emailError);
+      // Don't fail approval if email fails
+    }
 
     // Get updated employee
     const updatedEmployee = await this.employeeRepo.findById(employeeId);
