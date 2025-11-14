@@ -14,14 +14,25 @@ export class AttendanceController {
       const userId = (req as any).user?.userId;
       const { lat, lng, address } = req.body;
 
+      if (!userId) {
+        throw new ValidationError('User ID not found');
+      }
+
       if (!lat || !lng) {
         throw new ValidationError('Location coordinates are required');
       }
 
-      const employeeId = userId;
+      // Get employee_id from user_id
+      const { EmployeeRepository } = require('../repositories/EmployeeRepository');
+      const employeeRepo = new EmployeeRepository();
+      const employee = await employeeRepo.findByUserId(userId);
+      
+      if (!employee) {
+        throw new ValidationError('Employee profile not found. Please complete your profile first.');
+      }
 
       const result = await this.attendanceService.clockIn({
-        employee_id: employeeId,
+        employee_id: employee.id,
         lat,
         lng,
         address
@@ -42,14 +53,25 @@ export class AttendanceController {
       const userId = (req as any).user?.userId;
       const { lat, lng, address } = req.body;
 
+      if (!userId) {
+        throw new ValidationError('User ID not found');
+      }
+
       if (!lat || !lng) {
         throw new ValidationError('Location coordinates are required');
       }
 
-      const employeeId = userId;
+      // Get employee_id from user_id
+      const { EmployeeRepository } = require('../repositories/EmployeeRepository');
+      const employeeRepo = new EmployeeRepository();
+      const employee = await employeeRepo.findByUserId(userId);
+      
+      if (!employee) {
+        throw new ValidationError('Employee profile not found. Please complete your profile first.');
+      }
 
       const result = await this.attendanceService.clockOut({
-        employee_id: employeeId,
+        employee_id: employee.id,
         lat,
         lng,
         address
@@ -70,10 +92,23 @@ export class AttendanceController {
       const userId = (req as any).user?.userId;
       const { startDate, endDate } = req.query;
 
+      if (!userId) {
+        throw new ValidationError('User ID not found');
+      }
+
+      // Get employee_id from user_id
+      const { EmployeeRepository } = require('../repositories/EmployeeRepository');
+      const employeeRepo = new EmployeeRepository();
+      const employee = await employeeRepo.findByUserId(userId);
+      
+      if (!employee) {
+        throw new ValidationError('Employee profile not found');
+      }
+
       const start = startDate ? new Date(startDate as string) : undefined;
       const end = endDate ? new Date(endDate as string) : undefined;
 
-      const records = await this.attendanceService.getMyRecords(userId, start, end);
+      const records = await this.attendanceService.getMyRecords(employee.id, start, end);
 
       res.json({
         success: true,
@@ -88,7 +123,20 @@ export class AttendanceController {
     try {
       const userId = (req as any).user?.userId;
 
-      const status = await this.attendanceService.getTodayStatus(userId);
+      if (!userId) {
+        throw new ValidationError('User ID not found');
+      }
+
+      // Get employee_id from user_id
+      const { EmployeeRepository } = require('../repositories/EmployeeRepository');
+      const employeeRepo = new EmployeeRepository();
+      const employee = await employeeRepo.findByUserId(userId);
+      
+      if (!employee) {
+        throw new ValidationError('Employee profile not found');
+      }
+
+      const status = await this.attendanceService.getTodayStatus(employee.id);
 
       res.json({
         success: true,
