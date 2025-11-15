@@ -137,9 +137,48 @@ export function LeaveRequestsPage() {
       return;
     }
 
+    // Calculate requested days
+    const timeDiff = endDate.getTime() - startDate.getTime();
+    const requestedDays = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1;
+
     try {
       setSubmitting(true);
       
+      // Fetch current employee balance before submitting
+      const balanceResponse = await api.get('/employees/me');
+      const employee = balanceResponse.data.data || balanceResponse.data;
+      const remainingLeave = employee.remaining_annual_leave || 0;
+      
+      // Check if sufficient balance (including pending requests)
+      const pendingDays = leaveRequests
+        .filter(req => req.status === 'pending' && (req.employee_id === currentUser?.employeeId || req.employee_id === currentUser?.id))
+        .reduce((sum, req) => sum + (req.days_requested || 0), 0);
+      
+      const availableDays = remainingLeave - pendingDays;
+      
+      if (requestedDays > availableDays) {
+        addToast('error', `Insufficient leave balance. You have ${availableDays} days available (${remainingLeave} remaining - ${pendingDays} pending). You're requesting ${requestedDays} days.`);
+        setSubmitting(false);
+        return;
+      }
+
+      // Check for overlapping requests
+      const hasOverlap = leaveRequests.some(req => {
+        if (req.status !== 'approved' && req.status !== 'pending') return false;
+        if (req.employee_id !== currentUser?.employeeId && req.employee_id !== currentUser?.id) return false;
+        
+        const reqStart = new Date(req.start_date);
+        const reqEnd = new Date(req.end_date);
+        
+        return (startDate <= reqEnd && endDate >= reqStart);
+      });
+      
+      if (hasOverlap) {
+        addToast('error', 'You have an overlapping leave request for these dates. Please choose different dates.');
+        setSubmitting(false);
+        return;
+      }
+        
       const response = await api.post('/leave/request', {
         leaveType: formData.type,
         startDate: formData.startDate,
@@ -147,39 +186,39 @@ export function LeaveRequestsPage() {
         reason: formData.reason,
         notes: formData.notes
       });
-      
-      if (response.data.success) {
-        // Refresh the list
-        await fetchLeaveRequests();
-        // Reset form
-        setFormData({ startDate: '', endDate: '', reason: '', type: 'Annual Leave', notes: '' });
-        setIsCreating(false);
-        addToast('success', 'Leave request created successfully');
-      } else {
-        throw new Error(response.data.message || 'Failed to create leave request');
-      }
-    } catch (error: any) {
-      console.error('Error creating leave request:', error);
-      
-      // Enhanced error handling
-      let errorMessage = 'Failed to create leave request';
-      
-      if (error.response?.data) {
-        // Check for different error formats
-        if (error.response.data.error) {
-          if (typeof error.response.data.error === 'string') {
-            errorMessage = error.response.data.error;
-          } else if (error.response.data.error.message) {
-            errorMessage = error.response.data.error.message;
-          }
-        } else if (error.response.data.message) {
-          errorMessage = error.response.data.message;
+        
+        if (response.data.success) {
+          // Refresh the list
+          await fetchLeaveRequests();
+          // Reset form
+          setFormData({ startDate: '', endDate: '', reason: '', type: 'Annual Leave', notes: '' });
+          setIsCreating(false);
+          addToast('success', 'Leave request created successfully');
+        } else {
+          throw new Error(response.data.message || 'Failed to create leave request');
         }
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      addToast('error', errorMessage);
+      } catch (error: any) {
+        console.error('Error creating leave request:', error);
+        
+        // Enhanced error handling
+        let errorMessage = 'Failed to create leave request';
+        
+        if (error.response?.data) {
+          // Check for different error formats
+          if (error.response.data.error) {
+            if (typeof error.response.data.error === 'string') {
+              errorMessage = error.response.data.error;
+            } else if (error.response.data.error.message) {
+              errorMessage = error.response.data.error.message;
+            }
+          } else if (error.response.data.message) {
+            errorMessage = error.response.data.message;
+          }
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+        
+        addToast('error', errorMessage);
     } finally {
       setSubmitting(false);
     }
@@ -569,13 +608,17 @@ export function LeaveRequestsPage() {
                       )}
 
                       {/* Delete button for request owner */}
-                      {((currentUser?.id === request.employee_id || currentUser?.employee_id === request.employee_id) && request.status === 'pending') && (
+                      {(request.status === 'pending' && (
+                        currentUser?.employeeId === request.employee_id || 
+                        currentUser?.id === request.employee_id ||
+                        currentUser?._id === request.employee_id
+                      )) && (
                         <button
                           onClick={() => handleDeleteClick(request)}
-                          className={`transition-colors duration-200 ${
+                          className={`p-2 rounded-lg transition-colors duration-200 ${
                             darkMode 
-                              ? 'text-red-400 hover:text-red-300' 
-                              : 'text-red-600 hover:text-red-800'
+                              ? 'bg-red-900 text-red-400 hover:bg-red-800' 
+                              : 'bg-red-100 text-red-600 hover:bg-red-200'
                           }`}
                           title="Delete request"
                         >
