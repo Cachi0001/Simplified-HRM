@@ -18,28 +18,17 @@ export function EmployeeLeaveBalances({ darkMode = false }: EmployeeLeaveBalance
       const response = await api.get('/employees');
       const employeesData = response.data.data || response.data || [];
       
-      // Fetch leave balances for each employee
-      const employeesWithBalances = await Promise.all(
-        employeesData
-          .filter((emp: any) => emp.status === 'active' && emp.role !== 'superadmin')
-          .map(async (emp: any) => {
-            try {
-              const balanceResponse = await api.get(`/leave/balances/${emp.id}`);
-              const balances = balanceResponse.data.data || [];
-              const annualLeave = balances.find((b: any) => b.leave_type === 'Annual Leave');
-              
-              return {
-                ...emp,
-                leaveBalance: annualLeave || { remaining_days: 0, total_days: 7, used_days: 7 }
-              };
-            } catch (error) {
-              return {
-                ...emp,
-                leaveBalance: { remaining_days: 0, total_days: 7, used_days: 7 }
-              };
-            }
-          })
-      );
+      // Use single pool balance from employees table
+      const employeesWithBalances = employeesData
+        .filter((emp: any) => emp.status === 'active' && emp.role !== 'superadmin')
+        .map((emp: any) => ({
+          ...emp,
+          leaveBalance: {
+            total_days: emp.total_annual_leave || 7,
+            used_days: emp.used_annual_leave || 0,
+            remaining_days: emp.remaining_annual_leave || 7
+          }
+        }));
       
       return employeesWithBalances;
     },

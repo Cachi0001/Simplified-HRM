@@ -18,7 +18,8 @@ async function runMigration() {
     const migrations = [
       '../database/migrations/fix_final_issues.sql',
       '../database/migrations/fix_notification_types.sql',
-      '../database/migrations/fix_leave_system_single_pool.sql'
+      '../database/migrations/fix_leave_system_single_pool.sql',
+      '../database/migrations/fix_performance_metrics.sql'
     ];
     
     for (const migration of migrations) {

@@ -410,6 +410,14 @@ export function LeaveRequestsPage() {
             {isCreating && (
               <div className={`rounded-lg shadow-md p-6 mb-8 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
                 <h2 className={`text-xl font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Create Leave Request</h2>
+                
+                {/* Leave Balance Info */}
+                <div className={`mb-4 p-3 rounded-lg ${darkMode ? 'bg-blue-900/20 border border-blue-800' : 'bg-blue-50 border border-blue-200'}`}>
+                  <p className={`text-sm ${darkMode ? 'text-blue-300' : 'text-blue-800'}`}>
+                    <span className="font-semibold">📅 Annual Leave Pool:</span> You have a single pool of 7 days per year that can be used for any leave type (Annual, Sick, Emergency, etc.)
+                  </p>
+                </div>
+                
                 <form onSubmit={handleCreateLeaveRequest} className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
@@ -426,11 +434,11 @@ export function LeaveRequestsPage() {
                         }`}
                         required
                       >
-                        <option value="Annual Leave">Annual Leave (7 days)</option>
-                        <option value="Sick Leave">Sick Leave </option>
-                        <option value="Emergency Leave">Emergency Leave </option>
-                        <option value="Maternity Leave">Maternity Leave </option>
-                        <option value="Paternity Leave">Paternity Leave </option>
+                        <option value="Annual Leave">Annual Leave</option>
+                        <option value="Sick Leave">Sick Leave</option>
+                        <option value="Emergency Leave">Emergency Leave</option>
+                        <option value="Maternity Leave">Maternity Leave</option>
+                        <option value="Paternity Leave">Paternity Leave</option>
                       </select>
                     </div>
                     <div>
