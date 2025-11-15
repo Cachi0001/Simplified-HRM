@@ -36,7 +36,7 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
         department_id: employee.department_id,
         position: employee.position,
         role: employee.role,
-        manager_id: employee.manager_id,
+        // manager_id removed - column doesn't exist in database
         salary: employee.salary,
         status: employee.status,
         lead_department_id: employee.lead_department_id || ''
@@ -99,7 +99,7 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
         department_id: formData.department_id,
         position: formData.position,
         role: formData.role,
-        manager_id: formData.manager_id,
+        // manager_id removed - column doesn't exist in database
         salary: formData.salary
       });
 

@@ -174,7 +174,7 @@ class EmployeeService {
     department_id?: string;
     position?: string;
     role?: string;
-    manager_id?: string;
+    // manager_id removed - column doesn't exist in database
     salary?: number;
   }): Promise<{
     success: boolean;
