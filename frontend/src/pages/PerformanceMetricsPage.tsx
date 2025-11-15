@@ -25,8 +25,22 @@ import { useTheme } from '../contexts/ThemeContext';
 
 export default function PerformanceMetricsPage() {
   const { darkMode, setDarkMode } = useTheme();
-  const [startDate, setStartDate] = useState<string>('');
-  const [endDate, setEndDate] = useState<string>('');
+  
+  // Default to last 30 days
+  const getDefaultDates = () => {
+    const today = new Date();
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(today.getDate() - 30);
+    
+    return {
+      start: thirtyDaysAgo.toISOString().split('T')[0],
+      end: today.toISOString().split('T')[0]
+    };
+  };
+  
+  const defaultDates = getDefaultDates();
+  const [startDate, setStartDate] = useState<string>(defaultDates.start);
+  const [endDate, setEndDate] = useState<string>(defaultDates.end);
 
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
   const isAdmin = ['admin', 'hr', 'superadmin', 'teamlead'].includes(currentUser.role);

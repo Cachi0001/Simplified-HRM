@@ -388,10 +388,10 @@ export function LeaveRequestsPage() {
                         required
                       >
                         <option value="Annual Leave">Annual Leave (7 days)</option>
-                        <option value="Sick Leave">Sick Leave (10 days)</option>
-                        <option value="Emergency Leave">Emergency Leave (5 days)</option>
-                        <option value="Maternity Leave">Maternity Leave (90 days)</option>
-                        <option value="Paternity Leave">Paternity Leave (14 days)</option>
+                        <option value="Sick Leave">Sick Leave </option>
+                        <option value="Emergency Leave">Emergency Leave </option>
+                        <option value="Maternity Leave">Maternity Leave </option>
+                        <option value="Paternity Leave">Paternity Leave </option>
                       </select>
                     </div>
                     <div>

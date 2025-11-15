@@ -12,30 +12,39 @@ async function runMigration() {
     console.log('Connecting to database...');
     const client = await pool.connect();
     
-    console.log('Reading migration file...');
-    const migrationPath = path.join(__dirname, '../database/migrations/fix_profile_update_notifications.sql');
-    const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
+    console.log('Reading migration files...');
     
-    console.log('Running migration...');
-    await client.query(migrationSQL);
+    // Run multiple migrations
+    const migrations = [
+      '../database/migrations/fix_final_issues.sql',
+      '../database/migrations/fix_notification_types.sql',
+      '../database/migrations/fix_leave_system_single_pool.sql'
+    ];
     
-    console.log('✅ Migration completed successfully!');
+    for (const migration of migrations) {
+      const migrationPath = path.join(__dirname, migration);
+      const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
+      console.log(`Running ${migration.split('/').pop()}...`);
+      await client.query(migrationSQL);
+    }
     
-    // Verify the function exists
-    const result = await client.query(`
-      SELECT proname, pronargs 
-      FROM pg_proc 
-      WHERE proname = 'notify_profile_updated'
+    console.log('✅ All migrations completed successfully!');
+    
+    // Verify leave types
+    const leaveTypes = await client.query(`
+      SELECT name, default_days_per_year FROM leave_types WHERE is_active = TRUE ORDER BY name
     `);
     
-    if (result.rows.length > 0) {
-      console.log('✅ notify_profile_updated function verified:');
-      result.rows.forEach(row => {
-        console.log(`   - ${row.proname} with ${row.pronargs} arguments`);
-      });
-    } else {
-      console.log('⚠️  Warning: notify_profile_updated function not found after migration');
-    }
+    console.log('✅ Leave types verified:');
+    leaveTypes.rows.forEach(lt => {
+      console.log(`   - ${lt.name}: ${lt.default_days_per_year} days`);
+    });
+    
+    // Verify leave balances created
+    const balances = await client.query(`
+      SELECT COUNT(*) as count FROM leave_balances WHERE year = EXTRACT(YEAR FROM CURRENT_DATE)
+    `);
+    console.log(`✅ Leave balances: ${balances.rows[0].count} records`);
     
     client.release();
   } catch (error) {

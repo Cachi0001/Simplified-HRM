@@ -78,6 +78,16 @@ const WorkingDaysConfig: React.FC<WorkingDaysConfigProps> = ({
             }
           }
           
+          // Parse working_hours if it's a string
+          let workingHours = employee.working_hours;
+          if (typeof workingHours === 'string') {
+            try {
+              workingHours = JSON.parse(workingHours);
+            } catch (e) {
+              workingHours = { start: "08:35", end: "17:00" };
+            }
+          }
+          
           setWorkingDaysData({
             working_days: Array.isArray(workingDays) ? workingDays : [
               "monday",
@@ -86,7 +96,7 @@ const WorkingDaysConfig: React.FC<WorkingDaysConfigProps> = ({
               "thursday",
               "friday",
             ],
-            working_hours: employee.working_hours || {
+            working_hours: workingHours || {
               start: "08:35",
               end: "17:00",
             },
