@@ -137,17 +137,60 @@ export function LeaveRequestsPage() {
       return;
     }
 
-    // Calculate requested days
-    const timeDiff = endDate.getTime() - startDate.getTime();
-    const requestedDays = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1;
+    // Calculate requested WEEKDAYS only (excluding weekends)
+    let requestedDays = 0;
+    let currentDate = new Date(startDate);
+    const finalDate = new Date(endDate);
+    
+    while (currentDate <= finalDate) {
+      const dayOfWeek = currentDate.getDay();
+      // 0 = Sunday, 6 = Saturday - exclude these
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+        requestedDays++;
+      }
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    console.log('Date calculation:');
+    console.log('  Start:', startDate.toISOString().split('T')[0]);
+    console.log('  End:', endDate.toISOString().split('T')[0]);
+    console.log('  Weekdays only:', requestedDays);
 
     try {
       setSubmitting(true);
       
       // Fetch current employee balance before submitting
       const balanceResponse = await api.get('/employees/me');
-      const employee = balanceResponse.data.data || balanceResponse.data;
-      const remainingLeave = employee.remaining_annual_leave || 0;
+      console.log('Full API response:', balanceResponse.data);
+      
+      // Try multiple paths to find the employee data
+      let employee = null;
+      if (balanceResponse.data.data?.profile) {
+        employee = balanceResponse.data.data.profile;
+        console.log('Found employee in data.data.profile');
+      } else if (balanceResponse.data.profile) {
+        employee = balanceResponse.data.profile;
+        console.log('Found employee in data.profile');
+      } else if (balanceResponse.data.data) {
+        employee = balanceResponse.data.data;
+        console.log('Found employee in data.data');
+      } else {
+        employee = balanceResponse.data;
+        console.log('Found employee in data');
+      }
+      
+      console.log('Employee object:', employee);
+      console.log('Employee keys:', Object.keys(employee));
+      
+      const remainingLeave = employee.remaining_annual_leave ?? employee.remainingAnnualLeave ?? 0;
+      console.log('Remaining leave:', remainingLeave);
+      
+      if (remainingLeave === 0 && !employee.remaining_annual_leave && !employee.remainingAnnualLeave) {
+        console.error('WARNING: Could not find remaining_annual_leave in employee object!');
+        addToast('error', 'Could not fetch leave balance. Please refresh the page and try again.');
+        setSubmitting(false);
+        return;
+      }
       
       // Check if sufficient balance (including pending requests)
       const pendingDays = leaveRequests
