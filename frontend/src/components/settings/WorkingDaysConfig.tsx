@@ -64,9 +64,12 @@ const WorkingDaysConfig: React.FC<WorkingDaysConfigProps> = ({
         
         // Use my-profile endpoint which is faster and more reliable
         const response = await api.get("/employees/my-profile");
+        console.log('Full API response:', response.data);
 
         if (response.data.success) {
-          const employee = response.data.data;
+          // The API returns data.profile, not just data
+          const employee = response.data.data?.profile || response.data.data;
+          console.log('Employee data:', employee);
           
           // Parse working_days if it's a string
           let workingDays = employee.working_days || employee.work_days;
@@ -80,13 +83,25 @@ const WorkingDaysConfig: React.FC<WorkingDaysConfigProps> = ({
           
           // Parse working_hours if it's a string
           let workingHours = employee.working_hours;
+          console.log('Raw working_hours from API:', workingHours, 'Type:', typeof workingHours);
+          
           if (typeof workingHours === 'string') {
             try {
               workingHours = JSON.parse(workingHours);
+              console.log('Parsed working_hours:', workingHours);
             } catch (e) {
+              console.error('Failed to parse working_hours:', e);
               workingHours = { start: "08:35", end: "17:00" };
             }
           }
+          
+          // Ensure working_hours has the correct structure
+          if (!workingHours || typeof workingHours !== 'object' || !workingHours.start || !workingHours.end) {
+            console.warn('Invalid working_hours structure, using defaults');
+            workingHours = { start: "08:35", end: "17:00" };
+          }
+          
+          console.log('Final working_hours to set:', workingHours);
           
           setWorkingDaysData({
             working_days: Array.isArray(workingDays) ? workingDays : [
@@ -96,10 +111,7 @@ const WorkingDaysConfig: React.FC<WorkingDaysConfigProps> = ({
               "thursday",
               "friday",
             ],
-            working_hours: workingHours || {
-              start: "08:35",
-              end: "17:00",
-            },
+            working_hours: workingHours,
             timezone: employee.timezone || "UTC",
           });
         }
