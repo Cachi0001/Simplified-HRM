@@ -6,7 +6,7 @@ import api from '../../lib/api';
 import { authService } from '../../services/authService';
 import { EmployeeCard } from '../employee/EmployeeCard';
 import { EmployeeEditModal } from '../employee/EmployeeEditModal';
-import { Employee } from '../../types/employee';
+import { Employee } from '../../services/employeeService';
 
 interface PendingApprovalsProps {
   darkMode?: boolean;
@@ -18,11 +18,11 @@ const fetchInactiveEmployees = async (): Promise<Employee[]> => {
     const response = await api.get('/employees');
     const allEmployees = response.data.data?.employees || response.data.employees || [];
     
-    // Filter for inactive status only
+    // Filter for pending/inactive status
     const currentUser = authService.getCurrentUserFromStorage();
     const inactiveEmployees = allEmployees.filter((emp: any) => {
-      // Only show inactive employees
-      if (emp.status !== 'inactive') return false;
+      // Only show pending or inactive employees
+      if (emp.status !== 'inactive' && emp.status !== 'pending') return false;
       
       // Don't show current user
       if (emp.email === currentUser?.email) return false;
@@ -83,7 +83,10 @@ export function PendingApprovals({ darkMode = false }: PendingApprovalsProps) {
     setShowEditModal(true);
   };
 
-  const handleUpdateEmployee = async (id: string, data: Partial<Employee>) => {
+  const handleUpdateEmployee = async (employee: Employee) => {
+    // EmployeeEditModal will call this with the full employee object
+    // We need to extract id and data
+    const { id, ...data } = employee;
     await updateEmployeeMutation.mutateAsync({ id, data });
   };
 
@@ -120,7 +123,7 @@ export function PendingApprovals({ darkMode = false }: PendingApprovalsProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {inactiveEmployees.map((emp) => (
           <EmployeeCard
-            key={emp.id || emp._id}
+            key={emp.id}
             employee={emp}
             darkMode={darkMode}
             isHighlighted={false}
@@ -145,7 +148,6 @@ export function PendingApprovals({ darkMode = false }: PendingApprovalsProps) {
           }}
           onSave={handleUpdateEmployee}
           darkMode={darkMode}
-          currentUserRole={currentUserRole}
         />
       )}
     </div>
