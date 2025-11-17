@@ -246,10 +246,24 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
                           <Users className={`h-4 w-4 sm:h-5 sm:w-5 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className={`font-medium text-sm sm:text-base truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                            {getEmployeeName(record)}
-                          </p>
-                          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className={`font-medium text-sm sm:text-base truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                              {getEmployeeName(record)}
+                            </p>
+                            {/* On-time/Late indicator next to name */}
+                            {record.checkInTime && (
+                              (record.is_late || record.isLate) ? (
+                                <span className={`px-2 py-0.5 rounded text-xs font-medium ${darkMode ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-700'}`}>
+                                  +{record.late_minutes || record.lateMinutes || 0} min late
+                                </span>
+                              ) : (
+                                <span className={`px-2 py-0.5 rounded text-xs font-medium ${darkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700'}`}>
+                                  On-time
+                                </span>
+                              )
+                            )}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                             <p className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                               {formatDate(record._id?.date ?? record.date)}
                             </p>
@@ -257,16 +271,6 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
                               <MapPin className="h-3 w-3" />
                               {locationLabel}
                             </span>
-                            {/* On-time/Late indicator */}
-                            {isLate ? (
-                              <span className={`text-xs px-1.5 py-0.5 rounded-full inline-flex items-center gap-1 ${darkMode ? 'bg-red-900 text-red-200' : 'bg-red-100 text-red-700'}`}>
-                                ⏰ {formatLateTime(lateMinutes)}
-                              </span>
-                            ) : (
-                              <span className={`text-xs px-1.5 py-0.5 rounded-full inline-flex items-center gap-1 ${darkMode ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-700'}`}>
-                                ✓ On-time
-                              </span>
-                            )}
                           </div>
                         </div>
                       </div>
@@ -277,17 +281,6 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
                         <div className={`flex items-center gap-1 sm:gap-2 text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                           <Clock className="h-3 w-3" />
                           <span className="whitespace-nowrap">{formatTime(record.checkInTime)}</span>
-                          {record.checkInTime && (
-                            (record.is_late || record.isLate) ? (
-                              <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${darkMode ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-700'}`}>
-                                You are +{record.late_minutes || record.lateMinutes || 0} min late
-                              </span>
-                            ) : (
-                              <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${darkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700'}`}>
-                                On-time
-                              </span>
-                            )
-                          )}
                           {record.checkOutTime ? (
                             <>
                               <span>-</span>
