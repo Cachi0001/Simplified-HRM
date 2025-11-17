@@ -67,7 +67,8 @@ export function TasksPage() {
     description: '',
     assigneeId: '',
     priority: 'normal' as 'low' | 'normal' | 'high' | 'urgent',
-    dueDate: formatDateInput(tomorrow)
+    dueDate: formatDateInput(tomorrow),
+    dueTime: '' // Optional time field
   });
 
   // Fetch tasks assigned TO me (not for superadmin)
@@ -239,7 +240,8 @@ export function TasksPage() {
         description: '',
         assigneeId: '',
         priority: 'normal',
-        dueDate: formatDateInput(tomorrow)
+        dueDate: formatDateInput(tomorrow),
+        dueTime: ''
       });
     },
     onError: (error: any) => {
@@ -742,8 +744,24 @@ export function TasksPage() {
                   type="date"
                   value={newTask.dueDate}
                   onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
-                  min={formatDateInput(tomorrow)}
+                  min={formatDateInput(new Date())}
                 />
+              </div>
+              
+              <div>
+                <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Due Time (Optional)
+                </label>
+                <Input
+                  id="dueTime"
+                  label=""
+                  type="time"
+                  value={newTask.dueTime}
+                  onChange={(e) => setNewTask({ ...newTask, dueTime: e.target.value })}
+                />
+                <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  Leave empty for end of day (11:59 PM)
+                </p>
               </div>
             </div>
             
