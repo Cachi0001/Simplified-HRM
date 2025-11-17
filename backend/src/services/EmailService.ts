@@ -1,12 +1,24 @@
 import { transporter, emailConfig } from '../config/email';
 
 export class EmailService {
-  private readonly frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-  private readonly productionUrl = process.env.FRONTEND_URL_CUSTOM || process.env.FRONTEND_URL_PROD || process.env.PRODUCTION_FRONTEND_URL || 'https://go3net.com';
-
   private getBaseUrl(): string {
-    // Priority: FRONTEND_URL_CUSTOM > FRONTEND_URL_PROD > fallback to go3net.com
-    return process.env.NODE_ENV === 'production' ? this.productionUrl : this.frontendUrl;
+    // In production, use environment variables with priority order
+    if (process.env.NODE_ENV === 'production') {
+      // Priority: FRONTEND_URL_CUSTOM > FRONTEND_URL_PROD > PRODUCTION_FRONTEND_URL
+      const url = process.env.FRONTEND_URL_CUSTOM || 
+                  process.env.FRONTEND_URL_PROD || 
+                  process.env.PRODUCTION_FRONTEND_URL;
+      
+      if (!url) {
+        console.warn('⚠️ WARNING: No production frontend URL configured. Set FRONTEND_URL_CUSTOM in environment variables.');
+        return 'https://go3net.com'; // Emergency fallback only
+      }
+      
+      return url;
+    }
+    
+    // In development, use FRONTEND_URL or localhost
+    return process.env.FRONTEND_URL || 'http://localhost:3000';
   }
 
   private async sendEmail(to: string, subject: string, html: string): Promise<void> {
