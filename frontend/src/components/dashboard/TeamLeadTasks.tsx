@@ -54,6 +54,7 @@ export function TeamLeadTasks({ currentUser, darkMode }: TeamLeadTasksProps) {
     due_date: formatDateInput(tomorrow),
     due_time: ''
   });
+  const [hasInvalidTime, setHasInvalidTime] = useState(false);
 
   const { addToast } = useToast();
 
@@ -74,10 +75,12 @@ export function TeamLeadTasks({ currentUser, darkMode }: TeamLeadTasksProps) {
       
       if (selectedTime <= now) {
         addToast('error', 'Cannot select a past time. Please choose a future time.');
+        setHasInvalidTime(true);
         return; // Don't update the state
       }
     }
     
+    setHasInvalidTime(false);
     setNewTask({ ...newTask, due_time: timeValue });
   };
 
@@ -560,7 +563,10 @@ export function TeamLeadTasks({ currentUser, darkMode }: TeamLeadTasksProps) {
 
             <div className="flex gap-3 mt-6">
               <button
-                onClick={() => setShowCreateModal(false)}
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setHasInvalidTime(false);
+                }}
                 className={`flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50 transition-colors ${
                   darkMode 
                     ? 'border-gray-600 text-gray-300 hover:bg-gray-700' 
@@ -571,7 +577,10 @@ export function TeamLeadTasks({ currentUser, darkMode }: TeamLeadTasksProps) {
               </button>
               <button
                 onClick={createTask}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                disabled={hasInvalidTime || !newTask.title.trim() || !newTask.assignee_id}
+                className={`flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors ${
+                  (hasInvalidTime || !newTask.title.trim() || !newTask.assignee_id) ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
               >
                 Assign Task
               </button>

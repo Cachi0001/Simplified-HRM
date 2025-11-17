@@ -70,6 +70,7 @@ export function TasksPage() {
     dueDate: formatDateInput(tomorrow),
     dueTime: '' // Optional time field
   });
+  const [hasInvalidTime, setHasInvalidTime] = useState(false);
 
   // Fetch tasks assigned TO me (not for superadmin)
   const { data: myTasks = [], isLoading: myTasksLoading } = useQuery({
@@ -272,10 +273,12 @@ export function TasksPage() {
       
       if (selectedTime <= now) {
         addToast('error', 'Cannot select a past time. Please choose a future time.');
+        setHasInvalidTime(true);
         return; // Don't update the state
       }
     }
     
+    setHasInvalidTime(false);
     setNewTask({ ...newTask, dueTime: timeValue });
   };
 
@@ -873,7 +876,10 @@ export function TasksPage() {
             
             <div className="flex gap-3 mt-6">
               <Button
-                onClick={() => setShowCreateModal(false)}
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setHasInvalidTime(false);
+                }}
                 disabled={createTaskMutation.isPending}
               >
                 Cancel
@@ -881,7 +887,7 @@ export function TasksPage() {
               <Button
                 onClick={handleCreateTask}
                 isLoading={createTaskMutation.isPending}
-                disabled={createTaskMutation.isPending}
+                disabled={createTaskMutation.isPending || hasInvalidTime || !newTask.title || !newTask.assigneeId || !newTask.dueDate}
               >
                 Create Task
               </Button>

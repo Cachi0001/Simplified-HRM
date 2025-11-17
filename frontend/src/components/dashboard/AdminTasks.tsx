@@ -45,6 +45,7 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
     dueDate: formatDateInput(tomorrow),
     dueTime: ''
   });
+  const [hasInvalidTime, setHasInvalidTime] = useState(false);
 
   const queryClient = useQueryClient();
   const { addToast } = useToast();
@@ -191,10 +192,12 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
       
       if (selectedTime <= now) {
         addToast('error', 'Cannot select a past time. Please choose a future time.');
+        setHasInvalidTime(true);
         return; // Don't update the state
       }
     }
     
+    setHasInvalidTime(false);
     setNewTask({ ...newTask, dueTime: timeValue });
   };
 
@@ -434,11 +437,18 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
             </div>
 
             <div className="flex gap-3">
-              <Button onClick={handleCreateTask} isLoading={createTaskMutation.isPending} disabled={createTaskMutation.isPending}>
+              <Button 
+                onClick={handleCreateTask} 
+                isLoading={createTaskMutation.isPending} 
+                disabled={createTaskMutation.isPending || hasInvalidTime || !newTask.title || !newTask.assigneeId || !newTask.dueDate}
+              >
                 Create Task
               </Button>
               <Button
-                onClick={() => setShowCreateForm(false)}
+                onClick={() => {
+                  setShowCreateForm(false);
+                  setHasInvalidTime(false);
+                }}
                 disabled={createTaskMutation.isPending}
               >
                 Cancel
