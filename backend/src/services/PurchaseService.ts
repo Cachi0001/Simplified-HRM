@@ -97,6 +97,11 @@ export class PurchaseService {
       throw new ValidationError('You do not have permission to approve purchase requests');
     }
 
+    // Prevent self-approval
+    if (purchaseRequest.employee_id === approver.id) {
+      throw new ValidationError('You cannot approve your own purchase request');
+    }
+
     const result = await this.purchaseRepo.approvePurchaseRequest(purchaseRequestId, approver.id, notes);
 
     if (!result.success) {

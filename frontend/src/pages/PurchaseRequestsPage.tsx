@@ -543,7 +543,17 @@ export function PurchaseRequestsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {purchaseRequests.map((request) => (
+            {purchaseRequests
+              .filter((request) => {
+                // If user is admin/hr/superadmin, exclude their own requests from approval view
+                if (currentUser && ['hr', 'admin', 'superadmin'].includes(currentUser.role)) {
+                  const currentEmployeeId = currentUser.employeeId || currentUser.employee_id;
+                  return request.employee_id !== currentEmployeeId;
+                }
+                // Regular employees see only their own requests
+                return true;
+              })
+              .map((request) => (
               <div
                 key={request.id}
                 id={`purchase-card-${request.id}`}

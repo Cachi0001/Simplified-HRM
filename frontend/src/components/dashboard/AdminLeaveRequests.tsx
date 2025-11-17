@@ -111,9 +111,16 @@ export const AdminLeaveRequests: React.FC<AdminLeaveRequestsProps> = ({ darkMode
     }
   });
 
-  const filteredRequests = leaveRequests.filter((req: LeaveRequest) =>
-    filterStatus === 'all' || req.status === filterStatus
-  );
+  // Get current user's employee_id to filter out own requests
+  const currentEmployeeId = currentUser?.employeeId || currentUser?.employee_id;
+  
+  const filteredRequests = leaveRequests.filter((req: LeaveRequest) => {
+    // Filter by status
+    const statusMatch = filterStatus === 'all' || req.status === filterStatus;
+    // Exclude own requests
+    const notOwnRequest = req.employee_id !== currentEmployeeId;
+    return statusMatch && notOwnRequest;
+  });
 
   const getStatusColor = (status: string) => {
     switch (status) {

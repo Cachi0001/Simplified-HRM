@@ -113,6 +113,11 @@ export class LeaveService {
       throw new ValidationError('You do not have permission to approve leave requests');
     }
 
+    // Prevent self-approval
+    if (leaveRequest.employee_id === approver.id) {
+      throw new ValidationError('You cannot approve your own leave request');
+    }
+
     const result = await this.leaveRepo.approveLeaveRequest(leaveRequestId, approver.id, comments);
 
     if (!result.success) {
