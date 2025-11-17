@@ -28,12 +28,13 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   // List of all dashboard paths
   const allDashboards = Object.values(roleDashboards);
 
-  // If user is on a dashboard that's not their correct one, redirect
-  // But allow /dashboard for superadmin as it's an alias for /super-admin-dashboard
-  const isGenericDashboard = currentPath === '/dashboard';
-  const isSuperadminOnGenericDashboard = user.role === 'superadmin' && isGenericDashboard;
-  
-  if (allDashboards.includes(currentPath) && currentPath !== correctDashboard && !isSuperadminOnGenericDashboard) {
+  // Superadmin can access ANY page - no restrictions
+  if (user.role === 'superadmin') {
+    return children;
+  }
+
+  // For other roles, if user is on a dashboard that's not their correct one, redirect
+  if (allDashboards.includes(currentPath) && currentPath !== correctDashboard) {
     console.warn(`⚠️ Role mismatch detected! User role: ${user.role}, Current path: ${currentPath}, Redirecting to: ${correctDashboard}`);
     return <Navigate to={correctDashboard} replace />;
   }
