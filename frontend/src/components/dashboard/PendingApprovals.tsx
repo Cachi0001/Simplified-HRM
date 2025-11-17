@@ -66,8 +66,8 @@ export function PendingApprovals({ darkMode = false }: PendingApprovalsProps) {
   });
 
   const updateEmployeeMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<Employee> }) => {
-      const response = await api.put(`/employees/${id}`, data);
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const response = await api.put(`/employees/${id}/status`, { status });
       return response.data;
     },
     onSuccess: () => {
@@ -86,9 +86,8 @@ export function PendingApprovals({ darkMode = false }: PendingApprovalsProps) {
 
   const handleUpdateEmployee = async (employee: Employee) => {
     // EmployeeEditModal will call this with the full employee object
-    // We need to extract id and data
-    const { id, ...data } = employee;
-    await updateEmployeeMutation.mutateAsync({ id, data });
+    // We need to extract id and status
+    await updateEmployeeMutation.mutateAsync({ id: employee.id, status: employee.status });
   };
 
   if (isLoading) {

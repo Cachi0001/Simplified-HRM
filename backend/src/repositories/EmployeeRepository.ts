@@ -63,13 +63,13 @@ export class EmployeeRepository {
   }
 
   async findAll(filters?: { status?: string; department?: string }): Promise<Employee[]> {
-    // Use database function to get only active employees by default
-    if (!filters?.status || filters.status === 'active') {
+    // If specifically requesting active employees, use the optimized function
+    if (filters?.status === 'active' && !filters.department) {
       const result = await pool.query('SELECT * FROM get_active_employees() ORDER BY full_name');
       return result.rows;
     }
 
-    // For other statuses, use direct query
+    // Otherwise, query all employees with filters (or no filters = all employees)
     let queryText = 'SELECT * FROM employees WHERE 1=1';
     const params: any[] = [];
     let paramCount = 1;
