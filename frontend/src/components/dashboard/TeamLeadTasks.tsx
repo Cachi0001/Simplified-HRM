@@ -121,6 +121,29 @@ export function TeamLeadTasks({ currentUser, darkMode }: TeamLeadTasksProps) {
         return;
       }
 
+      // Validate date/time
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const selectedDate = new Date(newTask.due_date);
+      selectedDate.setHours(0, 0, 0, 0);
+      
+      if (selectedDate < today) {
+        addToast('error', 'Due date cannot be in the past');
+        return;
+      }
+      
+      if (selectedDate.getTime() === today.getTime() && newTask.due_time) {
+        const now = new Date();
+        const [hours, minutes] = newTask.due_time.split(':').map(Number);
+        const selectedTime = new Date();
+        selectedTime.setHours(hours, minutes, 0, 0);
+        
+        if (selectedTime <= now) {
+          addToast('error', 'Due time cannot be in the past. Please select a future time.');
+          return;
+        }
+      }
+
       // Check if trying to assign to self
       const currentEmployeeId = currentUser.employee_id || currentUser.id;
       if (newTask.assignee_id === currentEmployeeId || newTask.assignee_id === currentUser.id) {

@@ -282,9 +282,6 @@ export function TasksPage() {
   // Create task mutation
   const createTaskMutation = useMutation({
     mutationFn: async (taskData: any) => {
-      if (!validateTask()) {
-        throw new Error('Validation failed');
-      }
       return await taskService.createTask(taskData);
     },
     onSuccess: () => {
@@ -301,7 +298,6 @@ export function TasksPage() {
       });
     },
     onError: (error: any) => {
-      if (error.message === 'Validation failed') return; // Already showed toast
       const errorMessage = error.message || 'Failed to create task';
       addToast('error', errorMessage);
     },
@@ -349,6 +345,11 @@ export function TasksPage() {
   const handleCreateTask = () => {
     if (!newTask.title || !newTask.assigneeId || !newTask.dueDate) {
       addToast('error', 'Please fill in all required fields');
+      return;
+    }
+
+    // Validate task dates/times
+    if (!validateTask()) {
       return;
     }
 
