@@ -6,6 +6,7 @@ import { Card } from '../ui/Card';
 import { MapPin, Clock, Calendar, Play, Square, CheckCircle, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useToast } from '../ui/Toast';
+import { formatLateTime } from '../../utils/timeUtils';
 
 interface EmployeeAttendanceProps {
   employeeId: string;
@@ -259,7 +260,7 @@ export function EmployeeAttendance({ employeeId, darkMode = false }: EmployeeAtt
                           {record.clock_in && (
                             (record.is_late || record.isLate) ? (
                               <span className={`px-2 py-0.5 rounded text-xs font-medium ${darkMode ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-700'}`}>
-                                You are +{record.late_minutes || record.lateMinutes || 0} min late
+                                You are {formatLateTime(record.late_minutes || record.lateMinutes || 0)}
                               </span>
                             ) : (
                               <span className={`px-2 py-0.5 rounded text-xs font-medium ${darkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700'}`}>

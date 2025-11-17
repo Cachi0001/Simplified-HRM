@@ -5,7 +5,8 @@ import { employeeService } from '../../services/employeeService';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { Calendar, Clock, MapPin, Users, Filter, Download, RefreshCw } from 'lucide-react';
+import { Calendar, Users, Download, RefreshCw } from 'lucide-react';
+import { AttendanceCard } from '../attendance/AttendanceCard';
 
 interface AdminAttendanceProps {
   darkMode?: boolean;
@@ -99,15 +100,6 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
     const status = record.locationStatus ?? 'unknown';
     const distance = typeof record.distanceFromOffice === 'number' ? Math.round(record.distanceFromOffice) : null;
     return { status, distance };
-  };
-
-  const formatLateTime = (minutes: number): string => {
-    if (minutes < 60) {
-      return `${minutes} min`;
-    }
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
   };
 
   const exportReport = () => {
@@ -226,78 +218,17 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
           ) : report && report.length > 0 ? (
             <div className="space-y-3">
               {report.map((record, index) => {
-                const locationMeta = getLocationMeta(record);
-                const locationBadgeClass = locationMeta.status === 'onsite'
-                  ? darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-700'
-                  : locationMeta.status === 'remote'
-                    ? darkMode ? 'bg-orange-900 text-orange-200' : 'bg-orange-100 text-orange-700'
-                    : darkMode ? 'bg-gray-600 text-gray-200' : 'bg-gray-200 text-gray-700';
-                const locationLabel = locationMeta.status === 'onsite' ? 'Onsite' : locationMeta.status === 'remote' ? 'Remote' : 'Unknown';
-
-                // Calculate if on-time or late
-                const isLate = record.isLate || record.is_late || false;
-                const lateMinutes = record.lateMinutes || record.late_minutes || 0;
-
+                const uniqueKey = `${record._id?.employeeId ?? record.employeeId ?? index}-${record._id?.date ?? record.date ?? index}-${index}`;
                 return (
-                  <div key={`${record._id?.employeeId ?? record.employeeId ?? index}-${record._id?.date ?? record.date ?? index}-${index}`} className={`p-3 sm:p-4 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                      <div className="flex items-start gap-2 sm:gap-3 min-w-0 flex-1">
-                        <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center flex-shrink-0 ${darkMode ? 'bg-gray-600' : 'bg-gray-200'}`}>
-                          <Users className={`h-4 w-4 sm:h-5 sm:w-5 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <p className={`font-medium text-sm sm:text-base truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                              {getEmployeeName(record)}
-                            </p>
-                            {/* On-time/Late indicator next to name */}
-                            {record.checkInTime && (
-                              (record.is_late || record.isLate) ? (
-                                <span className={`px-2 py-0.5 rounded text-xs font-medium ${darkMode ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-700'}`}>
-                                  +{record.late_minutes || record.lateMinutes || 0} min late
-                                </span>
-                              ) : (
-                                <span className={`px-2 py-0.5 rounded text-xs font-medium ${darkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700'}`}>
-                                  On-time
-                                </span>
-                              )
-                            )}
-                          </div>
-                          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                            <p className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                              {formatDate(record._id?.date ?? record.date)}
-                            </p>
-                            <span className={`text-xs px-1.5 py-0.5 rounded-full inline-flex items-center gap-1 ${locationBadgeClass}`}>
-                              <MapPin className="h-3 w-3" />
-                              {locationLabel}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex sm:flex-col items-center sm:items-end gap-2 sm:gap-1 flex-shrink-0">
-                        <p className={`text-xs sm:text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                          {record.status === 'checked_out' ? 'Completed' : 'Active'}
-                        </p>
-                        <div className={`flex items-center gap-1 sm:gap-2 text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                          <Clock className="h-3 w-3" />
-                          <span className="whitespace-nowrap">{formatTime(record.checkInTime)}</span>
-                          {record.checkOutTime ? (
-                            <>
-                              <span>-</span>
-                              <span className="whitespace-nowrap">{formatTime(record.checkOutTime)}</span>
-                              <span className={`px-1.5 py-0.5 rounded text-xs ${darkMode ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-800'}`}>
-                                {record.totalHours ? `${record.totalHours.toFixed(1)}h` : '0h'}
-                              </span>
-                            </>
-                          ) : (
-                            <span className={`px-1.5 py-0.5 rounded text-xs ${darkMode ? 'bg-orange-900 text-orange-300' : 'bg-orange-100 text-orange-800'}`}>
-                              Active
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <AttendanceCard
+                    key={uniqueKey}
+                    record={record}
+                    darkMode={darkMode}
+                    getEmployeeName={getEmployeeName}
+                    formatDate={formatDate}
+                    formatTime={formatTime}
+                    getLocationMeta={getLocationMeta}
+                  />
                 );
               })}
             </div>
