@@ -67,8 +67,10 @@ export function TasksPage() {
     description: '',
     assigneeId: '',
     priority: 'normal' as 'low' | 'normal' | 'high' | 'urgent',
-    dueDate: formatDateInput(tomorrow)
+    dueDate: formatDateInput(tomorrow),
+    dueTime: '' // Optional time field
   });
+  const [hasInvalidTime, setHasInvalidTime] = useState(false);
 
   // Fetch tasks assigned TO me (not for superadmin)
   const { data: myTasks = [], isLoading: myTasksLoading } = useQuery({
@@ -225,6 +227,61 @@ export function TasksPage() {
     },
   });
 
+  // Validate task before creation
+  const validateTask = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const selectedDate = new Date(newTask.dueDate);
+    selectedDate.setHours(0, 0, 0, 0);
+    
+    // Check if date is in the past
+    if (selectedDate < today) {
+      addToast('error', 'Due date cannot be in the past');
+      return false;
+    }
+    
+    // If date is today and time is specified, check if time is in the past
+    if (selectedDate.getTime() === today.getTime() && newTask.dueTime) {
+      const now = new Date();
+      const [hours, minutes] = newTask.dueTime.split(':').map(Number);
+      const selectedTime = new Date();
+      selectedTime.setHours(hours, minutes, 0, 0);
+      
+      if (selectedTime <= now) {
+        addToast('error', 'Due time cannot be in the past. Please select a future time.');
+        return false;
+      }
+    }
+    
+    return true;
+  };
+
+  // Handle time input change with validation
+  const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const timeValue = e.target.value;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const selectedDate = new Date(newTask.dueDate);
+    selectedDate.setHours(0, 0, 0, 0);
+    
+    // If date is today, validate time is not in the past
+    if (selectedDate.getTime() === today.getTime() && timeValue) {
+      const now = new Date();
+      const [hours, minutes] = timeValue.split(':').map(Number);
+      const selectedTime = new Date();
+      selectedTime.setHours(hours, minutes, 0, 0);
+      
+      if (selectedTime <= now) {
+        addToast('error', 'Cannot select a past time. Please choose a future time.');
+        setHasInvalidTime(true);
+        return; // Don't update the state
+      }
+    }
+    
+    setHasInvalidTime(false);
+    setNewTask({ ...newTask, dueTime: timeValue });
+  };
+
   // Create task mutation
   const createTaskMutation = useMutation({
     mutationFn: async (taskData: any) => {
@@ -239,7 +296,8 @@ export function TasksPage() {
         description: '',
         assigneeId: '',
         priority: 'normal',
-        dueDate: formatDateInput(tomorrow)
+        dueDate: formatDateInput(tomorrow),
+        dueTime: ''
       });
     },
     onError: (error: any) => {
@@ -290,6 +348,11 @@ export function TasksPage() {
   const handleCreateTask = () => {
     if (!newTask.title || !newTask.assigneeId || !newTask.dueDate) {
       addToast('error', 'Please fill in all required fields');
+      return;
+    }
+
+    // Validate task dates/times
+    if (!validateTask()) {
       return;
     }
 
@@ -449,13 +512,13 @@ export function TasksPage() {
           )}
 
           {/* Metadata */}
-          <div className={`flex items-center gap-4 text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+          <div className={`flex flex-wrap items-center gap-3 text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
             <div className="flex items-center gap-1">
-              <Calendar className="h-3 w-3" />
-              <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
+              <Calendar className="h-3 w-3 flex-shrink-0" />
+              <span>Due: {new Date(task.dueDate).toLocaleDateString()}{task.dueTime ? ` at ${task.dueTime}` : ''}</span>
             </div>
             <div className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
+              <Clock className="h-3 w-3 flex-shrink-0" />
               <span>Created: {new Date(task.createdAt).toLocaleDateString()}</span>
             </div>
           </div>
@@ -742,14 +805,81 @@ export function TasksPage() {
                   type="date"
                   value={newTask.dueDate}
                   onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
-                  min={formatDateInput(tomorrow)}
+                  min={formatDateInput(new Date())}
                 />
+              </div>
+              
+              <div>
+                <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Due Time (Optional)
+                </label>
+                <input
+                  id="dueTime"
+                  type="time"
+                  value={newTask.dueTime}
+                  onChange={handleTimeChange}
+                  onBlur={(e) => {
+                    // Validate on blur as well
+                    const timeValue = e.target.value;
+                    if (!timeValue) return;
+                    
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const selectedDate = new Date(newTask.dueDate);
+                    selectedDate.setHours(0, 0, 0, 0);
+                    
+                    if (selectedDate.getTime() === today.getTime()) {
+                      const now = new Date();
+                      const [hours, minutes] = timeValue.split(':').map(Number);
+                      const selectedTime = new Date();
+                      selectedTime.setHours(hours, minutes, 0, 0);
+                      
+                      if (selectedTime <= now) {
+                        addToast('error', 'Cannot select a past time. Clearing time field.');
+                        setNewTask({ ...newTask, dueTime: '' });
+                      }
+                    }
+                  }}
+                  min={newTask.dueDate === formatDateInput(new Date()) ? new Date().toTimeString().slice(0, 5) : undefined}
+                  disabled={(() => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const selectedDate = new Date(newTask.dueDate);
+                    selectedDate.setHours(0, 0, 0, 0);
+                    return selectedDate < today;
+                  })()}
+                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    darkMode 
+                      ? 'bg-gray-700 border-gray-600 text-white' 
+                      : 'bg-white border-gray-300 text-gray-900'
+                  } ${(() => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const selectedDate = new Date(newTask.dueDate);
+                    selectedDate.setHours(0, 0, 0, 0);
+                    return selectedDate < today ? 'opacity-50 cursor-not-allowed' : '';
+                  })()}`}
+                />
+                <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  {(() => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const selectedDate = new Date(newTask.dueDate);
+                    selectedDate.setHours(0, 0, 0, 0);
+                    return selectedDate < today 
+                      ? 'Time input disabled for past dates'
+                      : 'Leave empty for end of day (11:59 PM)';
+                  })()}
+                </p>
               </div>
             </div>
             
             <div className="flex gap-3 mt-6">
               <Button
-                onClick={() => setShowCreateModal(false)}
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setHasInvalidTime(false);
+                }}
                 disabled={createTaskMutation.isPending}
               >
                 Cancel
@@ -757,7 +887,7 @@ export function TasksPage() {
               <Button
                 onClick={handleCreateTask}
                 isLoading={createTaskMutation.isPending}
-                disabled={createTaskMutation.isPending}
+                disabled={createTaskMutation.isPending || hasInvalidTime || !newTask.title || !newTask.assigneeId || !newTask.dueDate}
               >
                 Create Task
               </Button>

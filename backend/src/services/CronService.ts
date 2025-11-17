@@ -1,15 +1,18 @@
 import * as cron from 'node-cron';
 import notificationService from './NotificationService';
+import { pool } from '../config/database';
 
 export class CronService {
   private checkoutReminderJob: cron.ScheduledTask | null = null;
   private cleanupJob: cron.ScheduledTask | null = null;
   private birthdayJob: cron.ScheduledTask | null = null;
+  private taskDueNotificationJob: cron.ScheduledTask | null = null;
 
   start(): void {
     this.startCheckoutReminderJob();
     this.startCleanupJob();
     this.startBirthdayJob();
+    this.startTaskDueNotificationJob();
     console.log('✅ Cron jobs started');
   }
 
@@ -26,6 +29,10 @@ export class CronService {
     if (this.birthdayJob) {
       this.birthdayJob.stop();
       console.log('⏹️  Birthday job stopped');
+    }
+    if (this.taskDueNotificationJob) {
+      this.taskDueNotificationJob.stop();
+      console.log('⏹️  Task due notification job stopped');
     }
   }
 
@@ -88,6 +95,24 @@ export class CronService {
     console.log('✅ Birthday notification job scheduled (Daily at 9:00 AM)');
   }
 
+  // Task due notification job - runs every 15 minutes
+  private startTaskDueNotificationJob(): void {
+    // */15 * * * * = Every 15 minutes
+    this.taskDueNotificationJob = cron.schedule('*/15 * * * *', async () => {
+      try {
+        console.log('📋 Running task due notification job...');
+        await pool.query('SELECT send_task_due_notifications()');
+        console.log('✅ Task due notifications processed');
+      } catch (error) {
+        console.error('❌ Error in task due notification job:', error);
+      }
+    }, {
+      timezone: 'Africa/Lagos' // Adjust to your timezone
+    });
+
+    console.log('✅ Task due notification job scheduled (Every 15 minutes)');
+  }
+
   // Manual trigger for testing
   async triggerCheckoutReminder(): Promise<number> {
     console.log('🔔 Manually triggering checkout reminder...');
@@ -108,6 +133,12 @@ export class CronService {
     const count = await notificationService.sendBirthdayNotifications();
     console.log(`✅ Sent birthday notifications for ${count} celebrant(s)`);
     return count;
+  }
+
+  async triggerTaskDueNotifications(): Promise<void> {
+    console.log('📋 Manually triggering task due notifications...');
+    await pool.query('SELECT send_task_due_notifications()');
+    console.log('✅ Task due notifications processed');
   }
 }
 

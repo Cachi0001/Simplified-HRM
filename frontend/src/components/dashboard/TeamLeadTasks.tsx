@@ -13,6 +13,7 @@ interface Task {
   assignee_id: string;
   assignee_name?: string;
   due_date: string;
+  due_time?: string;
   created_at: string;
   completed_at?: string;
 }
@@ -38,15 +39,50 @@ export function TeamLeadTasks({ currentUser, darkMode }: TeamLeadTasksProps) {
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
   
+  const formatDateInput = (date: Date) => date.toISOString().split('T')[0];
+  const tomorrow = (() => {
+    const date = new Date();
+    date.setDate(date.getDate() + 1);
+    return date;
+  })();
+
   const [newTask, setNewTask] = useState({
     title: '',
     description: '',
     priority: 'normal' as const,
     assignee_id: '',
-    due_date: ''
+    due_date: formatDateInput(tomorrow),
+    due_time: ''
   });
+  const [hasInvalidTime, setHasInvalidTime] = useState(false);
 
   const { addToast } = useToast();
+
+  // Handle time input change with validation
+  const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const timeValue = e.target.value;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const selectedDate = new Date(newTask.due_date);
+    selectedDate.setHours(0, 0, 0, 0);
+    
+    // If date is today, validate time is not in the past
+    if (selectedDate.getTime() === today.getTime() && timeValue) {
+      const now = new Date();
+      const [hours, minutes] = timeValue.split(':').map(Number);
+      const selectedTime = new Date();
+      selectedTime.setHours(hours, minutes, 0, 0);
+      
+      if (selectedTime <= now) {
+        addToast('error', 'Cannot select a past time. Please choose a future time.');
+        setHasInvalidTime(true);
+        return; // Don't update the state
+      }
+    }
+    
+    setHasInvalidTime(false);
+    setNewTask({ ...newTask, due_time: timeValue });
+  };
 
   useEffect(() => {
     loadTasks();
@@ -88,6 +124,29 @@ export function TeamLeadTasks({ currentUser, darkMode }: TeamLeadTasksProps) {
         return;
       }
 
+      // Validate date/time
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const selectedDate = new Date(newTask.due_date);
+      selectedDate.setHours(0, 0, 0, 0);
+      
+      if (selectedDate < today) {
+        addToast('error', 'Due date cannot be in the past');
+        return;
+      }
+      
+      if (selectedDate.getTime() === today.getTime() && newTask.due_time) {
+        const now = new Date();
+        const [hours, minutes] = newTask.due_time.split(':').map(Number);
+        const selectedTime = new Date();
+        selectedTime.setHours(hours, minutes, 0, 0);
+        
+        if (selectedTime <= now) {
+          addToast('error', 'Due time cannot be in the past. Please select a future time.');
+          return;
+        }
+      }
+
       // Check if trying to assign to self
       const currentEmployeeId = currentUser.employee_id || currentUser.id;
       if (newTask.assignee_id === currentEmployeeId || newTask.assignee_id === currentUser.id) {
@@ -109,7 +168,8 @@ export function TeamLeadTasks({ currentUser, darkMode }: TeamLeadTasksProps) {
           description: '',
           priority: 'normal',
           assignee_id: '',
-          due_date: ''
+          due_date: formatDateInput(tomorrow),
+          due_time: ''
         });
         loadTasks();
       }
@@ -288,7 +348,7 @@ export function TeamLeadTasks({ currentUser, darkMode }: TeamLeadTasksProps) {
                     </div>
                     <div className="flex items-center gap-1">
                       <Calendar className="h-3 w-3" />
-                      <span>Due: {new Date(task.due_date).toLocaleDateString()}</span>
+                      <span>Due: {new Date(task.due_date).toLocaleDateString()}{task.due_time ? ` at ${task.due_time}` : ''}</span>
                     </div>
                   </div>
                 </div>
@@ -400,48 +460,113 @@ export function TeamLeadTasks({ currentUser, darkMode }: TeamLeadTasksProps) {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                    Priority
-                  </label>
-                  <select
-                    value={newTask.priority}
-                    onChange={(e) => setNewTask({ ...newTask, priority: e.target.value as any })}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      darkMode 
-                        ? 'bg-gray-700 border-gray-600 text-white' 
-                        : 'bg-white border-gray-300 text-gray-900'
-                    }`}
-                  >
-                    <option value="low">Low</option>
-                    <option value="normal">Normal</option>
-                    <option value="high">High</option>
-                    <option value="urgent">Urgent</option>
-                  </select>
-                </div>
+              <div>
+                <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Priority
+                </label>
+                <select
+                  value={newTask.priority}
+                  onChange={(e) => setNewTask({ ...newTask, priority: e.target.value as any })}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    darkMode 
+                      ? 'bg-gray-700 border-gray-600 text-white' 
+                      : 'bg-white border-gray-300 text-gray-900'
+                  }`}
+                >
+                  <option value="low">Low</option>
+                  <option value="normal">Normal</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
 
-                <div>
-                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                    Due Date
-                  </label>
-                  <input
-                    type="date"
-                    value={newTask.due_date}
-                    onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      darkMode 
-                        ? 'bg-gray-700 border-gray-600 text-white' 
-                        : 'bg-white border-gray-300 text-gray-900'
-                    }`}
-                  />
-                </div>
+              <div>
+                <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Due Date *
+                </label>
+                <input
+                  type="date"
+                  value={newTask.due_date}
+                  onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
+                  min={formatDateInput(new Date())}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    darkMode 
+                      ? 'bg-gray-700 border-gray-600 text-white' 
+                      : 'bg-white border-gray-300 text-gray-900'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Due Time (Optional)
+                </label>
+                <input
+                  type="time"
+                  value={newTask.due_time}
+                  onChange={handleTimeChange}
+                  onBlur={(e) => {
+                    // Validate on blur as well
+                    const timeValue = e.target.value;
+                    if (!timeValue) return;
+                    
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const selectedDate = new Date(newTask.due_date);
+                    selectedDate.setHours(0, 0, 0, 0);
+                    
+                    if (selectedDate.getTime() === today.getTime()) {
+                      const now = new Date();
+                      const [hours, minutes] = timeValue.split(':').map(Number);
+                      const selectedTime = new Date();
+                      selectedTime.setHours(hours, minutes, 0, 0);
+                      
+                      if (selectedTime <= now) {
+                        addToast('error', 'Cannot select a past time. Clearing time field.');
+                        setNewTask({ ...newTask, due_time: '' });
+                      }
+                    }
+                  }}
+                  min={newTask.due_date === formatDateInput(new Date()) ? new Date().toTimeString().slice(0, 5) : undefined}
+                  disabled={(() => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const selectedDate = new Date(newTask.due_date);
+                    selectedDate.setHours(0, 0, 0, 0);
+                    return selectedDate < today;
+                  })()}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    darkMode 
+                      ? 'bg-gray-700 border-gray-600 text-white' 
+                      : 'bg-white border-gray-300 text-gray-900'
+                  } ${(() => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const selectedDate = new Date(newTask.due_date);
+                    selectedDate.setHours(0, 0, 0, 0);
+                    return selectedDate < today ? 'opacity-50 cursor-not-allowed' : '';
+                  })()}`}
+                />
+                <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  {(() => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const selectedDate = new Date(newTask.due_date);
+                    selectedDate.setHours(0, 0, 0, 0);
+                    return selectedDate < today 
+                      ? 'Time input disabled for past dates'
+                      : 'Leave empty for end of day (11:59 PM)';
+                  })()}
+                </p>
               </div>
             </div>
 
             <div className="flex gap-3 mt-6">
               <button
-                onClick={() => setShowCreateModal(false)}
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setHasInvalidTime(false);
+                }}
                 className={`flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50 transition-colors ${
                   darkMode 
                     ? 'border-gray-600 text-gray-300 hover:bg-gray-700' 
@@ -452,7 +577,10 @@ export function TeamLeadTasks({ currentUser, darkMode }: TeamLeadTasksProps) {
               </button>
               <button
                 onClick={createTask}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                disabled={hasInvalidTime || !newTask.title.trim() || !newTask.assignee_id}
+                className={`flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors ${
+                  (hasInvalidTime || !newTask.title.trim() || !newTask.assignee_id) ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
               >
                 Assign Task
               </button>
