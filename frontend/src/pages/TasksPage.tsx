@@ -785,13 +785,19 @@ export function TasksPage() {
                 <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                   Due Time (Optional)
                 </label>
-                <Input
+                <input
                   id="dueTime"
-                  label=""
                   type="time"
                   value={newTask.dueTime}
                   onChange={(e) => setNewTask({ ...newTask, dueTime: e.target.value })}
                   min={newTask.dueDate === formatDateInput(new Date()) ? new Date().toTimeString().slice(0, 5) : undefined}
+                  readOnly={(() => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const selectedDate = new Date(newTask.dueDate);
+                    selectedDate.setHours(0, 0, 0, 0);
+                    return selectedDate < today;
+                  })()}
                   disabled={(() => {
                     const today = new Date();
                     today.setHours(0, 0, 0, 0);
@@ -799,6 +805,17 @@ export function TasksPage() {
                     selectedDate.setHours(0, 0, 0, 0);
                     return selectedDate < today;
                   })()}
+                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    darkMode 
+                      ? 'bg-gray-700 border-gray-600 text-white' 
+                      : 'bg-white border-gray-300 text-gray-900'
+                  } ${(() => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const selectedDate = new Date(newTask.dueDate);
+                    selectedDate.setHours(0, 0, 0, 0);
+                    return selectedDate < today ? 'opacity-50 cursor-not-allowed' : '';
+                  })()}`}
                 />
                 <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                   {(() => {

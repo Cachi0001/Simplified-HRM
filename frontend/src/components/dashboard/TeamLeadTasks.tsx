@@ -13,6 +13,7 @@ interface Task {
   assignee_id: string;
   assignee_name?: string;
   due_date: string;
+  due_time?: string;
   created_at: string;
   completed_at?: string;
 }
@@ -38,12 +39,20 @@ export function TeamLeadTasks({ currentUser, darkMode }: TeamLeadTasksProps) {
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
   
+  const formatDateInput = (date: Date) => date.toISOString().split('T')[0];
+  const tomorrow = (() => {
+    const date = new Date();
+    date.setDate(date.getDate() + 1);
+    return date;
+  })();
+
   const [newTask, setNewTask] = useState({
     title: '',
     description: '',
     priority: 'normal' as const,
     assignee_id: '',
-    due_date: ''
+    due_date: formatDateInput(tomorrow),
+    due_time: ''
   });
 
   const { addToast } = useToast();
@@ -109,7 +118,8 @@ export function TeamLeadTasks({ currentUser, darkMode }: TeamLeadTasksProps) {
           description: '',
           priority: 'normal',
           assignee_id: '',
-          due_date: ''
+          due_date: formatDateInput(tomorrow),
+          due_time: ''
         });
         loadTasks();
       }
@@ -288,7 +298,7 @@ export function TeamLeadTasks({ currentUser, darkMode }: TeamLeadTasksProps) {
                     </div>
                     <div className="flex items-center gap-1">
                       <Calendar className="h-3 w-3" />
-                      <span>Due: {new Date(task.due_date).toLocaleDateString()}</span>
+                      <span>Due: {new Date(task.due_date).toLocaleDateString()}{task.due_time ? ` at ${task.due_time}` : ''}</span>
                     </div>
                   </div>
                 </div>
@@ -400,42 +410,89 @@ export function TeamLeadTasks({ currentUser, darkMode }: TeamLeadTasksProps) {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                    Priority
-                  </label>
-                  <select
-                    value={newTask.priority}
-                    onChange={(e) => setNewTask({ ...newTask, priority: e.target.value as any })}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      darkMode 
-                        ? 'bg-gray-700 border-gray-600 text-white' 
-                        : 'bg-white border-gray-300 text-gray-900'
-                    }`}
-                  >
-                    <option value="low">Low</option>
-                    <option value="normal">Normal</option>
-                    <option value="high">High</option>
-                    <option value="urgent">Urgent</option>
-                  </select>
-                </div>
+              <div>
+                <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Priority
+                </label>
+                <select
+                  value={newTask.priority}
+                  onChange={(e) => setNewTask({ ...newTask, priority: e.target.value as any })}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    darkMode 
+                      ? 'bg-gray-700 border-gray-600 text-white' 
+                      : 'bg-white border-gray-300 text-gray-900'
+                  }`}
+                >
+                  <option value="low">Low</option>
+                  <option value="normal">Normal</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
 
-                <div>
-                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                    Due Date
-                  </label>
-                  <input
-                    type="date"
-                    value={newTask.due_date}
-                    onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      darkMode 
-                        ? 'bg-gray-700 border-gray-600 text-white' 
-                        : 'bg-white border-gray-300 text-gray-900'
-                    }`}
-                  />
-                </div>
+              <div>
+                <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Due Date *
+                </label>
+                <input
+                  type="date"
+                  value={newTask.due_date}
+                  onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
+                  min={formatDateInput(new Date())}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    darkMode 
+                      ? 'bg-gray-700 border-gray-600 text-white' 
+                      : 'bg-white border-gray-300 text-gray-900'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Due Time (Optional)
+                </label>
+                <input
+                  type="time"
+                  value={newTask.due_time}
+                  onChange={(e) => setNewTask({ ...newTask, due_time: e.target.value })}
+                  min={newTask.due_date === formatDateInput(new Date()) ? new Date().toTimeString().slice(0, 5) : undefined}
+                  readOnly={(() => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const selectedDate = new Date(newTask.due_date);
+                    selectedDate.setHours(0, 0, 0, 0);
+                    return selectedDate < today;
+                  })()}
+                  disabled={(() => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const selectedDate = new Date(newTask.due_date);
+                    selectedDate.setHours(0, 0, 0, 0);
+                    return selectedDate < today;
+                  })()}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    darkMode 
+                      ? 'bg-gray-700 border-gray-600 text-white' 
+                      : 'bg-white border-gray-300 text-gray-900'
+                  } ${(() => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const selectedDate = new Date(newTask.due_date);
+                    selectedDate.setHours(0, 0, 0, 0);
+                    return selectedDate < today ? 'opacity-50 cursor-not-allowed' : '';
+                  })()}`}
+                />
+                <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  {(() => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const selectedDate = new Date(newTask.due_date);
+                    selectedDate.setHours(0, 0, 0, 0);
+                    return selectedDate < today 
+                      ? 'Time input disabled for past dates'
+                      : 'Leave empty for end of day (11:59 PM)';
+                  })()}
+                </p>
               </div>
             </div>
 
