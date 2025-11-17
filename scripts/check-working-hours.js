@@ -1,53 +1,54 @@
 const { Pool } = require('../backend/node_modules/pg');
 require('../backend/node_modules/dotenv').config({ path: './backend/.env' });
 
-async function checkWorkingHours() {
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-  });
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
 
+async function checkWorkingHours() {
   try {
-    const client = await pool.connect();
-    
-    console.log('🔍 CHECKING WORKING HOURS DATA...\n');
-    
-    const result = await client.query(`
-      SELECT 
-        id,
-        full_name,
-        email,
-        working_hours,
-        pg_typeof(working_hours) as data_type
-      FROM employees
-      WHERE status = 'active'
-      ORDER BY full_name
+    // Check if get_active_employees function exists
+    const funcCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT 1 FROM pg_proc 
+        WHERE proname = 'get_active_employees'
+      ) as exists
     `);
-    
-    console.log('EMPLOYEE WORKING HOURS:\n');
+    console.log('get_active_employees function exists:', funcCheck.rows[0].exists);
+
+    // Get a sample employee with working_hours
+    const result = await pool.query(`
+      SELECT id, full_name, email, working_hours, working_days, timezone
+      FROM employees 
+      WHERE status = 'active'
+      LIMIT 3
+    `);
+
+    console.log('\nSample employees with working_hours:');
     result.rows.forEach(emp => {
-      console.log(`${emp.full_name} (${emp.email})`);
-      console.log(`  Data Type: ${emp.data_type}`);
-      console.log(`  Raw Value: ${JSON.stringify(emp.working_hours)}`);
-      console.log(`  Type: ${typeof emp.working_hours}`);
-      
-      if (emp.working_hours) {
-        if (typeof emp.working_hours === 'string') {
-          try {
-            const parsed = JSON.parse(emp.working_hours);
-            console.log(`  Parsed: ${JSON.stringify(parsed)}`);
-          } catch (e) {
-            console.log(`  Parse Error: ${e.message}`);
-          }
-        } else if (typeof emp.working_hours === 'object') {
-          console.log(`  Already Object: start=${emp.working_hours.start}, end=${emp.working_hours.end}`);
-        }
-      }
-      console.log('');
+      console.log(`\nEmployee: ${emp.full_name}`);
+      console.log(`  ID: ${emp.id}`);
+      console.log(`  Email: ${emp.email}`);
+      console.log(`  working_hours (raw):`, emp.working_hours);
+      console.log(`  working_hours (type):`, typeof emp.working_hours);
+      console.log(`  working_days:`, emp.working_days);
+      console.log(`  timezone:`, emp.timezone);
     });
-    
-    client.release();
+
+    // Try the get_active_employees function if it exists
+    if (funcCheck.rows[0].exists) {
+      console.log('\n\nTesting get_active_employees() function:');
+      const funcResult = await pool.query('SELECT * FROM get_active_employees() LIMIT 1');
+      if (funcResult.rows.length > 0) {
+        const emp = funcResult.rows[0];
+        console.log(`Employee: ${emp.full_name}`);
+        console.log(`  working_hours:`, emp.working_hours);
+        console.log(`  working_hours (type):`, typeof emp.working_hours);
+      }
+    }
+
   } catch (error) {
-    console.error('❌ Error:', error.message);
+    console.error('Error:', error.message);
   } finally {
     await pool.end();
   }

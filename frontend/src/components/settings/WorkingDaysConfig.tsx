@@ -67,8 +67,8 @@ const WorkingDaysConfig: React.FC<WorkingDaysConfigProps> = ({
         console.log('Full API response:', response.data);
 
         if (response.data.success) {
-          // The API returns data.profile, not just data
-          const employee = response.data.data?.profile || response.data.data;
+          // The API returns { success: true, profile: {...}, completion_percentage: 100 }
+          const employee = response.data.profile || response.data.data?.profile || response.data.data;
           console.log('Employee data:', employee);
           
           // Parse working_days if it's a string
