@@ -73,12 +73,19 @@ export function EmployeeAttendance({ employeeId, darkMode = false }: EmployeeAtt
       }
       return await attendanceService.checkIn();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['employee-attendance', employeeId] });
-      addToast('success', 'Successfully checked in!');
+      // Use the message from backend which includes on-time/late status
+      const message = data?.message || 'Successfully checked in!';
+      addToast('success', message);
     },
-    onError: (error: Error) => {
-      addToast('error', error.message || 'Check-in failed');
+    onError: (error: any) => {
+      // Handle specific error messages from backend
+      const errorMessage = error.response?.data?.message || 
+                          error.response?.data?.error?.message || 
+                          error.message || 
+                          'Check-in failed';
+      addToast('error', errorMessage);
     }
   });
 
@@ -249,11 +256,15 @@ export function EmployeeAttendance({ employeeId, darkMode = false }: EmployeeAtt
                           <p className={`font-medium text-sm sm:text-base ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                             {formatDate(record.date)}
                           </p>
-                          {record.is_late && (
-                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${darkMode ? 'bg-orange-900/30 text-orange-400' : 'bg-orange-100 text-orange-700'}`}>
-                              Late
+                          {record.is_late ? (
+                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${darkMode ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-700'}`}>
+                              +{record.late_minutes || 0} min late
                             </span>
-                          )}
+                          ) : record.clock_in ? (
+                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${darkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700'}`}>
+                              On-time
+                            </span>
+                          ) : null}
                         </div>
                         <div className={`flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                           <div className="flex items-center gap-1">

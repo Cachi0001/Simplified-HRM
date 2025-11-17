@@ -265,6 +265,15 @@ export default function AttendanceReportPage() {
                               Check-out: {formatTime(record.checkOutTime)}
                             </span>
                           )}
+                          {record?.is_late ? (
+                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${darkMode ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-700'}`}>
+                              +{record.late_minutes || 0} min late
+                            </span>
+                          ) : record?.checkInTime ? (
+                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${darkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700'}`}>
+                              On-time
+                            </span>
+                          ) : null}
                           {(() => {
                             const meta = getLocationMeta(record);
                             const badgeClass = meta.status === 'onsite'
