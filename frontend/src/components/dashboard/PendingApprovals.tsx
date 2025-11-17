@@ -14,16 +14,16 @@ interface PendingApprovalsProps {
 
 const fetchInactiveEmployees = async (): Promise<Employee[]> => {
   try {
-    // Fetch all employees
-    const response = await api.get('/employees');
-    const allEmployees = response.data.data?.employees || response.data.employees || [];
+    // Fetch pending employees specifically
+    console.log('🔍 Fetching pending employees for approvals...');
+    const response = await api.get('/employees/pending');
+    const allEmployees = response.data.employees || response.data.data || [];
     
-    // Filter for pending/inactive status
+    console.log('📊 Total pending employees fetched:', allEmployees.length);
+    
+    // Filter out current user and apply role restrictions
     const currentUser = authService.getCurrentUserFromStorage();
-    const inactiveEmployees = allEmployees.filter((emp: any) => {
-      // Only show pending or inactive employees
-      if (emp.status !== 'inactive' && emp.status !== 'pending') return false;
-      
+    const filteredEmployees = allEmployees.filter((emp: any) => {
       // Don't show current user
       if (emp.email === currentUser?.email) return false;
       
@@ -33,7 +33,8 @@ const fetchInactiveEmployees = async (): Promise<Employee[]> => {
       return true;
     });
     
-    return inactiveEmployees;
+    console.log('✅ Pending employees to show:', filteredEmployees.length);
+    return filteredEmployees;
   } catch (error) {
     console.error('Failed to fetch inactive employees:', error);
     return [];

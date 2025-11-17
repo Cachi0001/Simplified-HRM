@@ -20,6 +20,13 @@ export class AuthService {
         const { token, user } = response.data.data;
         
         // Store token and user data
+        console.log('💾 Storing user data after login:', {
+          email: user.email,
+          role: user.role,
+          id: user.id,
+          timestamp: new Date().toISOString()
+        });
+        
         localStorage.setItem('accessToken', token);
         localStorage.setItem('user', JSON.stringify(user));
         
@@ -196,10 +203,35 @@ export class AuthService {
     return !!localStorage.getItem('accessToken');
   }
 
-  // Get stored user
+  // Get stored user with validation
   getCurrentUserFromStorage(): User | null {
-    const userStr = localStorage.getItem('user');
-    return userStr ? JSON.parse(userStr) : null;
+    try {
+      const userStr = localStorage.getItem('user');
+      if (!userStr) return null;
+      
+      const user = JSON.parse(userStr);
+      
+      // Validate user has required fields
+      if (!user.id || !user.email || !user.role) {
+        console.error('Invalid user data in localStorage, clearing...');
+        this.logout();
+        return null;
+      }
+      
+      // Validate role is one of the allowed values
+      const validRoles = ['superadmin', 'admin', 'hr', 'teamlead', 'employee'];
+      if (!validRoles.includes(user.role)) {
+        console.error(`Invalid role "${user.role}" in localStorage, clearing...`);
+        this.logout();
+        return null;
+      }
+      
+      return user;
+    } catch (error) {
+      console.error('Error parsing user from localStorage:', error);
+      this.logout();
+      return null;
+    }
   }
 
   // Get stored token

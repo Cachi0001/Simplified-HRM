@@ -410,8 +410,12 @@ export const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({
                       <option value="">Select Role</option>
                       <option value="employee">Staff</option>
                       <option value="teamlead">Team Lead</option>
-                      <option value="hr">HR</option>
-                      <option value="admin">Admin</option>
+                      {(user?.role === 'superadmin' || user?.role === 'admin') && (
+                        <option value="hr">HR</option>
+                      )}
+                      {user?.role === 'superadmin' && (
+                        <option value="admin">Admin</option>
+                      )}
                       {user?.role === 'superadmin' && (
                         <option value="superadmin">Super Admin</option>
                       )}

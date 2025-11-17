@@ -13,13 +13,25 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     return <Navigate to="/auth" replace />;
   }
 
-  // Redirect based on user role
-  if (user.role === 'employee' && window.location.pathname === '/dashboard') {
-    return <Navigate to="/employee-dashboard" replace />;
-  }
+  // Define correct dashboard for each role
+  const roleDashboards: Record<string, string> = {
+    'superadmin': '/super-admin-dashboard',
+    'admin': '/dashboard',
+    'hr': '/hr-dashboard',
+    'teamlead': '/teamlead-dashboard',
+    'employee': '/employee-dashboard'
+  };
 
-  if (user.role === 'admin' && window.location.pathname === '/employee-dashboard') {
-    return <Navigate to="/dashboard" replace />;
+  const currentPath = window.location.pathname;
+  const correctDashboard = roleDashboards[user.role] || '/employee-dashboard';
+
+  // List of all dashboard paths
+  const allDashboards = Object.values(roleDashboards);
+
+  // If user is on a dashboard that's not their correct one, redirect
+  if (allDashboards.includes(currentPath) && currentPath !== correctDashboard) {
+    console.warn(`⚠️ Role mismatch detected! User role: ${user.role}, Current path: ${currentPath}, Redirecting to: ${correctDashboard}`);
+    return <Navigate to={correctDashboard} replace />;
   }
 
   return children;

@@ -4,18 +4,18 @@ import { useQuery } from '@tanstack/react-query';
 import { authService } from '../services/authService';
 import { useTheme } from '../contexts/ThemeContext';
 import { AdminLeaveRequests } from '../components/dashboard/AdminLeaveRequests';
-// import { AdminEmployeeManagement } from '../components/dashboard/AdminEmployeeManagement'; // Temporarily disabled
 import { AdminTasks } from '../components/dashboard/AdminTasks';
 import { AdminAttendance } from '../components/dashboard/AdminAttendance';
 import { AdminDepartments } from '../components/dashboard/AdminDepartments';
 import { PendingApprovals } from '../components/dashboard/PendingApprovals';
+import { OverviewCards } from '../components/dashboard/OverviewCards';
 import { DraggableLogo } from '../components/dashboard/DraggableLogo';
 import { BottomNavbar } from '../components/layout/BottomNavbar';
 import { DarkModeToggle } from '../components/ui/DarkModeToggle';
 import { NotificationBell } from '../components/notifications/NotificationBell';
 import { NotificationManager } from '../components/notifications/NotificationManager';
 import Logo from '../components/ui/Logo';
-import { Clock, Users, FileText, CheckSquare, Building, Calendar } from 'lucide-react';
+import { Users, CheckSquare, Building, Calendar, Clock } from 'lucide-react';
 import { useTokenValidation } from '../hooks/useTokenValidation';
 import api from '../lib/api';
 
@@ -24,7 +24,6 @@ export default function HRDashboard() {
   const { darkMode, setDarkMode } = useTheme();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('overview');
-  const [selectedTimeRange, setSelectedTimeRange] = useState('30');
 
   // Save dark mode preference
   useEffect(() => {
@@ -61,19 +60,25 @@ export default function HRDashboard() {
     }
   });
 
-  // Fetch dashboard stats
+  // Fetch employee stats (same as Admin dashboard)
   const { data: stats, isLoading: statsLoading } = useQuery({
-    queryKey: ['dashboard-stats', selectedTimeRange],
+    queryKey: ['employee-stats'],
     queryFn: async () => {
-      const response = await api.get(`/dashboard/stats?timeRange=${selectedTimeRange}`);
-      return response.data.data;
+      try {
+        const response = await api.get('/employees/stats');
+        const statsData = response.data.data || response.data;
+        return {
+          total: statsData.total || 0,
+          active: statsData.active || 0,
+          pending: statsData.pending || 0
+        };
+      } catch (error) {
+        console.error('Failed to fetch employee stats:', error);
+        return { total: 0, active: 0, pending: 0 };
+      }
     },
     enabled: !!currentUser,
-    refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
-    staleTime: 2 * 60 * 1000, // Consider data stale after 2 minutes
-    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes (renamed from cacheTime)
-    retry: 3,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    retry: 1,
   });
 
 
@@ -123,110 +128,23 @@ export default function HRDashboard() {
       </header>
 
       <div className="container mx-auto px-4 py-6">
-        {/* Time Range Selector */}
-        <div className="mb-6">
-          <select
-            value={selectedTimeRange}
-            onChange={(e) => setSelectedTimeRange(e.target.value)}
-            className={`px-3 py-2 rounded-md border ${darkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
-          >
-            <option value="7">Last 7 days</option>
-            <option value="30">Last 30 days</option>
-            <option value="90">Last 90 days</option>
-          </select>
-        </div>
-
-        {/* Loading State */}
-        {statsLoading && (
-          <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <span className="ml-2">Loading dashboard data...</span>
-          </div>
-        )}
-
-
-
-        {/* Stats Cards */}
-        {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            {/* Total Staff Card */}
-            <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                    Total Staff
-                  </p>
-                  <p className={`text-3xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                    {(stats as any)?.totalEmployees || 0}
-                  </p>
-                  <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                    {(stats as any)?.activeEmployees || 0} active
-                  </p>
-                </div>
-                <div className="bg-blue-100 dark:bg-blue-900 p-3 rounded-lg">
-                  <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-                </div>
-              </div>
+        {/* Overview Cards - Same as Admin Dashboard */}
+        <section className="mb-8">
+          {statsLoading ? (
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className={`h-24 rounded-lg animate-pulse ${darkMode ? 'bg-gray-800' : 'bg-gray-200'}`} />
+              ))}
             </div>
-
-            {/* Departments Card */}
-            <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                    Departments
-                  </p>
-                  <p className={`text-3xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                    {(stats as any)?.totalDepartments || 0}
-                  </p>
-                </div>
-                <div className="bg-green-100 dark:bg-green-900 p-3 rounded-lg">
-                  <Building className="w-6 h-6 text-green-600 dark:text-green-400" />
-                </div>
-              </div>
-            </div>
-
-            {/* Leave Requests Card */}
-            <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                    Leave Requests
-                  </p>
-                  <p className={`text-3xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                    {(stats as any)?.pendingLeaves || 0}
-                  </p>
-                  <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                    {(stats as any)?.totalLeaves || 0} total
-                  </p>
-                </div>
-                <div className="bg-yellow-100 dark:bg-yellow-900 p-3 rounded-lg">
-                  <Clock className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
-                </div>
-              </div>
-            </div>
-
-            {/* Purchase Requests Card */}
-            <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                    Purchase Requests
-                  </p>
-                  <p className={`text-3xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                    {(stats as any)?.pendingPurchases || 0}
-                  </p>
-                  <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                    {(stats as any)?.totalPurchases || 0} total
-                  </p>
-                </div>
-                <div className="bg-purple-100 dark:bg-purple-900 p-3 rounded-lg">
-                  <FileText className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+          ) : (
+            <OverviewCards
+              total={stats?.total || 0}
+              active={stats?.active || 0}
+              pending={stats?.pending || 0}
+              darkMode={darkMode}
+            />
+          )}
+        </section>
 
         {/* Navigation Tabs */}
         <div className={`rounded-lg shadow-md mb-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>

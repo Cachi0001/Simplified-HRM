@@ -220,8 +220,8 @@ export class AuthService {
             admin.id,
             'info',
             'high',
-            '👤 New Staff Registration',
-            `${employeeName} (${employeeEmail}) has registered and is awaiting approval.`,
+            '👤 New Employee Registration',
+            `${employeeName} (${employeeEmail}) has registered and is pending approval.`,
             'approval',
             JSON.stringify({
               employee_name: employeeName,

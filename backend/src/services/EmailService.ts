@@ -256,14 +256,14 @@ export class EmailService {
     const approvalUrl = `${this.getBaseUrl()}/employee-management`;
     
     const content = `
-      <h2>New Employee Registration</h2>
-      <p>A new employee has registered and is awaiting approval:</p>
+      <h2>👤 New Employee Registration</h2>
+      <p>A new employee has registered and is pending approval:</p>
       <p><strong>Name:</strong> ${employeeName}</p>
       <p><strong>Email:</strong> ${employeeEmail}</p>
       <a href="${approvalUrl}" class="button" style="background-color: #00BFFF !important; color: #ffffff !important; text-decoration: none !important; display: inline-block; padding: 14px 32px; border-radius: 8px; font-weight: 600;">Review Application</a>
     `;
     
-    await this.sendEmail(adminEmail, 'New Employee Registration - Go3net HR', this.getEmailTemplate(content));
+    await this.sendEmail(adminEmail, '👤 New Employee Registration - Go3net HR', this.getEmailTemplate(content));
   }
 
   async sendCheckoutReminderEmail(email: string, fullName: string): Promise<void> {
