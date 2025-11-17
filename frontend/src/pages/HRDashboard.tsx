@@ -23,7 +23,7 @@ export default function HRDashboard() {
   const navigate = useNavigate();
   const { darkMode, setDarkMode } = useTheme();
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('tasks');
 
   // Save dark mode preference
   useEffect(() => {
@@ -128,13 +128,29 @@ export default function HRDashboard() {
       </header>
 
       <div className="container mx-auto px-4 py-6">
-
+        {/* Overview Cards */}
+        <section className="mb-8">
+          {statsLoading ? (
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className={`h-24 rounded-lg animate-pulse ${darkMode ? 'bg-gray-800' : 'bg-gray-200'}`} />
+              ))}
+            </div>
+          ) : (
+            <OverviewCards
+              total={stats?.total || 0}
+              active={stats?.active || 0}
+              pending={stats?.pending || 0}
+              darkMode={darkMode}
+            />
+          )}
+        </section>
 
         {/* Navigation Tabs */}
         <div className={`rounded-lg shadow-md mb-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
           <div className="flex flex-wrap border-b border-gray-200 dark:border-gray-700">
             {[
-              { id: 'overview', label: 'Overview', icon: Users },
+              // { id: 'overview', label: 'Overview', icon: Users }, // Removed as requested
               // { id: 'employees', label: 'Employee Management', icon: Users }, // Temporarily disabled
               { id: 'tasks', label: 'Task Management', icon: CheckSquare },
               { id: 'departments', label: 'Departments', icon: Building },
