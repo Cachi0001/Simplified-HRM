@@ -185,9 +185,17 @@ export function LeaveRequestsPage() {
       const remainingLeave = employee.remaining_annual_leave ?? employee.remainingAnnualLeave ?? 0;
       console.log('Remaining leave:', remainingLeave);
       
-      if (remainingLeave === 0 && !employee.remaining_annual_leave && !employee.remainingAnnualLeave) {
+      // Check if we couldn't find the balance field (undefined vs 0)
+      if (employee.remaining_annual_leave === undefined && employee.remainingAnnualLeave === undefined) {
         console.error('WARNING: Could not find remaining_annual_leave in employee object!');
         addToast('error', 'Could not fetch leave balance. Please refresh the page and try again.');
+        setSubmitting(false);
+        return;
+      }
+      
+      // Check if balance is actually 0
+      if (remainingLeave === 0) {
+        addToast('error', 'You have no remaining leave days. All your annual leave has been used or is pending approval.');
         setSubmitting(false);
         return;
       }
