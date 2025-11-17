@@ -614,8 +614,8 @@ export function PurchaseRequestsPage() {
                     </div>
                   )}
 
-                  {/* Delete button for request owner */}
-                  {((currentUser?.id === request.employee_id || currentUser?.employee_id === request.employee_id) && request.status === 'pending') && (
+                  {/* Delete button for request owner - can delete pending or rejected */}
+                  {((currentUser?.id === request.employee_id || currentUser?.employee_id === request.employee_id) && (request.status === 'pending' || request.status === 'rejected')) && (
                     <button
                       onClick={() => handleDeleteClick(request)}
                       className={`transition-colors duration-200 ${darkMode ? 'text-red-400 hover:text-red-300' : 'text-red-600 hover:text-red-800'

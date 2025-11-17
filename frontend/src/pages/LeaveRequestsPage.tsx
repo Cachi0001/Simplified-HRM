@@ -193,19 +193,19 @@ export function LeaveRequestsPage() {
         return;
       }
       
-      // Check if balance is actually 0
-      if (remainingLeave === 0) {
-        addToast('error', 'You have no remaining leave days. All your annual leave has been used or is pending approval.');
-        setSubmitting(false);
-        return;
-      }
-      
       // Check if sufficient balance (including pending requests)
       const pendingDays = leaveRequests
         .filter(req => req.status === 'pending' && (req.employee_id === currentUser?.employeeId || req.employee_id === currentUser?.id))
         .reduce((sum, req) => sum + (req.days_requested || 0), 0);
       
       const availableDays = remainingLeave - pendingDays;
+      
+      // Check if balance is actually 0 AFTER calculating available days
+      if (availableDays <= 0) {
+        addToast('error', `You have no available leave days. Balance: ${remainingLeave} days, Pending: ${pendingDays} days.`);
+        setSubmitting(false);
+        return;
+      }
       
       if (requestedDays > availableDays) {
         addToast('error', `Insufficient leave balance. You have ${availableDays} days available (${remainingLeave} remaining - ${pendingDays} pending). You're requesting ${requestedDays} days.`);
@@ -666,8 +666,8 @@ export function LeaveRequestsPage() {
                         </div>
                       )}
 
-                      {/* Delete button for request owner */}
-                      {(request.status === 'pending' && (
+                      {/* Delete button for request owner - can delete pending or rejected */}
+                      {((request.status === 'pending' || request.status === 'rejected') && (
                         currentUser?.employeeId === request.employee_id || 
                         currentUser?.id === request.employee_id ||
                         currentUser?._id === request.employee_id

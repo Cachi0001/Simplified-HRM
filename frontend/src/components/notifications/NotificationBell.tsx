@@ -79,6 +79,12 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ darkMode: pr
   const loadNotifications = async () => {
     try {
       const data = await notificationService.getNotifications(undefined, 50, 0, false);
+      
+      // On first load, mark all existing unread notifications as "already seen" (no sound)
+      if (playedNotificationIds.current.size === 0) {
+        data.filter(n => !n.read).forEach(n => playedNotificationIds.current.add(n.id));
+      }
+      
       setNotifications(data);
       
       // Play sound only for NEW unread notifications that haven't been played before
