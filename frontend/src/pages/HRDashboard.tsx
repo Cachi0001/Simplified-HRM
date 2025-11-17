@@ -128,23 +128,7 @@ export default function HRDashboard() {
       </header>
 
       <div className="container mx-auto px-4 py-6">
-        {/* Overview Cards - Same as Admin Dashboard */}
-        <section className="mb-8">
-          {statsLoading ? (
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-              {[1, 2, 3, 4].map(i => (
-                <div key={i} className={`h-24 rounded-lg animate-pulse ${darkMode ? 'bg-gray-800' : 'bg-gray-200'}`} />
-              ))}
-            </div>
-          ) : (
-            <OverviewCards
-              total={stats?.total || 0}
-              active={stats?.active || 0}
-              pending={stats?.pending || 0}
-              darkMode={darkMode}
-            />
-          )}
-        </section>
+
 
         {/* Navigation Tabs */}
         <div className={`rounded-lg shadow-md mb-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>

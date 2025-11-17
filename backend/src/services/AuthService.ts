@@ -45,8 +45,8 @@ export class AuthService {
         .catch(err => console.error('Failed to send verification email:', err));
     }
 
-    this.notifyAdminsOfNewEmployee(data.fullName, data.email)
-      .catch(err => console.error('Failed to notify admins:', err));
+    // Notification is handled by database trigger (notify_admins_on_employee_signup)
+    // No need to send duplicate notification here
 
     return { message: 'Registration successful. Please check your email for verification link.' };
   }
@@ -198,46 +198,5 @@ export class AuthService {
     };
   }
 
-  private async notifyAdminsOfNewEmployee(employeeName: string, employeeEmail: string): Promise<void> {
-    try {
-      // Get all users with admin, hr, or superadmin roles
-      const adminUsers = await this.userRepo.findByRoles(['superadmin', 'admin', 'hr']);
-      
-      // Send notification to each admin
-      for (const admin of adminUsers) {
-        try {
-          // Send email notification
-          await this.emailService.sendNewEmployeeNotification(admin.email, employeeName, employeeEmail);
-          
-          // Send push notification using database function
-          const { Pool } = require('pg');
-          const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
-          
-          await pool.query(`
-            INSERT INTO notifications (user_id, type, priority, title, message, category, metadata)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-          `, [
-            admin.id,
-            'info',
-            'high',
-            '👤 New Employee Registration',
-            `${employeeName} (${employeeEmail}) has registered and is pending approval.`,
-            'approval',
-            JSON.stringify({
-              employee_name: employeeName,
-              employee_email: employeeEmail,
-              action_url: '/dashboard',
-              highlight_type: 'approval'
-            })
-          ]);
-          
-          await pool.end();
-        } catch (notificationError) {
-          console.error(`Failed to send notification to ${admin.email}:`, notificationError);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to notify admins:', error);
-    }
-  }
+
 }
