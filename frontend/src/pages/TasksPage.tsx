@@ -255,6 +255,30 @@ export function TasksPage() {
     return true;
   };
 
+  // Handle time input change with validation
+  const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const timeValue = e.target.value;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const selectedDate = new Date(newTask.dueDate);
+    selectedDate.setHours(0, 0, 0, 0);
+    
+    // If date is today, validate time is not in the past
+    if (selectedDate.getTime() === today.getTime() && timeValue) {
+      const now = new Date();
+      const [hours, minutes] = timeValue.split(':').map(Number);
+      const selectedTime = new Date();
+      selectedTime.setHours(hours, minutes, 0, 0);
+      
+      if (selectedTime <= now) {
+        addToast('error', 'Cannot select a past time. Please choose a future time.');
+        return; // Don't update the state
+      }
+    }
+    
+    setNewTask({ ...newTask, dueTime: timeValue });
+  };
+
   // Create task mutation
   const createTaskMutation = useMutation({
     mutationFn: async (taskData: any) => {
@@ -789,15 +813,30 @@ export function TasksPage() {
                   id="dueTime"
                   type="time"
                   value={newTask.dueTime}
-                  onChange={(e) => setNewTask({ ...newTask, dueTime: e.target.value })}
-                  min={newTask.dueDate === formatDateInput(new Date()) ? new Date().toTimeString().slice(0, 5) : undefined}
-                  readOnly={(() => {
+                  onChange={handleTimeChange}
+                  onBlur={(e) => {
+                    // Validate on blur as well
+                    const timeValue = e.target.value;
+                    if (!timeValue) return;
+                    
                     const today = new Date();
                     today.setHours(0, 0, 0, 0);
                     const selectedDate = new Date(newTask.dueDate);
                     selectedDate.setHours(0, 0, 0, 0);
-                    return selectedDate < today;
-                  })()}
+                    
+                    if (selectedDate.getTime() === today.getTime()) {
+                      const now = new Date();
+                      const [hours, minutes] = timeValue.split(':').map(Number);
+                      const selectedTime = new Date();
+                      selectedTime.setHours(hours, minutes, 0, 0);
+                      
+                      if (selectedTime <= now) {
+                        addToast('error', 'Cannot select a past time. Clearing time field.');
+                        setNewTask({ ...newTask, dueTime: '' });
+                      }
+                    }
+                  }}
+                  min={newTask.dueDate === formatDateInput(new Date()) ? new Date().toTimeString().slice(0, 5) : undefined}
                   disabled={(() => {
                     const today = new Date();
                     today.setHours(0, 0, 0, 0);
