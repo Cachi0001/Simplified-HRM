@@ -256,15 +256,17 @@ export function EmployeeAttendance({ employeeId, darkMode = false }: EmployeeAtt
                           <p className={`font-medium text-sm sm:text-base ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                             {formatDate(record.date)}
                           </p>
-                          {record.is_late ? (
-                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${darkMode ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-700'}`}>
-                              +{record.late_minutes || 0} min late
-                            </span>
-                          ) : record.clock_in ? (
-                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${darkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700'}`}>
-                              On-time
-                            </span>
-                          ) : null}
+                          {record.clock_in && (
+                            record.is_late ? (
+                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${darkMode ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-700'}`}>
+                                +{record.late_minutes || 0} min late
+                              </span>
+                            ) : (
+                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${darkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700'}`}>
+                                On-time
+                              </span>
+                            )
+                          )}
                         </div>
                         <div className={`flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                           <div className="flex items-center gap-1">

@@ -10,12 +10,15 @@ export class DepartmentController {
 
   getAllDepartments = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      console.log('[DepartmentController] Fetching all departments');
       const departments = await this.departmentService.getAllDepartments();
+      console.log(`[DepartmentController] Successfully fetched ${departments.length} departments`);
       res.json({
         success: true,
         data: departments
       });
-    } catch (error) {
+    } catch (error: any) {
+      console.error('[DepartmentController] Error:', error.message);
       next(error);
     }
   };

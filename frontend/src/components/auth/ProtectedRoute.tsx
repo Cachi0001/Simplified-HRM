@@ -1,6 +1,7 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { authService } from '../../services/authService';
+import { getDashboardForRole, isValidRole } from '../../utils/roleUtils';
 
 interface ProtectedRouteProps {
   children: JSX.Element;
@@ -10,32 +11,38 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const user = authService.getCurrentUserFromStorage();
 
   if (!user) {
+    console.log('[ProtectedRoute] No user found, redirecting to auth');
     return <Navigate to="/auth" replace />;
   }
 
-  // Define correct dashboard for each role
-  const roleDashboards: Record<string, string> = {
-    'superadmin': '/super-admin-dashboard',
-    'admin': '/dashboard',
-    'hr': '/hr-dashboard',
-    'teamlead': '/teamlead-dashboard',
-    'employee': '/employee-dashboard'
-  };
+  // Validate user role
+  if (!isValidRole(user.role)) {
+    console.error('[ProtectedRoute] Invalid user role:', user.role);
+    authService.logout();
+    return <Navigate to="/auth" replace />;
+  }
 
   const currentPath = window.location.pathname;
-  const correctDashboard = roleDashboards[user.role] || '/employee-dashboard';
+  const correctDashboard = getDashboardForRole(user.role);
 
   // List of all dashboard paths
-  const allDashboards = Object.values(roleDashboards);
+  const allDashboards = [
+    '/super-admin-dashboard',
+    '/dashboard',
+    '/hr-dashboard',
+    '/teamlead-dashboard',
+    '/employee-dashboard'
+  ];
 
   // Superadmin can access ANY page - no restrictions
   if (user.role === 'superadmin') {
+    console.log('[ProtectedRoute] Superadmin access granted to:', currentPath);
     return children;
   }
 
   // For other roles, if user is on a dashboard that's not their correct one, redirect
   if (allDashboards.includes(currentPath) && currentPath !== correctDashboard) {
-    console.warn(`⚠️ Role mismatch detected! User role: ${user.role}, Current path: ${currentPath}, Redirecting to: ${correctDashboard}`);
+    console.warn(`[ProtectedRoute] ⚠️ Role mismatch! User: ${user.role}, Path: ${currentPath}, Redirecting to: ${correctDashboard}`);
     return <Navigate to={correctDashboard} replace />;
   }
 

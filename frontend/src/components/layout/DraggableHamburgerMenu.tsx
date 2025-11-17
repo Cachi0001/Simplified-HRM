@@ -262,13 +262,15 @@ export function DraggableHamburgerMenu({ darkMode = false }: DraggableHamburgerM
       icon: Home,
       label: 'Dashboard',
       onClick: () => {
-        if (currentUser?.role === 'employee') {
-          navigate('/employee-dashboard');
-        } else if (currentUser?.role === 'hr') {
-          navigate('/hr-dashboard');
-        } else {
-          navigate('/dashboard');
-        }
+        const dashboardMap: Record<string, string> = {
+          'superadmin': '/super-admin-dashboard',
+          'admin': '/dashboard',
+          'hr': '/hr-dashboard',
+          'teamlead': '/teamlead-dashboard',
+          'employee': '/employee-dashboard'
+        };
+        const targetDashboard = dashboardMap[currentUser?.role || 'employee'] || '/employee-dashboard';
+        navigate(targetDashboard);
         setIsOpen(false);
       },
     },

@@ -112,7 +112,15 @@ export function DraggableHamburgerMenuAdvanced({ darkMode = false }: DraggableHa
       icon: Home,
       label: 'Dashboard',
       onClick: () => {
-        navigate(currentUser?.role === 'employee' ? '/employee-dashboard' : '/dashboard');
+        const dashboardMap: Record<string, string> = {
+          'superadmin': '/super-admin-dashboard',
+          'admin': '/dashboard',
+          'hr': '/hr-dashboard',
+          'teamlead': '/teamlead-dashboard',
+          'employee': '/employee-dashboard'
+        };
+        const targetDashboard = dashboardMap[currentUser?.role || 'employee'] || '/employee-dashboard';
+        navigate(targetDashboard);
         setIsOpen(false);
       },
     },

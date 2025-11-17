@@ -30,10 +30,16 @@ export interface UpdateDepartmentData {
 
 export class DepartmentRepository {
   async getAll(): Promise<Department[]> {
-    const result = await pool.query(
-      'SELECT * FROM get_all_departments()'
-    );
-    return result.rows;
+    try {
+      const result = await pool.query(
+        'SELECT * FROM get_all_departments()'
+      );
+      console.log(`[DepartmentRepo] Fetched ${result.rows.length} departments`);
+      return result.rows;
+    } catch (error: any) {
+      console.error('[DepartmentRepo] Error fetching departments:', error.message);
+      throw new Error(`Failed to fetch departments: ${error.message}`);
+    }
   }
 
   async getById(id: string): Promise<Department | null> {

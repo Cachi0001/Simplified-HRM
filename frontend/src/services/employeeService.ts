@@ -82,12 +82,21 @@ class EmployeeService {
 
   async getDepartments(): Promise<Department[]> {
     try {
+      console.log('[EmployeeService] Fetching departments...');
       const response = await api.get('/departments');
+      console.log('[EmployeeService] Departments response:', response.data);
       // Backend returns { success: true, data: [...] }
-      return response.data.data || response.data.departments || [];
-    } catch (error) {
-      console.error('Failed to fetch departments:', error);
-      throw new Error('Failed to fetch departments');
+      const departments = response.data.data || response.data.departments || [];
+      console.log(`[EmployeeService] Fetched ${departments.length} departments`);
+      return departments;
+    } catch (error: any) {
+      console.error('[EmployeeService] Failed to fetch departments:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data
+      });
+      // Return empty array instead of throwing to prevent page crashes
+      return [];
     }
   }
 

@@ -59,9 +59,9 @@ const SignupCard: React.FC<SignupCardProps> = ({ onSwitchToLogin }) => {
         // User is logged in immediately - show success toast and redirect
         addToast('success', result.message || "Account created successfully!");
 
-        // Redirect to dashboard or appropriate page
+        // Redirect to auth page for login
         setTimeout(() => {
-          navigate('/dashboard');
+          navigate('/auth');
         }, 1500);
       }
 
