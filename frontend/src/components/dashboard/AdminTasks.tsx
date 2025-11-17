@@ -42,7 +42,8 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
     description: '',
     assigneeId: '',
     priority: 'medium' as 'low' | 'medium' | 'high',
-    dueDate: formatDateInput(tomorrow)
+    dueDate: formatDateInput(tomorrow),
+    dueTime: ''
   });
 
   const queryClient = useQueryClient();
@@ -125,7 +126,7 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['admin-tasks'] });
       setShowCreateForm(false);
-      setNewTask({ title: '', description: '', assigneeId: '', priority: 'medium', dueDate: formatDateInput(tomorrow) });
+      setNewTask({ title: '', description: '', assigneeId: '', priority: 'medium', dueDate: formatDateInput(tomorrow), dueTime: '' });
       addToast('success', 'Task created successfully!');
 
     },
@@ -173,10 +174,57 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
     }
   };
 
+  // Handle time input change with validation
+  const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const timeValue = e.target.value;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const selectedDate = new Date(newTask.dueDate);
+    selectedDate.setHours(0, 0, 0, 0);
+    
+    // If date is today, validate time is not in the past
+    if (selectedDate.getTime() === today.getTime() && timeValue) {
+      const now = new Date();
+      const [hours, minutes] = timeValue.split(':').map(Number);
+      const selectedTime = new Date();
+      selectedTime.setHours(hours, minutes, 0, 0);
+      
+      if (selectedTime <= now) {
+        addToast('error', 'Cannot select a past time. Please choose a future time.');
+        return; // Don't update the state
+      }
+    }
+    
+    setNewTask({ ...newTask, dueTime: timeValue });
+  };
+
   const handleCreateTask = () => {
     if (!newTask.title || !newTask.assigneeId || !newTask.dueDate) {
       addToast('error', 'Please fill in all required fields');
       return;
+    }
+
+    // Validate date/time
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const selectedDate = new Date(newTask.dueDate);
+    selectedDate.setHours(0, 0, 0, 0);
+    
+    if (selectedDate < today) {
+      addToast('error', 'Due date cannot be in the past');
+      return;
+    }
+    
+    if (selectedDate.getTime() === today.getTime() && newTask.dueTime) {
+      const now = new Date();
+      const [hours, minutes] = newTask.dueTime.split(':').map(Number);
+      const selectedTime = new Date();
+      selectedTime.setHours(hours, minutes, 0, 0);
+      
+      if (selectedTime <= now) {
+        addToast('error', 'Due time cannot be in the past. Please select a future time.');
+        return;
+      }
     }
 
     // Get current user
@@ -306,18 +354,69 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
                   id="dueDate"
                   label=""
                   type="date"
-                  min={formatDateInput(tomorrow)}
+                  min={formatDateInput(new Date())}
                   value={newTask.dueDate}
-                  onChange={(e) => {
-                    const selected = e.target.value;
-                    const selectedDate = new Date(selected);
-                    if (selected && selectedDate < tomorrow) {
-                      addToast('error', 'Due date cannot be in the past.');
-                      return;
-                    }
-                    setNewTask({ ...newTask, dueDate: selected });
-                  }}
+                  onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
                 />
+              </div>
+
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Due Time (Optional)
+                </label>
+                <input
+                  type="time"
+                  value={newTask.dueTime}
+                  onChange={handleTimeChange}
+                  onBlur={(e) => {
+                    // Validate on blur as well
+                    const timeValue = e.target.value;
+                    if (!timeValue) return;
+                    
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const selectedDate = new Date(newTask.dueDate);
+                    selectedDate.setHours(0, 0, 0, 0);
+                    
+                    if (selectedDate.getTime() === today.getTime()) {
+                      const now = new Date();
+                      const [hours, minutes] = timeValue.split(':').map(Number);
+                      const selectedTime = new Date();
+                      selectedTime.setHours(hours, minutes, 0, 0);
+                      
+                      if (selectedTime <= now) {
+                        addToast('error', 'Cannot select a past time. Clearing time field.');
+                        setNewTask({ ...newTask, dueTime: '' });
+                      }
+                    }
+                  }}
+                  min={newTask.dueDate === formatDateInput(new Date()) ? new Date().toTimeString().slice(0, 5) : undefined}
+                  disabled={(() => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const selectedDate = new Date(newTask.dueDate);
+                    selectedDate.setHours(0, 0, 0, 0);
+                    return selectedDate < today;
+                  })()}
+                  className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} ${(() => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const selectedDate = new Date(newTask.dueDate);
+                    selectedDate.setHours(0, 0, 0, 0);
+                    return selectedDate < today ? 'opacity-50 cursor-not-allowed' : '';
+                  })()}`}
+                />
+                <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  {(() => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const selectedDate = new Date(newTask.dueDate);
+                    selectedDate.setHours(0, 0, 0, 0);
+                    return selectedDate < today 
+                      ? 'Time input disabled for past dates'
+                      : 'Leave empty for end of day (11:59 PM)';
+                  })()}
+                </p>
               </div>
             </div>
 
@@ -441,13 +540,13 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
                   )}
 
                   {/* Metadata: Dates */}
-                  <div className={`flex items-center gap-4 text-xs mb-4 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  <div className={`flex items-center gap-4 text-xs mb-4 flex-wrap ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                     <div className="flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />
-                      <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
+                      <Calendar className="h-3 w-3 flex-shrink-0" />
+                      <span>Due: {new Date(task.dueDate).toLocaleDateString()}{task.dueTime ? ` at ${task.dueTime}` : ''}</span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
+                      <Clock className="h-3 w-3 flex-shrink-0" />
                       <span>Created: {new Date(task.createdAt).toLocaleDateString()}</span>
                     </div>
                   </div>
