@@ -226,9 +226,41 @@ export function TasksPage() {
     },
   });
 
+  // Validate task before creation
+  const validateTask = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const selectedDate = new Date(newTask.dueDate);
+    selectedDate.setHours(0, 0, 0, 0);
+    
+    // Check if date is in the past
+    if (selectedDate < today) {
+      addToast('error', 'Due date cannot be in the past');
+      return false;
+    }
+    
+    // If date is today and time is specified, check if time is in the past
+    if (selectedDate.getTime() === today.getTime() && newTask.dueTime) {
+      const now = new Date();
+      const [hours, minutes] = newTask.dueTime.split(':').map(Number);
+      const selectedTime = new Date();
+      selectedTime.setHours(hours, minutes, 0, 0);
+      
+      if (selectedTime <= now) {
+        addToast('error', 'Due time cannot be in the past. Please select a future time.');
+        return false;
+      }
+    }
+    
+    return true;
+  };
+
   // Create task mutation
   const createTaskMutation = useMutation({
     mutationFn: async (taskData: any) => {
+      if (!validateTask()) {
+        throw new Error('Validation failed');
+      }
       return await taskService.createTask(taskData);
     },
     onSuccess: () => {
@@ -245,6 +277,7 @@ export function TasksPage() {
       });
     },
     onError: (error: any) => {
+      if (error.message === 'Validation failed') return; // Already showed toast
       const errorMessage = error.message || 'Failed to create task';
       addToast('error', errorMessage);
     },
