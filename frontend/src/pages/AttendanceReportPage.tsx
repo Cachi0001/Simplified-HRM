@@ -248,9 +248,22 @@ export default function AttendanceReportPage() {
                     <div className="flex items-start gap-3 min-w-0 flex-1">
                       <Users className={`h-5 w-5 flex-shrink-0 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
                       <div className="min-w-0 flex-1">
-                        <p className={`font-medium truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                          {getEmployeeName(record)}
-                        </p>
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className={`font-medium truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                            {getEmployeeName(record)}
+                          </p>
+                          {record?.checkInTime && (
+                            (record?.is_late || record?.isLate) ? (
+                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${darkMode ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-700'}`}>
+                                +{record.late_minutes || record.lateMinutes || 0} min late
+                              </span>
+                            ) : (
+                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${darkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700'}`}>
+                                On-time
+                              </span>
+                            )
+                          )}
+                        </div>
                         <div className={`flex items-center flex-wrap gap-2 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                           <span className="flex items-center gap-1">
                             <Calendar className="h-4 w-4" />
@@ -264,17 +277,6 @@ export default function AttendanceReportPage() {
                             <span className="flex items-center gap-1">
                               Check-out: {formatTime(record.checkOutTime)}
                             </span>
-                          )}
-                          {record?.checkInTime && (
-                            (record?.is_late || record?.isLate) ? (
-                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${darkMode ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-700'}`}>
-                                You are +{record.late_minutes || record.lateMinutes || 0} min late
-                              </span>
-                            ) : (
-                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${darkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700'}`}>
-                                On-time
-                              </span>
-                            )
                           )}
                           {(() => {
                             const meta = getLocationMeta(record);
