@@ -19,16 +19,23 @@ export function EmployeeLeaveBalances({ darkMode = false }: EmployeeLeaveBalance
       const employeesData = response.data.data || response.data || [];
       
       // Use single pool balance from employees table
+      // remaining_annual_leave already accounts for approved leaves only (not pending)
       const employeesWithBalances = employeesData
         .filter((emp: any) => emp.status === 'active' && emp.role !== 'superadmin')
-        .map((emp: any) => ({
-          ...emp,
-          leaveBalance: {
-            total_days: emp.total_annual_leave || 7,
-            used_days: emp.used_annual_leave || 0,
-            remaining_days: emp.remaining_annual_leave || 7
-          }
-        }));
+        .map((emp: any) => {
+          const totalDays = emp.total_annual_leave ?? 7;
+          const usedDays = emp.used_annual_leave ?? 0;
+          const remainingDays = emp.remaining_annual_leave ?? (totalDays - usedDays);
+          
+          return {
+            ...emp,
+            leaveBalance: {
+              total_days: totalDays,
+              used_days: usedDays,
+              remaining_days: remainingDays
+            }
+          };
+        });
       
       return employeesWithBalances;
     },

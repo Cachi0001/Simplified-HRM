@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../lib/api';
 import { useToast } from '../ui/Toast';
 import { Check, X, Clock, ChevronDown } from 'lucide-react';
+import { LeaveApprovalActions } from '../leave/LeaveApprovalActions';
 
 interface LeaveRequest {
   id: string;
@@ -308,21 +309,17 @@ export const AdminLeaveRequests: React.FC<AdminLeaveRequestsProps> = ({ darkMode
                           </div>
                         </div>
                       ) : (
-                        <div className="flex gap-3 mt-4">
-                          <button
-                            onClick={() => approveMutation.mutate(request.id || request._id)}
-                            disabled={approveMutation.isPending}
-                            className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
-                          >
-                            {approveMutation.isPending ? 'Approving...' : '✓ Approve'}
-                          </button>
-                          <button
-                            onClick={() => setShowRejectModal(request.id || request._id)}
-                            disabled={rejectMutation.isPending}
-                            className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
-                          >
-                            ✗ Reject
-                          </button>
+                        <div className="flex justify-center mt-4">
+                          <LeaveApprovalActions
+                            requestId={request.id || request._id}
+                            onApprove={() => approveMutation.mutate(request.id || request._id)}
+                            onReject={() => setShowRejectModal(request.id || request._id)}
+                            approving={approveMutation.isPending}
+                            rejecting={rejectMutation.isPending}
+                            darkMode={darkMode}
+                            size="lg"
+                            layout="horizontal"
+                          />
                         </div>
                       )}
                     </>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Clock, CheckCircle, XCircle, AlertCircle, ArrowLeft, Check, X } from 'lucide-react';
+import { Plus, Trash2, Clock, CheckCircle, XCircle, AlertCircle, ArrowLeft } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { useToast } from '../components/ui/Toast';
@@ -9,6 +9,7 @@ import LoadingButton from '../components/ui/LoadingButton';
 import { ConfirmationDialog } from '../components/ui/ConfirmationDialog';
 import { BulkLeaveReset } from '../components/leave/BulkLeaveReset';
 import { EmployeeLeaveBalances } from '../components/leave/EmployeeLeaveBalances';
+import { LeaveApprovalActions } from '../components/leave/LeaveApprovalActions';
 import api from '../lib/api';
 import { 
   LeaveRequest, 
@@ -183,7 +184,7 @@ export function LeaveRequestsPage() {
       console.log('Employee keys:', Object.keys(employee));
       
       const remainingLeave = employee.remaining_annual_leave ?? employee.remainingAnnualLeave ?? 0;
-      console.log('Remaining leave:', remainingLeave);
+      console.log('Remaining leave from DB:', remainingLeave);
       
       // Check if we couldn't find the balance field (undefined vs 0)
       if (employee.remaining_annual_leave === undefined && employee.remainingAnnualLeave === undefined) {
@@ -193,22 +194,31 @@ export function LeaveRequestsPage() {
         return;
       }
       
-      // Check if sufficient balance (including pending requests)
+      // CRITICAL: Calculate pending days to prevent over-requesting
       const pendingDays = leaveRequests
-        .filter(req => req.status === 'pending' && (req.employee_id === currentUser?.employeeId || req.employee_id === currentUser?.id))
+        .filter(req => 
+          req.status === 'pending' && 
+          (req.employee_id === currentUser?.employeeId || 
+           req.employee_id === currentUser?.id ||
+           req.employee_id === currentUser?._id)
+        )
         .reduce((sum, req) => sum + (req.days_requested || 0), 0);
       
-      const availableDays = remainingLeave - pendingDays;
+      console.log('Pending days:', pendingDays);
       
-      // Check if balance is actually 0 AFTER calculating available days
+      // Available days = remaining balance - pending requests
+      const availableDays = remainingLeave - pendingDays;
+      console.log('Available days after pending:', availableDays);
+      
+      // Check if sufficient balance
       if (availableDays <= 0) {
-        addToast('error', `You have no available leave days. Balance: ${remainingLeave} days, Pending: ${pendingDays} days.`);
+        addToast('error', `You have no available leave days. Balance: ${remainingLeave} days, Pending: ${pendingDays} days, Available: ${availableDays} days.`);
         setSubmitting(false);
         return;
       }
       
       if (requestedDays > availableDays) {
-        addToast('error', `Insufficient leave balance. You have ${availableDays} days available (${remainingLeave} remaining - ${pendingDays} pending). You're requesting ${requestedDays} days.`);
+        addToast('error', `Insufficient leave balance. You have ${availableDays} days available (${remainingLeave} remaining - ${pendingDays} pending) but are requesting ${requestedDays} days.`);
         setSubmitting(false);
         return;
       }
@@ -630,40 +640,16 @@ export function LeaveRequestsPage() {
                       </div>
                       {/* Approve/Reject buttons for HR/Admin/SuperAdmin */}
                       {canApproveReject(request) && (
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => handleApprove(request.id)}
-                            disabled={approving === request.id}
-                            className={`p-2 rounded-lg transition-colors duration-200 ${
-                              darkMode 
-                                ? 'bg-green-900 text-green-400 hover:bg-green-800 disabled:bg-gray-700 disabled:text-gray-500' 
-                                : 'bg-green-100 text-green-600 hover:bg-green-200 disabled:bg-gray-100 disabled:text-gray-400'
-                            }`}
-                            title="Approve request"
-                          >
-                            {approving === request.id ? (
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
-                            ) : (
-                              <Check className="h-4 w-4" />
-                            )}
-                          </button>
-                          <button
-                            onClick={() => handleRejectClick(request.id)}
-                            disabled={rejecting === request.id}
-                            className={`p-2 rounded-lg transition-colors duration-200 ${
-                              darkMode 
-                                ? 'bg-red-900 text-red-400 hover:bg-red-800 disabled:bg-gray-700 disabled:text-gray-500' 
-                                : 'bg-red-100 text-red-600 hover:bg-red-200 disabled:bg-gray-100 disabled:text-gray-400'
-                            }`}
-                            title="Reject request"
-                          >
-                            {rejecting === request.id ? (
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
-                            ) : (
-                              <X className="h-4 w-4" />
-                            )}
-                          </button>
-                        </div>
+                        <LeaveApprovalActions
+                          requestId={request.id}
+                          onApprove={handleApprove}
+                          onReject={handleRejectClick}
+                          approving={approving === request.id}
+                          rejecting={rejecting === request.id}
+                          darkMode={darkMode}
+                          size="md"
+                          layout="horizontal"
+                        />
                       )}
 
                       {/* Delete button for request owner - can delete pending or rejected */}

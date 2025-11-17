@@ -28,12 +28,15 @@ export function LeaveBalanceManager({
       return response.data;
     },
     onSuccess: (data) => {
+      // Invalidate ALL related queries to ensure consistency
       queryClient.invalidateQueries({ queryKey: ['leave-balances'] });
+      queryClient.invalidateQueries({ queryKey: ['employee-leave-balances'] });
       queryClient.invalidateQueries({ queryKey: ['employees'] });
+      queryClient.invalidateQueries({ queryKey: ['current-user'] });
       setShowConfirm(false);
       
       // Show success message
-      alert(`✅ ${data.message}`);
+      alert(`✅ ${data.message || 'Leave balance reset successfully'}`);
     },
     onError: (error: any) => {
       alert(`❌ Failed to reset leave balance: ${error.response?.data?.message || error.message}`);

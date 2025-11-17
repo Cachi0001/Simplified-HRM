@@ -20,11 +20,15 @@ export function BulkLeaveReset({ darkMode = false }: BulkLeaveResetProps) {
       return response.data;
     },
     onSuccess: (data) => {
+      // Invalidate ALL related queries to ensure consistency
       queryClient.invalidateQueries({ queryKey: ['leave-balances'] });
+      queryClient.invalidateQueries({ queryKey: ['employee-leave-balances'] });
       queryClient.invalidateQueries({ queryKey: ['employees'] });
+      queryClient.invalidateQueries({ queryKey: ['current-user'] });
       setShowConfirm(false);
       
-      alert(`✅ ${data.message}\n${data.data.employees_affected} employees' leave balances have been reset to 7 days.`);
+      const affectedCount = data.data?.affected_count || data.data?.employees_affected || 'All';
+      alert(`✅ ${data.message || 'Leave balances reset successfully'}\n${affectedCount} employees' leave balances have been reset to 7 days.`);
     },
     onError: (error: any) => {
       alert(`❌ Failed to reset leave balances: ${error.response?.data?.message || error.message}`);

@@ -86,9 +86,6 @@ export class LeaveService {
   }
 
   async approveLeaveRequest(leaveRequestId: string, approvedByUserId: string, comments?: string): Promise<{ message: string; leaveRequest: LeaveRequest }> {
-    console.log('[LeaveService] Approving leave request:', leaveRequestId);
-    console.log('[LeaveService] Approver userId from JWT:', approvedByUserId);
-    
     const leaveRequest = await this.leaveRepo.getLeaveRequestById(leaveRequestId);
     if (!leaveRequest) {
       throw new NotFoundError('Leave request not found');
@@ -98,22 +95,16 @@ export class LeaveService {
       throw new ValidationError(`Cannot approve leave request with status: ${leaveRequest.status}`);
     }
 
-    console.log('[LeaveService] Looking for employee with user_id:', approvedByUserId);
     const approver = await this.employeeRepo.findByUserId(approvedByUserId);
-    console.log('[LeaveService] Found approver:', approver ? `Yes (id: ${approver.id}, role: ${approver.role})` : 'NO - THIS IS THE PROBLEM');
-    
     if (!approver) {
-      // Log all employees to debug
-      const allEmployees = await this.employeeRepo.findAll({});
-      console.log('[LeaveService] All employees in database:', allEmployees.map(e => ({ id: e.id, user_id: e.user_id, email: e.email, role: e.role })));
-      throw new NotFoundError('Approver not found');
+      throw new NotFoundError('Approver profile not found');
     }
 
     if (!['superadmin', 'admin', 'hr'].includes(approver.role)) {
       throw new ValidationError('You do not have permission to approve leave requests');
     }
 
-    // Prevent self-approval
+    // CRITICAL: Prevent self-approval - check if approver is the same as requester
     if (leaveRequest.employee_id === approver.id) {
       throw new ValidationError('You cannot approve your own leave request');
     }
@@ -124,13 +115,16 @@ export class LeaveService {
       throw new ValidationError(result.message);
     }
 
-    await this.emailService.sendLeaveApprovedEmail(
-      leaveRequest.employee_email!,
-      leaveRequest.employee_name!,
-      leaveRequest.leave_type,
-      leaveRequest.start_date,
-      leaveRequest.end_date
-    );
+    // Send email notification
+    if (leaveRequest.employee_email && leaveRequest.employee_name) {
+      await this.emailService.sendLeaveApprovedEmail(
+        leaveRequest.employee_email,
+        leaveRequest.employee_name,
+        leaveRequest.leave_type,
+        leaveRequest.start_date,
+        leaveRequest.end_date
+      );
+    }
 
     const updatedLeaveRequest = await this.leaveRepo.getLeaveRequestById(leaveRequestId);
 
@@ -156,11 +150,16 @@ export class LeaveService {
 
     const rejector = await this.employeeRepo.findByUserId(rejectedByUserId);
     if (!rejector) {
-      throw new NotFoundError('Rejector not found');
+      throw new NotFoundError('Rejector profile not found');
     }
 
     if (!['superadmin', 'admin', 'hr'].includes(rejector.role)) {
       throw new ValidationError('You do not have permission to reject leave requests');
+    }
+
+    // CRITICAL: Prevent self-rejection - check if rejector is the same as requester
+    if (leaveRequest.employee_id === rejector.id) {
+      throw new ValidationError('You cannot reject your own leave request');
     }
 
     const result = await this.leaveRepo.rejectLeaveRequest(leaveRequestId, rejector.id, reason);
@@ -169,12 +168,15 @@ export class LeaveService {
       throw new ValidationError(result.message);
     }
 
-    await this.emailService.sendLeaveRejectedEmail(
-      leaveRequest.employee_email!,
-      leaveRequest.employee_name!,
-      leaveRequest.leave_type,
-      reason
-    );
+    // Send email notification
+    if (leaveRequest.employee_email && leaveRequest.employee_name) {
+      await this.emailService.sendLeaveRejectedEmail(
+        leaveRequest.employee_email,
+        leaveRequest.employee_name,
+        leaveRequest.leave_type,
+        reason
+      );
+    }
 
     const updatedLeaveRequest = await this.leaveRepo.getLeaveRequestById(leaveRequestId);
 
@@ -213,6 +215,7 @@ export class LeaveService {
   }
 
   async deleteLeaveRequest(leaveRequestId: string, userId: string): Promise<{ message: string }> {
+    // Pass user_id directly to the function (not employee_id)
     const result = await this.leaveRepo.deleteLeaveRequest(leaveRequestId, userId);
 
     if (!result.success) {
