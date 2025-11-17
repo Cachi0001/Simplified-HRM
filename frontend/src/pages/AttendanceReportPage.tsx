@@ -241,76 +241,75 @@ export default function AttendanceReportPage() {
             <div className="space-y-4">
               {report.map((record: any, index: number) => {
                 const uniqueKey = `${record?.employeeId || record?._id?.employeeId || 'unknown'}-${record?.date || record?._id?.date || index}`;
+                const meta = getLocationMeta(record);
+                const locationBadgeClass = meta.status === 'onsite'
+                  ? darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-700'
+                  : meta.status === 'remote'
+                    ? darkMode ? 'bg-orange-900 text-orange-200' : 'bg-orange-100 text-orange-700'
+                    : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700';
+                const locationLabel = meta.status === 'onsite' ? 'Onsite' : meta.status === 'remote' ? 'Remote' : 'Unknown';
+                
                 return (
-                <Card key={uniqueKey} className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-                <div className="p-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div className="flex items-start gap-3 min-w-0 flex-1">
-                      <Users className={`h-5 w-5 flex-shrink-0 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className={`font-medium truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                            {getEmployeeName(record)}
-                          </p>
-                          {record?.checkInTime && (
-                            (record?.is_late || record?.isLate) ? (
-                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${darkMode ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-700'}`}>
-                                +{record.late_minutes || record.lateMinutes || 0} min late
-                              </span>
-                            ) : (
-                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${darkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700'}`}>
-                                On-time
-                              </span>
-                            )
-                          )}
+                  <div key={uniqueKey} className={`p-3 sm:p-4 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div className="flex items-start gap-2 sm:gap-3 min-w-0 flex-1">
+                        <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center flex-shrink-0 ${darkMode ? 'bg-gray-600' : 'bg-gray-200'}`}>
+                          <Users className={`h-4 w-4 sm:h-5 sm:w-5 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
                         </div>
-                        <div className={`flex items-center flex-wrap gap-2 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                          <span className="flex items-center gap-1">
-                            <Calendar className="h-4 w-4" />
-                            {formatDate(record?._id?.date ?? record?.date)}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-4 w-4" />
-                            Check-in: {formatTime(record?.checkInTime)}
-                          </span>
-                          {record?.checkOutTime && (
-                            <span className="flex items-center gap-1">
-                              Check-out: {formatTime(record.checkOutTime)}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className={`font-medium text-sm sm:text-base truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                              {getEmployeeName(record)}
+                            </p>
+                            {/* On-time/Late indicator next to name */}
+                            {record?.checkInTime && (
+                              (record?.is_late || record?.isLate) ? (
+                                <span className={`px-2 py-0.5 rounded text-xs font-medium ${darkMode ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-700'}`}>
+                                  +{record.late_minutes || record.lateMinutes || 0} min late
+                                </span>
+                              ) : (
+                                <span className={`px-2 py-0.5 rounded text-xs font-medium ${darkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700'}`}>
+                                  On-time
+                                </span>
+                              )
+                            )}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                            <p className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                              {formatDate(record?._id?.date ?? record?.date)}
+                            </p>
+                            <span className={`text-xs px-1.5 py-0.5 rounded-full inline-flex items-center gap-1 ${locationBadgeClass}`}>
+                              <MapPin className="h-3 w-3" />
+                              {locationLabel}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex sm:flex-col items-center sm:items-end gap-2 sm:gap-1 flex-shrink-0">
+                        <p className={`text-xs sm:text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                          {record?.status === 'checked_out' ? 'Completed' : 'Active'}
+                        </p>
+                        <div className={`flex items-center gap-1 sm:gap-2 text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                          <Clock className="h-3 w-3" />
+                          <span className="whitespace-nowrap">{formatTime(record?.checkInTime)}</span>
+                          {record?.checkOutTime ? (
+                            <>
+                              <span>-</span>
+                              <span className="whitespace-nowrap">{formatTime(record.checkOutTime)}</span>
+                              <span className={`px-1.5 py-0.5 rounded text-xs ${darkMode ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-800'}`}>
+                                {record.totalHours ? `${record.totalHours.toFixed(1)}h` : '0h'}
+                              </span>
+                            </>
+                          ) : (
+                            <span className={`px-1.5 py-0.5 rounded text-xs ${darkMode ? 'bg-orange-900 text-orange-300' : 'bg-orange-100 text-orange-800'}`}>
+                              Active
                             </span>
                           )}
-                          {(() => {
-                            const meta = getLocationMeta(record);
-                            const badgeClass = meta.status === 'onsite'
-                              ? darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-700'
-                              : meta.status === 'remote'
-                                ? darkMode ? 'bg-orange-900 text-orange-200' : 'bg-orange-100 text-orange-700'
-                                : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700';
-                            const label = meta.status === 'onsite' ? 'Onsite' : meta.status === 'remote' ? 'Remote' : 'Unknown';
-                            return (
-                              <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${badgeClass}`}>
-                                <MapPin className="h-3 w-3" />
-                                {label}
-                                {typeof meta.distance === 'number' ? `· ${meta.distance}m` : ''}
-                              </span>
-                            );
-                          })()}
                         </div>
                       </div>
-                    </div>
-                    <div className="flex sm:flex-col items-center sm:items-end gap-2 sm:gap-1 flex-shrink-0">
-                      <div className={`text-sm font-medium ${record?.status === 'checked_out' ? (darkMode ? 'text-green-400' : 'text-green-600') : (darkMode ? 'text-orange-400' : 'text-orange-600')}`}>
-                        {record?.status === 'checked_out' ? 'Completed' : 'Active'}
-                      </div>
-                      {record?.totalHours && (
-                        <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                          {record.totalHours.toFixed(1)}h
-                        </div>
-                      )}
                     </div>
                   </div>
-                </div>
-              </Card>
-            );
+                );
             })}
             </div>
           ) : (
