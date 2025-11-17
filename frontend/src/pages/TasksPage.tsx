@@ -792,9 +792,24 @@ export function TasksPage() {
                   value={newTask.dueTime}
                   onChange={(e) => setNewTask({ ...newTask, dueTime: e.target.value })}
                   min={newTask.dueDate === formatDateInput(new Date()) ? new Date().toTimeString().slice(0, 5) : undefined}
+                  disabled={(() => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const selectedDate = new Date(newTask.dueDate);
+                    selectedDate.setHours(0, 0, 0, 0);
+                    return selectedDate < today;
+                  })()}
                 />
                 <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                  Leave empty for end of day (11:59 PM)
+                  {(() => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const selectedDate = new Date(newTask.dueDate);
+                    selectedDate.setHours(0, 0, 0, 0);
+                    return selectedDate < today 
+                      ? 'Time input disabled for past dates'
+                      : 'Leave empty for end of day (11:59 PM)';
+                  })()}
                 </p>
               </div>
             </div>
