@@ -78,38 +78,11 @@
       }
     </script>
     <style>
-      /* Fix date and time input contrast in dark mode */
-      input[type="date"],
-      input[type="time"],
-      input[type="datetime-local"] {
-        color-scheme: dark;
-      }
-      
-      /* Ensure text is visible in dark mode */
-      .dark input[type="date"],
-      .dark input[type="time"],
-      .dark input[type="datetime-local"],
-      input[type="date"]:not([class*="bg-white"]),
-      input[type="time"]:not([class*="bg-white"]),
-      input[type="datetime-local"]:not([class*="bg-white"]) {
-        color: #E0E1DD !important;
-        background-color: #1B263B !important;
-        border-color: #415A77 !important;
-      }
-      
-      /* Calendar icon and picker styling */
+      /* Make calendar/clock icon visible in light mode date/time inputs */
       input[type="date"]::-webkit-calendar-picker-indicator,
       input[type="time"]::-webkit-calendar-picker-indicator,
       input[type="datetime-local"]::-webkit-calendar-picker-indicator {
-        filter: invert(0.8);
-        cursor: pointer;
-      }
-      
-      /* Firefox date/time input styling */
-      input[type="date"]::-moz-calendar-picker-indicator,
-      input[type="time"]::-moz-calendar-picker-indicator,
-      input[type="datetime-local"]::-moz-calendar-picker-indicator {
-        filter: invert(0.8);
+        filter: invert(0.5);
         cursor: pointer;
       }
     </style>
