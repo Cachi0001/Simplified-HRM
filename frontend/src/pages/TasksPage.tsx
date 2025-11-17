@@ -484,13 +484,13 @@ export function TasksPage() {
           )}
 
           {/* Metadata */}
-          <div className={`flex items-center gap-4 text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+          <div className={`flex flex-wrap items-center gap-3 text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
             <div className="flex items-center gap-1">
-              <Calendar className="h-3 w-3" />
-              <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
+              <Calendar className="h-3 w-3 flex-shrink-0" />
+              <span>Due: {new Date(task.dueDate).toLocaleDateString()}{task.dueTime ? ` at ${task.dueTime}` : ''}</span>
             </div>
             <div className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
+              <Clock className="h-3 w-3 flex-shrink-0" />
               <span>Created: {new Date(task.createdAt).toLocaleDateString()}</span>
             </div>
           </div>
@@ -791,6 +791,7 @@ export function TasksPage() {
                   type="time"
                   value={newTask.dueTime}
                   onChange={(e) => setNewTask({ ...newTask, dueTime: e.target.value })}
+                  min={newTask.dueDate === formatDateInput(new Date()) ? new Date().toTimeString().slice(0, 5) : undefined}
                 />
                 <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                   Leave empty for end of day (11:59 PM)
