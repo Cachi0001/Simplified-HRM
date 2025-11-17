@@ -4,12 +4,12 @@ import { authService } from '../services/authService';
 import api from '../lib/api';
 
 interface UseTokenValidationOptions {
-  checkInterval?: number; // in milliseconds, default 5 minutes
+  checkInterval?: number; // in milliseconds, default 15 minutes
   onTokenExpired?: () => void;
 }
 
 export function useTokenValidation(options: UseTokenValidationOptions = {}) {
-  const { checkInterval = 5 * 60 * 1000, onTokenExpired } = options;
+  const { checkInterval = 15 * 60 * 1000, onTokenExpired } = options; // Changed from 5 to 15 minutes
 
   // Check token validity by making a simple API call
   const { error } = useQuery({
@@ -23,9 +23,12 @@ export function useTokenValidation(options: UseTokenValidationOptions = {}) {
       } catch (error: any) {
         console.log('[TokenValidation] Token check failed:', error.response?.status);
 
-        // If it's a 401 (unauthorized) error, the token has expired
-        if (error.response?.status === 401) {
-          console.log('[TokenValidation] Token expired (401), logging out user');
+        // Only logout on 401 if it's explicitly a token expiration error
+        // Don't logout on network errors or other issues
+        if (error.response?.status === 401 && 
+            (error.response?.data?.message?.includes('Token expired') ||
+             error.response?.data?.message?.includes('Invalid token'))) {
+          console.log('[TokenValidation] Token expired, logging out user');
           authService.logout();
 
           if (onTokenExpired) {
@@ -34,6 +37,9 @@ export function useTokenValidation(options: UseTokenValidationOptions = {}) {
             // Default behavior: redirect to login
             window.location.href = '/auth';
           }
+        } else {
+          // For other errors, just log and don't logout
+          console.log('[TokenValidation] Non-critical error, keeping session');
         }
 
         return false;
@@ -43,7 +49,9 @@ export function useTokenValidation(options: UseTokenValidationOptions = {}) {
     refetchInterval: checkInterval,
     retry: false, // Don't retry failed requests
     refetchOnWindowFocus: false, // Don't check on window focus - causes issues
-    staleTime: checkInterval // Consider data fresh for the check interval
+    staleTime: checkInterval, // Consider data fresh for the check interval
+    refetchOnMount: false, // Don't check on mount - prevents logout on page refresh
+    refetchOnReconnect: false // Don't check on reconnect
   });
 
   // Don't check immediately on mount - causes logout on refresh
