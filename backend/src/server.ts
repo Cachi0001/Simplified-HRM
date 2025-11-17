@@ -25,20 +25,26 @@ const PORT = process.env.PORT || 3000;
 
 // Allowed origins for CORS
 const allowedOrigins = [
+  // Local development
   'http://localhost:5173',
   'http://localhost:3000',
+  // Vercel deployments
   'https://go3net.vercel.app',
   'https://go3nethrm.vercel.app',
   'https://go3nethrm-backend.vercel.app',
-  process.env.FRONTEND_URL,
-  process.env.FRONTEND_URL_PROD,
-  process.env.FRONTEND_URL_CUSTOM,
+  // Custom domain - go3net.com
   'https://go3net.com',
   'https://www.go3net.com',
+  'https://api.go3net.com',
+  // Potential subdomains
   'https://admin.go3net.com',
   'https://app.go3net.com',
   'https://hr.go3net.com',
-  'https://hrm.go3net.com'
+  'https://hrm.go3net.com',
+  // Environment variables
+  process.env.FRONTEND_URL,
+  process.env.FRONTEND_URL_PROD,
+  process.env.FRONTEND_URL_CUSTOM
 ].filter(Boolean);
 
 // Enhanced CORS configuration with logging
