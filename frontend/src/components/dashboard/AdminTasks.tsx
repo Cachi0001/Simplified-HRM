@@ -78,7 +78,7 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
         // Use employee_id if available, otherwise use id
         const employeeId = currentUser.employee_id || currentUser.id;
         const teamMembers = response.filter((emp: any) => 
-          (emp.team_lead_id === employeeId || emp.manager_id === employeeId) &&
+          emp.team_lead_id === employeeId &&
           emp.role === 'employee'
         );
         // Add self to the list

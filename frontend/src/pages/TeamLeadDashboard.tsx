@@ -68,20 +68,16 @@ export default function TeamLeadDashboard() {
             id: allEmployees[0].id,
             name: allEmployees[0].full_name,
             team_lead_id: allEmployees[0].team_lead_id,
-            manager_id: allEmployees[0].manager_id,
-            department: allEmployees[0].department
+            department_id: allEmployees[0].department_id
           });
         }
         
         const teamMembers = allEmployees.filter((emp: any) => {
           const isTeamMember = emp.team_lead_id === teamLeadId || 
-                              emp.manager_id === teamLeadId ||
-                              emp.team_lead_id === currentUser?.id ||
-                              emp.manager_id === currentUser?.id;
+                              emp.team_lead_id === currentUser?.id;
           if (isTeamMember) {
             console.log('[TeamLeadStats] Found team member:', emp.full_name, {
               team_lead_id: emp.team_lead_id,
-              manager_id: emp.manager_id,
               matches_id: teamLeadId
             });
           }
@@ -91,8 +87,7 @@ export default function TeamLeadDashboard() {
         console.log('[TeamLeadStats] Team members:', teamMembers.map((m: any) => ({ 
           id: m.id, 
           name: m.full_name,
-          team_lead_id: m.team_lead_id,
-          manager_id: m.manager_id
+          team_lead_id: m.team_lead_id
         })));
 
         // Fetch tasks assigned to team members

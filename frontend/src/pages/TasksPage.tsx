@@ -137,7 +137,7 @@ export function TasksPage() {
         // Team leads see their team members + themselves
         const employeeId = currentUser.employee_id || currentUser.id;
         const teamMembers = response.filter((emp: any) => 
-          (emp.team_lead_id === employeeId || emp.manager_id === employeeId) &&
+          emp.team_lead_id === employeeId &&
           emp.role === 'employee'
         );
         // Add self to the list
