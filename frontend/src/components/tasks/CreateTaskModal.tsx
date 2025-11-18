@@ -119,6 +119,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               placeholder="Enter task title"
+              darkMode={darkMode}
               required
             />
           </div>
@@ -200,6 +201,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                 value={formData.dueDate}
                 onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
                 min={new Date().toISOString().split('T')[0]}
+                darkMode={darkMode}
                 required
               />
             </div>
@@ -214,6 +216,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                 type="time"
                 value={formData.dueTime}
                 onChange={(e) => setFormData({ ...formData, dueTime: e.target.value })}
+                darkMode={darkMode}
               />
             </div>
           </div>

@@ -735,6 +735,7 @@ export function TasksPage() {
                   value={newTask.title}
                   onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
                   placeholder="Enter task title"
+                  darkMode={darkMode}
                 />
               </div>
               
@@ -817,6 +818,7 @@ export function TasksPage() {
                   value={newTask.dueDate}
                   onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
                   min={formatDateInput(new Date())}
+                  darkMode={darkMode}
                 />
               </div>
               
