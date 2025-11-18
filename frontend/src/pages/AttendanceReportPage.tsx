@@ -5,7 +5,7 @@ import { employeeService } from '../services/employeeService';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { RefreshCw, Calendar, Users, Download, ArrowLeft } from 'lucide-react';
+import { RefreshCw, Calendar, Users, Download, ArrowLeft, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Logo from '../components/ui/Logo';
 import { DarkModeToggle } from '../components/ui/DarkModeToggle';
@@ -24,6 +24,8 @@ export default function AttendanceReportPage() {
 
   // Get current user
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const currentEmployeeId = currentUser.employeeId || currentUser.employee_id || currentUser.id;
+  const canViewAllAttendance = ['hr', 'admin', 'superadmin'].includes(currentUser.role);
 
   // Add token validation to automatically logout on token expiry
   useTokenValidation({
@@ -33,14 +35,14 @@ export default function AttendanceReportPage() {
     }
   });
 
-  // Fetch all employees for filtering (if admin)
+  // Fetch all employees for filtering (only for HR/Admin/SuperAdmin)
   const { data: employees = [], isLoading: employeesLoading } = useQuery({
     queryKey: ['employees'],
     queryFn: async () => {
       const allEmployees = await employeeService.getAllEmployees();
-      return allEmployees.filter((emp) => emp.role !== 'admin');
+      return allEmployees.filter((emp) => emp.role !== 'admin' && emp.role !== 'superadmin');
     },
-    enabled: currentUser.role === 'admin',
+    enabled: canViewAllAttendance,
   });
 
   // Fetch attendance report
@@ -61,11 +63,30 @@ export default function AttendanceReportPage() {
         startDate: start?.toISOString(),
         endDate: end?.toISOString(),
         start,
-        end
+        end,
+        currentUserRole: currentUser.role,
+        currentEmployeeId
       });
 
       const result = await attendanceService.getAttendanceReport(selectedEmployee || undefined, start, end);
       console.log('AttendanceReportPage: Received attendance data', result);
+      
+      // FRONTEND FILTER: TeamLeads and Employees should ONLY see their OWN attendance
+      if (!canViewAllAttendance) {
+        const filtered = result.filter((record: any) => {
+          const recordEmployeeId = record._id?.employeeId || record.employee_id;
+          const isOwnRecord = recordEmployeeId === currentEmployeeId;
+          return isOwnRecord;
+        });
+        console.log('AttendanceReportPage: Filtered for current user only', {
+          original: result.length,
+          filtered: filtered.length,
+          currentEmployeeId,
+          role: currentUser.role
+        });
+        return filtered;
+      }
+      
       return result;
     },
     enabled: true,
@@ -168,7 +189,7 @@ export default function AttendanceReportPage() {
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-              {currentUser.role === 'admin' && (
+              {canViewAllAttendance && (
                 <div>
                   <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                     Employee
@@ -181,7 +202,7 @@ export default function AttendanceReportPage() {
                     <option value="">All Employees</option>
                     {employees.map((emp: any) => (
                       <option key={emp.id} value={emp.id}>
-                        {emp.fullName} ({emp.department || 'No Department'})
+                        {emp.full_name || emp.fullName} ({emp.department || 'No Department'})
                       </option>
                     ))}
                   </select>
