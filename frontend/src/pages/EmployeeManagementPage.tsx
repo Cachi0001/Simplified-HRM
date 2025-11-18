@@ -123,9 +123,10 @@ export const EmployeeManagementPage: React.FC = () => {
       setEmployees(normalizedEmployees);
       setDepartments(departmentsData || []);
       
-      if (normalizedEmployees.length > 0) {
-        addToast('success', `Loaded ${normalizedEmployees.length} staff members`);
-      }
+      // Remove unnecessary toast - data loads silently
+      // if (normalizedEmployees.length > 0) {
+      //   addToast('success', `Loaded ${normalizedEmployees.length} staff members`);
+      // }
     } catch (err: any) {
       const errorMessage = err.message || 'Failed to load employee data. Please try again.';
       setError(errorMessage);

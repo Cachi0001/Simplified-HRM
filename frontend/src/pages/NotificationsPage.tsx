@@ -154,9 +154,10 @@ export function NotificationsPage() {
     }
 
     try {
-      // Note: This would need to be implemented in the notification service
-      // await notificationService.deleteNotification(notificationId);
+      // Call API to delete notification
+      await notificationService.deleteNotification(notificationId);
       
+      // Update local state after successful deletion
       setNotifications(prev => prev.filter(n => n.id !== notificationId));
       addToast('success', 'Notification deleted');
     } catch (error) {
@@ -185,6 +186,12 @@ export function NotificationsPage() {
           return;
         }
         
+        // Call API to delete each notification
+        for (const id of selectedNotifications) {
+          await notificationService.deleteNotification(id);
+        }
+        
+        // Update local state after successful deletion
         setNotifications(prev => prev.filter(n => !selectedNotifications.has(n.id)));
         addToast('success', `${selectedNotifications.size} notifications deleted`);
       }

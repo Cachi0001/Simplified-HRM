@@ -301,7 +301,18 @@ export function TasksPage() {
       });
     },
     onError: (error: any) => {
-      const errorMessage = error.message || 'Failed to create task';
+      console.error('Task creation error:', error);
+      // Extract meaningful error message from different error formats
+      let errorMessage = 'Failed to create task';
+      
+      if (error.response?.data?.error?.message) {
+        errorMessage = error.response.data.error.message;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       addToast('error', errorMessage);
     },
   });
