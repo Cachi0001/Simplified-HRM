@@ -29,6 +29,9 @@ export function TasksPage() {
   const isSuperAdmin = currentUser?.role === 'superadmin';
   const canAssignTasks = ['hr', 'admin', 'teamlead', 'superadmin'].includes(currentUser?.role || '');
   
+  console.log('[TasksPage] User role:', currentUser?.role);
+  console.log('[TasksPage] Can assign tasks:', canAssignTasks);
+  
   // Fetch current employee profile to get the correct employee ID
   const { data: currentEmployeeProfile } = useQuery({
     queryKey: ['current-employee-profile'],
