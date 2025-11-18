@@ -14,6 +14,8 @@ import { BottomNavbar } from '../components/layout/BottomNavbar';
 import { DarkModeToggle } from '../components/ui/DarkModeToggle';
 import { NotificationBell } from '../components/notifications/NotificationBell';
 import { NotificationManager } from '../components/notifications/NotificationManager';
+import { ProfileCompletionModal } from '../components/profile/ProfileCompletionModal';
+import { useProfileCompletion } from '../hooks/useProfileCompletion';
 import Logo from '../components/ui/Logo';
 import { Users, CheckSquare, Building, Calendar, Clock } from 'lucide-react';
 import { useTokenValidation } from '../hooks/useTokenValidation';
@@ -23,6 +25,7 @@ export default function HRDashboard() {
   const navigate = useNavigate();
   const { darkMode, setDarkMode } = useTheme();
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const { showModal, completionPercentage, closeModal, recheckProfile } = useProfileCompletion();
   const [activeTab, setActiveTab] = useState('tasks');
 
   // Save dark mode preference
@@ -59,6 +62,14 @@ export default function HRDashboard() {
       console.log('HR Dashboard token expired, redirecting to login');
     }
   });
+
+  // Recheck profile completion when user is loaded
+  useEffect(() => {
+    if (currentUser) {
+      console.log('[HRDashboard] User loaded, rechecking profile completion');
+      recheckProfile();
+    }
+  }, [currentUser, recheckProfile]);
 
   // Fetch employee stats (same as Admin dashboard)
   const { data: stats, isLoading: statsLoading } = useQuery({
@@ -296,6 +307,14 @@ export default function HRDashboard() {
 
       {/* Bottom Navigation */}
       <BottomNavbar darkMode={darkMode} />
+
+      {/* Profile Completion Modal */}
+      <ProfileCompletionModal
+        isOpen={showModal}
+        onClose={closeModal}
+        completionPercentage={completionPercentage}
+        userName={currentUser?.fullName || currentUser?.full_name || 'User'}
+      />
     </div>
   );
 }

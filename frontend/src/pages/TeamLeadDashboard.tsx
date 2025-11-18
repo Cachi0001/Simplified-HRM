@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { AdminAttendance } from '../components/dashboard/AdminAttendance';
 import { AdminTasks } from '../components/dashboard/AdminTasks';
 import { NotificationManager } from '../components/notifications/NotificationManager';
+import { ProfileCompletionModal } from '../components/profile/ProfileCompletionModal';
+import { useProfileCompletion } from '../hooks/useProfileCompletion';
 import { useQuery } from '@tanstack/react-query';
 import { notificationService } from '../services/notificationService';
 import Logo from '../components/ui/Logo';
@@ -20,6 +22,7 @@ export default function TeamLeadDashboard() {
   const { darkMode, setDarkMode } = useTheme();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const { showModal, completionPercentage, closeModal, recheckProfile } = useProfileCompletion();
 
   const { addToast } = useToast();
 
@@ -76,10 +79,14 @@ export default function TeamLeadDashboard() {
 
         // Fetch attendance for team members
         const today = new Date().toISOString().split('T')[0];
-        const attendanceRes = await api.get('/attendance/my-records');
-        const attendance = attendanceRes.data.data || [];
-        const presentToday = attendance.filter((record: any) => 
-          record.date === today && record.clock_in
+        const attendanceRes = await api.get('/attendance/report', {
+          params: { date: today }
+        });
+        const allAttendance = attendanceRes.data.data || attendanceRes.data || [];
+        // Filter to only team members' attendance
+        const teamMemberIds = teamMembers.map((m: any) => m.id);
+        const presentToday = allAttendance.filter((record: any) => 
+          teamMemberIds.includes(record.employee_id) && record.clock_in
         ).length;
 
         return {
@@ -105,6 +112,14 @@ export default function TeamLeadDashboard() {
       });
     }
   }, [currentUser]);
+
+  // Recheck profile completion when user is loaded
+  useEffect(() => {
+    if (currentUser) {
+      console.log('[TeamLeadDashboard] User loaded, rechecking profile completion');
+      recheckProfile();
+    }
+  }, [currentUser, recheckProfile]);
 
   if (error) {
     return (
@@ -244,6 +259,14 @@ export default function TeamLeadDashboard() {
 
       {/* Bottom Navigation */}
       <BottomNavbar darkMode={darkMode} />
+
+      {/* Profile Completion Modal */}
+      <ProfileCompletionModal
+        isOpen={showModal}
+        onClose={closeModal}
+        completionPercentage={completionPercentage}
+        userName={currentUser?.fullName || currentUser?.full_name || 'User'}
+      />
     </div>
   );
 }
