@@ -392,6 +392,10 @@ api.interceptors.response.use(
         // Don't modify existing message for "already exists" errors
       } else if (error.response?.data?.message?.includes('required')) {
         // Don't modify existing message for "required field" errors
+      } else if (error.response?.data?.message?.includes('already clocked in')) {
+        // Don't modify - let component handle this specific error
+      } else if (error.response?.data?.message?.includes('already clocked out')) {
+        // Don't modify - let component handle this specific error
       } else if (hasStatusCodeText(error.response?.data?.message)) {
         applyFriendlyMessage(error, `Invalid request. Please check your input and try again. (Error ID: ${errorId})`);
       }
