@@ -21,7 +21,7 @@ export default function EmployeeDashboard() {
   const { darkMode, setDarkMode } = useTheme();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
-  const { showModal, completionPercentage, closeModal } = useProfileCompletion();
+  const { showModal, completionPercentage, closeModal, recheckProfile } = useProfileCompletion();
 
   // Get current user - fetch from backend to ensure fresh approval status
   useEffect(() => {
@@ -197,6 +197,14 @@ export default function EmployeeDashboard() {
       });
     }
   }, [currentUser]);
+
+  // Recheck profile completion when user is loaded
+  useEffect(() => {
+    if (currentUser) {
+      console.log('[EmployeeDashboard] User loaded, rechecking profile completion');
+      recheckProfile();
+    }
+  }, [currentUser, recheckProfile]);
 
   // If there's an error, show error message
   if (error) {

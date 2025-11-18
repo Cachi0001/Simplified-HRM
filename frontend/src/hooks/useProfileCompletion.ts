@@ -13,12 +13,14 @@ export function useProfileCompletion() {
   const checkProfileCompletion = async () => {
     try {
       setIsLoading(true);
+      console.log('[useProfileCompletion] Starting profile check...');
       
       // Always check profile completion on every login/token update
       // No session-based dismissal - modal shows until profile is 100% complete
 
       // Fetch profile with completion percentage
       const response = await employeeService.getMyProfile();
+      console.log('[useProfileCompletion] Profile response:', response);
       
       // Calculate completion percentage based on ACTUAL database fields
       const profile = response as any;
@@ -57,7 +59,11 @@ export function useProfileCompletion() {
 
       // Show modal if profile is incomplete
       if (percentage < 100) {
+        console.log('[useProfileCompletion] Profile incomplete, showing modal');
         setShowModal(true);
+      } else {
+        console.log('[useProfileCompletion] Profile complete, hiding modal');
+        setShowModal(false);
       }
     } catch (error) {
       console.error('Error checking profile completion:', error);
