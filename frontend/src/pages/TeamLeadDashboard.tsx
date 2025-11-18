@@ -3,9 +3,11 @@ import { AdminAttendance } from '../components/dashboard/AdminAttendance';
 import { AdminTasks } from '../components/dashboard/AdminTasks';
 import { NotificationManager } from '../components/notifications/NotificationManager';
 import { ProfileCompletionModal } from '../components/profile/ProfileCompletionModal';
+import { EmployeeOverviewCards } from '../components/dashboard/EmployeeOverviewCards';
 import { useProfileCompletion } from '../hooks/useProfileCompletion';
 import { useQuery } from '@tanstack/react-query';
 import { notificationService } from '../services/notificationService';
+import { taskService } from '../services/taskService';
 import Logo from '../components/ui/Logo';
 import { authService } from '../services/authService';
 import { BottomNavbar } from '../components/layout/BottomNavbar';
@@ -14,7 +16,6 @@ import { DarkModeToggle } from '../components/ui/DarkModeToggle';
 import { NotificationBell } from '../components/notifications/NotificationBell';
 import { DraggableLogo } from '../components/dashboard/DraggableLogo';
 import { useTheme } from '../contexts/ThemeContext';
-import { Users, CheckSquare } from 'lucide-react';
 import api from '../lib/api';
 import { useTokenValidation } from '../hooks/useTokenValidation';
 
@@ -49,85 +50,63 @@ export default function TeamLeadDashboard() {
     }
   }, []);
 
-  const { data: stats, isLoading: statsLoading } = useQuery({
-    queryKey: ['teamlead-stats', currentUser?.id],
+  // Fetch employee stats (same as Employee dashboard)
+  const { data: employeeStats, isLoading: statsLoading } = useQuery({
+    queryKey: ['employee-stats', currentUser?._id || currentUser?.id],
     queryFn: async () => {
-      try {
-        const teamLeadId = currentUser?.id || currentUser?._id;
-        console.log('[TeamLeadStats] Fetching stats for team lead ID:', teamLeadId);
-        console.log('[TeamLeadStats] Current user object:', currentUser);
-        
-        // Fetch team members (employees under this team lead)
-        const employeesRes = await api.get('/employees');
-        const allEmployees = employeesRes.data.data?.employees || employeesRes.data.data || [];
-        console.log('[TeamLeadStats] Total employees:', allEmployees.length);
-        
-        // Log first few employees to see their structure
-        if (allEmployees.length > 0) {
-          console.log('[TeamLeadStats] Sample employee structure:', {
-            id: allEmployees[0].id,
-            name: allEmployees[0].full_name,
-            team_lead_id: allEmployees[0].team_lead_id,
-            department_id: allEmployees[0].department_id
-          });
-        }
-        
-        const teamMembers = allEmployees.filter((emp: any) => {
-          const isTeamMember = emp.team_lead_id === teamLeadId || 
-                              emp.team_lead_id === currentUser?.id;
-          if (isTeamMember) {
-            console.log('[TeamLeadStats] Found team member:', emp.full_name, {
-              team_lead_id: emp.team_lead_id,
-              matches_id: teamLeadId
-            });
-          }
-          return isTeamMember;
-        });
-        console.log('[TeamLeadStats] Team members found:', teamMembers.length);
-        console.log('[TeamLeadStats] Team members:', teamMembers.map((m: any) => ({ 
-          id: m.id, 
-          name: m.full_name,
-          team_lead_id: m.team_lead_id
-        })));
+      const userId = currentUser?._id || currentUser?.id;
+      if (!userId) {
+        console.log('[TeamLeadDashboard] No user ID available, using fallback data');
+        return {
+          totalTasks: 0,
+          completedTasks: 0,
+          pendingTasks: 0,
+          attendanceDays: 0,
+          totalHours: 0
+        };
+      }
 
-        // Fetch tasks assigned to team members
-        const tasksRes = await api.get('/tasks/all');
-        const tasksData = tasksRes.data.data || tasksRes.data || {};
-        const allTasks = Array.isArray(tasksData) ? tasksData : (tasksData.tasks || []);
-        console.log('[TeamLeadStats] Total tasks:', allTasks.length);
+      try {
+        console.log('[TeamLeadDashboard] Fetching employee stats for user:', userId);
+
+        const [tasks, attendanceResponse] = await Promise.all([
+          taskService.getMyTasks(),
+          api.get('/attendance/my-records')
+        ]);
+
+        console.log('[TeamLeadDashboard] Tasks received:', tasks);
+        console.log('[TeamLeadDashboard] Attendance response:', attendanceResponse.data);
+
+        const attendances = attendanceResponse.data?.data || attendanceResponse.data || [];
+
+        const totalTasks = Array.isArray(tasks) ? tasks.length : 0;
+        const completedTasks = Array.isArray(tasks) ? tasks.filter((t: any) => t.status === 'completed').length : 0;
+        const pendingTasks = Array.isArray(tasks) ? tasks.filter((t: any) => t.status === 'pending' || t.status === 'in_progress').length : 0;
+        const attendanceDays = Array.isArray(attendances) ? attendances.filter((a: any) => a.clock_in).length : 0;
         
-        const teamTasks = allTasks.filter((task: any) => 
-          teamMembers.some((member: any) => member.id === task.assigned_to || member.id === task.assignee_id)
-        );
-        console.log('[TeamLeadStats] Team tasks:', teamTasks.length);
-        
-        const activeTasks = teamTasks.filter((task: any) => 
-          task.status !== 'completed' && task.status !== 'cancelled'
-        );
-        console.log('[TeamLeadStats] Active tasks:', activeTasks.length);
-        const completedTasks = teamTasks.filter((task: any) => task.status === 'completed');
-        const completionRate = teamTasks.length > 0 
-          ? Math.round((completedTasks.length / teamTasks.length) * 100) 
+        // Calculate total hours from attendance records
+        const totalHours = Array.isArray(attendances) 
+          ? attendances.reduce((sum: number, record: any) => {
+              return sum + (parseFloat(record.hours_worked) || 0);
+            }, 0)
           : 0;
 
-        // TeamLead sees only their own attendance (not team members)
-        // Only SuperAdmin, Admin, and HR can see all attendance
-        const today = new Date().toISOString().split('T')[0];
-        const attendanceRes = await api.get('/attendance/my-records');
-        const myAttendance = attendanceRes.data.data || [];
-        const presentToday = myAttendance.filter((record: any) => 
-          record.date === today && record.clock_in
-        ).length;
-
         return {
-          teamMembers: teamMembers.length,
-          activeTasks: activeTasks.length,
-          completionRate,
-          presentToday
+          totalTasks,
+          completedTasks,
+          pendingTasks,
+          attendanceDays,
+          totalHours: Math.round(totalHours * 10) / 10 // Round to 1 decimal
         };
       } catch (error) {
-        console.error('Failed to fetch team lead stats:', error);
-        return { teamMembers: 0, activeTasks: 0, completionRate: 0, presentToday: 0 };
+        console.error('[TeamLeadDashboard] Failed to fetch employee stats:', error);
+        return {
+          totalTasks: 0,
+          completedTasks: 0,
+          pendingTasks: 0,
+          attendanceDays: 0,
+          totalHours: 0
+        };
       }
     },
     enabled: !!currentUser,
@@ -207,50 +186,23 @@ export default function TeamLeadDashboard() {
       </header>
 
       <div className="container mx-auto px-4 py-6">
-        {/* Team Overview Cards */}
+        {/* Employee Overview Cards */}
         <section className="mb-8">
           {statsLoading ? (
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+            <div className="grid grid-cols-2 gap-4">
               {[1, 2, 3, 4].map(i => (
                 <div key={i} className={`h-24 rounded-lg animate-pulse ${darkMode ? 'bg-gray-800' : 'bg-gray-200'}`} />
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Team Members Card */}
-              <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                      Team Members
-                    </p>
-                    <p className={`text-3xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                      {stats?.teamMembers || 0}
-                    </p>
-                  </div>
-                  <div className={`p-3 rounded-lg ${darkMode ? 'bg-blue-900' : 'bg-blue-100'}`}>
-                    <Users className={`w-6 h-6 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Active Tasks Card */}
-              <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                      Active Tasks
-                    </p>
-                    <p className={`text-3xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                      {stats?.activeTasks || 0}
-                    </p>
-                  </div>
-                  <div className={`p-3 rounded-lg ${darkMode ? 'bg-green-900' : 'bg-green-100'}`}>
-                    <CheckSquare className={`w-6 h-6 ${darkMode ? 'text-green-400' : 'text-green-600'}`} />
-                  </div>
-                </div>
-              </div>
-            </div>
+            <EmployeeOverviewCards
+              totalTasks={employeeStats?.totalTasks || 0}
+              completedTasks={employeeStats?.completedTasks || 0}
+              pendingTasks={employeeStats?.pendingTasks || 0}
+              attendanceDays={employeeStats?.attendanceDays || 0}
+              totalHours={employeeStats?.totalHours || 0}
+              darkMode={darkMode}
+            />
           )}
         </section>
 
