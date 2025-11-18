@@ -36,7 +36,6 @@ async function checkAndFix() {
 
     console.log('\n🔧 Updating threshold to 9:00 AM...\n');
 
-    // Update the function with correct threshold
     await client.query(`
       CREATE OR REPLACE FUNCTION calculate_late_status(
           p_clock_in TIMESTAMPTZ,

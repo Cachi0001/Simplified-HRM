@@ -21,24 +21,16 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
   const currentEmployeeId = currentUser.employeeId || currentUser.employee_id || currentUser.id;
 
-  // Fetch all employees for filtering - Team Leads only see their team
+  // Fetch all employees for filtering
   const { data: employees = [], isLoading: employeesLoading } = useQuery({
     queryKey: ['employees-for-attendance'],
     queryFn: async () => {
       const allEmployees = await employeeService.getAllEmployees();
       
-      // If Team Lead, only show their team members
+      // If Team Lead, only show themselves (not team members)
       if (currentUser.role === 'teamlead') {
-        const teamMembers = allEmployees.filter((emp) => 
-          emp.team_lead_id === currentEmployeeId &&
-          emp.role === 'employee'
-        );
-        // Add self to the list
         const self = allEmployees.find((emp) => emp.id === currentEmployeeId);
-        if (self && !teamMembers.find((emp) => emp.id === self.id)) {
-          teamMembers.unshift(self);
-        }
-        return teamMembers;
+        return self ? [self] : [];
       }
       
       // For HR/Admin/SuperAdmin, filter out admin users
@@ -65,23 +57,24 @@ export function AdminAttendance({ darkMode = false }: AdminAttendanceProps) {
         endDate: end?.toISOString(),
         start,
         end,
-        currentUserRole: currentUser.role
+        currentUserRole: currentUser.role,
+        currentEmployeeId
       });
 
       const result = await attendanceService.getAttendanceReport(selectedEmployee || undefined, start, end);
       console.log('AdminAttendance: Received attendance data', result);
       
-      // FRONTEND FILTER: TeamLeads should only see their own attendance and their team members
+      // FRONTEND FILTER: TeamLeads should ONLY see their OWN attendance (not team members)
       if (currentUser.role === 'teamlead') {
-        const teamMemberIds = employees.map((emp: any) => emp.id);
         const filtered = result.filter((record: any) => {
           const recordEmployeeId = record._id?.employeeId || record.employee_id;
-          return teamMemberIds.includes(recordEmployeeId);
+          const isOwnRecord = recordEmployeeId === currentEmployeeId;
+          return isOwnRecord;
         });
-        console.log('AdminAttendance: Filtered for TeamLead', {
+        console.log('AdminAttendance: Filtered for TeamLead (own records only)', {
           original: result.length,
           filtered: filtered.length,
-          teamMemberIds
+          currentEmployeeId
         });
         return filtered;
       }
