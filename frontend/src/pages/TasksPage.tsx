@@ -134,10 +134,22 @@ export function TasksPage() {
       
       // Filter based on role
       if (currentUser?.role === 'teamlead') {
-        // Team leads see their team members
-        return response.filter((emp: any) => 
-          emp.role === 'employee' || emp.id === currentEmployeeId
+        // Team leads see their team members + themselves
+        const employeeId = currentUser.employee_id || currentUser.id;
+        const teamMembers = response.filter((emp: any) => 
+          (emp.team_lead_id === employeeId || emp.manager_id === employeeId) &&
+          emp.role === 'employee'
         );
+        // Add self to the list
+        const self = response.find((emp: any) => 
+          emp.id === employeeId || 
+          emp.user_id === currentUser.id ||
+          emp.id === currentUser.id
+        );
+        if (self && !teamMembers.find((emp: any) => emp.id === self.id)) {
+          teamMembers.unshift(self);
+        }
+        return teamMembers;
       }
       
       if (currentUser?.role === 'superadmin') {

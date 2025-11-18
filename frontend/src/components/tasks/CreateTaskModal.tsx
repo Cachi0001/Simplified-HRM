@@ -159,11 +159,20 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                 required
               >
                 <option value="">Select employee</option>
-                {employees.map((emp) => (
-                  <option key={emp.id} value={emp.id}>
-                    {emp.full_name || emp.fullName} ({emp.department || 'No Dept'})
-                  </option>
-                ))}
+                {employees.map((emp) => {
+                  const currentUserId = currentUser?.id || currentUser?._id;
+                  const currentEmployeeId = currentUser?.employeeId || currentUser?.employee_id || currentUserId;
+                  const isYou = emp.id === currentUserId || emp.id === currentEmployeeId;
+                  
+                  return (
+                    <option key={emp.id} value={emp.id}>
+                      {isYou 
+                        ? `${emp.full_name || emp.fullName} (YOU - ${emp.role || emp.department || 'No Dept'})` 
+                        : `${emp.full_name || emp.fullName} (${emp.role || emp.department || 'No Dept'})`
+                      }
+                    </option>
+                  );
+                })}
               </select>
             </div>
 
