@@ -166,20 +166,19 @@ export class AttendanceController {
         throw new ValidationError('Employee profile not found');
       }
 
-      // ACCESS CONTROL: Only HR, Admin, SuperAdmin, and TeamLead can view attendance reports
-      const canViewAllAttendance = ['hr', 'admin', 'superadmin', 'teamlead'].includes(userRole);
+      // ACCESS CONTROL: Determine what user can see
+      const canViewAllAttendance = ['hr', 'admin', 'superadmin'].includes(userRole);
       
-      if (!canViewAllAttendance) {
-        // Regular employees can only see their own attendance
-        // Redirect them to use /my-records endpoint instead
-        throw new ValidationError('You do not have permission to view attendance reports. Use /my-records to view your own attendance.');
-      }
-
-      // TeamLeads can only see their team members' attendance
+      // For employees and teamleads, force them to only see their own records
       let filteredEmployeeId = employeeId as string | undefined;
       
-      if (userRole === 'teamlead' && employeeId) {
-        // Verify the requested employee is in their team
+      if (!canViewAllAttendance) {
+        // Regular employees and TeamLeads can only see their own attendance
+        filteredEmployeeId = currentEmployee.id;
+        console.log(`[AttendanceReport] User ${userRole} restricted to own records: ${filteredEmployeeId}`);
+      } else if (userRole === 'teamlead' && employeeId) {
+        // This code won't run anymore since teamleads are not in canViewAllAttendance
+        // But keeping for future reference if we want to allow teamleads to see team attendance
         const requestedEmployee = await employeeRepo.findById(employeeId as string);
         
         if (requestedEmployee && requestedEmployee.team_lead_id !== currentEmployee.id) {
@@ -196,20 +195,8 @@ export class AttendanceController {
         end
       );
 
-      // Additional filtering for TeamLeads - only return their team members
-      let filteredReport = report;
-      if (userRole === 'teamlead') {
-        // Get all team members
-        const allEmployees = await employeeRepo.findAll({});
-        const teamMemberIds = allEmployees
-          .filter((emp: any) => emp.team_lead_id === currentEmployee.id)
-          .map((emp: any) => emp.id);
-        
-        // Filter report to only include team members
-        filteredReport = report.filter((record: any) => 
-          teamMemberIds.includes(record._id?.employeeId || record.employee_id)
-        );
-      }
+      // No additional filtering needed - already filtered by employeeId
+      const filteredReport = report;
 
       res.json({
         success: true,
