@@ -73,23 +73,39 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
       const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
       const response = await employeeService.getAllEmployees();
       
+      console.log('[AdminTasks] Current user:', currentUser);
+      console.log('[AdminTasks] All employees:', response);
+      
       // If Team Lead, show their team members + themselves
       if (currentUser.role === 'teamlead') {
-        // Use employee_id if available, otherwise use id
-        const employeeId = currentUser.employee_id || currentUser.id;
-        const teamMembers = response.filter((emp: any) => 
-          emp.team_lead_id === employeeId &&
-          emp.role === 'employee'
-        );
+        // Use employeeId if available, otherwise use id
+        const employeeId = currentUser.employeeId || currentUser.employee_id || currentUser.id;
+        console.log('[AdminTasks] TeamLead employeeId:', employeeId);
+        
+        const teamMembers = response.filter((emp: any) => {
+          const matches = emp.team_lead_id === employeeId && emp.role === 'employee';
+          if (matches) {
+            console.log('[AdminTasks] Found team member:', emp.full_name, emp.id);
+          }
+          return matches;
+        });
+        
+        console.log('[AdminTasks] Team members found:', teamMembers.length);
+        
         // Add self to the list
         const self = response.find((emp: any) => 
           emp.id === employeeId || 
           emp.user_id === currentUser.id ||
           emp.id === currentUser.id
         );
+        
+        console.log('[AdminTasks] TeamLead self:', self);
+        
         if (self && !teamMembers.find((emp: any) => emp.id === self.id)) {
           teamMembers.unshift(self);
         }
+        
+        console.log('[AdminTasks] Final team members list:', teamMembers);
         return teamMembers;
       }
       
