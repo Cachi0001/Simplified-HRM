@@ -202,8 +202,8 @@ export class AttendanceController {
         // Get all team members
         const allEmployees = await employeeRepo.findAll({});
         const teamMemberIds = allEmployees
-          .filter(emp => emp.team_lead_id === currentEmployee.id)
-          .map(emp => emp.id);
+          .filter((emp: any) => emp.team_lead_id === currentEmployee.id)
+          .map((emp: any) => emp.id);
         
         // Filter report to only include team members
         filteredReport = report.filter((record: any) => 
