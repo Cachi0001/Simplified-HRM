@@ -28,11 +28,17 @@ export function AttendanceCard({
   const locationLabel = meta.status === 'onsite' ? 'Onsite' : meta.status === 'remote' ? 'Remote' : 'Unknown';
   
   const isLate = record.is_late || record.isLate;
-  const lateMinutes = record.late_minutes || record.lateMinutes || 0;
+  // WORKAROUND: Add 1 hour (60 minutes) to late_minutes to fix calculation bug
+  const rawLateMinutes = record.late_minutes || record.lateMinutes || 0;
+  const lateMinutes = rawLateMinutes + 60; // Add 1 hour workaround
+  
+  // Check if this is the current user's attendance
+  const employeeName = getEmployeeName(record);
+  const isOwnAttendance = employeeName === 'You';
 
   return (
-    <div className={`p-3 sm:p-4 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div className={`p-4 sm:p-4 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-3">
         <div className="flex items-start gap-2 sm:gap-3 min-w-0 flex-1">
           <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center flex-shrink-0 ${darkMode ? 'bg-gray-600' : 'bg-gray-200'}`}>
             <Users className={`h-4 w-4 sm:h-5 sm:w-5 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
@@ -45,8 +51,8 @@ export function AttendanceCard({
               {/* On-time/Late indicator next to name */}
               {(record.checkInTime || record.clock_in) && (
                 isLate ? (
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${darkMode ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-700'}`}>
-                    You are {formatLateTime(lateMinutes)}
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${darkMode ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-700'}`}>
+                    {isOwnAttendance ? `You are ${formatLateTime(lateMinutes)}` : `${formatLateTime(lateMinutes)}`}
                   </span>
                 ) : (
                   <span className={`px-2 py-0.5 rounded text-xs font-medium ${darkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700'}`}>
