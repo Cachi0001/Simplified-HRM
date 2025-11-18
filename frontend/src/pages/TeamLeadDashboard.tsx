@@ -160,7 +160,7 @@ export default function TeamLeadDashboard() {
   }
 
   console.log('Rendering TeamLeadDashboard for user:', currentUser.fullName);
-  console.log('Stats loading:', statsLoading, 'Stats data:', stats);
+  console.log('Stats loading:', statsLoading, 'Stats data:', employeeStats);
 
   return (
     <div className={`min-h-screen transition-colors duration-300 ${darkMode ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}>
