@@ -8,20 +8,17 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { useToast } from '../ui/Toast';
 import { getDisplayName } from '../../utils/userDisplay';
+import { CreateTaskModal, TaskFormData } from '../tasks';
 import {
   Plus,
   Search,
-  Filter,
   Calendar,
   User,
   Clock,
   CheckCircle,
-  AlertCircle,
-  Edit,
   Trash2,
   Bell
 } from 'lucide-react';
-import { notificationService } from '../../services/notificationService';
 
 interface AdminTasksProps {
   darkMode?: boolean;
@@ -30,25 +27,13 @@ interface AdminTasksProps {
 export function AdminTasks({ darkMode = false }: AdminTasksProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const formatDateInput = (date: Date) => date.toISOString().split('T')[0];
-  const tomorrow = (() => {
-    const date = new Date();
-    date.setDate(date.getDate() + 1);
-    return date;
-  })();
-  const [newTask, setNewTask] = useState({
-    title: '',
-    description: '',
-    assigneeId: '',
-    priority: 'medium' as 'low' | 'medium' | 'high',
-    dueDate: formatDateInput(tomorrow),
-    dueTime: ''
-  });
-  const [hasInvalidTime, setHasInvalidTime] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   const queryClient = useQueryClient();
   const { addToast } = useToast();
+  
+  // Get current user
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
 
   const statusOptions = [
     { value: 'all', label: 'All Status' },
@@ -121,15 +106,17 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
 
   // Create task mutation
   const createTaskMutation = useMutation({
-    mutationFn: async (taskData: any) => {
-      return await taskService.createTask(taskData);
+    mutationFn: async (taskData: TaskFormData) => {
+      return await taskService.createTask({
+        ...taskData,
+        dueDate: new Date(taskData.dueDate).toISOString()
+      });
     },
-    onSuccess: (_data, variables) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-tasks'] });
-      setShowCreateForm(false);
-      setNewTask({ title: '', description: '', assigneeId: '', priority: 'medium', dueDate: formatDateInput(tomorrow), dueTime: '' });
+      queryClient.invalidateQueries({ queryKey: ['all-tasks'] });
+      setShowCreateModal(false);
       addToast('success', 'Task created successfully!');
-
     },
     onError: (error: any) => {
       const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || error.message || 'Failed to create task';
@@ -158,8 +145,10 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'high': return darkMode ? 'bg-red-900 text-red-300' : 'bg-red-100 text-red-800';
-      case 'medium': return darkMode ? 'bg-yellow-900 text-yellow-300' : 'bg-yellow-100 text-yellow-800';
+      case 'high': 
+      case 'urgent': return darkMode ? 'bg-red-900 text-red-300' : 'bg-red-100 text-red-800';
+      case 'medium':
+      case 'normal': return darkMode ? 'bg-yellow-900 text-yellow-300' : 'bg-yellow-100 text-yellow-800';
       case 'low': return darkMode ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-800';
       default: return darkMode ? 'bg-gray-900 text-gray-300' : 'bg-gray-100 text-gray-800';
     }
@@ -175,82 +164,8 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
     }
   };
 
-  // Handle time input change with validation
-  const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const timeValue = e.target.value;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const selectedDate = new Date(newTask.dueDate);
-    selectedDate.setHours(0, 0, 0, 0);
-    
-    // If date is today, validate time is not in the past
-    if (selectedDate.getTime() === today.getTime() && timeValue) {
-      const now = new Date();
-      const [hours, minutes] = timeValue.split(':').map(Number);
-      const selectedTime = new Date();
-      selectedTime.setHours(hours, minutes, 0, 0);
-      
-      if (selectedTime <= now) {
-        addToast('error', 'Cannot select a past time. Please choose a future time.');
-        setHasInvalidTime(true);
-        return; // Don't update the state
-      }
-    }
-    
-    setHasInvalidTime(false);
-    setNewTask({ ...newTask, dueTime: timeValue });
-  };
-
-  const handleCreateTask = () => {
-    if (!newTask.title || !newTask.assigneeId || !newTask.dueDate) {
-      addToast('error', 'Please fill in all required fields');
-      return;
-    }
-
-    // Validate date/time
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const selectedDate = new Date(newTask.dueDate);
-    selectedDate.setHours(0, 0, 0, 0);
-    
-    if (selectedDate < today) {
-      addToast('error', 'Due date cannot be in the past');
-      return;
-    }
-    
-    if (selectedDate.getTime() === today.getTime() && newTask.dueTime) {
-      const now = new Date();
-      const [hours, minutes] = newTask.dueTime.split(':').map(Number);
-      const selectedTime = new Date();
-      selectedTime.setHours(hours, minutes, 0, 0);
-      
-      if (selectedTime <= now) {
-        addToast('error', 'Due time cannot be in the past. Please select a future time.');
-        return;
-      }
-    }
-
-    // Get current user
-    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-    const currentEmployeeId = currentUser.employee_id || currentUser.id;
-
-    // Check if trying to assign to self
-    if (newTask.assigneeId === currentEmployeeId || newTask.assigneeId === currentUser.id) {
-      addToast('error', 'Cannot assign tasks to yourself. Please select a different employee.');
-      return;
-    }
-
-    // Check if trying to assign to superadmin
-    const selectedEmployee = employees.find(emp => normalizeId(emp.id) === newTask.assigneeId);
-    if (selectedEmployee && selectedEmployee.role === 'superadmin') {
-      addToast('error', 'Cannot assign tasks to Superadmin. Please select a different employee.');
-      return;
-    }
-
-    createTaskMutation.mutate({
-      ...newTask,
-      dueDate: new Date(newTask.dueDate).toISOString()
-    });
+  const handleCreateTask = (taskData: TaskFormData) => {
+    createTaskMutation.mutate(taskData);
   };
 
   const handleDeleteTask = (taskId: string) => {
@@ -266,197 +181,11 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
         <h2 className={`text-2xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
           Task Management
         </h2>
-        <Button
-          onClick={() => {
-            setShowCreateForm(prev => {
-              const next = !prev;
-              if (!prev && !newTask.dueDate) {
-                setNewTask(current => ({ ...current, dueDate: formatDateInput(tomorrow) }));
-              }
-              return next;
-            });
-          }}
-        >
+        <Button onClick={() => setShowCreateModal(true)}>
           <Plus className="h-4 w-4 mr-2" />
           New Task
         </Button>
       </div>
-
-      {/* Create Task Form */}
-      {showCreateForm && (
-        <Card className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-          <div className="p-6">
-            <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-              Create New Task
-            </h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                  Title *
-                </label>
-                <Input
-                  id="title"
-                  label=""
-                  value={newTask.title}
-                  onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-                  placeholder="Task title"
-                />
-              </div>
-
-              <div>
-                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                  Assignee *
-                </label>
-                <select
-                  value={newTask.assigneeId}
-                  onChange={(e) => setNewTask({ ...newTask, assigneeId: e.target.value })}
-                  className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
-                >
-                  <option value="">Select Employee</option>
-                  {employees.map(emp => {
-                    const value = normalizeId(emp.id);
-                    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-                    const displayName = getDisplayName(
-                      emp.full_name,
-                      value,
-                      currentUser.id,
-                      currentUser.employee_id
-                    );
-                    const isYou = displayName === 'You';
-                    
-                    return (
-                      <option key={value} value={value}>
-                        {isYou ? `${emp.full_name} (YOU - ${emp.department || 'No Department'})` : `${emp.full_name} (${emp.department || 'No Department'})`}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-
-              <div>
-                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                  Priority
-                </label>
-                <select
-                  value={newTask.priority}
-                  onChange={(e) => setNewTask({ ...newTask, priority: e.target.value as 'low' | 'medium' | 'high' })}
-                  className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
-                >
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                </select>
-              </div>
-
-              <div>
-                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                  Due Date *
-                </label>
-                <Input
-                  id="dueDate"
-                  label=""
-                  type="date"
-                  min={formatDateInput(new Date())}
-                  value={newTask.dueDate}
-                  onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                  Due Time (Optional)
-                </label>
-                <input
-                  type="time"
-                  value={newTask.dueTime}
-                  onChange={handleTimeChange}
-                  onBlur={(e) => {
-                    // Validate on blur as well
-                    const timeValue = e.target.value;
-                    if (!timeValue) return;
-                    
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
-                    const selectedDate = new Date(newTask.dueDate);
-                    selectedDate.setHours(0, 0, 0, 0);
-                    
-                    if (selectedDate.getTime() === today.getTime()) {
-                      const now = new Date();
-                      const [hours, minutes] = timeValue.split(':').map(Number);
-                      const selectedTime = new Date();
-                      selectedTime.setHours(hours, minutes, 0, 0);
-                      
-                      if (selectedTime <= now) {
-                        addToast('error', 'Cannot select a past time. Clearing time field.');
-                        setNewTask({ ...newTask, dueTime: '' });
-                      }
-                    }
-                  }}
-                  min={newTask.dueDate === formatDateInput(new Date()) ? new Date().toTimeString().slice(0, 5) : undefined}
-                  disabled={(() => {
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
-                    const selectedDate = new Date(newTask.dueDate);
-                    selectedDate.setHours(0, 0, 0, 0);
-                    return selectedDate < today;
-                  })()}
-                  className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} ${(() => {
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
-                    const selectedDate = new Date(newTask.dueDate);
-                    selectedDate.setHours(0, 0, 0, 0);
-                    return selectedDate < today ? 'opacity-50 cursor-not-allowed' : '';
-                  })()}`}
-                />
-                <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                  {(() => {
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
-                    const selectedDate = new Date(newTask.dueDate);
-                    selectedDate.setHours(0, 0, 0, 0);
-                    return selectedDate < today 
-                      ? 'Time input disabled for past dates'
-                      : 'Leave empty for end of day (11:59 PM)';
-                  })()}
-                </p>
-              </div>
-            </div>
-
-            <div className="mb-4">
-              <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                Description
-              </label>
-              <textarea
-                value={newTask.description}
-                onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
-                placeholder="Task description (optional)"
-                rows={3}
-                className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
-              />
-            </div>
-
-            <div className="flex gap-3">
-              <Button 
-                onClick={handleCreateTask} 
-                isLoading={createTaskMutation.isPending} 
-                disabled={createTaskMutation.isPending || hasInvalidTime || !newTask.title || !newTask.assigneeId || !newTask.dueDate}
-              >
-                Create Task
-              </Button>
-              <Button
-                onClick={() => {
-                  setShowCreateForm(false);
-                  setHasInvalidTime(false);
-                }}
-                disabled={createTaskMutation.isPending}
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </Card>
-      )}
 
       {/* Filters */}
       <Card className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
@@ -602,6 +331,17 @@ export function AdminTasks({ darkMode = false }: AdminTasksProps) {
           </div>
         </Card>
       )}
+
+      {/* Create Task Modal */}
+      <CreateTaskModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSubmit={handleCreateTask}
+        employees={employees}
+        currentUser={currentUser}
+        darkMode={darkMode}
+        isSubmitting={createTaskMutation.isPending}
+      />
     </div>
   );
 }
