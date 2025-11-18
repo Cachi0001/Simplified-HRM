@@ -127,40 +127,71 @@ export function TasksPage() {
   });
 
   // Fetch employees for task assignment
-  const { data: employees = [] } = useQuery({
+  const { data: employees = [], isLoading: employeesLoading, error: employeesError } = useQuery({
     queryKey: ['employees-for-tasks'],
     queryFn: async () => {
+      console.log('[TasksPage] Fetching employees...');
+      console.log('[TasksPage] Current user:', currentUser);
+      console.log('[TasksPage] Can assign tasks:', canAssignTasks);
+      
       const response = await employeeService.getAllEmployees();
+      console.log('[TasksPage] All employees response:', response);
       
       // Filter based on role
       if (currentUser?.role === 'teamlead') {
         // Team leads see their team members + themselves
-        const employeeId = currentUser.employee_id || currentUser.id;
-        const teamMembers = response.filter((emp: any) => 
-          emp.team_lead_id === employeeId &&
-          emp.role === 'employee'
-        );
+        const employeeId = currentUser.employeeId || currentUser.employee_id || currentUser.id;
+        console.log('[TasksPage] TeamLead employeeId:', employeeId);
+        
+        const teamMembers = response.filter((emp: any) => {
+          const matches = emp.team_lead_id === employeeId && emp.role === 'employee';
+          if (matches) {
+            console.log('[TasksPage] Found team member:', emp.full_name, emp.id);
+          }
+          return matches;
+        });
+        
+        console.log('[TasksPage] Team members found:', teamMembers.length);
+        
         // Add self to the list
         const self = response.find((emp: any) => 
           emp.id === employeeId || 
           emp.user_id === currentUser.id ||
           emp.id === currentUser.id
         );
+        
+        console.log('[TasksPage] TeamLead self:', self);
+        
         if (self && !teamMembers.find((emp: any) => emp.id === self.id)) {
           teamMembers.unshift(self);
         }
+        
+        console.log('[TasksPage] Final team members list:', teamMembers);
         return teamMembers;
       }
       
       if (currentUser?.role === 'superadmin') {
+        console.log('[TasksPage] Superadmin - returning all employees:', response.length);
         return response; // Superadmin can assign to anyone
       }
       
       // HR/Admin can assign to anyone except superadmin
-      return response.filter((emp: any) => emp.role !== 'superadmin');
+      const filtered = response.filter((emp: any) => emp.role !== 'superadmin');
+      console.log('[TasksPage] HR/Admin - filtered employees:', filtered.length);
+      return filtered;
     },
     enabled: canAssignTasks,
   });
+  
+  // Log employees state
+  useEffect(() => {
+    console.log('[TasksPage] Employees state:', {
+      loading: employeesLoading,
+      error: employeesError,
+      count: employees.length,
+      employees: employees
+    });
+  }, [employees, employeesLoading, employeesError]);
 
   // Handle notification highlight
   useEffect(() => {
