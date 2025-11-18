@@ -4,74 +4,36 @@ import { employeeService } from '../services/employeeService';
 const SESSION_STORAGE_KEY = 'profile_completion_dismissed_session';
 
 export function useProfileCompletion() {
-  const [showModal, setShowModal] = useState(false);
+  // DISABLED: Profile completion popup logic removed per user request
+  // The modal will never show automatically, but the card component can still be used manually
+  const [showModal] = useState(false); // Always false - never shows popup
   const [completionPercentage, setCompletionPercentage] = useState(100);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    checkProfileCompletion();
-  }, []);
-
+  // Calculate completion percentage for display purposes only (no popup)
   const checkProfileCompletion = async () => {
     try {
       setIsLoading(true);
-      console.log('[useProfileCompletion] Starting profile check...');
+      console.log('[useProfileCompletion] Calculating profile completion (popup disabled)');
       
-      // Check if user already dismissed modal in this login session
-      const dismissedInSession = sessionStorage.getItem(SESSION_STORAGE_KEY);
-      if (dismissedInSession === 'true') {
-        console.log('[useProfileCompletion] Modal was already dismissed in this session, not showing again');
-        setIsLoading(false);
-        return;
-      }
-
-      // Fetch profile with completion percentage
       const response = await employeeService.getMyProfile();
-      console.log('[useProfileCompletion] Profile response:', response);
-      
-      // Calculate completion percentage based on ACTUAL database fields
       const profile = response as any;
       let completed = 0;
-      let total = 8;  // Reduced from 9 to 8 (removed department_id requirement)
+      let total = 8;
 
-      // Check actual database fields (not profile_picture - that's out of MVP scope)
       if (profile.full_name) completed++;
       if (profile.email) completed++;
       if (profile.phone) completed++;
       if (profile.address) completed++;
       if (profile.date_of_birth) completed++;
-      if (profile.position) completed++;  // This is NULL in your DB!
-      // if (profile.department_id) completed++;  // COMMENTED OUT - Not required for superadmin/CEO roles
+      if (profile.position) completed++;
       if (profile.emergency_contact_name) completed++;
       if (profile.emergency_contact_phone) completed++;
 
       const percentage = Math.round((completed / total) * 100);
-      console.log('[ProfileCompletion] Check:', { 
-        completed, 
-        total, 
-        percentage,
-        fields: {
-          full_name: !!profile.full_name,
-          email: !!profile.email,
-          phone: !!profile.phone,
-          address: !!profile.address,
-          date_of_birth: !!profile.date_of_birth,
-          position: !!profile.position,
-          // department_id: !!profile.department_id,  // COMMENTED OUT
-          emergency_contact_name: !!profile.emergency_contact_name,
-          emergency_contact_phone: !!profile.emergency_contact_phone
-        }
-      });
       setCompletionPercentage(percentage);
-
-      // Show modal if profile is incomplete
-      if (percentage < 100) {
-        console.log('[useProfileCompletion] Profile incomplete, showing modal');
-        setShowModal(true);
-      } else {
-        console.log('[useProfileCompletion] Profile complete, hiding modal');
-        setShowModal(false);
-      }
+      
+      console.log('[useProfileCompletion] Profile completion:', percentage + '%', '(popup will NOT show)');
     } catch (error) {
       console.error('Error checking profile completion:', error);
     } finally {
@@ -80,14 +42,12 @@ export function useProfileCompletion() {
   };
 
   const handleCloseModal = () => {
-    setShowModal(false);
-    // Store dismissal for this session only - will show again on next login
-    sessionStorage.setItem(SESSION_STORAGE_KEY, 'true');
-    console.log('[useProfileCompletion] Modal dismissed for this session, will show again on next login');
+    // No-op since modal never shows
+    console.log('[useProfileCompletion] Close called but modal is disabled');
   };
 
   return {
-    showModal,
+    showModal, // Always false
     completionPercentage,
     isLoading,
     closeModal: handleCloseModal,

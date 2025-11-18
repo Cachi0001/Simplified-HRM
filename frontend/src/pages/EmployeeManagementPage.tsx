@@ -48,11 +48,18 @@ export const EmployeeManagementPage: React.FC = () => {
     setDarkMode(!darkMode);
   };
 
-  // Check authorization
+  // Check authorization - FIXED: Don't redirect if user is still loading
   useEffect(() => {
+    // Wait for user to load before checking authorization
+    if (!user) {
+      console.log('[EmployeeManagement] User not loaded yet, waiting...');
+      return;
+    }
+
     const authorizedRoles = ['superadmin', 'admin', 'hr'];
-    if (!user || !authorizedRoles.includes(user.role)) {
-      // Redirect to appropriate dashboard based on role
+    if (!authorizedRoles.includes(user.role)) {
+      console.log('[EmployeeManagement] Unauthorized role:', user.role);
+      // Only redirect if user is loaded AND not authorized
       const dashboardMap: Record<string, string> = {
         'superadmin': '/super-admin-dashboard',
         'admin': '/dashboard',
@@ -60,7 +67,7 @@ export const EmployeeManagementPage: React.FC = () => {
         'teamlead': '/teamlead-dashboard',
         'employee': '/employee-dashboard'
       };
-      const targetDashboard = dashboardMap[user?.role || 'employee'] || '/employee-dashboard';
+      const targetDashboard = dashboardMap[user.role] || '/employee-dashboard';
       
       navigate(targetDashboard, {
         replace: true,
@@ -68,6 +75,8 @@ export const EmployeeManagementPage: React.FC = () => {
       });
       return;
     }
+    
+    console.log('[EmployeeManagement] Authorized access for role:', user.role);
   }, [user, navigate]);
 
   // Load initial data
