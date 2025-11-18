@@ -364,7 +364,18 @@ export function LeaveRequestsPage() {
       }
     } catch (error: any) {
       console.error('Error rejecting leave request:', error);
-      addToast('error', error.response?.data?.message || error.message || 'Failed to reject leave request');
+      // Extract meaningful error message from different error formats
+      let errorMessage = 'Failed to reject leave request';
+      
+      if (error.response?.data?.error?.message) {
+        errorMessage = error.response.data.error.message;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      addToast('error', errorMessage);
     } finally {
       setRejecting(null);
     }

@@ -544,10 +544,10 @@ export function TasksPage() {
       <header className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-b sticky top-0 z-40`}>
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center space-x-2 md:space-x-4 flex-1 min-w-0">
-            {/* Back button - visible on mobile */}
+            {/* Back button - visible on all screens */}
             <Link 
               to="/dashboard" 
-              className={`md:hidden p-2 rounded-lg transition-colors ${
+              className={`p-2 rounded-lg transition-colors ${
                 darkMode ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-100 text-gray-600'
               }`}
               title="Back to Dashboard"
@@ -555,8 +555,8 @@ export function TasksPage() {
               <ArrowLeft className="h-5 w-5" />
             </Link>
             
-            {/* Logo - hidden on mobile */}
-            <Logo className="h-8 w-auto hidden md:block" />
+            {/* Logo */}
+            <Logo className="h-8 w-auto" />
             
             <div className="min-w-0 flex-1">
               <h1 className={`text-lg md:text-xl font-bold truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
