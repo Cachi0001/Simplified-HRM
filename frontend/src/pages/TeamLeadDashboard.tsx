@@ -91,17 +91,47 @@ export default function TeamLeadDashboard() {
     queryKey: ['teamlead-stats', currentUser?.id],
     queryFn: async () => {
       try {
-        console.log('[TeamLeadStats] Fetching stats for team lead:', currentUser?.id);
+        const teamLeadId = currentUser?.id || currentUser?._id;
+        console.log('[TeamLeadStats] Fetching stats for team lead ID:', teamLeadId);
+        console.log('[TeamLeadStats] Current user object:', currentUser);
         
         // Fetch team members (employees under this team lead)
         const employeesRes = await api.get('/employees');
         const allEmployees = employeesRes.data.data?.employees || employeesRes.data.data || [];
         console.log('[TeamLeadStats] Total employees:', allEmployees.length);
         
-        const teamMembers = allEmployees.filter((emp: any) => 
-          emp.team_lead_id === currentUser?.id || emp.manager_id === currentUser?.id
-        );
-        console.log('[TeamLeadStats] Team members found:', teamMembers.length, teamMembers.map((m: any) => ({ id: m.id, name: m.full_name })));
+        // Log first few employees to see their structure
+        if (allEmployees.length > 0) {
+          console.log('[TeamLeadStats] Sample employee structure:', {
+            id: allEmployees[0].id,
+            name: allEmployees[0].full_name,
+            team_lead_id: allEmployees[0].team_lead_id,
+            manager_id: allEmployees[0].manager_id,
+            department: allEmployees[0].department
+          });
+        }
+        
+        const teamMembers = allEmployees.filter((emp: any) => {
+          const isTeamMember = emp.team_lead_id === teamLeadId || 
+                              emp.manager_id === teamLeadId ||
+                              emp.team_lead_id === currentUser?.id ||
+                              emp.manager_id === currentUser?.id;
+          if (isTeamMember) {
+            console.log('[TeamLeadStats] Found team member:', emp.full_name, {
+              team_lead_id: emp.team_lead_id,
+              manager_id: emp.manager_id,
+              matches_id: teamLeadId
+            });
+          }
+          return isTeamMember;
+        });
+        console.log('[TeamLeadStats] Team members found:', teamMembers.length);
+        console.log('[TeamLeadStats] Team members:', teamMembers.map((m: any) => ({ 
+          id: m.id, 
+          name: m.full_name,
+          team_lead_id: m.team_lead_id,
+          manager_id: m.manager_id
+        })));
 
         // Fetch tasks assigned to team members
         const tasksRes = await api.get('/tasks/all');

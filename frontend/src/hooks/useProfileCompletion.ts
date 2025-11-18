@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { employeeService } from '../services/employeeService';
 
 const SESSION_STORAGE_KEY = 'profile_completion_dismissed';
+const SESSION_STORAGE_TIMESTAMP = 'profile_completion_dismissed_time';
 
 export function useProfileCompletion() {
   const [showModal, setShowModal] = useState(false);
@@ -17,12 +18,21 @@ export function useProfileCompletion() {
       setIsLoading(true);
       console.log('[useProfileCompletion] Starting profile check...');
       
-      // Check if user dismissed modal in this session
-      const dismissedThisSession = sessionStorage.getItem(SESSION_STORAGE_KEY);
-      if (dismissedThisSession === 'true') {
-        console.log('[useProfileCompletion] Modal was dismissed this session, not showing again');
-        setIsLoading(false);
-        return;
+      // Check if user dismissed modal recently (within last 5 minutes)
+      const dismissedTime = sessionStorage.getItem(SESSION_STORAGE_TIMESTAMP);
+      if (dismissedTime) {
+        const timeSinceDismissal = Date.now() - parseInt(dismissedTime);
+        const fiveMinutes = 5 * 60 * 1000;
+        
+        if (timeSinceDismissal < fiveMinutes) {
+          console.log('[useProfileCompletion] Modal was dismissed recently, not showing again');
+          setIsLoading(false);
+          return;
+        } else {
+          // Clear old dismissal
+          sessionStorage.removeItem(SESSION_STORAGE_KEY);
+          sessionStorage.removeItem(SESSION_STORAGE_TIMESTAMP);
+        }
       }
 
       // Fetch profile with completion percentage
@@ -81,9 +91,10 @@ export function useProfileCompletion() {
 
   const handleCloseModal = () => {
     setShowModal(false);
-    // Store dismissal in sessionStorage - will reset on page refresh/new session
+    // Store dismissal with timestamp - will show again after 5 minutes
     sessionStorage.setItem(SESSION_STORAGE_KEY, 'true');
-    console.log('[useProfileCompletion] Modal dismissed for this session');
+    sessionStorage.setItem(SESSION_STORAGE_TIMESTAMP, Date.now().toString());
+    console.log('[useProfileCompletion] Modal dismissed, will show again after 5 minutes or page refresh');
   };
 
   return {
