@@ -34,15 +34,40 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     '/employee-dashboard'
   ];
 
+  // List of management/utility pages that all roles can access
+  const managementPages = [
+    '/employee-management',
+    '/tasks',
+    '/attendance-report',
+    '/profile',
+    '/settings'
+  ];
+
+  // Check if current path is a management page
+  const isManagementPage = managementPages.some(page => currentPath.startsWith(page));
+
   // If user is on a dashboard that's not their correct one, redirect
   if (allDashboards.includes(currentPath) && currentPath !== correctDashboard) {
     console.warn(`[ProtectedRoute] ⚠️ Role mismatch! User: ${user.role}, Path: ${currentPath}, Redirecting to: ${correctDashboard}`);
     return <Navigate to={correctDashboard} replace />;
   }
 
-  // Superadmin can access non-dashboard pages (like employee-management, tasks, etc.)
-  if (user.role === 'superadmin' && !allDashboards.includes(currentPath)) {
-    console.log('[ProtectedRoute] Superadmin access granted to:', currentPath);
+  // Allow access to management pages for authorized roles
+  if (isManagementPage) {
+    // Superadmin can access all management pages
+    if (user.role === 'superadmin') {
+      console.log('[ProtectedRoute] Superadmin access granted to:', currentPath);
+      return children;
+    }
+    
+    // HR and Admin can access most management pages
+    if (['hr', 'admin'].includes(user.role)) {
+      console.log('[ProtectedRoute] Admin/HR access granted to:', currentPath);
+      return children;
+    }
+    
+    // Other roles can access their allowed pages
+    console.log('[ProtectedRoute] Access granted to:', currentPath);
     return children;
   }
 
