@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { authService } from '../services/authService';
 import { useTheme } from '../contexts/ThemeContext';
 import { AdminLeaveRequests } from '../components/dashboard/AdminLeaveRequests';
@@ -16,6 +16,9 @@ import { NotificationBell } from '../components/notifications/NotificationBell';
 import { NotificationManager } from '../components/notifications/NotificationManager';
 import { ProfileCompletionModal } from '../components/profile/ProfileCompletionModal';
 import { useProfileCompletion } from '../hooks/useProfileCompletion';
+import { CreateTaskModal, TaskFormData } from '../components/tasks';
+import { taskService } from '../services/taskService';
+import { useToast } from '../components/ui/Toast';
 import Logo from '../components/ui/Logo';
 import { Users, CheckSquare, Building, Calendar, Clock } from 'lucide-react';
 import { useTokenValidation } from '../hooks/useTokenValidation';
@@ -27,6 +30,9 @@ export default function HRDashboard() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const { showModal, completionPercentage, closeModal, recheckProfile } = useProfileCompletion();
   const [activeTab, setActiveTab] = useState('tasks');
+  const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
+  const { addToast } = useToast();
+  const queryClient = useQueryClient();
 
   // Save dark mode preference
   useEffect(() => {
@@ -62,6 +68,40 @@ export default function HRDashboard() {
       console.log('HR Dashboard token expired, redirecting to login');
     }
   });
+
+  // Fetch employees for task assignment
+  const { data: employees = [] } = useQuery({
+    queryKey: ['employees'],
+    queryFn: async () => {
+      const response = await api.get('/employees');
+      const allEmployees = response.data.data?.employees || response.data.data || [];
+      return allEmployees.filter((emp: any) => emp.role !== 'superadmin');
+    },
+    enabled: !!currentUser,
+  });
+
+  // Create task mutation
+  const createTaskMutation = useMutation({
+    mutationFn: async (taskData: TaskFormData) => {
+      return await taskService.createTask({
+        ...taskData,
+        dueDate: new Date(taskData.dueDate).toISOString()
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['all-tasks'] });
+      addToast('success', 'Task created successfully');
+      setShowCreateTaskModal(false);
+    },
+    onError: (error: any) => {
+      const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || error.message || 'Failed to create task';
+      addToast('error', errorMessage);
+    },
+  });
+
+  const handleCreateTask = (taskData: TaskFormData) => {
+    createTaskMutation.mutate(taskData);
+  };
 
   // Recheck profile completion when user is loaded
   useEffect(() => {
@@ -291,7 +331,23 @@ export default function HRDashboard() {
         )}
 
         {/* {activeTab === 'employees' && <AdminEmployeeManagement darkMode={darkMode} />} */}
-        {activeTab === 'tasks' && <AdminTasks darkMode={darkMode} />}
+        {activeTab === 'tasks' && (
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                Task Management
+              </h2>
+              <button
+                onClick={() => setShowCreateTaskModal(true)}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+              >
+                <span className="text-xl">+</span>
+                Create Task
+              </button>
+            </div>
+            <AdminTasks darkMode={darkMode} />
+          </div>
+        )}
         {activeTab === 'departments' && <AdminDepartments darkMode={darkMode} currentUser={currentUser} />}
         {activeTab === 'attendance' && <AdminAttendance darkMode={darkMode} />}
         {activeTab === 'leaves' && <AdminLeaveRequests darkMode={darkMode} />}
@@ -314,6 +370,17 @@ export default function HRDashboard() {
         onClose={closeModal}
         completionPercentage={completionPercentage}
         userName={currentUser?.fullName || currentUser?.full_name || 'User'}
+      />
+
+      {/* Create Task Modal */}
+      <CreateTaskModal
+        isOpen={showCreateTaskModal}
+        onClose={() => setShowCreateTaskModal(false)}
+        onSubmit={handleCreateTask}
+        employees={employees}
+        currentUser={currentUser}
+        darkMode={darkMode}
+        isSubmitting={createTaskMutation.isPending}
       />
     </div>
   );

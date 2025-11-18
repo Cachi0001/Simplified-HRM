@@ -4,8 +4,10 @@ import { AdminTasks } from '../components/dashboard/AdminTasks';
 import { NotificationManager } from '../components/notifications/NotificationManager';
 import { ProfileCompletionModal } from '../components/profile/ProfileCompletionModal';
 import { useProfileCompletion } from '../hooks/useProfileCompletion';
-import { useQuery } from '@tanstack/react-query';
+import { CreateTaskModal, TaskFormData } from '../components/tasks';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { notificationService } from '../services/notificationService';
+import { taskService } from '../services/taskService';
 import Logo from '../components/ui/Logo';
 import { authService } from '../services/authService';
 import { BottomNavbar } from '../components/layout/BottomNavbar';
@@ -23,8 +25,10 @@ export default function TeamLeadDashboard() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const { showModal, completionPercentage, closeModal, recheckProfile } = useProfileCompletion();
+  const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
 
   const { addToast } = useToast();
+  const queryClient = useQueryClient();
 
   useTokenValidation({
     checkInterval: 2 * 60 * 1000,
@@ -49,44 +53,83 @@ export default function TeamLeadDashboard() {
     }
   }, []);
 
+  // Fetch employees for task assignment
+  const { data: employees = [] } = useQuery({
+    queryKey: ['employees'],
+    queryFn: async () => {
+      const response = await api.get('/employees');
+      const allEmployees = response.data.data?.employees || response.data.data || [];
+      return allEmployees.filter((emp: any) => emp.role !== 'superadmin');
+    },
+    enabled: !!currentUser,
+  });
+
+  // Create task mutation
+  const createTaskMutation = useMutation({
+    mutationFn: async (taskData: TaskFormData) => {
+      return await taskService.createTask({
+        ...taskData,
+        dueDate: new Date(taskData.dueDate).toISOString()
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['all-tasks'] });
+      addToast('success', 'Task created successfully');
+      setShowCreateTaskModal(false);
+    },
+    onError: (error: any) => {
+      const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || error.message || 'Failed to create task';
+      addToast('error', errorMessage);
+    },
+  });
+
+  const handleCreateTask = (taskData: TaskFormData) => {
+    createTaskMutation.mutate(taskData);
+  };
+
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['teamlead-stats', currentUser?.id],
     queryFn: async () => {
       try {
-        console.log('Fetching team lead stats...');
+        console.log('[TeamLeadStats] Fetching stats for team lead:', currentUser?.id);
         
         // Fetch team members (employees under this team lead)
         const employeesRes = await api.get('/employees');
         const allEmployees = employeesRes.data.data?.employees || employeesRes.data.data || [];
+        console.log('[TeamLeadStats] Total employees:', allEmployees.length);
+        
         const teamMembers = allEmployees.filter((emp: any) => 
           emp.team_lead_id === currentUser?.id || emp.manager_id === currentUser?.id
         );
+        console.log('[TeamLeadStats] Team members found:', teamMembers.length, teamMembers.map((m: any) => ({ id: m.id, name: m.full_name })));
 
         // Fetch tasks assigned to team members
         const tasksRes = await api.get('/tasks/all');
         const tasksData = tasksRes.data.data || tasksRes.data || {};
         const allTasks = Array.isArray(tasksData) ? tasksData : (tasksData.tasks || []);
+        console.log('[TeamLeadStats] Total tasks:', allTasks.length);
+        
         const teamTasks = allTasks.filter((task: any) => 
           teamMembers.some((member: any) => member.id === task.assigned_to || member.id === task.assignee_id)
         );
+        console.log('[TeamLeadStats] Team tasks:', teamTasks.length);
+        
         const activeTasks = teamTasks.filter((task: any) => 
           task.status !== 'completed' && task.status !== 'cancelled'
         );
+        console.log('[TeamLeadStats] Active tasks:', activeTasks.length);
         const completedTasks = teamTasks.filter((task: any) => task.status === 'completed');
         const completionRate = teamTasks.length > 0 
           ? Math.round((completedTasks.length / teamTasks.length) * 100) 
           : 0;
 
-        // Fetch attendance for team members
+        // TeamLead sees only their own attendance (not team members)
+        // Only SuperAdmin, Admin, and HR can see all attendance
         const today = new Date().toISOString().split('T')[0];
-        const attendanceRes = await api.get('/attendance/report', {
-          params: { date: today }
-        });
-        const allAttendance = attendanceRes.data.data || attendanceRes.data || [];
-        // Filter to only team members' attendance
-        const teamMemberIds = teamMembers.map((m: any) => m.id);
-        const presentToday = allAttendance.filter((record: any) => 
-          teamMemberIds.includes(record.employee_id) && record.clock_in
+        const attendanceRes = await api.get('/attendance/my-records');
+        const myAttendance = attendanceRes.data.data || [];
+        const presentToday = myAttendance.filter((record: any) => 
+          record.date === today && record.clock_in
         ).length;
 
         return {
@@ -245,6 +288,18 @@ export default function TeamLeadDashboard() {
 
         {/* Team Task Management */}
         <section>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+              Task Management
+            </h2>
+            <button
+              onClick={() => setShowCreateTaskModal(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+            >
+              <span className="text-xl">+</span>
+              Create Task
+            </button>
+          </div>
           <AdminTasks darkMode={darkMode} />
         </section>
       </div>
@@ -266,6 +321,17 @@ export default function TeamLeadDashboard() {
         onClose={closeModal}
         completionPercentage={completionPercentage}
         userName={currentUser?.fullName || currentUser?.full_name || 'User'}
+      />
+
+      {/* Create Task Modal */}
+      <CreateTaskModal
+        isOpen={showCreateTaskModal}
+        onClose={() => setShowCreateTaskModal(false)}
+        onSubmit={handleCreateTask}
+        employees={employees}
+        currentUser={currentUser}
+        darkMode={darkMode}
+        isSubmitting={createTaskMutation.isPending}
       />
     </div>
   );

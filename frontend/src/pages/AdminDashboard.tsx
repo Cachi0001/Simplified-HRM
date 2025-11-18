@@ -7,8 +7,11 @@ import { AdminLeaveRequests } from '../components/dashboard/AdminLeaveRequests';
 import { NotificationManager } from '../components/notifications/NotificationManager';
 import { DraggableLogo } from '../components/dashboard/DraggableLogo';
 import { BulkLeaveReset } from '../components/leave/BulkLeaveReset';
-import { useQuery } from '@tanstack/react-query';
+import { CreateTaskModal, TaskFormData } from '../components/tasks';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { notificationService } from '../services/notificationService';
+import { employeeService } from '../services/employeeService';
+import { taskService } from '../services/taskService';
 import Logo from '../components/ui/Logo';
 import { authService } from '../services/authService';
 import { BottomNavbar } from '../components/layout/BottomNavbar';
@@ -25,8 +28,10 @@ export default function AdminDashboard() {
   const { darkMode, setDarkMode } = useTheme();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
 
   const { addToast } = useToast();
+  const queryClient = useQueryClient();
 
   // Add token validation to automatically logout on token expiry
   useTokenValidation({
@@ -92,6 +97,29 @@ export default function AdminDashboard() {
     enabled: !!currentUser, // Only run query if user is authenticated
     retry: 1,
   });
+
+  // Create task mutation
+  const createTaskMutation = useMutation({
+    mutationFn: async (taskData: TaskFormData) => {
+      return await taskService.createTask({
+        ...taskData,
+        dueDate: new Date(taskData.dueDate).toISOString()
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['all-tasks'] });
+      addToast('success', 'Task created successfully');
+      setShowCreateTaskModal(false);
+    },
+    onError: (error: any) => {
+      const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || error.message || 'Failed to create task';
+      addToast('error', errorMessage);
+    },
+  });
+
+  const handleCreateTask = (taskData: TaskFormData) => {
+    createTaskMutation.mutate(taskData);
+  };
 
   // Initialize push notifications on mount
   useEffect(() => {
@@ -225,6 +253,18 @@ export default function AdminDashboard() {
 
         {/* Task Management */}
         <section className="mb-8">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+              Task Management
+            </h2>
+            <button
+              onClick={() => setShowCreateTaskModal(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+            >
+              <span className="text-xl">+</span>
+              Create Task
+            </button>
+          </div>
           <AdminTasks darkMode={darkMode} />
         </section>
 
@@ -244,6 +284,17 @@ export default function AdminDashboard() {
 
       {/* Bottom Navigation */}
       <BottomNavbar darkMode={darkMode} />
+
+      {/* Create Task Modal */}
+      <CreateTaskModal
+        isOpen={showCreateTaskModal}
+        onClose={() => setShowCreateTaskModal(false)}
+        onSubmit={handleCreateTask}
+        employees={employees}
+        currentUser={currentUser}
+        darkMode={darkMode}
+        isSubmitting={createTaskMutation.isPending}
+      />
     </div>
   );
 }

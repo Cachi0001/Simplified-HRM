@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { employeeService } from '../services/employeeService';
 
+const SESSION_STORAGE_KEY = 'profile_completion_dismissed';
+
 export function useProfileCompletion() {
   const [showModal, setShowModal] = useState(false);
   const [completionPercentage, setCompletionPercentage] = useState(100);
@@ -15,8 +17,13 @@ export function useProfileCompletion() {
       setIsLoading(true);
       console.log('[useProfileCompletion] Starting profile check...');
       
-      // Always check profile completion on every login/token update
-      // No session-based dismissal - modal shows until profile is 100% complete
+      // Check if user dismissed modal in this session
+      const dismissedThisSession = sessionStorage.getItem(SESSION_STORAGE_KEY);
+      if (dismissedThisSession === 'true') {
+        console.log('[useProfileCompletion] Modal was dismissed this session, not showing again');
+        setIsLoading(false);
+        return;
+      }
 
       // Fetch profile with completion percentage
       const response = await employeeService.getMyProfile();
@@ -74,7 +81,9 @@ export function useProfileCompletion() {
 
   const handleCloseModal = () => {
     setShowModal(false);
-    // Don't store dismissal - modal will show again on next login if incomplete
+    // Store dismissal in sessionStorage - will reset on page refresh/new session
+    sessionStorage.setItem(SESSION_STORAGE_KEY, 'true');
+    console.log('[useProfileCompletion] Modal dismissed for this session');
   };
 
   return {

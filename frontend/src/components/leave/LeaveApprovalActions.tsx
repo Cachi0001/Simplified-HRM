@@ -1,5 +1,4 @@
 import React from 'react';
-import { Check, X } from 'lucide-react';
 
 interface LeaveApprovalActionsProps {
   requestId: string;
@@ -23,18 +22,12 @@ export const LeaveApprovalActions: React.FC<LeaveApprovalActionsProps> = ({
   layout = 'horizontal'
 }) => {
   const sizeClasses = {
-    sm: 'p-1.5',
-    md: 'p-2',
-    lg: 'p-3'
+    sm: 'px-3 py-1.5 text-xs',
+    md: 'px-4 py-2 text-sm',
+    lg: 'px-6 py-2.5 text-base'
   };
 
-  const iconSizes = {
-    sm: 'h-3 w-3',
-    md: 'h-4 w-4',
-    lg: 'h-5 w-5'
-  };
-
-  const containerClass = layout === 'horizontal' ? 'flex space-x-2' : 'flex flex-col space-y-2';
+  const containerClass = layout === 'horizontal' ? 'flex gap-2' : 'flex flex-col gap-2';
 
   return (
     <div className={containerClass}>
@@ -42,17 +35,15 @@ export const LeaveApprovalActions: React.FC<LeaveApprovalActionsProps> = ({
       <button
         onClick={() => onApprove(requestId)}
         disabled={approving || rejecting}
-        className={`${sizeClasses[size]} rounded-lg transition-all duration-200 ${
-          darkMode 
-            ? 'bg-green-900 text-green-400 hover:bg-green-800 disabled:bg-gray-700 disabled:text-gray-500' 
-            : 'bg-green-100 text-green-600 hover:bg-green-200 disabled:bg-gray-100 disabled:text-gray-400'
-        } disabled:cursor-not-allowed`}
-        title="Approve request"
+        className={`${sizeClasses[size]} bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2`}
       >
         {approving ? (
-          <div className={`animate-spin rounded-full border-b-2 border-current ${iconSizes[size]}`}></div>
+          <>
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+            <span>Approving...</span>
+          </>
         ) : (
-          <Check className={iconSizes[size]} />
+          'Approve'
         )}
       </button>
 
@@ -60,17 +51,15 @@ export const LeaveApprovalActions: React.FC<LeaveApprovalActionsProps> = ({
       <button
         onClick={() => onReject(requestId)}
         disabled={approving || rejecting}
-        className={`${sizeClasses[size]} rounded-lg transition-all duration-200 ${
-          darkMode 
-            ? 'bg-red-900 text-red-400 hover:bg-red-800 disabled:bg-gray-700 disabled:text-gray-500' 
-            : 'bg-red-100 text-red-600 hover:bg-red-200 disabled:bg-gray-100 disabled:text-gray-400'
-        } disabled:cursor-not-allowed`}
-        title="Reject request"
+        className={`${sizeClasses[size]} bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2`}
       >
         {rejecting ? (
-          <div className={`animate-spin rounded-full border-b-2 border-current ${iconSizes[size]}`}></div>
+          <>
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+            <span>Rejecting...</span>
+          </>
         ) : (
-          <X className={iconSizes[size]} />
+          'Reject'
         )}
       </button>
     </div>
