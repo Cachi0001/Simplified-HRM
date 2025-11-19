@@ -99,6 +99,18 @@ export function AttendanceCard({
             )}
           </div>
         </div>
+
+        {/* Auto-clockout indicator - only show if clocked out by system */}
+        {(record.auto_clocked_out || record.autoClockedOut) && (
+          <div className={`mt-2 px-3 py-2 rounded-lg border ${darkMode ? 'bg-orange-900/20 border-orange-700' : 'bg-orange-50 border-orange-200'}`}>
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🤖</span>
+              <p className={`text-xs font-medium ${darkMode ? 'text-orange-300' : 'text-orange-700'}`}>
+                Auto clocked-out by system at midnight
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
