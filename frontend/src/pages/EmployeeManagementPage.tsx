@@ -52,13 +52,11 @@ export const EmployeeManagementPage: React.FC = () => {
   useEffect(() => {
     // Wait for user to load before checking authorization
     if (!user) {
-      console.log('[EmployeeManagement] User not loaded yet, waiting...');
       return;
     }
 
     const authorizedRoles = ['superadmin', 'admin', 'hr'];
     if (!authorizedRoles.includes(user.role)) {
-      console.log('[EmployeeManagement] Unauthorized role:', user.role);
       // Only redirect if user is loaded AND not authorized
       const dashboardMap: Record<string, string> = {
         'superadmin': '/super-admin-dashboard',
@@ -75,8 +73,6 @@ export const EmployeeManagementPage: React.FC = () => {
       });
       return;
     }
-    
-    console.log('[EmployeeManagement] Authorized access for role:', user.role);
   }, [user, navigate]);
 
   // Load initial data
@@ -116,8 +112,7 @@ export const EmployeeManagementPage: React.FC = () => {
 
       const [employeesData, departmentsData] = await Promise.all([
         employeeService.getAllEmployees(),
-        employeeService.getDepartments().catch(err => {
-          console.error('Failed to load departments:', err);
+        employeeService.getDepartments().catch(() => {
           addToast('warning', 'Failed to load departments');
           return []; // Return empty array if departments fail to load
         })
@@ -140,7 +135,6 @@ export const EmployeeManagementPage: React.FC = () => {
       const errorMessage = err.message || 'Failed to load employee data. Please try again.';
       setError(errorMessage);
       addToast('error', errorMessage);
-      console.error('Error loading data:', err);
     } finally {
       setLoading(false);
     }
@@ -180,7 +174,6 @@ export const EmployeeManagementPage: React.FC = () => {
   const handleEmployeeUpdate = (updatedEmployee: Employee) => {
     // Validate the updated employee has required fields
     if (!updatedEmployee || !updatedEmployee.id) {
-      console.error('Invalid employee data received:', updatedEmployee);
       addToast('error', 'Failed to update employee: Invalid data received');
       setShowEditModal(false);
       setManagingEmployee(null);
@@ -194,7 +187,6 @@ export const EmployeeManagementPage: React.FC = () => {
       prev.map(emp => {
         // Safety check: ensure emp exists and has an id
         if (!emp || !emp.id) {
-          console.warn('Found invalid employee in list:', emp);
           return emp; // Keep the invalid entry for now
         }
         return emp.id === updatedEmployee.id ? updatedEmployee : emp;

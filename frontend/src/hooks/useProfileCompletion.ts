@@ -44,11 +44,10 @@ export function useProfileCompletion() {
 
       // Show modal every time user visits dashboard if profile incomplete
       if (percentage < 100) {
-        console.log('[useProfileCompletion] Profile incomplete, showing modal');
         setShowModal(true);
       }
     } catch (error) {
-      console.error('[useProfileCompletion] Error:', error);
+      // Silent error handling
     } finally {
       setIsLoading(false);
     }
@@ -63,7 +62,6 @@ export function useProfileCompletion() {
     // Dismiss for 1 hour
     const dismissUntil = Date.now() + (60 * 60 * 1000);
     localStorage.setItem(DISMISSED_UNTIL_KEY, dismissUntil.toString());
-    console.log('[useProfileCompletion] Modal dismissed for 1 hour');
   }, []);
 
   return {

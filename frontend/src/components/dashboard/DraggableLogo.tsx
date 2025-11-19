@@ -97,11 +97,8 @@ export function DraggableLogo({ darkMode = false, employeeId, onStatusChange }: 
           setLocationError(null);
         },
         (error) => {
-          console.error('Location error:', error);
           // Don't show error for timeout during auto-refresh
-          if (error.code === 3) {
-            console.log('Location timeout - will retry on next interval');
-          } else {
+          if (error.code !== 3) {
             setLocationError('Unable to get location. Please enable location services.');
           }
         },
@@ -125,7 +122,7 @@ export function DraggableLogo({ darkMode = false, employeeId, onStatusChange }: 
       }
       onStatusChange?.(status?.status || 'checked_out');
     } catch (error) {
-      console.error('Error checking status:', error);
+      // Silent error handling
     }
   };
 
@@ -227,7 +224,6 @@ export function DraggableLogo({ darkMode = false, employeeId, onStatusChange }: 
         addToast('error', 'Geolocation is not supported on this device.');
         setLocationError('Geolocation is not supported by this browser.');
       } else {
-        console.error('Check-in error:', error);
         // Extract proper error message from API response
         const message = error?.response?.data?.error?.message || error?.response?.data?.message || error?.message || 'Failed to check in. Please try again.';
         addToast('error', message);
@@ -256,7 +252,6 @@ export function DraggableLogo({ darkMode = false, employeeId, onStatusChange }: 
       setLocationError(null);
       addToast('success', 'Checked out successfully.');
     } catch (error: any) {
-      console.error('Check-out error:', error);
       // Extract proper error message from API response
       const message = error?.response?.data?.error?.message || error?.response?.data?.message || error?.message || 'Failed to check out. Please try again.';
       addToast('error', message);
