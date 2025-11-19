@@ -1,21 +1,30 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { employeeService } from '../services/employeeService';
 
-const SESSION_STORAGE_KEY = 'profile_completion_dismissed_session';
+const DISMISSED_UNTIL_KEY = 'profile_completion_dismissed_until';
 
 export function useProfileCompletion() {
-  // DISABLED: Profile completion popup logic removed per user request
-  // The modal will never show automatically, but the card component can still be used manually
-  const [showModal] = useState(false); // Always false - never shows popup
+  const [showModal, setShowModal] = useState(false);
   const [completionPercentage, setCompletionPercentage] = useState(100);
   const [isLoading, setIsLoading] = useState(false);
+  const hasCheckedRef = useRef(false);
 
-  // Calculate completion percentage for display purposes only (no popup)
-  const checkProfileCompletion = async () => {
+  const checkProfileCompletion = useCallback(async () => {
+    if (hasCheckedRef.current) {
+      return;
+    }
+
     try {
+      hasCheckedRef.current = true;
       setIsLoading(true);
-      console.log('[useProfileCompletion] Calculating profile completion (popup disabled)');
       
+      // Check if user dismissed it recently (within 1 hour)
+      const dismissedUntil = localStorage.getItem(DISMISSED_UNTIL_KEY);
+      if (dismissedUntil && Date.now() < parseInt(dismissedUntil)) {
+        setIsLoading(false);
+        return;
+      }
+
       const response = await employeeService.getMyProfile();
       const profile = response as any;
       let completed = 0;
@@ -32,22 +41,33 @@ export function useProfileCompletion() {
 
       const percentage = Math.round((completed / total) * 100);
       setCompletionPercentage(percentage);
-      
-      console.log('[useProfileCompletion] Profile completion:', percentage + '%', '(popup will NOT show)');
+
+      // Show modal every time user visits dashboard if profile incomplete
+      if (percentage < 100) {
+        console.log('[useProfileCompletion] Profile incomplete, showing modal');
+        setShowModal(true);
+      }
     } catch (error) {
-      console.error('Error checking profile completion:', error);
+      console.error('[useProfileCompletion] Error:', error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const handleCloseModal = () => {
-    // No-op since modal never shows
-    console.log('[useProfileCompletion] Close called but modal is disabled');
-  };
+  useEffect(() => {
+    checkProfileCompletion();
+  }, [checkProfileCompletion]);
+
+  const handleCloseModal = useCallback(() => {
+    setShowModal(false);
+    // Dismiss for 1 hour
+    const dismissUntil = Date.now() + (60 * 60 * 1000);
+    localStorage.setItem(DISMISSED_UNTIL_KEY, dismissUntil.toString());
+    console.log('[useProfileCompletion] Modal dismissed for 1 hour');
+  }, []);
 
   return {
-    showModal, // Always false
+    showModal,
     completionPercentage,
     isLoading,
     closeModal: handleCloseModal,

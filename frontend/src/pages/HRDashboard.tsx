@@ -65,13 +65,8 @@ export default function HRDashboard() {
     }
   });
 
-  // Recheck profile completion when user is loaded
-  useEffect(() => {
-    if (currentUser) {
-      console.log('[HRDashboard] User loaded, rechecking profile completion');
-      recheckProfile();
-    }
-  }, [currentUser, recheckProfile]);
+  // Profile completion check happens automatically in the hook on mount
+  // No need to manually trigger it here
 
   // Fetch employee stats (same as Admin dashboard)
   const { data: stats, isLoading: statsLoading } = useQuery({

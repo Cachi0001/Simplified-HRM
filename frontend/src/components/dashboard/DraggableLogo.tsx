@@ -50,10 +50,16 @@ export function DraggableLogo({ darkMode = false, employeeId, onStatusChange }: 
     // Check current status
     checkCurrentStatus();
 
+    // Auto-refresh location every 10 seconds
+    const locationRefreshInterval = setInterval(() => {
+      getCurrentLocation();
+    }, 10000); // 10 seconds
+
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
+      clearInterval(locationRefreshInterval);
     };
   }, []);
 
@@ -92,12 +98,17 @@ export function DraggableLogo({ darkMode = false, employeeId, onStatusChange }: 
         },
         (error) => {
           console.error('Location error:', error);
-          setLocationError('Unable to get location. Please enable location services.');
+          // Don't show error for timeout during auto-refresh
+          if (error.code === 3) {
+            console.log('Location timeout - will retry on next interval');
+          } else {
+            setLocationError('Unable to get location. Please enable location services.');
+          }
         },
         {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 60000
+          enableHighAccuracy: false, // Changed to false for faster response
+          timeout: 30000, // Increased to 30 seconds
+          maximumAge: 30000 // Cache for 30 seconds
         }
       );
     } else {
@@ -166,8 +177,8 @@ export function DraggableLogo({ darkMode = false, employeeId, onStatusChange }: 
         },
         {
           enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 60000
+          timeout: 30000, // Increased to 30 seconds
+          maximumAge: 30000 // Cache for 30 seconds
         }
       );
     });
@@ -217,7 +228,8 @@ export function DraggableLogo({ darkMode = false, employeeId, onStatusChange }: 
         setLocationError('Geolocation is not supported by this browser.');
       } else {
         console.error('Check-in error:', error);
-        const message = error?.message ?? 'Failed to check in. Please try again.';
+        // Extract proper error message from API response
+        const message = error?.response?.data?.error?.message || error?.response?.data?.message || error?.message || 'Failed to check in. Please try again.';
         addToast('error', message);
         setLocationError(message);
       }
@@ -245,7 +257,8 @@ export function DraggableLogo({ darkMode = false, employeeId, onStatusChange }: 
       addToast('success', 'Checked out successfully.');
     } catch (error: any) {
       console.error('Check-out error:', error);
-      const message = error?.message ?? 'Failed to check out. Please try again.';
+      // Extract proper error message from API response
+      const message = error?.response?.data?.error?.message || error?.response?.data?.message || error?.message || 'Failed to check out. Please try again.';
       addToast('error', message);
       setLocationError(message);
     } finally {
@@ -309,28 +322,33 @@ export function DraggableLogo({ darkMode = false, employeeId, onStatusChange }: 
 
         {currentLocation && officeLocation && (
           <div className={`mb-4 p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
-            <div className="flex items-center gap-2 text-sm">
-              <MapPin className={`h-4 w-4 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
-              <span className={darkMode ? 'text-gray-300' : 'text-gray-700'}>
-                Office: {officeLocation.lat.toFixed(4)}, {officeLocation.lng.toFixed(4)}
-              </span>
+            <div className="flex items-center justify-between text-sm mb-2">
+              <div className="flex items-center gap-2">
+                <MapPin className={`h-4 w-4 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
+                <span className={darkMode ? 'text-gray-300' : 'text-gray-700'}>
+                  Office: {officeLocation.lat.toFixed(4)}, {officeLocation.lng.toFixed(4)}
+                </span>
+              </div>
             </div>
-            <div className="flex items-center gap-2 text-sm mt-1">
+            <div className="flex items-center justify-between text-sm">
               <span className={darkMode ? 'text-gray-300' : 'text-gray-700'}>
                 You: {currentLocation.lat.toFixed(4)}, {currentLocation.lng.toFixed(4)}
               </span>
-              <span className={`text-xs px-2 py-1 rounded ${
+              <span className={`text-xs px-2 py-1 rounded font-medium ${
                 verifyLocation()
                   ? (darkMode ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-800')
                   : (darkMode ? 'bg-yellow-900 text-yellow-300' : 'bg-yellow-100 text-yellow-800')
               }`}>
-                {verifyLocation() ? 'In Range' : `${Math.round(calculateDistance(
+                {verifyLocation() ? '✓ In Range' : `${Math.round(calculateDistance(
                   currentLocation.lat,
                   currentLocation.lng,
                   officeLocation.lat,
                   officeLocation.lng
                 ))}m away`}
               </span>
+            </div>
+            <div className={`text-xs mt-2 ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+              <span className="animate-pulse">● </span>Auto-updating every 10s
             </div>
           </div>
         )}

@@ -198,13 +198,8 @@ export default function EmployeeDashboard() {
     }
   }, [currentUser]);
 
-  // Recheck profile completion when user is loaded
-  useEffect(() => {
-    if (currentUser) {
-      console.log('[EmployeeDashboard] User loaded, rechecking profile completion');
-      recheckProfile();
-    }
-  }, [currentUser, recheckProfile]);
+  // Profile completion check happens automatically in the hook on mount
+  // No need to manually trigger it here
 
   // If there's an error, show error message
   if (error) {

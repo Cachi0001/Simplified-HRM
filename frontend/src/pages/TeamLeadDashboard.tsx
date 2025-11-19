@@ -122,13 +122,8 @@ export default function TeamLeadDashboard() {
     }
   }, [currentUser]);
 
-  // Recheck profile completion when user is loaded
-  useEffect(() => {
-    if (currentUser) {
-      console.log('[TeamLeadDashboard] User loaded, rechecking profile completion');
-      recheckProfile();
-    }
-  }, [currentUser, recheckProfile]);
+  // Profile completion check happens automatically in the hook on mount
+  // No need to manually trigger it here
 
   if (error) {
     return (
@@ -171,7 +166,7 @@ export default function TeamLeadDashboard() {
             <Logo className="h-8 w-auto" />
             <div>
               <h1 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                Team Lead Dashboard
+                Your Dashboard
               </h1>
               <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                 Welcome back, {currentUser.fullName}
