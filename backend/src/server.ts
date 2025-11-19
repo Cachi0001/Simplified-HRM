@@ -16,6 +16,7 @@ import taskRoutes from './routes/task.routes';
 import dashboardRoutes from './routes/dashboard.routes';
 import notificationRoutes from './routes/notification.routes';
 import performanceRoutes from './routes/performance.routes';
+import cronRoutes from './routes/cron.routes';
 import cronService from './services/CronService';
 
 dotenv.config();
@@ -146,6 +147,7 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/performance', performanceRoutes);
+app.use('/api/cron', cronRoutes);
 
 app.use(errorHandler);
 
@@ -157,10 +159,9 @@ const initializeDatabase = async () => {
       console.warn('⚠️ Database not connected, but server will start anyway');
     } else {
       console.log('✅ Database connected successfully');
-      // Start cron jobs only if database is connected and not in serverless
-      if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
-        cronService.start();
-      }
+      // REMOVED: Cron jobs disabled on Vercel - using Vercel Cron instead
+      // Cron jobs will be triggered via /api/cron/* endpoints
+      console.log('ℹ️  Cron jobs managed by Vercel Cron (see vercel.json)');
     }
   } catch (error: any) {
     console.error('❌ Database connection error:', error.message);
