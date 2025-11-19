@@ -36,6 +36,17 @@ export function AttendanceCard({
   const employeeName = getEmployeeName(record);
   const isOwnAttendance = employeeName === 'You';
 
+  // Debug: Check if auto_clocked_out field exists
+  const isAutoClockedOut = record.auto_clocked_out || record.autoClockedOut;
+  if (isAutoClockedOut) {
+    console.log('[AttendanceCard] Auto-clocked out record:', {
+      employee: employeeName,
+      auto_clocked_out: record.auto_clocked_out,
+      autoClockedOut: record.autoClockedOut,
+      fullRecord: record
+    });
+  }
+
   return (
     <div className={`p-4 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
       {/* Mobile: Vertical layout, Desktop: Horizontal layout */}
@@ -77,12 +88,12 @@ export function AttendanceCard({
         </div>
 
         {/* Bottom section: Status and Time */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
             {record.status === 'checked_out' || record.checkOutTime ? 'Completed' : 'Active'}
           </p>
-          <div className={`flex items-center gap-2 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-            <Clock className="h-4 w-4" />
+          <div className={`flex flex-wrap items-center gap-2 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+            <Clock className="h-4 w-4 flex-shrink-0" />
             <span className="whitespace-nowrap">{formatTime(record.checkInTime || record.clock_in)}</span>
             {(record.checkOutTime || record.clock_out) ? (
               <>
