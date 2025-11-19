@@ -7,12 +7,14 @@ const router = Router();
 // Runs Monday-Friday at 6:00 PM (18:00)
 router.get('/checkout-reminders', async (req: Request, res: Response) => {
   try {
-    // Verify Vercel Cron secret for security
-    const authHeader = req.headers.authorization;
+    // Optional: Verify Vercel Cron secret for security
+    // If CRON_SECRET is set in environment variables, verify it
+    const authHeader = req.headers.authorization;    // Otherwise, allow the request (Vercel Cron is already secure)
+
     const cronSecret = process.env.CRON_SECRET;
     
     if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-      console.warn('⚠️  Unauthorized cron request');
+      console.warn('⚠️  Unauthorized cron request - invalid CRON_SECRET');
       return res.status(401).json({ error: 'Unauthorized' });
     }
     
