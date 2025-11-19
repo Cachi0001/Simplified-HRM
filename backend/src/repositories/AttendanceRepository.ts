@@ -126,6 +126,7 @@ export class AttendanceRepository {
         a.status,
         a.is_late,
         a.late_minutes,
+        a.auto_clocked_out,
         e.full_name as employee_name,
         d.name as department_name
       FROM attendance a
@@ -162,6 +163,7 @@ export class AttendanceRepository {
       status: row.clock_out ? 'checked_out' : 'checked_in',
       isLate: row.is_late,
       lateMinutes: row.late_minutes,
+      autoClockedOut: row.auto_clocked_out || false,
       locationStatus: 'onsite', // Default, can be enhanced
       distanceFromOffice: null
     }));
