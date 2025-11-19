@@ -38,12 +38,22 @@ export function AttendanceCard({
 
   // Debug: Check if auto_clocked_out field exists
   const isAutoClockedOut = record.auto_clocked_out || record.autoClockedOut;
+  
+  // Log ALL records to see what fields are present
+  console.log('[AttendanceCard] Record data:', {
+    employee: employeeName,
+    date: record.date,
+    hasCheckOut: !!(record.checkOutTime || record.clock_out),
+    auto_clocked_out: record.auto_clocked_out,
+    autoClockedOut: record.autoClockedOut,
+    allKeys: Object.keys(record)
+  });
+  
   if (isAutoClockedOut) {
-    console.log('[AttendanceCard] Auto-clocked out record:', {
+    console.log('[AttendanceCard] ✅ AUTO-CLOCKED OUT RECORD FOUND:', {
       employee: employeeName,
       auto_clocked_out: record.auto_clocked_out,
-      autoClockedOut: record.autoClockedOut,
-      fullRecord: record
+      autoClockedOut: record.autoClockedOut
     });
   }
 
