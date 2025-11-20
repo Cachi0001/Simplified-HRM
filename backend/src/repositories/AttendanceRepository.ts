@@ -93,19 +93,21 @@ export class AttendanceRepository {
     return result.rows[0] || null;
   }
 
-  async validateClockInLocation(employeeId: string, lat: number, lng: number): Promise<any> {
+  async validateClockInLocation(employeeId: string, lat: number, lng: number, date?: Date): Promise<any> {
+    const checkDate = date || new Date();
     const result = await pool.query(
-      'SELECT validate_clock_in_location($1, $2, $3) as result',
-      [employeeId, lat, lng]
+      'SELECT validate_clock_in_location($1, $2, $3, $4) as result',
+      [employeeId, lat, lng, checkDate.toISOString().split('T')[0]]
     );
     
     return result.rows[0].result;
   }
 
-  async validateClockOutLocation(employeeId: string, lat: number, lng: number): Promise<any> {
+  async validateClockOutLocation(employeeId: string, lat: number, lng: number, date?: Date): Promise<any> {
+    const checkDate = date || new Date();
     const result = await pool.query(
-      'SELECT validate_clock_out_location($1, $2, $3) as result',
-      [employeeId, lat, lng]
+      'SELECT validate_clock_out_location($1, $2, $3, $4) as result',
+      [employeeId, lat, lng, checkDate.toISOString().split('T')[0]]
     );
     
     return result.rows[0].result;

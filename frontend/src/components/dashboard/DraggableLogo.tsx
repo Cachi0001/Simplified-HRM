@@ -189,11 +189,8 @@ export function DraggableLogo({ darkMode = false, employeeId, onStatusChange }: 
       setCurrentLocation(newLocation);
       setLocationError(null);
 
-      // Check if today is Friday (5 = Friday)
       const today = new Date();
       const isFriday = today.getDay() === 5;
-
-      // Skip location validation on Fridays (remote work allowed)
       if (!isFriday && REQUIRE_OFFICE_LOCATION && !verifyLocation(newLocation)) {
         const distance = officeLocation ? calculateDistance(
           newLocation.lat,
