@@ -189,7 +189,12 @@ export function DraggableLogo({ darkMode = false, employeeId, onStatusChange }: 
       setCurrentLocation(newLocation);
       setLocationError(null);
 
-      if (REQUIRE_OFFICE_LOCATION && !verifyLocation(newLocation)) {
+      // Check if today is Friday (5 = Friday)
+      const today = new Date();
+      const isFriday = today.getDay() === 5;
+
+      // Skip location validation on Fridays (remote work allowed)
+      if (!isFriday && REQUIRE_OFFICE_LOCATION && !verifyLocation(newLocation)) {
         const distance = officeLocation ? calculateDistance(
           newLocation.lat,
           newLocation.lng,
@@ -200,9 +205,14 @@ export function DraggableLogo({ darkMode = false, employeeId, onStatusChange }: 
         if (ALLOW_LOCATION_FALLBACK) {
           setLocationError(`You're ${Math.round(distance)}m from office. Check-in allowed but location noted.`);
         } else {
-          setLocationError(`You're ${Math.round(distance)}m from office. Please move closer to check in.`);
+          setLocationError(`You're ${Math.round(distance)}m from office. Remote work only allowed on Friday.`);
           return;
         }
+      }
+
+      // Show success message for Friday remote work
+      if (isFriday && REQUIRE_OFFICE_LOCATION && !verifyLocation(newLocation)) {
+        setLocationError('Remote check-in allowed on Friday ✓');
       }
 
       await attendanceService.checkIn({
