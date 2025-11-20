@@ -93,7 +93,6 @@ const api = axios.create({
   withCredentials: false, // Set to true only if you need to send cookies
 });
 
-// Request interceptor to add auth token and debug information
 api.interceptors.request.use(
   (config) => {
     // Generate a unique request ID for tracking
