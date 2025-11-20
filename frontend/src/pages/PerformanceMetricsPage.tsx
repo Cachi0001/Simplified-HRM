@@ -186,7 +186,9 @@ export default function PerformanceMetricsPage() {
               ))}
             </div>
           ) : metrics && metrics.length > 0 ? (
-            metrics.map((metric: any, index: number) => (
+            [...metrics]
+              .sort((a, b) => (b.overall_score || 0) - (a.overall_score || 0))
+              .map((metric: any, index: number) => (
               <Card key={metric.employee_id || index} className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
                 <div className="p-6">
                   {/* Employee Header */}
