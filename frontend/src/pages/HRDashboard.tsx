@@ -136,6 +136,22 @@ export default function HRDashboard() {
       </header>
 
       <div className="container mx-auto px-4 py-6">
+        {/* Check-in/Check-out Section */}
+        <section className="mb-6">
+          <div className={`rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+            <h2 className={`text-xl font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+              Daily Attendance
+            </h2>
+            <DraggableLogo
+              employeeId={currentUser._id || currentUser.id}
+              darkMode={darkMode}
+              onStatusChange={(status) => {
+                console.log('Check-in status changed:', status);
+              }}
+            />
+          </div>
+        </section>
+
         {/* Overview Cards */}
         <section className="mb-8">
           {statsLoading ? (
