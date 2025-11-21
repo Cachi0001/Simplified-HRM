@@ -70,10 +70,10 @@ router.get('/auto-clockout', async (req: Request, res: Response) => {
     const { pool } = require('../config/database');
     
     // Run the auto-clockout function
-    const result = await pool.query('SELECT * FROM auto_clockout_users()');
+    const result = await pool.query('SELECT * FROM auto_clockout_at_midnight()');
     
     const count = result.rows.length;
-    console.log(`✅ Auto-clocked out ${count} employees`);
+    console.log(`✅ Auto-clocked out ${count} employees at midnight`);
     
     res.json({ 
       success: true, 
